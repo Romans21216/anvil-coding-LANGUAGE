@@ -139,9 +139,9 @@
         "Reject malformed, duplicate, late, and unsupported version declarations with path-and-line diagnostics.",
         "Document the current version and compatibility policy and obtain independent review."
       ],
-      "verification_result": "IN PROGRESS: all 64 tests pass, including 5,000-digit version handling; extension token validation, Python compilation, JSON checks, and git diff check pass. Issues #32/#33 fixes are ready for exact-commit independent review.",
+      "verification_result": "IN PROGRESS: pushed candidate f7372a6805d3324f91eb362d9f3e64f501c4090b passes all 64 tests, including 5,000-digit version handling; extension token validation, Python compilation, JSON checks, and git diff check pass. Exact-commit independent review is pending.",
       "github_issue": "#23",
-      "commit": null
+      "commit": "f7372a6805d3324f91eb362d9f3e64f501c4090b"
     },
     {
       "number": 301,

@@ -5,13 +5,13 @@
   "last_completed_batch": 5,
   "last_completed_backlog_item": 47,
   "current_active_item": 49,
-  "current_active_item_status": "Independent review of exact commit 2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2 scored 85/100 (below 98) and reported issues #32 and #33. The oversized-version crash and stale progress wording are fixed in the current worktree; all 64 tests, extension validation, Python compilation, JSON checks, and diff checks pass. Commit/push and exact-commit re-review are pending.",
-  "current_candidate_commit": null,
+  "current_active_item_status": "Independent review of exact commit 2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2 scored 85/100 (below 98) and reported issues #32 and #33. Both fixes are committed and pushed in f7372a6805d3324f91eb362d9f3e64f501c4090b. All 64 tests, extension validation, Python compilation, JSON checks, and diff checks pass; exact-commit re-review is pending.",
+  "current_candidate_commit": "f7372a6805d3324f91eb362d9f3e64f501c4090b",
   "latest_verified_commit": "2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2",
   "last_pushed_reviewed_below_threshold_commit": "2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2",
   "latest_independently_reviewed_candidate_commit": "2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Exact pushed snapshot 2dd1d8e scored 85/100 against 98/100. Findings #32 (oversized version conversion traceback) and #33 (stale progress wording) are fixed in the current worktree; the next full review is pending.",
+  "latest_push_result": "Fixes for findings #32/#33 are pushed in f7372a6; all 64 tests and supporting checks pass. Exact-commit review is pending. Latest completed review is 2dd1d8e, 85/100 below 98/100.",
   "latest_independent_review": {
     "commit": "2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2",
     "score": 85,
@@ -41,7 +41,7 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "64 passed, including explicit/implicit language version, malformed/duplicate/late/unsupported headers, and a 5,000-digit version regression",
+    "python_unittest": "64 passed on pushed candidate f7372a6, including explicit/implicit language version, malformed/duplicate/late/unsupported headers, and a 5,000-digit version regression",
     "vscode_extension_validation": "passed",
     "python_compile": "passed (python -m compileall -q compiler tests)",
     "msvc_numeric_demo": "built and ran successfully; output 17",
@@ -50,7 +50,7 @@
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "Evaluation and QA report record exact review 2dd1d8e, 85/100, and findings #32/#33. Both fixes pass the 64-test suite, extension validation, Python compilation, JSON checks, and git diff check; commit/push and exact-commit review remain pending. Required bar is 98/100.",
+  "pending_documentation_review": "Evaluation and QA report record exact review 2dd1d8e, 85/100, and findings #32/#33. Both fixes are pushed in f7372a6 and pass the 64-test suite, extension validation, Python compilation, JSON checks, and git diff check; exact-commit review remains pending. Required bar is 98/100.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -62,7 +62,7 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
     "next_recommended_tasks": [
-    "Commit and push the verified fixes for issues #32/#33, then obtain independent review of the exact snapshot; latest overall score is 85/100, below 98/100.",
+    "Obtain independent review of pushed candidate f7372a6 and close issues #32/#33 if confirmed; latest overall score is 85/100, below 98/100.",
     "Continue selecting work directly from issue #23; keep the full item list only in that issue."
   ],
   "master_backlog": {
