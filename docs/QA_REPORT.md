@@ -16,7 +16,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 69 tests on the current follow-up candidate; includes numeric overflow, UDP behavior, language-spec regressions, and QA validator tests. The latest independent implementation review ran 67 tests on `65c15bf` |
+| `python -m unittest discover -s tests -q` | PASS — 72 tests on the unreviewed compiler-refactor candidate; includes numeric overflow, UDP behavior, language-spec regressions, and QA validator tests. The previous independent review ran 69 tests on `7c1385c` |
 | `python -m unittest discover -s tests -p test_qa_report.py -v` | PASS — zero-score rubric accepted; mismatched category subtotal rejected |
 | `python scripts/validate_qa_report.py` | PASS — 50 criteria total 90/100; category subtotals agree |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
@@ -44,6 +44,10 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 These checks verify the prototype workflows and selected regression cases. They do not establish production readiness, cross-platform behavior, or performance.
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
+
+## Unreviewed compiler-architecture candidate
+
+The current working candidate decomposes the 1,018-line compiler into `common.py`, `lexer.py`, `parser.py`, `semantics.py`, `expressions.py`, `codegen.py`, `build.py`, and `cli.py`; `anvil.py` remains the public CLI/API facade. Three phase-boundary tests were added. The full suite passes 72 tests, VS Code extension validation, compileall, Black check, QA arithmetic check, and diff check. A compatibility experiment compared generated C from the old and new compiler for nine representative examples; all outputs were byte-identical. No fresh independent score has been assigned to this candidate.
 
 ## Latest independent review — QA validator snapshot `7c1385c`
 

@@ -8,6 +8,25 @@
 
 `compiler/anvil.py` is the current command-line compiler. It translates Anvil statements to direct C function calls and links `runtime/anvil_runtime.c`. The generated file is ordinary inspectable C; the game program itself is not Rust and is not an extension to Rust. A Rust backend is not implemented yet.
 
+## Compiler architecture
+
+The command-line path remains `compiler/anvil.py`; it is now a small compatibility facade that re-exports the existing compiler API. Implementation responsibilities are separated into these modules:
+
+| Module | Responsibility |
+|---|---|
+| `compiler/lexer.py` | Comment stripping, delimiter-aware keyword splitting, and lexical helpers. |
+| `compiler/parser.py` | Parse source statements and produce an unresolved `ParsedProgram`; its `parse()` entry point preserves the former four-value result. |
+| `compiler/semantics.py` | Resolve variable/local references, reject invalid declarations, and validate C symbol collisions before code generation. |
+| `compiler/expressions.py` | Parse expressions, check expression types/arity, and lower expressions to C. |
+| `compiler/codegen.py` | Emit C statements, runtime calls, and complete translation units from validated nodes. |
+| `compiler/build.py` | Discover MSVC and invoke the native compiler/linker. |
+| `compiler/cli.py` | Parse CLI/project settings and orchestrate source loading, semantic validation, C generation, and build output. |
+| `compiler/common.py` | Shared AST/data types, language limits, runtime names, and repository paths. |
+
+The CLI order is source reading → syntax parsing → semantic validation → C generation → optional native build. The parser and semantic checker expose phase-level entry points for focused tests, while existing `compiler/anvil.py` commands and importable functions remain compatible. The phase boundary regression tests live in `tests/test_compiler_modules.py`.
+
+Python compiler files use Black's default 88-column formatting. Contributors can check formatting with `python -m black --check compiler tests/test_compiler_modules.py` when Black is installed. The project does not require Black to run or build Anvil.
+
 ```powershell
 python compiler/anvil.py examples/first_world.ANVL --emit-c build/first_world.c
 python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe

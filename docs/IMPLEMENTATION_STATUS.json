@@ -4,16 +4,16 @@
   "reviewed_implementation_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
   "branch": "main",
   "summary": {
-    "NEEDS VERIFICATION": 434,
+    "NEEDS VERIFICATION": 430,
     "PARTIALLY IMPLEMENTED": 3,
     "COMPLETE": 13,
-    "IN PROGRESS": 0
+    "IN PROGRESS": 4
   },
   "latest_verified_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
   "latest_independently_reviewed_candidate_commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
-  "latest_followup_status_change": "Independent review of exact commit 7c1385c scored 90/100 against 98. It reran 69 tests, extension validation, Python compileall, QA arithmetic validation including valid-zero and malformed fixtures, diff check, and ledger totals. Issue #44 is resolved and closed.",
+  "latest_followup_status_change": "Compiler architecture refactor candidate is in progress for issue #12/backlog items 101–104: lexer, syntax parser, semantic validator, codegen, build, and CLI responsibilities are separated. Three module tests pass; full suite is 72 and nine prior C outputs are byte-identical. Independent review is pending.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -156,7 +156,7 @@
         "Independent critic verified 69 Python tests, npm extension validation, Python compileall, and git diff --check on exact commit 7c1385c",
         "QA validator accepts a valid zero-point criterion fixture and rejects a mismatched category subtotal fixture",
         "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37–#43 are resolved",
-        "MSVC release build/run of the specification conformance sample previously produced output 6"
+        "Compiler-refactor candidate: the full suite passes 72 tests; the latest independent specification review separately verified 67 tests on 65c15bf"
       ],
       "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
       "dependencies": [],
@@ -172,6 +172,134 @@
       "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37–#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
       "github_issue": "#23",
       "commit": "e17eeac505cf12d70363bf658f598cb6d485a45b"
+    },
+    {
+      "number": 101,
+      "section": "3. COMPILER AND CODE GENERATION",
+      "title": "Separate lexical analysis from parsing.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "compiler/lexer.py owns lexical helpers; parser.py consumes them.",
+        "docs/COMPILER.md documents module responsibilities and compiler phase order."
+      ],
+      "tests": [
+        "tests/test_compiler_modules.py: phase-boundary/compatibility regressions passed",
+        "python -m unittest discover -s tests -q: 72 passed",
+        "Nine representative generated-C artifacts byte-identical to pre-refactor commit 854d36c",
+        "Black check and Python compileall passed"
+      ],
+      "missing_or_limitations": "Candidate is not yet independently reviewed. Compiler/runtime remains Windows/MSVC and C backend only; no incremental compiler or IR is implemented.",
+      "dependencies": [
+        "compiler refactor acceptance issue #12"
+      ],
+      "priority": "P0 for architecture and maintainability",
+      "assigned_agent": "Codex lead",
+      "acceptance_criteria": [
+        "Preserve existing CLI behavior and diagnostics.",
+        "Separate the compiler phases into focused modules.",
+        "Add phase-level tests.",
+        "Document module responsibilities.",
+        "Obtain independent review of the exact refactor commit."
+      ],
+      "verification_result": "IN PROGRESS: local tests and nine-sample byte-for-byte generated C compatibility check pass; independent review pending.",
+      "github_issue": "#23",
+      "commit": "854d36c764240362a85fc22a801f8f36a609fde5"
+    },
+    {
+      "number": 102,
+      "section": "3. COMPILER AND CODE GENERATION",
+      "title": "Separate parsing from semantic validation.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "parser.parse_syntax returns ParsedProgram; semantics.validate_program resolves variable/local references and C symbols.",
+        "docs/COMPILER.md documents module responsibilities and compiler phase order."
+      ],
+      "tests": [
+        "tests/test_compiler_modules.py: phase-boundary/compatibility regressions passed",
+        "python -m unittest discover -s tests -q: 72 passed",
+        "Nine representative generated-C artifacts byte-identical to pre-refactor commit 854d36c",
+        "Black check and Python compileall passed"
+      ],
+      "missing_or_limitations": "Candidate is not yet independently reviewed. Compiler/runtime remains Windows/MSVC and C backend only; no incremental compiler or IR is implemented.",
+      "dependencies": [
+        "compiler refactor acceptance issue #12"
+      ],
+      "priority": "P0 for architecture and maintainability",
+      "assigned_agent": "Codex lead",
+      "acceptance_criteria": [
+        "Preserve existing CLI behavior and diagnostics.",
+        "Separate the compiler phases into focused modules.",
+        "Add phase-level tests.",
+        "Document module responsibilities.",
+        "Obtain independent review of the exact refactor commit."
+      ],
+      "verification_result": "IN PROGRESS: local tests and nine-sample byte-for-byte generated C compatibility check pass; independent review pending.",
+      "github_issue": "#23",
+      "commit": "854d36c764240362a85fc22a801f8f36a609fde5"
+    },
+    {
+      "number": 103,
+      "section": "3. COMPILER AND CODE GENERATION",
+      "title": "Separate semantic validation from C generation.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "Semantic validation is an explicit phase before codegen; nine representative output C files are byte-identical to the old compiler.",
+        "docs/COMPILER.md documents module responsibilities and compiler phase order."
+      ],
+      "tests": [
+        "tests/test_compiler_modules.py: phase-boundary/compatibility regressions passed",
+        "python -m unittest discover -s tests -q: 72 passed",
+        "Nine representative generated-C artifacts byte-identical to pre-refactor commit 854d36c",
+        "Black check and Python compileall passed"
+      ],
+      "missing_or_limitations": "Candidate is not yet independently reviewed. Compiler/runtime remains Windows/MSVC and C backend only; no incremental compiler or IR is implemented.",
+      "dependencies": [
+        "compiler refactor acceptance issue #12"
+      ],
+      "priority": "P0 for architecture and maintainability",
+      "assigned_agent": "Codex lead",
+      "acceptance_criteria": [
+        "Preserve existing CLI behavior and diagnostics.",
+        "Separate the compiler phases into focused modules.",
+        "Add phase-level tests.",
+        "Document module responsibilities.",
+        "Obtain independent review of the exact refactor commit."
+      ],
+      "verification_result": "IN PROGRESS: local tests and nine-sample byte-for-byte generated C compatibility check pass; independent review pending.",
+      "github_issue": "#23",
+      "commit": "854d36c764240362a85fc22a801f8f36a609fde5"
+    },
+    {
+      "number": 104,
+      "section": "3. COMPILER AND CODE GENERATION",
+      "title": "Separate C generation from build orchestration.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "codegen.py, build.py, and cli.py isolate emission, native toolchain, and orchestration; anvil.py remains a facade.",
+        "docs/COMPILER.md documents module responsibilities and compiler phase order."
+      ],
+      "tests": [
+        "tests/test_compiler_modules.py: phase-boundary/compatibility regressions passed",
+        "python -m unittest discover -s tests -q: 72 passed",
+        "Nine representative generated-C artifacts byte-identical to pre-refactor commit 854d36c",
+        "Black check and Python compileall passed"
+      ],
+      "missing_or_limitations": "Candidate is not yet independently reviewed. Compiler/runtime remains Windows/MSVC and C backend only; no incremental compiler or IR is implemented.",
+      "dependencies": [
+        "compiler refactor acceptance issue #12"
+      ],
+      "priority": "P0 for architecture and maintainability",
+      "assigned_agent": "Codex lead",
+      "acceptance_criteria": [
+        "Preserve existing CLI behavior and diagnostics.",
+        "Separate the compiler phases into focused modules.",
+        "Add phase-level tests.",
+        "Document module responsibilities.",
+        "Obtain independent review of the exact refactor commit."
+      ],
+      "verification_result": "IN PROGRESS: local tests and nine-sample byte-for-byte generated C compatibility check pass; independent review pending.",
+      "github_issue": "#23",
+      "commit": "854d36c764240362a85fc22a801f8f36a609fde5"
     },
     {
       "number": 301,

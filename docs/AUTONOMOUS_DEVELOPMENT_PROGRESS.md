@@ -174,3 +174,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Verification:** 69 Python tests, npm extension validation, Python compileall, QA arithmetic validator, valid-zero and malformed-subtotal fixtures, and `git diff --check HEAD^ HEAD` all pass. JSON/Markdown counts agree at 450.
 - **Resolution:** The critic confirmed the validator and zero-score regression. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) acceptance is met; it is being closed.
 - **Evaluation:** Updated all current evaluation and status records immediately after the critic. The 98-point pass requirement remains unmet.
+
+
+## Batch 10 — compiler phase separation candidate
+
+- **Scope:** Issue #12 and backlog items #101–#104. The 1,018-line compiler entry module was decomposed into common model/configuration, lexer helpers, syntax parser, semantic validator, expression parser/lowering, C backend, build driver, and CLI orchestrator. `compiler/anvil.py` remains a compatibility facade and CLI.
+- **Behavior preservation:** Generated C for `numeric_demo`, `functions`, `arrays`, `loops`, `local_arrays`, `first_world`, `ray_backends`, `network_counter`, and `network_client` is byte-identical to the pre-refactor compiler at `854d36c`.
+- **Phase tests:** Added tests for parse→semantic→codegen, semantic rejection of an unresolved variable before generation, and compatibility-facade exports.
+- **Validation:** Full Python suite: 72 passed; extension validation passed; compileall, Black check, QA arithmetic validation, and diff check passed.
+- **Review state:** Items #101–#104 are marked IN PROGRESS pending independent review of the exact committed candidate. The last scored review remains 90/100 — FAIL against 98; no score change is claimed before review.
