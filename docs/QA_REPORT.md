@@ -3,7 +3,7 @@
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
 **Latest completed independent full review:** **87/100 — FAIL** (threshold: 90/100)
-**Review snapshot:** after fixed-size global numeric arrays were implemented and the 39-test suite plus VS Code 0.1.2 package were checked. The installed VS Code extension remains 0.1.1; visual language-mode verification was not completed.
+**Review snapshot:** the 87/100 result below is the prior independent score, recorded before corrections to QA records, generated-file tracking, and the VS Code installation. Follow-up verification now confirms the 0.1.2 extension is installed and visually highlights `examples/arrays.ANVL`; a fresh independent rescore is pending.
 
 ## Scope
 
@@ -23,16 +23,16 @@ This is not a production engine. Assets, audio, physics, cross-platform support,
 | New `examples/loops.ANVL` sample | PASS — MSVC release build and execution output `15` |
 | Native runtime integration | PASS — fixed-step updates, delta, queued Space edge, and clean shutdown covered |
 | Projected sphere bounds regression | PASS — production projection helper sampled centered, off-axis, and near-camera sphere surfaces |
-| VS Code extension installation | PARTIAL — installed version is 0.1.1; current packaged version is 0.1.2 |
+| VS Code extension installation | PASS — VS Code 1.143.1 lists `anvil-engine.anvil-language-support@0.1.2` after installing the project VSIX |
 | VS Code package registration | PASS — 0.1.2 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
-| Visible VS Code language mode/sample colors | NOT VERIFIED visually; no current 0.1.2 install was checked |
+| Visible VS Code language mode/sample colors | PASS — VS Code status bar shows Anvil for `examples/arrays.ANVL`; the open sample visibly highlights array declarations, indexing, function syntax, keywords, and numbers. |
 | Live game window in latest review | NOT INSPECTED |
 
 These checks verify the prototype workflows and selected regression cases. They do not establish production readiness, cross-platform behavior, or performance.
 
 ## Independent 50-criterion review
 
-The latest independent review scored **87/100 (87%) — FAIL**, below the 90-point threshold. It verified fixed-size array support and 39 passing Python tests. The main deductions were stale QA records (criterion 38: 0), formatting/line-ending noise and dense compiler structure (22: 1, 23: 1), partial portability/backend design (27: 1), unverified visible editor language mode (46: 1), and the installed extension remaining at 0.1.1 while the checked package is 0.1.2 (47: 1). It also confirmed that the broader requested engine scope remains incomplete (2, 3, 5, 9, 40, 50). No critical runtime/compiler failure was reproduced.
+The previous independent review scored **87/100 (87%) — FAIL**. Since that review, QA records were synchronized, generated C for the array example was added to version control and verified stable on rebuild, and extension 0.1.2 was installed and visually inspected. The 87/100 breakdown below preserves the prior evaluator's criterion-by-criterion findings; a fresh rescore is requested after these corrections. The prior review also noted dense compiler structure (22: 1, 23: 1), C/MSVC portability limits (27: 1), and incomplete engine scope (2, 3, 5, 9, 40, 50). It reproduced no critical compiler/runtime failure.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -73,7 +73,7 @@ The latest independent review scored **87/100 (87%) — FAIL**, below the 90-poi
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest and function samples. |
-| 38 | Results recorded accurately | 0 | The evaluator scored the report as it existed at review time: it said 35 tests, treated 0.1.1 as current, and marked array coverage pending. This revision corrects those entries; criterion scores remain the reviewer's original scores until an independent rerun. |
+| 38 | Results recorded accurately | 0 | Prior-review score: at evaluation time the report said 35 tests, treated 0.1.1 as current, and marked arrays pending. Commit e784bb2 corrects these records; the prior score remains historical pending rescore. |
 | 39 | Regression checks performed | 2 | The full 39-test suite passes after array/compiler changes. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
@@ -81,9 +81,9 @@ The latest independent review scored **87/100 (87%) — FAIL**, below the 90-poi
 | 43 | Usage understandable | 2 | Guides and examples explain the supported syntax and build path. |
 | 44 | Design decisions documented | 2 | Runtime, compiler backend, renderer, ray tracing, and networking limits are described. |
 | 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
-| 46 | Opens in intended environment | 1 | Installed extension 0.1.1 is listed by VS Code; visual language-mode and sample-color verification was not performed. |
-| 47 | Editor integration works | 1 | Current 0.1.2 VSIX metadata and grammar tests pass, but VS Code still reports installed 0.1.1; updated installation and visible behavior remain unverified. |
-| 48 | Deliverables organized | 2 | Repository separates source, runtime, tests, docs, examples, and extension. |
+| 46 | Opens in intended environment | 1 | Prior-review score: VS Code install was 0.1.1 and visual language mode was unverified. Follow-up now shows installed 0.1.2 mode and highlighting in `examples/arrays.ANVL`; fresh score pending. |
+| 47 | Editor integration works | 1 | Prior-review score: package 0.1.2 passed grammar checks but installed version was 0.1.1. Follow-up installed 0.1.2 and visually confirmed `examples/arrays.ANVL`; fresh score pending. |
+| 48 | Deliverables organized | 1 | Prior-review score: array build left an untracked generated C file. Commit c201aa7 tracks it, and a repeated build left it unchanged; fresh score pending. |
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
 | | **Requirement fulfillment** | **16/20** | |
@@ -97,10 +97,9 @@ The latest independent review scored **87/100 (87%) — FAIL**, below the 90-poi
 
 1. Continue the game-engine backlog: GPU rendering, assets, audio, physics, richer data structures, robust networking, benchmarks, and portability.
 2. Split and format the compiler into clear parser, validation, C generation, and build modules.
-3. Verify the extension's visible language mode and sample highlighting in an editor session.
-4. Keep evaluation scores and verification results synchronized with every fresh review.
+3. Keep evaluation scores and verification results synchronized with every fresh review.
 
 ## Bug tracking
 
-Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track corrected report defects and are closed. Current review findings are documented in [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (stale QA records), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (distinguish capability gaps from reproduced defects), and [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (generated artifacts/whitespace; cleaned and verified locally). Every finding remains in GitHub as requested; issue bodies distinguish reproduced defects, verification gaps, and unimplemented capabilities even where the requested `Codex Bugs` label is used. Remaining capability and verification findings are tracked in open `Codex Bugs` issues: [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#13 VS Code installation/visual verification](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15). The review scored 87/100; do not interpret that score as full engine completion.
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed findings from the array review are recorded and resolved in [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (QA record synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), and [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (generated C build output). The extension installation and visual verification finding [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) is resolved by installing 0.1.2 and visually checking `examples/arrays.ANVL`. Every evaluator finding remains a GitHub issue with the requested `Codex Bugs` label; issue bodies distinguish reproduced defects, verification gaps, and unimplemented capabilities. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15). The prior review scored 87/100; a fresh independent rescore is pending.
 
