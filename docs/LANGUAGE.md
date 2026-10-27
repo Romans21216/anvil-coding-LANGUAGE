@@ -22,13 +22,29 @@ end
 call fn(main)
 ```
 
-Comments begin with `#` outside a quoted string. Names are case-sensitive. Function parameters and return values are numeric. `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside a numeric expression. Recursive calls are supported by the generated C functions.
+Comments begin with `#` outside a quoted string. Names are case-sensitive. Function parameters and return values are numeric. `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside a numeric expression. Recursive calls are supported by the generated C functions. `while expression ... end` repeats its body while the numeric condition is nonzero.
 
 `var(name)` reads a global numeric variable, except that a function parameter with the same name takes precedence inside that function. `set local(name) = expression` declares function-local numeric state, initialized to `0` at function entry; `local(name)` reads it, and `add local(name) amount` / `sub local(name) amount` update it. Local names are visible only in their declaring function. Existing `set var(name)` assignments continue to use global state unless `name` is a parameter of the current function. The compiler validates local/global references and function-call arity before generating C.
 
 ## Expressions
 
 Supported arithmetic operators are `+`, `-`, `*`, `/`, and `%`; comparison operators are `=`, `==`, `!=`, `<`, `<=`, `>`, and `>=`; conditions can use `and` and `or`. Arithmetic binds more tightly than comparisons, then `and`, then `or`. Numeric literals may be integers or decimals. `var(name)` reads a global or shadowing parameter; `local(name)` reads function-local state; `call fn(name, arguments...)` calls a function and evaluates to its numeric return value.
+
+`while condition` begins a loop and `end` closes it. The condition is checked before each iteration. Ensure the loop body changes state used by its condition so the loop can finish. Loops can be nested inside functions, branches, or other loops.
+
+```anv
+fn(sum-to, limit)
+  set local(index) = 1
+  set local(total) = 0
+  while local(index) <= var(limit)
+    add local(total) local(index)
+    add local(index) 1
+  end
+  output local(total)
+end
+
+call fn(sum-to, 5) # prints 15
+```
 
 Built-ins currently include `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, and `max`. The implemented key names include letters, `SPACE`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, and `ESCAPE`.
 
@@ -65,5 +81,5 @@ fixed_hz = 60
 
 ## Not implemented yet
 
-Static types, loops, arrays, structures, modules/imports, assets/sprites, audio, collision/physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, and function-local numeric variables are supported, but the language and engine remain much smaller than a general-purpose game engine today.
+Static types, arrays, structures, modules/imports, assets/sprites, audio, collision/physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables, and `while` loops are supported, but the language and engine remain much smaller than a general-purpose game engine today.
 
