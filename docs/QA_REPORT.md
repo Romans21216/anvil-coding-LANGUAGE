@@ -2,8 +2,8 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **87/100 — FAIL** (commit `f96a212`; threshold: 90/100)
-**Review snapshot:** the table below records the independent review of `f96a212`, which found uncontrolled process stack exhaustion for valid recursion with large local arrays. The current worktree switches local arrays to checked heap allocation with guaranteed return cleanup and a 16 MiB active-allocation cap; its 43-test suite passes, but that fix has not yet been independently rescored.
+**Latest completed independent full review:** **91/100 — PASS** (commit `8f82f1c`; threshold: 90/100)
+**Review snapshot:** the table below records the independent review of `8f82f1c`. The earlier `f96a212` review scored 87/100 after reproducing native stack exhaustion with large recursive local arrays. The fix uses checked, zero-initialized heap allocation, frees local arrays on generated returns, and caps active allocations at 16 MiB. The independent reviewer rescored the fix at 91/100.
 
 ## Scope
 
@@ -34,7 +34,7 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 ## Independent 50-criterion review
 
-The latest independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. All 42 tests, the extension check, Python compilation, and local-array example passed, but an evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each valid function call declared an 8,192-element local array. The source respected the documented per-function limit; the implementation nevertheless exhausted the native stack without an Anvil diagnostic. This is tracked with exact steps in issue #21. The current changes replace stack arrays with checked heap allocations, free local arrays on return, and enforce a 16 MiB total active-call budget; 43 tests now pass, including a stress test that verifies a source-line error instead of stack overflow. The fix is committed after local verification; independent rescore is pending. Other findings remain compiler density (22: 1), module boundaries (23: 1), Windows/C backend portability (27: 1), and incomplete engine scope (2, 3, 5, 9, 40, 50). Issues #19 and #20 are resolved.
+The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit, reran the 43-test suite, extension checks, Python compilation, and samples, and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. The remaining deductions concern compiler density (22: 1), module boundaries (23: 1), Windows/C backend portability (27: 1), and incomplete engine scope (2, 3, 5, 9, 40, 50). Issues #19–#21 are resolved.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -52,11 +52,11 @@ The latest independent review of commit `f96a212` scored **87/100 (87%) — FAIL
 | 12 | Secondary functionality works | 2 | Timing, input, math/noise, networking primitive, and native-tested `while`/`for` loops are covered. |
 | 13 | Primary workflows functional | 2 | Direct source and manifest build/run workflows pass. |
 | 14 | Inputs validated | 2 | Syntax, arity, references, manifest fields, paths, rates, and ports are checked. |
-| 15 | Errors handled gracefully | 1 | On f96a212, recursive maximum-size local arrays exhausted the OS stack without an Anvil error; the current unscored worktree replaces them with checked heap storage and a source-located 16 MiB budget error. |
-| 16 | Edge cases covered | 1 | The f96a212 tests missed cumulative recursion stack use; current worktree adds budget-exhaustion coverage, pending independent review. |
+| 15 | Errors handled gracefully | 2 | The 16 MiB active-array budget fails with exit code 2 and a source-located diagnostic instead of exhausting the OS stack. |
+| 16 | Edge cases covered | 2 | Independent review confirmed coverage for recursion isolation, allocation limits, explicit/implicit return cleanup, and array bounds. |
 | 17 | Invalid inputs controlled | 2 | Malformed inputs are rejected before generating/building C. |
 | 18 | Stable across repeated operations | 2 | Compiler/runtime tests and repeatable random/noise checks pass. |
-| 19 | No known critical defects | 1 | The f96a212 evaluator reproduced stack exhaustion for valid recursive local arrays; current heap-budget fix is not yet independently verified. |
+| 19 | No known critical defects | 2 | The evaluator's recursive-array stack-exhaustion finding was fixed and independently verified on `8f82f1c`; no known critical defect remains in the reviewed scope. |
 | 20 | Components integrate | 2 | Compiler, generated C, runtime, manifest, extension, and networking sample integrate. |
 | 21 | Logical project structure | 2 | Compiler, runtime, examples, tests, docs, and extension are organized. |
 | 22 | Readable and consistently formatted | 1 | Compiler remains densely formatted; reformatting is still recommended. |
@@ -68,15 +68,15 @@ The latest independent review of commit `f96a212` scored **87/100 (87%) — FAIL
 | 28 | No unfinished placeholders | 2 | Unsupported capabilities are described as future work. |
 | 29 | Configuration understandable | 2 | TOML project settings are explicit and validated. |
 | 30 | Conventions followed | 2 | Current Python, C, TOML, and extension conventions are adequate. |
-| 31 | Automated tests provided | 2 | At the f96a212 review snapshot, 42 Python tests covered global and function-local numeric arrays. The current suite has 43 tests after adding the recursive memory-budget regression. |
+| 31 | Automated tests provided | 2 | The independently reviewed `8f82f1c` suite contains 43 Python tests, including local-array recursion, budget, cleanup, and bounds regressions. |
 | 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, and generated executable paths are covered. |
 | 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
-| 34 | Edge cases explicitly tested | 1 | The f96a212 suite lacked recursive allocation exhaustion coverage; a budget regression test now exists in the current worktree. |
+| 34 | Edge cases explicitly tested | 2 | The 43-test suite covers recursive allocation exhaustion and repeated cleanup; the evaluator also reproduced the bounded source diagnostic. |
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest and function samples. |
-| 38 | Results recorded accurately | 2 | The previous 87-point review's row/category mismatch is corrected; the f96a212 review used the 42-test count, and the latest local verification records 43 tests. |
-| 39 | Regression checks performed | 2 | The full 42-test f96a212 suite passed; the current 43-test suite also passes after the memory-budget fix. |
+| 38 | Results recorded accurately | 2 | Review score, commit, test count, category totals, and independent verification evidence match the `8f82f1c` review. |
+| 39 | Regression checks performed | 2 | Independent review reran all 43 tests and the local-array regression after the heap-budget fix. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
@@ -89,11 +89,11 @@ The latest independent review of commit `f96a212` scored **87/100 (87%) — FAIL
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
 | | **Requirement fulfillment** | **16/20** | |
-| | **Functionality and reliability** | **17/20** | |
+| | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **18/20** | |
+| | **Testing and verification** | **19/20** | |
 | | **Developer experience and delivery** | **19/20** | |
-| | **Total** | **87/100 — FAIL** | |
+| | **Total** | **91/100 — PASS** | |
 
 ### Priorities from the review
 
@@ -103,5 +103,5 @@ The latest independent review of commit `f96a212` scored **87/100 (87%) — FAIL
 
 ## Bug tracking
 
-Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed findings from the array review are recorded in [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (QA record synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (tracked generated C), [#19](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/19) (test output side effects), and [#20](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/20) (evaluation arithmetic); those fixes are closed. Issue [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) records verified installation and highlighting for extension 0.1.2. The latest reproduced stack-exhaustion finding is documented in open issue [#21](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/21); its fix and fresh score are pending independent verification. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15).
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed findings from the array review are recorded in [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (QA record synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (tracked generated C), [#19](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/19) (test output side effects), [#20](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/20) (evaluation arithmetic), and [#21](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/21) (recursive local-array stack exhaustion); those fixes are closed. Issue [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) records verified installation and highlighting for extension 0.1.2. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15).
 
