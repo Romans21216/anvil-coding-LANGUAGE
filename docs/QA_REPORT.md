@@ -9,7 +9,7 @@
 
 Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit. The compiler supports fixed-size global and function-local numeric arrays; each function call is capped at 8,192 local elements, with a 16 MiB active-allocation budget across calls.
 
-This is not a production engine. Current physics supports at most 128 2D circles and axis-aligned boxes, fixed-step gravity/force integration, mixed-shape overlap queries, and a four-pass contact solver; it does not include continuous collision detection, polygon or 3D bodies, friction, rotation, or joints. Assets, audio, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree also remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state and arrays, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
+This is not a production engine. Current physics supports up to 128 2D circle and axis-aligned box bodies, with a configurable active pool limit, fixed-step gravity/force integration, mixed-shape overlap queries, and a four-pass contact solver; it does not include continuous collision detection, polygon or 3D bodies, friction, rotation, or joints. Assets, audio, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree also remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state and arrays, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
 
 ## Verification
 
@@ -36,6 +36,10 @@ This is not a production engine. Current physics supports at most 128 2D circles
 | Live game window in latest review | NOT INSPECTED |
 
 These checks verify the prototype workflows and selected regression cases. They do not establish production readiness, cross-platform behavior, or performance.
+
+### Post-review physics-capacity candidate checks
+
+Since the reviewed `0d3b5ed` snapshot, `physics_capacity(n)` has been added to configure the active body pool from 1 through the compiled maximum of 128 slots. The complete suite now passes **52 tests**, including native pool growth, exhaustion, safe shrink refusal, shrink after release, and builtin-arity coverage. The box-physics example builds with the capacity setting enabled. Extension 0.1.6 is packaged and grammar-tested for `physics_capacity`; VS Code 0.1.4 remains installed and this new token has not been visually verified. These candidate changes require the next independent review below before they replace the latest reviewed baseline.
 
 ## Independent 50-criterion review
 

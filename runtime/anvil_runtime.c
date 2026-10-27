@@ -80,6 +80,7 @@ static int anvil_net_has_peer;
 static int anvil_winsock_started;
 static double anvil_net_value;
 static AnvilPhysicsBody anvil_physics_bodies[ANVIL_PHYSICS_BODIES];
+static int anvil_physics_active_capacity = ANVIL_PHYSICS_BODIES;
 static double anvil_physics_gravity_x;
 static double anvil_physics_gravity_y = -9.81;
 
@@ -946,7 +947,7 @@ static double anvil_physics_allocate_body(double x, double y, double radius,
                                           double half_width,
                                           double half_height, double mass,
                                           int shape) {
-  for (int slot = 0; slot < ANVIL_PHYSICS_BODIES; ++slot) {
+  for (int slot = 0; slot < anvil_physics_active_capacity; ++slot) {
     AnvilPhysicsBody *body = &anvil_physics_bodies[slot];
     if (body->active)
       continue;
@@ -990,6 +991,19 @@ double anvil_body_create_box(double x, double y, double width, double height,
     return -1.0;
   return anvil_physics_allocate_body(x, y, 0.0, width * 0.5, height * 0.5,
                                      mass, ANVIL_PHYSICS_BOX);
+}
+
+double anvil_physics_capacity(double requested_capacity) {
+  if (!isfinite(requested_capacity) || floor(requested_capacity) != requested_capacity ||
+      requested_capacity < 1.0 || requested_capacity > ANVIL_PHYSICS_BODIES)
+    return -1.0;
+  int capacity = (int)requested_capacity;
+  for (int slot = capacity; slot < anvil_physics_active_capacity; ++slot) {
+    if (anvil_physics_bodies[slot].active)
+      return -1.0;
+  }
+  anvil_physics_active_capacity = capacity;
+  return (double)anvil_physics_active_capacity;
 }
 
 double anvil_body_destroy(double handle) {

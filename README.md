@@ -9,7 +9,7 @@
 - Keyboard camera movement/look, adjustable field of view, and a built-in BVH-accelerated CPU ray-traced sphere with shadows and specular lighting.
 - Keyboard edge/held state, configurable fixed-step updates, deterministic RNG and noise helpers.
 - A first LAN multiplayer primitive: opt-in UDP host/join and exchanging one numeric value.
-- A bounded fixed-step 2D circle and axis-aligned box-body system with forces, gravity, restitution, and mixed-shape collision response.
+- A configurable fixed-step 2D circle and axis-aligned box-body system (up to 128 slots) with forces, gravity, restitution, and mixed-shape collision response.
 - A VS Code language extension and a browser-based preview workbench.
 
 This is an early prototype. Conventional primitives use a fixed-size software rasterizer, and ray-traced spheres use CPU BVH traversal; hardware DXR is not implemented. Physics supports up to 128 fixed-step 2D circles and axis-aligned boxes, including mixed-shape contacts, but has no rotation, continuous collision detection, or broad phase. The networking sample is a bare LAN prototype, not a secure or reliable Internet multiplayer stack. Rust output, assets, audio, 3D physics, a full editor, portability, and performance benchmarks are future work. “Hyper-efficient” is a design goal, not a measured result.

@@ -2,7 +2,7 @@
   "name": "anvil-language-support",
   "displayName": "Anvil Language Support",
   "description": "Syntax highlighting and editor support for the Anvil game language.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "anvil-engine",
   "engines": {
     "vscode": "^1.85.0"

@@ -1,6 +1,7 @@
 # Fixed-step mixed-shape physics: a movable box and circle land on a static box.
 scene 2d
 clear rgba(12, 17, 29, 255)
+set var(pool_capacity) = physics_capacity(32)
 
 set var(floor) = body_create_box(0, -2, 12, 1, 0)
 set var(box) = body_create_box(-1, 2, 1, 1, 1)
@@ -34,4 +35,5 @@ fn(draw)
   display text("2D box and circle physics") -l(20, 20) -rgb(237, 243, 255)
   display text("Hold left/right to push the box") -l(20, 48) -rgb(187, 202, 221)
   display text("Contacts: " + var(contact_count)) -l(20, 76) -rgb(157, 199, 255)
+  display text("Physics body slots: " + var(pool_capacity)) -l(20, 104) -rgb(157, 199, 255)
 end

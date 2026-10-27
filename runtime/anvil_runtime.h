@@ -92,6 +92,7 @@ void anvil_net_close(void);
 double anvil_body_create(double x, double y, double radius, double mass);
 double anvil_body_create_box(double x, double y, double width, double height,
                              double mass);
+double anvil_physics_capacity(double requested_capacity);
 double anvil_body_destroy(double handle);
 double anvil_body_active(double handle);
 double anvil_body_x(double handle);

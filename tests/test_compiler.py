@@ -232,6 +232,61 @@ class CompilerTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("body_create_box() expects 5 argument(s), got 4", result.stderr)
 
+    def test_physics_body_capacity_can_grow_and_safely_shrink(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics-capacity.ANVL"
+            out = pathlib.Path(temp) / "physics-capacity.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  if physics_capacity(4) != 4\n"
+                "    output 0\n"
+                "  end\n"
+                "  if physics_capacity(0) >= 0 or physics_capacity(1.5) >= 0 or physics_capacity(129) >= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(a) = body_create(-20, 0, 0.5, 1)\n"
+                "  set local(b) = body_create(-10, 0, 0.5, 1)\n"
+                "  set local(c) = body_create(10, 0, 0.5, 1)\n"
+                "  set local(d) = body_create(20, 0, 0.5, 1)\n"
+                "  if body_create(30, 0, 0.5, 1) >= 0 or physics_capacity(3) >= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  if physics_capacity(5) != 5\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(e) = body_create(30, 0, 0.5, 1)\n"
+                "  if local(e) < 0 or physics_capacity(4) >= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(ok) = body_destroy(local(d))\n"
+                "  set local(ok) = body_destroy(local(e))\n"
+                "  if physics_capacity(3) != 3\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_create(30, 0, 0.5, 1) >= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(ok) = body_destroy(local(c))\n"
+                "  if body_create(30, 0, 0.5, 1) < 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  output 1\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "1")
+
+    def test_physics_capacity_builtin_arity_is_validated(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics-capacity-arity.ANVL"
+            source.write_text("fn(main)\n  output physics_capacity()\nend\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("physics_capacity() expects 1 argument(s), got 0", result.stderr)
+
     def test_physics_builtin_arity_is_validated_before_c_generation(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "physics-arity.ANVL"

@@ -1,6 +1,6 @@
 # Engine Runtime
 
-The native runtime also includes deterministic fixed-step 2D physics for circles and axis-aligned boxes with 128 body slots. Read the [physics API and limits](../ENGINE.md#fixed-step-2d-physics); run `examples/physics.ANVL` or `examples/physics_boxes.ANVL` for playable samples.
+The native runtime also includes deterministic fixed-step 2D physics for circles and axis-aligned boxes. Programs can configure the active body-slot limit up to 128. Read the [physics API and limits](../ENGINE.md#fixed-step-2d-physics); run `examples/physics.ANVL` or `examples/physics_boxes.ANVL` for playable samples.
 
 The current native runtime uses a fixed 960 by 600 software pixel buffer. It has a fixed-step update callback (60 Hz by default) and a draw callback. A project may set `[engine].fixed_hz` from 1 to 240 in its `.ANVLproj` file.
 
