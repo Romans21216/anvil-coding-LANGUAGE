@@ -1,38 +1,64 @@
 # Anvil
 
-**Anvil** is a small BASIC/Lua-inspired game language with its own `.ANVL` source format. The compiler validates Anvil programs, emits ordinary C, and invokes MSVC to produce a native Windows `.exe`. Anvil is not Rust syntax and does not extend Rust.
+**Anvil** is a small BASIC/Lua-inspired game language with its own `.ANVL` source format. The compiler reads Anvil, emits ordinary C source, and invokes MSVC to produce a native Windows `.exe`. Anvil is not Rust syntax and does not extend Rust.
 
 ## What works now
 
-- Numeric global variables, function parameters, numeric return values, recursion, and function-local state.
-- A Windows C backend, branches, input, time, seeded random numbers, gradient noise, and fractal noise.
-- A native software renderer for 2D rectangles, circles, lines and text, plus basic 3D cubes, spheres, and planes.
-- Keyboard camera movement/look, adjustable field of view, and the built-in BVH-accelerated CPU ray-traced sphere function `display ray_sphere(...)`.
-- A small opt-in UDP multiplayer primitive for one numeric value and one LAN peer.
-- A VS Code syntax extension and a browser-based preview workbench.
+- A Windows C backend for numeric globals and function-local variables, parameterized and recursive functions with numeric return values, calls, branches, inclusive `for`/`while` loops, input, time, seeded random numbers, gradient noise, and fractal noise.
+- A small native software renderer for 2D rectangles, circles, lines and text, plus shaded 3D cubes, spheres, and grid planes with a perspective camera and depth buffer.
+- Keyboard camera movement/look, adjustable field of view, and a built-in BVH-accelerated CPU ray-traced sphere with shadows and specular lighting.
+- Keyboard edge/held state, configurable fixed-step updates, deterministic RNG and noise helpers.
+- A first LAN multiplayer primitive: opt-in UDP host/join and exchanging one numeric value.
+- A VS Code language extension and a browser-based preview workbench.
 
-This is an early prototype, not a production engine. Rendering uses a fixed-size software buffer. CPU BVH ray tracing is implemented; RTX/DXR and Embree are not. The network sample is not secure or reliable Internet multiplayer. Rust output, GPU rendering, assets, audio, physics, portability, and performance benchmarks remain future work. “Hyper-efficient” is a design goal, not a measured result.
+This is an early prototype. Conventional primitives use a fixed-size software rasterizer, and ray-traced spheres use CPU BVH traversal; hardware DXR is not implemented. The networking sample is a bare LAN prototype, not a secure or reliable Internet multiplayer stack. Rust output, assets, audio, physics, a full editor, portability, and performance benchmarks are future work. “Hyper-efficient” is a design goal, not a measured result.
 
-## Build a Windows executable
+## Build an EXE
 
-Install Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. Then run:
+On Windows, install Python 3.11 or newer and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC is the verified compiler. Then run:
 
 ```powershell
+python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
+python compiler/anvil.py examples/loops.ANVL --release --output build/loops.exe
 ```
 
-The compiler emits inspectable C and uses MSVC to build the executable.
+This writes inspectable C and compiles it with MSVC. To only translate Anvil to C, add `--emit-c build/first_world.c`. The generated C is ordinary C, while the runtime currently targets Windows.
 
-## Documentation and development
+## Run checks
+
+```powershell
+python -m unittest discover -s tests -v
+npm ci --prefix vscode-extension
+npm test --prefix vscode-extension
+```
+
+The numeric sample builds and prints `17`. The starter world builds into a native Windows executable. Run it to open the game window.
+
+## Files
 
 - [Language guide](docs/LANGUAGE.md)
 - [Engine runtime](docs/ENGINE.md)
-- [Compiler and build](docs/COMPILER.md)
 - [Multiplayer prototype](docs/MULTIPLAYER.md)
-- [Complete improvement backlog](docs/IMPROVEMENT_BACKLOG.md)
-- [Wiki-ready reference pages](docs/Wiki/Home.md)
-- [Bug reporting and contribution rules](CONTRIBUTING.md)
+- [Compiler and build](docs/COMPILER.md)
+- [Starter world](examples/first_world.ANVL)
+- [LAN counter sample](examples/network_counter.ANVL)
+- [LAN client sample](examples/network_client.ANVL)
+- [Numeric compiler sample](examples/numeric_demo.ANVL)
+- [Function parameters and local variables sample](examples/functions.ANVL)
+- [While and numeric for loop sample](examples/loops.ANVL)
+- [VS Code extension](vscode-extension/README.md)
+- [Full improvement backlog](docs/IMPROVEMENT_BACKLOG.md)
+- [Wiki pages](docs/Wiki/Home.md)
+- [Contribution and bug reporting rules](CONTRIBUTING.md)
 
-Run compiler/runtime tests with `python -m unittest discover -s tests -v`; validate VS Code syntax support with `npm test --prefix vscode-extension`.
+`.ANVL` is the source extension and `.ANVLproj` is the TOML project manifest. The compiler resolves the manifest's entry path within the project folder and applies its project name and fixed update rate. Anvil is a working project name; it has not had trademark clearance.
 
-Source files use `.ANVL`; project manifests use `.ANVLproj`. The language/engine are a prototype and do not claim the `.ANVL` suffix is globally unique.
+## Troubleshooting
+
+- **No C compiler found:** install the Visual Studio Build Tools C++ workload, then rerun the command from a new PowerShell session.
+- **Manifest entry is rejected:** use a path relative to `game.ANVLproj`; entries must stay inside that project folder.
+- **VS Code validation cannot find a package:** run `npm ci --prefix vscode-extension` once, then rerun the validation command.
+
+The `.ANVL` suffix is used here for Anvil source; the name also appears in an unrelated metadata serialization format, so the suffix is not globally unique.
+
