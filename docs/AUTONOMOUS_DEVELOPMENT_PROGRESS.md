@@ -172,7 +172,7 @@ This log records verified implementation batches and is reconciled with Git befo
 
 - **Fresh score:** 90/100 — FAIL against 98. Categories: 16/20, 20/20, 17/20, 19/20, 18/20. Criterion 38 rises to 2/2; the prior QA record score remains 89 for its exact snapshot.
 - **Verification:** 69 Python tests, npm extension validation, Python compileall, QA arithmetic validator, valid-zero and malformed-subtotal fixtures, and `git diff --check HEAD^ HEAD` all pass. JSON/Markdown counts agree at 450.
-- **Resolution:** The critic confirmed the validator and zero-score regression. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) acceptance is met; it is being closed.
+- **Resolution:** The critic confirmed the validator and zero-score regression. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) is closed.
 - **Evaluation:** Updated all current evaluation and status records immediately after the critic. The 98-point pass requirement remains unmet.
 
 
@@ -199,4 +199,13 @@ This log records verified implementation batches and is reconciled with Git befo
 
 - **Candidate:** `3f77eee7bf23d70ae97e7f1968851882dd0d923e` wraps source lines in the five compiler modules cited by review `96b71fe`; generated C strings are split only as adjacent literals, preserving emitted bytes.
 - **Local verification:** 72 tests passed; Black 26.10.1 default 88-column check passed; no lines exceed 88 columns in the five cited modules; compileall, QA arithmetic, and diff check passed; 12 examples produce byte-identical generated C versus `854d36c`.
-- **Review:** Pending independent evaluation of this exact candidate. The last scored review remains 91/100 on `96b71fe`, FAIL against 98.
+- **Review:** Independently evaluated as exact commit `5072597`; fresh score 92/100, FAIL against 98.
+
+
+### Formatting review — exact commit `5072597`
+
+- **Fresh score:** **92/100 — FAIL** against the 98/100 threshold. Categories: requirements 16/20, functionality 20/20, architecture 19/20, testing 19/20, delivery 18/20. Criterion 22 improved to 2/2; criterion 23 remains 2/2.
+- **Independent checks:** 72 Python tests, extension validation, compileall, QA arithmetic, diff check, both CLI help forms, all 21 legacy facade exports, and 12/12 generated-C parity comparisons passed. Black 26.10.1 default-style check passed and the cited modules are all at most 88 columns.
+- **Inventory:** 20 audited rows; 430 needing verification, 3 partial, 17 complete, 0 in progress (450 total).
+- **Resolution:** Issue #12 acceptance is met; compiler modules, formatting, phase tests, docs, and compatibility have independent evidence. Issue #12 is closed. The critic also found `current_active_item: 22` ambiguous beside completed backlog item 104 and zero in-progress backlog rows. This was filed as [issue #45](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/45), labeled `Codex Bugs`; the sync clears the active backlog item and records rubric criterion 22 in `last_reviewed_rubric_criterion`. Issue #45 is resolved and closed.
+- **Remaining score deductions:** engine scope, Windows/MSVC and C-only limits, and unverified new-token highlighting because extension 0.1.4 remains installed per user preference.

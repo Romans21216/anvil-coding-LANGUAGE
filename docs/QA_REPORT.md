@@ -1,12 +1,12 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **91/100 — FAIL** (exact commit `96b71fedca97facaff60f2c3b8362f16c64b8b9d`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 18/20, testing 19/20, delivery 18/20.
+**Latest independent evaluation:** **92/100 — FAIL** (exact commit `5072597f0fe8ed21a97774fa2582f7174ed242cd`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 19/20, testing 19/20, delivery 18/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
-**Latest review evidence:** the critic evaluated exact pushed commit `96b71fedca97facaff60f2c3b8362f16c64b8b9d` and scored 91/100 (16/20, 20/20, 18/20, 19/20, 18/20). It reran all 72 Python tests, extension validation, compileall, QA validation, and `git diff --check`; both CLI help paths and 21 legacy facade exports worked. Generated C matched byte-for-byte for 12 examples against `854d36c`. The 20-row audited subset matches Markdown/JSON and totals 450 with 430 needing verification, 3 partial, 17 complete, and 0 in progress. Issue #12 remains open for the remaining formatting requirement; extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
-**Latest finding:** compiler phase separation is independently verified and criterion 23 rises to 2/2 on review `96b71fe`, improving the score from 90 to 91. The 98-point threshold remains unmet. Issue [#12](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12) stays open because long lines remain and Black was unavailable during review. Issue #44 remains resolved and closed.
+**Latest review evidence:** the critic evaluated exact pushed commit `5072597f0fe8ed21a97774fa2582f7174ed242cd` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran all 72 Python tests, extension validation, compileall, QA validation, and `git diff --check`; both CLI help paths and 21 legacy facade exports worked. Generated C matched byte-for-byte for 12 examples against `854d36c`. Black 26.10.1 default 88-column check passed and each cited compiler module is at most 88 columns. The 20-row audited subset matches Markdown/JSON and totals 450 with 430 needing verification, 3 partial, 17 complete, and 0 in progress. Issue #12 acceptance is met and it is closed; issue #45 records and resolves the state-field ambiguity; extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
+**Latest finding:** compiler phase separation and formatting are independently verified. Criterion 22 rises to 2/2 on `5072597`, improving the score from 91 to 92; criterion 23 remains 2/2. The 98-point threshold remains unmet. Issue [#12](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12) is closed after its acceptance criteria were independently verified. Issue #44 remains resolved and closed.
 
-**Unreviewed follow-up:** commit `3f77eee` wraps the cited compiler modules to Black’s default 88-column style. The local 72-test suite, formatter check, compileall, QA arithmetic, 12-example generated-C parity, and diff check pass. This follow-up has no independent score yet; the latest scored snapshot remains `96b71fe` at 91/100.
+**Formatting follow-up review:** candidate `3f77eee` was independently reviewed on exact commit `5072597`; all 72 tests, Black check, compileall, QA arithmetic, diff check, and 12-example generated-C parity pass. The critic scored this snapshot 92/100, still below 98.
 
 ## Scope
 
@@ -20,7 +20,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 |---|---|
 | `python -m unittest discover -s tests -q` | PASS — 72 tests; independently rerun on exact reviewed commit `96b71fe` |
 | `python -m unittest discover -s tests -p test_qa_report.py -v` | PASS — zero-score rubric accepted; mismatched category subtotal rejected |
-| `python scripts/validate_qa_report.py` | PASS — 50 criteria total 91/100; category subtotals agree |
+| `python scripts/validate_qa_report.py` | PASS — 50 criteria total 92/100; category subtotals agree |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -47,9 +47,9 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Latest independent review — compiler refactor snapshot `96b71fe`
+## Latest independent review — compiler architecture and formatting snapshot `5072597`
 
-**91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 18/20; testing and verification 19/20; developer experience and delivery 18/20. The exact reviewed commit was `96b71fedca97facaff60f2c3b8362f16c64b8b9d`. The critic reran 72 Python tests, extension validation, compileall, the QA validator, and diff check; verified both CLI help paths and 21 legacy facade exports; and compared generated C for 12 examples against `854d36c` with byte-identical results. The audited ledgers contain 20 matching rows and totals of 450. Criterion 23 rises from 1 to 2 after the compiler phase split. Criterion 22 remains 1 because several modules contain long lines and Black is unavailable in the review environment. Criterion 27 remains 1 for the Windows/MSVC and C-only backend. Criterion 47 remains 1 because new extension tokens are not visually verified in the installed editor. Scope deductions remain for the prototype not covering the full requested game-engine scope. The threshold remains 98/100. Issue #12 remains open for formatting follow-up.
+**92/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 19/20; testing and verification 19/20; developer experience and delivery 18/20. The exact reviewed commit was `5072597f0fe8ed21a97774fa2582f7174ed242cd`. The critic reran 72 Python tests, extension validation, compileall, the QA validator, and diff check; verified both CLI help paths and 21 legacy facade exports; and compared generated C for 12 examples against `854d36c` with byte-identical results. It independently ran Black 26.10.1; default 88-column check passed and all five cited compiler modules are at most 88 columns. The audited ledgers contain 20 matching rows and totals of 450. Criterion 22 rises from 1 to 2 after formatting; criterion 23 remains 2 for the compiler phase split. Criterion 27 remains 1 for the Windows/MSVC and C-only backend. Criterion 47 remains 1 because new extension tokens are not visually verified in the installed editor. Scope deductions remain for the prototype not covering the full requested game-engine scope. The threshold remains 98/100. Issue #12 is closed after acceptance verification; the state-field finding is tracked as resolved issue #45.
 
 ## 50-criterion scoring for latest review `96b71fe`
 
@@ -78,7 +78,7 @@ Historical context: the independent review of commit `f96a212` scored **87/100 (
 | 19 | No known critical defects | 2 | The recursive-array stack-exhaustion finding is fixed; the physics reviewer found no critical issue in the reviewed physics paths. |
 | 20 | Components integrate | 2 | Compiler, generated C, runtime, manifest, extension, and networking sample integrate. |
 | 21 | Logical project structure | 2 | Compiler, runtime, examples, tests, docs, and extension are organized. |
-| 22 | Readable and consistently formatted | 1 | Phase modules have clear responsibilities, but the critic found long lines in `codegen.py`, `parser.py`, `expressions.py`, `cli.py`, and `semantics.py`; Black was unavailable. Formatting follow-up remains in issue #12. |
+| 22 | Readable and consistently formatted | 2 | Independent review `5072597` confirmed Black 26.10.1 default formatting and no lines over 88 columns in the five cited compiler modules. |
 | 23 | Clear module responsibilities | 2 | Independent review of `96b71fe` confirmed separate lexer, parser, semantic, expression, code-generation, build, CLI, and shared-definition modules, with a compatibility facade and phase tests. |
 | 24 | Consistent descriptive naming | 2 | Anvil identity and `.ANVL` naming are consistent. |
 | 25 | Duplication minimized | 2 | Reviewer found no material duplicate/unused code issue. |
@@ -109,10 +109,10 @@ Historical context: the independent review of commit `f96a212` scored **87/100 (
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
-| | **Code quality and architecture** | **18/20** | |
+| | **Code quality and architecture** | **19/20** | |
 | | **Testing and verification** | **19/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **91/100** | Exact review `96b71fe`; FAIL under the 98-point requirement. |
+| | **Total** | **92/100** | Exact review `5072597`; FAIL under the 98-point requirement. |
 
 ### Deduction details and follow-up
 
@@ -138,7 +138,8 @@ Historical context: the independent review of commit `f96a212` scored **87/100 (
 
 ### Remaining deductions and follow-up
 
-- **Issue #12 — compiler formatting:** the refactor satisfies phase separation and compatibility acceptance. The reviewer identified long lines in `compiler/codegen.py`, `compiler/parser.py`, `compiler/expressions.py`, `compiler/cli.py`, and `compiler/semantics.py`. Black was not available in the review environment, so criterion 22 remains 1/2. The issue remains open until formatting is consistent and independently verified.
+- **Issue #12 — compiler architecture and formatting: RESOLVED.** Independent review `5072597` confirmed the phase split, compatibility, phase tests, documentation, Black formatting, and 88-column limit. Issue #12 is closed.
+- **Issue #45 — state-field ambiguity: RESOLVED.** The critic found that `current_active_item: 22` was ambiguous beside `last_completed_backlog_item: 104` and a zero in-progress count. The sync clears the active backlog item, documents no item as active, and stores `last_reviewed_rubric_criterion: 22` separately. The `Codex Bugs` issue is documented and closed after syncing.
 - **Platform/backend breadth:** the project remains Windows/MSVC and generated-C only (criterion 27: 1/2).
 - **Editor visual verification:** newer extension grammar is automated-tested but the user chose to keep extension 0.1.4 installed, so criterion 47 remains 1/2.
 - **Engine scope:** asset/audio pipelines, GPU rendering, broad physics, and production multiplayer remain future work (criteria 2, 3, 5, 9, 40, and 50).
