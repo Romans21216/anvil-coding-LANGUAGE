@@ -87,9 +87,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Review:** Exact commit `ed08f43ca0d9beb5440f18fade48faf556694b1f` scored **89/100 — FAIL** against 98. The critic reran 64 tests, verified the oversized-version diagnostic, confirmed the progress wording fix, and closed issues #32 and #33. It also found a mismatch between historical test counts in QA rubric rows 31 and 39; tracked in [#34](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/34).
 - **Next batch:** Sync QA counts for issue #34, obtain fresh review, then continue issue #23 item #50.
 
-## Batch 8 — synchronize QA review counts (in progress)
+## Batch 8 — synchronize QA review counts (complete)
 
-- **Finding:** Review `ed08f43` identified stale test totals in QA rows 31/39; review `c648ccb` confirmed those were fixed and found rubric arithmetic and Markdown/JSON status drift. Issues #34, #35, and #36 record those findings; #34 is now closed.
+- **Finding:** Review `ed08f43` identified stale test totals in QA rows 31/39; review `c648ccb` confirmed those were fixed and found rubric arithmetic and Markdown/JSON status drift. Issues #34–#36 record those findings; all three are now closed after review `727d349`.
 - **Fix:** Rows 31/39 distinguish 63 tests on `2dd1d8e` and 64 on `ed08f43`; criteria 8, 14, 15, and 17 are scored 2 to align verified behavior and sum to 89; the Markdown ledger now matches JSON (12 complete, 0 in progress; review `ed08f43`, score 89).
-- **Tracking:** Issues #35 and #36 are labeled `Codex Bugs`; the corrections are in the current worktree pending commit/push and independent verification.
-- **Review:** Latest score is 89/100 on `c648ccb`, below the user's 98/100 threshold.
+- **Tracking:** Issues #35 and #36 are labeled `Codex Bugs`; both are fixed and closed after independent confirmation.
+- **Review:** Exact documentation commit `727d349b94f226e2ff7d4fa76e2828495fda8050` scored 89/100. The critic verified rubric arithmetic, Markdown/JSON status counts, JSON validity, and the 450-item backlog invariant. The overall score is below the user's 98/100 threshold.
+- **Next batch:** Continue from issue #23 item #50 (formal language specification); address the remaining engine breadth, compiler architecture, and editor-verification deductions.

@@ -2,24 +2,24 @@
   "project": "Anvil language and game engine",
   "repository": "Romans21216/anvil-coding-LANGUAGE",
   "branch": "main",
-  "last_completed_batch": 7,
+  "last_completed_batch": 8,
   "last_completed_backlog_item": 49,
   "current_active_item": 50,
-  "current_active_item_status": "Backlog item #49 language feature versioning is complete and independently verified. Latest evaluation of c648ccb scored 89/100, below 98; issues #32/#33/#34 are fixed and closed. Correcting the individual-score arithmetic and Markdown status mismatch (#35/#36) before starting backlog item #50.",
-  "current_candidate_commit": null,
-  "latest_verified_commit": "c648ccb8e2f1b89f568c6a8cb1e1fd61d9174436",
-  "last_pushed_reviewed_below_threshold_commit": "c648ccb8e2f1b89f568c6a8cb1e1fd61d9174436",
-  "latest_independently_reviewed_candidate_commit": "c648ccb8e2f1b89f568c6a8cb1e1fd61d9174436",
+  "current_active_item_status": "Backlog item #49 and critic follow-ups #32–#36 are complete. Documentation review of 727d349 confirmed score arithmetic, Markdown/JSON counts, and the 450-item issue #23 invariant. Latest score is 89/100, below 98; proceed with backlog item #50 and broader deductions.",
+  "current_candidate_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
+  "latest_verified_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
+  "last_pushed_reviewed_below_threshold_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
+  "latest_independently_reviewed_candidate_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Exact documentation snapshot c648ccb scored 89/100 against 98/100. Critic confirmed #34 count correction and found individual rubric scores not summing to 89 (#35) and a stale Markdown ledger (#36); both are corrected in the current follow-up, awaiting review.",
+  "latest_push_result": "Exact documentation snapshot 727d349 scored 89/100 against 98/100. Critic confirmed #34–#36 follow-ups are resolved, rubric scores sum to 89, Markdown and JSON counts agree, and issue #23 remains the sole full-list location.",
   "latest_independent_review": {
-    "commit": "c648ccb8e2f1b89f568c6a8cb1e1fd61d9174436",
+    "commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
     "score": 89,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
     "current_required_threshold": 98,
     "current_threshold_status": "BELOW_THRESHOLD",
-    "findings": ["#35: Individual criterion scores in QA_REPORT.md sum to 85 while category totals and total score are 89; corrected in current follow-up.", "#36: IMPLEMENTATION_STATUS.md summary and review data lag IMPLEMENTATION_STATUS.json; corrected in current follow-up."],
+    "findings": [],
     "categories": {
       "requirements": "16/20",
       "functionality_reliability": "20/20",
@@ -41,7 +41,7 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "64 passed on code commit ed08f43, including explicit/implicit language version, malformed/duplicate/late/unsupported headers, and a 5,000-digit version regression; documentation-only review c648ccb did not rerun runtime tests",
+    "python_unittest": "64 passed on code commit ed08f43, including explicit/implicit language version, malformed/duplicate/late/unsupported headers, and a 5,000-digit version regression; documentation-only review 727d349 did not rerun runtime tests",
     "vscode_extension_validation": "passed",
     "python_compile": "passed (python -m compileall -q compiler tests)",
     "msvc_numeric_demo": "built and ran successfully; output 17",
@@ -50,7 +50,7 @@
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "Evaluation records latest exact review c648ccb, 89/100. Issues #32/#33/#34 are confirmed fixed and closed. Review found rubric score arithmetic issue #35 and stale Markdown ledger #36; current changes correct criteria 8/14/15/17 and sync markdown counts/status with JSON. Fresh exact-commit review pending; required bar is 98/100.",
+  "pending_documentation_review": "Latest exact review 727d349 scored 89/100 and confirmed score arithmetic, Markdown/JSON status synchronization, and 450-item source-of-truth consistency. Issues #32–#36 are fixed and closed. No documentation review remains pending; continue work toward the 98/100 threshold.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -62,7 +62,7 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
     "next_recommended_tasks": [
-    "Obtain independent confirmation of issues #35/#36 fixes; then continue issue #23 item #50. Latest overall score is 89/100, below 98/100.",
+    "Continue issue #23 item #50 (formal language specification), then pursue architecture and engine-scope deductions. Latest overall score is 89/100, below 98/100.",
     "Continue selecting work directly from issue #23; keep the full item list only in that issue."
   ],
   "master_backlog": {
