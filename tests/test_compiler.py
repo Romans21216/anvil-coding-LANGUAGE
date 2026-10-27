@@ -42,25 +42,25 @@ class CompilerTests(unittest.TestCase):
     def test_starter_game_links_native_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / "world.exe"
-            subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "first_world.ANVL"), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "first_world.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertGreater(out.stat().st_size, 100_000)
 
     def test_multiplayer_sample_links_winsock_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / "network.exe"
-            subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "network_counter.ANVL"), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "network_counter.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertGreater(out.stat().st_size, 100_000)
 
     def test_multiplayer_client_links_winsock_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / "client.exe"
-            subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "network_client.ANVL"), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "network_client.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertGreater(out.stat().st_size, 100_000)
 
     def test_numeric_program_builds_and_runs(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / "numeric.exe"
-            subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "numeric_demo.ANVL"), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "numeric_demo.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "17")
 
     def test_function_parameters_returns_and_local_scope(self):
@@ -81,7 +81,7 @@ class CompilerTests(unittest.TestCase):
                 "end\n"
                 "call fn(main)\n",
                 encoding="utf-8")
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "13")
 
@@ -120,7 +120,7 @@ class CompilerTests(unittest.TestCase):
                 "end\n"
                 "call fn(main)\n",
                 encoding="utf-8")
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "120")
 
@@ -144,7 +144,7 @@ class CompilerTests(unittest.TestCase):
                 "call fn(main)\n",
                 encoding="utf-8",
             )
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "15")
 
@@ -183,7 +183,7 @@ class CompilerTests(unittest.TestCase):
                 "call fn(main)\n",
                 encoding="utf-8",
             )
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "24")
 
@@ -207,7 +207,7 @@ class CompilerTests(unittest.TestCase):
                 "call fn(main)\n",
                 encoding="utf-8",
             )
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "3")
 
@@ -245,7 +245,7 @@ class CompilerTests(unittest.TestCase):
                 "call fn(main)\n",
                 encoding="utf-8",
             )
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "10")
 
@@ -262,7 +262,7 @@ class CompilerTests(unittest.TestCase):
                     "call fn(main)\n",
                     encoding="utf-8",
                 )
-                subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+                subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
                 result = subprocess.run([str(out)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 2)
                 self.assertIn("array index", result.stderr)
@@ -290,7 +290,7 @@ class CompilerTests(unittest.TestCase):
                 "call fn(main)\n",
                 encoding="utf-8",
             )
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "9")
 
@@ -342,7 +342,7 @@ class CompilerTests(unittest.TestCase):
             source = pathlib.Path(temp) / "nested.ANVL"
             out = pathlib.Path(temp) / "nested.exe"
             source.write_text("fn(main)\n  set var(value) = 5\n  if var(value) > 0\n    if var(value) < 10\n      output var(value)\n    else\n      output 0\n    end\n  else\n    output 0\n  end\nend\ncall fn(main)\n", encoding="utf-8")
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "5")
 
     def test_expression_precedence_builds_expected_result(self):
@@ -350,7 +350,7 @@ class CompilerTests(unittest.TestCase):
             source = pathlib.Path(temp) / "precedence.ANVL"
             out = pathlib.Path(temp) / "precedence.exe"
             source.write_text("fn(main)\n  output 2 + 3 * 4\nend\ncall fn(main)\n", encoding="utf-8")
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "14")
 
     def test_remainder_operator_compiles_and_runs_for_numbers(self):
@@ -358,7 +358,7 @@ class CompilerTests(unittest.TestCase):
             source = pathlib.Path(temp) / "remainder.ANVL"
             out = pathlib.Path(temp) / "remainder.exe"
             source.write_text("fn(main)\n  output 7 % 4\nend\ncall fn(main)\n", encoding="utf-8")
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "3")
 
     def test_string_value_is_rejected_in_numeric_context(self):
@@ -410,7 +410,7 @@ class CompilerTests(unittest.TestCase):
             source = pathlib.Path(temp) / "random.ANVL"
             out = pathlib.Path(temp) / "random.exe"
             source.write_text("fn(main)\n  seed(42)\n  set var(roll) = rnd(1, 100)\n  output var(roll) + noise(0.1, 0.2, 0.3)\nend\ncall fn(main)\n", encoding="utf-8")
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             first = subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip()
             second = subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip()
             self.assertEqual(first, second)

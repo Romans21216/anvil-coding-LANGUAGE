@@ -2,8 +2,8 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **87/100 — FAIL** (threshold: 90/100)
-**Review snapshot:** the 87/100 result below is the prior independent score, recorded before corrections to QA records, generated-file tracking, and the VS Code installation. Follow-up verification now confirms the 0.1.2 extension is installed and visually highlights `examples/arrays.ANVL`; a fresh independent rescore is pending.
+**Latest completed independent full review:** **89/100 — FAIL** (commit `eae0b91`; threshold: 90/100)
+**Review snapshot:** the criterion table below preserves the earlier 87/100 evaluation for its original snapshot. The fresh 89/100 review corrected the two-point editor deductions, but found a one-point arithmetic mismatch in that historical table and that a full test run rewrites four tracked generated C files. Both findings have GitHub issues #19 and #20; fixes are underway and a new review is pending.
 
 ## Scope
 
@@ -32,7 +32,7 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 ## Independent 50-criterion review
 
-The previous independent review scored **87/100 (87%) — FAIL**. Since that review, QA records were synchronized, generated C for the array example was added to version control and verified stable on rebuild, and extension 0.1.2 was installed and visually inspected. The 87/100 breakdown below preserves the prior evaluator's criterion-by-criterion findings; a fresh rescore is requested after these corrections. The prior review also noted dense compiler structure (22: 1, 23: 1), C/MSVC portability limits (27: 1), and incomplete engine scope (2, 3, 5, 9, 40, 50). It reproduced no critical compiler/runtime failure.
+The fresh independent review of commit `eae0b91` scored **89/100 (89%) — FAIL**. Since the previous review, generated C for the array example was tracked and verified stable, the QA records were synchronized, and extension 0.1.2 was installed and visually inspected. The fresh evaluator reported 39 passing Python tests, passing extension checks, a successful array executable (output `50`), an installed 0.1.2 extension with Anvil language mode, and a clean initial tree. It also found that the full Python suite changes four other tracked generated C files and that the historical 87-point criterion rows added up to 86; these are tracked in issues #19 and #20. Other continuing deductions are compiler density (22: 1), compiler module boundaries (23: 1), Windows/C backend portability (27: 1), and incomplete requested engine scope (2, 3, 5, 9, 40, 50). No critical compiler/runtime failure was reproduced.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -73,7 +73,7 @@ The previous independent review scored **87/100 (87%) — FAIL**. Since that rev
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest and function samples. |
-| 38 | Results recorded accurately | 0 | Prior-review score: at evaluation time the report said 35 tests, treated 0.1.1 as current, and marked arrays pending. Commit e784bb2 corrects these records; the prior score remains historical pending rescore. |
+| 38 | Results recorded accurately | 1 | Prior-review score: the earlier report said 35 tests, treated 0.1.1 as current, and marked arrays pending. Commit e784bb2 corrected those records. The later reviewer also found that this table's old criterion-38 value made the historic rows total 86 while category totals said 87; issue #20 tracks the arithmetic correction. |
 | 39 | Regression checks performed | 2 | The full 39-test suite passes after array/compiler changes. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
@@ -89,8 +89,8 @@ The previous independent review scored **87/100 (87%) — FAIL**. Since that rev
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **17/20** | |
-| | **Developer experience and delivery** | **17/20** | |
+| | **Testing and verification** | **18/20** | |
+| | **Developer experience and delivery** | **16/20** | |
 | | **Total** | **87/100 — FAIL** | |
 
 ### Priorities from the review
@@ -101,5 +101,5 @@ The previous independent review scored **87/100 (87%) — FAIL**. Since that rev
 
 ## Bug tracking
 
-Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed findings from the array review are recorded and resolved in [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (QA record synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), and [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (generated C build output). The extension installation and visual verification finding [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) is resolved by installing 0.1.2 and visually checking `examples/arrays.ANVL`. Every evaluator finding remains a GitHub issue with the requested `Codex Bugs` label; issue bodies distinguish reproduced defects, verification gaps, and unimplemented capabilities. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15). The prior review scored 87/100; a fresh independent rescore is pending.
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed findings from the array review are recorded and resolved in [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (QA record synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), and [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (generated C for the array example). Issue [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) records verified installation and highlighting for extension 0.1.2. The latest evaluator findings are [#19](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/19) (test suite overwrites checked-in generated C) and [#20](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/20) (historical score table arithmetic); both are being fixed and independently rechecked. Every evaluator finding remains a GitHub issue with the requested `Codex Bugs` label; issue bodies distinguish reproduced defects, verification gaps, and unimplemented capabilities. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15).
 
