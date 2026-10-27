@@ -3,7 +3,7 @@
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
 **Latest completed independent full review:** **90/100 — PASS** (commit `12b4e55b142d0fd48cccddfc6d6f67eefed16710`; threshold: 90/100).
-**Review snapshot:** the independent reviewer evaluated exact commit `12b4e55b142d0fd48cccddfc6d6f67eefed16710`, reran all 56 Python tests, VS Code extension validation, and Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), passed `git diff --check`, and validated 450 unique sequential backlog entries in `docs/IMPLEMENTATION_STATUS.json`. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. The reviewer verified division-by-zero diagnostics report source path/line and exit code 2 while regular division remains functional. No defect was found in batch 3. Visual highlighting in 0.1.7 remains unverified.
+**Review snapshot:** the independent reviewer evaluated exact commit `12b4e55b142d0fd48cccddfc6d6f67eefed16710`, reran all 56 Python tests, VS Code extension validation, and Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), passed `git diff --check`, and validated 450 unique sequential backlog records present in that snapshot. After the user requested a single home for the full list, it was posted as a comment to issue #23; repository files now retain only an audited subset and point to the issue. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. The reviewer verified division-by-zero diagnostics report source path/line and exit code 2 while regular division remains functional. No defect was found in batch 3. Visual highlighting in 0.1.7 remains unverified.
 
 ## Scope
 

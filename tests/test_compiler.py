@@ -849,6 +849,29 @@ class CompilerTests(unittest.TestCase):
             subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "14")
 
+    def test_and_or_short_circuit_side_effecting_calls(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "short-circuit.ANVL"
+            out = pathlib.Path(temp) / "short-circuit.exe"
+            source.write_text(
+                "set var(calls) = 0\n"
+                "fn(mark)\n"
+                "  add var(calls) 1\n"
+                "  output 1\n"
+                "end\n"
+                "fn(main)\n"
+                "  set local(a) = false and call fn(mark)\n"
+                "  set local(b) = true or call fn(mark)\n"
+                "  set local(c) = true and call fn(mark)\n"
+                "  set local(d) = false or call fn(mark)\n"
+                "  output var(calls)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "2")
+
     def test_remainder_operator_compiles_and_runs_for_numbers(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "remainder.ANVL"

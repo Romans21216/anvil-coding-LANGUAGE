@@ -1,8 +1,8 @@
 # Anvil implementation status
 
-This is an initial evidence inventory for all 450 entries mirrored from GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). The issue remains the user-maintained source of truth; it was not modified. Items without an audited implementation are marked NEEDS VERIFICATION rather than guessed complete or missing. See `IMPLEMENTATION_STATUS.json` for evidence, tests, limitations, acceptance checks, priority, linked issue, and commit per item.
+The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Generated 2026-10-27 against independently reviewed commit `12b4e55b142d0fd48cccddfc6d6f67eefed16710` on `main`.
+Updated 2026-10-27 from `main` at `ba5df3c`; item #46 is in progress. The latest independently reviewed implementation is `12b4e55b142d0fd48cccddfc6d6f67eefed16710`.
 
 ## Status counts
 
@@ -10,13 +10,14 @@ Generated 2026-10-27 against independently reviewed commit `12b4e55b142d0fd48ccc
 - PARTIALLY IMPLEMENTED: 3
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
-- NEEDS VERIFICATION: 438
-- IN PROGRESS: 0
+- NEEDS VERIFICATION: 437
+- IN PROGRESS: 1
 
 ## Audited current items
 
 | # | Item | Status | Evidence and remaining work |
 |---:|---|---|---|
+| 46 | Add short-circuit Boolean evaluation. | IN PROGRESS | `compiler/anvil.py` maps `and`/`or` to C `&&`/`||`; a native side-effect test confirms false `and` / true `or` skip calls while true `and` / false `or` execute them. All 57 tests, extension validation, Python compilation, and diff check pass; awaiting independent review. |
 | 48 | Add division-by-zero diagnostics. | COMPLETE | `compiler/anvil.py` lowers `/` through `anvil_divide`; `runtime/anvil_runtime.c` reports path/line and exits 2 on zero (including negative zero). Native tests cover zero diagnostic and regular division; the independent reviewer confirmed the behavior on commit `12b4e55` (90/100 PASS). Runtime detection only; no compile-time constant analysis. |
 | 301 | Improve the existing bounded 2D circle physics prototype. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: bounded fixed-step circle/axis-aligned-box solver; docs/ENGINE.md. No CCD, rotation, broad phase, joints, 3D bodies, or complete stability coverage. Issue #8; commit `f7c91b0`. |
 | 302 | Make the current 128-body limit configurable where feasible. | COMPLETE | runtime/anvil_runtime.c: physics_capacity and active-capacity-bounded loops; tests/test_compiler.py: growth, exhaustion, invalid values, refused shrink, shrink after release. The configured active pool still has a fixed compiled maximum of 128 slots. Issue #8; commit `560cee1`. |
@@ -34,5 +35,5 @@ Generated 2026-10-27 against independently reviewed commit `12b4e55b142d0fd48ccc
 
 - `COMPLETE` means the item-specific behavior has source evidence, tests, documentation, and review; preserve any listed limits.
 - `PARTIALLY IMPLEMENTED` means a working subset exists but one or more listed acceptance parts are missing.
-- `NEEDS VERIFICATION` is the conservative initial status until source/test evidence is explicitly audited. It is not a claim that the feature is absent.
+- The counts summarize the 450 entries in issue #23, but unverified entries are not copied into this ledger. `NEEDS VERIFICATION` is a conservative status, not a claim that a feature is absent.
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.

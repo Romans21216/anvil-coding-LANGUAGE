@@ -45,7 +45,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Language guide](docs/LANGUAGE.md)
 - [Engine runtime](docs/ENGINE.md)
 - [Completion matrix](docs/COMPLETION_MATRIX.md)
-- [450-item implementation status](docs/IMPLEMENTATION_STATUS.md)
+- [Audited implementation status](docs/IMPLEMENTATION_STATUS.md)
 - [Autonomous development progress](docs/AUTONOMOUS_DEVELOPMENT_PROGRESS.md)
 - [Multiplayer prototype](docs/MULTIPLAYER.md)
 - [Compiler and build](docs/COMPILER.md)
