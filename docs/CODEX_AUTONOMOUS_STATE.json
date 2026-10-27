@@ -4,39 +4,41 @@
   "branch": "main",
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
-  "current_active_item": 144,
-  "current_active_item_status": "Backlog item #144 is in progress: native-window resize presentation uses a centered aspect-preserving viewport; internal framebuffer remains 960\u00d7600. Full 73-test suite and 3 native runtime tests pass locally; independent review pending.",
-  "current_candidate_commit": "296245532a12255c79e4092c66f0cbacb3b085d3",
-  "latest_verified_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
-  "last_pushed_reviewed_below_threshold_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
-  "latest_independently_reviewed_candidate_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
+  "current_active_item": 172,
+  "current_active_item_status": "Backlog item #172 (dynamic window resizing) is in progress. 73 tests pass. Item #144 is compiler version reporting and remains unverified. Issue #46 tracks the mapping correction.",
+  "current_candidate_commit": "pending corrected-record candidate commit",
+  "latest_verified_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
+  "last_pushed_reviewed_below_threshold_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
+  "latest_independently_reviewed_candidate_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Item #144 candidate 2962455 is pushed; all 73 Python tests, 3 native runtime tests, extension validation, compileall, QA arithmetic, and diff check pass locally. Independent review pending; latest scored review remains 92/100 on 5072597.",
+  "latest_push_result": "Exact review bc4db99 scored 91/100 \u2014 FAIL vs98. Item #172 resize implementation passes 73 tests; criterion 38 was reduced due the incorrect #144 mapping, now corrected in the working records and tracked by issue #46.",
   "latest_independent_review": {
-    "commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
-    "score": 92,
+    "commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
+    "score": 91,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
     "current_required_threshold": 98,
     "current_threshold_status": "BELOW_THRESHOLD",
     "findings": [
-      "Requirements/goal deductions remain because the engine prototype lacks broad production systems.",
-      "Criterion 27: Windows/MSVC and C-only backend constrain platform/backend breadth.",
-      "Criterion 47: visual highlighting for newer grammar tokens remains unverified; user chose to keep extension 0.1.4 installed."
+      "Criterion 38: resize feature was tracked under #144, but canonical issue #23 comment 6451810775 defines dynamic resizing as #172; issue #46 tracks correction.",
+      "The reviewer inspected the viewport helper and paint path but did not visually launch a resized window.",
+      "Criterion 27: Windows/MSVC and C-only backend limit platform/backend breadth.",
+      "Criterion 47: new extension token highlighting remains unverified; user chose to keep 0.1.4 installed.",
+      "Broader engine scope remains incomplete."
     ],
     "categories": {
       "requirements": "16/20",
       "functionality_reliability": "20/20",
       "code_architecture": "19/20",
-      "testing_verification": "19/20",
+      "testing_verification": "18/20",
       "developer_experience_delivery": "18/20"
     }
   },
   "previous_independent_review": {
-    "commit": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
-    "score": 91,
+    "commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
+    "score": 92,
     "threshold_at_time": 98,
-    "result_at_time": "FAIL; compiler module boundaries verified; criterion 22 formatting was still incomplete."
+    "result_at_time": "FAIL; formatting and compiler phase separation verified; state field corrected; resize work had not begun."
   },
   "earlier_independent_review": {
     "commit": "8ae53c4daaed0d2160262aa24a2a0d5178235a96",
@@ -51,21 +53,21 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "73 passed locally on exact item #144 candidate 2962455; independent review pending",
-    "vscode_extension_validation": "passed; independently rerun on exact review commit 96b71fe",
-    "python_compile": "passed; independently rerun on exact review commit 96b71fe",
+    "python_unittest": "73 passed; independently rerun on exact review commit bc4db99",
+    "vscode_extension_validation": "passed; independently rerun on exact review commit bc4db99",
+    "python_compile": "passed; independently rerun on exact review commit bc4db99",
     "msvc_numeric_demo": "built and ran successfully; output 17",
     "msvc_language_spec_example": "built with --release and ran successfully; output 6",
-    "git_diff_check": "passed locally on formatting candidate 3f77eee",
-    "implementation_status_inventory": "Issue #23 contains all 450 items; compact audited subset has 21 entries. Counts: 17 complete, 3 partial, 1 in progress, 429 needing verification.",
+    "git_diff_check": "passed; independently rerun on exact review commit bc4db99",
+    "implementation_status_inventory": "21 audited entries; 429 needing verification, 3 partial, 17 complete, 1 in progress = 450. Resize feature mapped to canonical #172; #144 remains unverified.",
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)",
-    "qa_report_validator": "passed; QA rubric totals 92/100 with category subtotals in agreement on exact review commit 5072597",
+    "qa_report_validator": "passed; QA rubric totals 91/100 with category subtotals in agreement",
     "black": "passed independently: Black 26.10.1 --check compiler tests/test_compiler_modules.py; all five cited modules max 88 columns",
     "generated_c_parity": "12/12 examples byte-identical to baseline 854d36c after line wrapping",
-    "runtime_viewport_test": "3 native runtime tests passed locally on item #144 candidate 2962455"
+    "runtime_viewport_test": "3 passed on exact reviewed commit; helper geometry exercised, no live window inspection"
   },
-  "pending_documentation_review": "Item #144 candidate 2962455 is documented and locally validated; obtain independent review of exact pushed snapshot, then update evaluation immediately.",
+  "pending_documentation_review": "Backlog mapping correction to #172 and the 91-point evaluation are synchronized; issue #46 awaits independent confirmation of the exact correction commit.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -77,8 +79,8 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
   "next_recommended_tasks": [
-    "Finish and independently verify item #144 resizable-window presentation, then sync evaluation after critic review.",
-    "Select the next concrete renderer or game-engine capability from issue #23; keep full backlog only in that issue and maintain 98/100 as the passing threshold."
+    "Finish corrected status synchronization for item #172 and re-review; then implement next authentic game-engine work from issue #23.",
+    "Keep current passing threshold at 98; sync all evaluation documents immediately after every critic run."
   ],
   "master_backlog": {
     "issue": 23,
@@ -91,7 +93,7 @@
   "current_required_qa_threshold": 98,
   "audited_item_50_status": "COMPLETE",
   "latest_source_refactor_base_commit": "854d36c764240362a85fc22a801f8f36a609fde5",
-  "last_reviewed_rubric_criterion": 22,
+  "last_reviewed_rubric_criterion": 38,
   "implementation_status_counts": {
     "COMPLETE": 17,
     "PARTIALLY IMPLEMENTED": 3,
@@ -105,15 +107,16 @@
     45
   ],
   "candidate_validation": {
-    "status": "local validation passed; independent review pending",
-    "item": 144,
+    "status": "corrected backlog mapping pending independent review",
+    "item": 172,
+    "prior_review_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
     "python_unittest": "73 passed",
     "runtime_tests": "3 passed",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "passed, rubric latest reviewed score remains 92",
-    "generated_c_parity": "not applicable to runtime-only feature",
+    "qa_report_validator": "passed; current QA rubric totals 91/100",
     "git_diff_check": "passed",
     "commit": "296245532a12255c79e4092c66f0cbacb3b085d3"
-  }
+  },
+  "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775"
 }

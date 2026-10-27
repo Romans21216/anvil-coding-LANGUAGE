@@ -211,9 +211,17 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Remaining score deductions:** engine scope, Windows/MSVC and C-only limits, and unverified new-token highlighting because extension 0.1.4 remains installed per user preference.
 
 
-## Batch 11 — resizable game window (item #144; candidate `2962455`)
+## Batch 11 — resizable game window (canonical item #172; candidate `2962455`)
 
-- **Scope:** The native window is already resizable, but the old paint path always drew the 960×600 frame from the top-left, leaving clipping or unused space. The runtime now computes a centered 16:10 viewport, fills letterbox bars, and scales presentation without changing the internal resolution.
+- **Scope:** Canonical item #172 in issue #23 comment 6451810775 is “Add dynamic window resizing.” The native window is already resizable, but the old paint path always drew the 960×600 frame from the top-left, leaving clipping or unused space. The runtime now computes a centered 16:10 viewport, fills letterbox bars, and scales presentation without changing the internal resolution.
 - **Regression coverage:** A native C harness checks the original 960×600 size, a wide 1200×600 client (120-pixel side bars), a tall 600×800 client (212-pixel top bar), a 1280×720 client, and invalid dimensions. All 73 Python tests pass; the runtime test module passes all 3 tests.
 - **Documentation:** Engine and completion-matrix docs state the distinction between resizable presentation and fixed internal framebuffer.
-- **Status:** Item #144 is IN PROGRESS pending independent review; all 73 tests pass locally. Latest independent score remains 92/100 on `5072597`, below the 98-point threshold.
+- **Status:** Canonical item #172 is IN PROGRESS pending independent review; all 73 tests pass locally. Item #144 is compiler version reporting and remains unverified. Latest independent score is 91/100 on `bc4db99`, below the 98-point threshold.
+
+
+### Review finding — canonical backlog mapping correction
+
+- **Exact reviewed commit:** `bc4db99368b3af2953e49adc4e4cbd8f5706bb4e`. **Score:** 91/100 — FAIL against 98. Categories: requirements 16/20, functionality 20/20, architecture 19/20, testing 18/20, delivery 18/20.
+- The latest full-list comment on issue #23 (`6451810775`) defines #144 as compiler version reporting and #172 as dynamic window resizing. The candidate had incorrectly recorded the feature as #144. This reduced criterion 38 from 2 to 1; issue #46 (`Codex Bugs`) records the finding.
+- The runtime viewport implementation passed the 73-test suite and 3 native runtime tests. Review inspected geometry and paint handling but did not visually launch a resized window. No code defect was reproduced.
+- The status and QA records are being corrected to canonical #172; fresh review is required before treating criterion 38 as restored.

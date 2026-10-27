@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
+  "reviewed_implementation_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 429,
@@ -9,11 +9,11 @@
     "COMPLETE": 17,
     "IN PROGRESS": 1
   },
-  "latest_verified_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
-  "latest_independently_reviewed_candidate_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
+  "latest_verified_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
+  "latest_independently_reviewed_candidate_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
-  "latest_followup_status_change": "Backlog item #144 dynamic window resizing is in progress: fixed framebuffer is scaled into a centered aspect-preserving viewport; native regression test and docs are added. Latest independent score remains 92/100 on 5072597.",
+  "last_pushed_reviewed_below_threshold_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
+  "latest_followup_status_change": "Independent critic bc4db99 scored 91/100, FAIL vs98. Runtime resize feature passed tests but was mislabeled as #144 instead of canonical item #172. Issue #46 tracks correction; item #144 remains unverified.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -201,7 +201,7 @@
         "Document module responsibilities.",
         "Obtain independent review of the exact refactor commit."
       ],
-      "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 remains open for formatting follow-up, not these completed phase-separation items.",
+      "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 is closed after formatting acceptance was independently verified.",
       "github_issue": "#23",
       "commit": "43894d3"
     },
@@ -233,7 +233,7 @@
         "Document module responsibilities.",
         "Obtain independent review of the exact refactor commit."
       ],
-      "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 remains open for formatting follow-up, not these completed phase-separation items.",
+      "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 is closed after formatting acceptance was independently verified.",
       "github_issue": "#23",
       "commit": "43894d3"
     },
@@ -265,7 +265,7 @@
         "Document module responsibilities.",
         "Obtain independent review of the exact refactor commit."
       ],
-      "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 remains open for formatting follow-up, not these completed phase-separation items.",
+      "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 is closed after formatting acceptance was independently verified.",
       "github_issue": "#23",
       "commit": "43894d3"
     },
@@ -297,12 +297,12 @@
         "Document module responsibilities.",
         "Obtain independent review of the exact refactor commit."
       ],
-      "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 remains open for formatting follow-up, not these completed phase-separation items.",
+      "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 is closed after formatting acceptance was independently verified.",
       "github_issue": "#23",
       "commit": "43894d3"
     },
     {
-      "number": 144,
+      "number": 172,
       "section": "B. CPU AND GPU RENDERING",
       "title": "Add dynamic window resizing.",
       "status": "IN PROGRESS",
@@ -316,7 +316,7 @@
         "python -m unittest discover -s tests -q: 73 passed locally on unreviewed candidate",
         "python -m unittest discover -s tests -p test_runtime.py -v: 3 native runtime tests passed"
       ],
-      "missing_or_limitations": "Only the presentation window resizes. The software framebuffer and internal rendering remain fixed at 960\u00d7600; there is no dynamic-resolution renderer. Independent review pending.",
+      "missing_or_limitations": "Internal framebuffer remains fixed at 960\u00d7600. The reviewer did not visually inspect a live resized window. Canonical item #144 is compiler version reporting and remains unverified.",
       "dependencies": [
         "Windows GDI presentation path"
       ],
@@ -328,9 +328,9 @@
         "Zero or invalid client sizes do not cause invalid viewport dimensions.",
         "Native regression tests and docs cover the behavior; obtain independent review."
       ],
-      "verification_result": "IN PROGRESS: full 73-test suite and all 3 native runtime tests pass locally; independent review pending.",
-      "github_issue": "#23 item 144",
-      "commit": "296245532a12255c79e4092c66f0cbacb3b085d3"
+      "verification_result": "IN PROGRESS: implementation and native viewport tests pass; critic `bc4db99` confirmed helper behavior and found a prior tracking-number mismatch. Corrected record maps the feature to canonical #172; independent review of the correction pending.",
+      "github_issue": "#23 item 172",
+      "commit": "2962455"
     },
     {
       "number": 301,
@@ -611,35 +611,35 @@
     "score": 91,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
+    "commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
     "categories": {
       "requirements": "16/20",
       "functionality_reliability": "20/20",
-      "code_architecture": "18/20",
-      "testing_verification": "19/20",
+      "code_architecture": "19/20",
+      "testing_verification": "18/20",
       "developer_experience_delivery": "18/20"
     },
     "findings": [
-      "Criterion 22: long lines remain; Black was unavailable during review. Tracked in issue #12.",
-      "Criterion 27: Windows/MSVC and C-only target limit portability and backend extensibility.",
-      "Criterion 47: newer VS Code grammar highlighting remains unverified in the installed editor by user preference.",
-      "Broader game-engine scope remains incomplete."
+      "Criterion 38: dynamic window resizing was mislabeled as #144; canonical issue #23 comment 6451810775 assigns it to #172. Issue #46 tracks the correction.",
+      "No live resized window was visually inspected; native viewport geometry helper tests pass.",
+      "Windows/MSVC and C-only backend limit platform/backend breadth.",
+      "Newer VS Code grammar highlighting remains unverified by the user preference to retain 0.1.4.",
+      "Broader engine scope remains incomplete."
     ]
   },
-  "current_candidate_commit": "296245532a12255c79e4092c66f0cbacb3b085d3",
-  "status_counts_validated_on": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
+  "current_candidate_commit": "pending corrected-record candidate commit",
+  "status_counts_validated_on": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
   "candidate_validation": {
-    "status": "unreviewed item #144 candidate; local validation passed",
-    "scope": "Resizable-window presentation with 16:10 letterboxing; internal framebuffer remains 960x600",
+    "commit": "296245532a12255c79e4092c66f0cbacb3b085d3",
+    "reviewed_score": 91,
+    "threshold": 98,
+    "result": "FAIL",
     "python_unittest": "73 passed",
-    "runtime_tests": "3 passed, including viewport resize",
-    "extension_validation": "passed",
-    "compileall": "passed",
-    "qa_report_validator": "passed; current reviewed score remains 92/100",
-    "status_ledger": "21 audited entries; counts 17 complete, 3 partial, 1 in progress, 429 needing verification; total 450",
-    "diff_check": "passed",
-    "commit": "296245532a12255c79e4092c66f0cbacb3b085d3"
+    "runtime_tests": "3 passed; viewport helper tested, actual window not visually launched",
+    "status_ledger": "21 entries, 450 total; correction candidate maps resize feature to #172 and leaves #144 unverified",
+    "finding": "Canonical mapping correction is recorded in issue #46; fresh independent review pending."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
-  "current_active_item": 144
+  "current_active_item": 172,
+  "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775"
 }
