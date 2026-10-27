@@ -190,7 +190,7 @@ static int anvil_project_camera(AnvilCameraVertex p, AnvilProjected *out) {
   out->x = ANVIL_WIDTH * 0.5 + p.x * anvil_camera_focal / p.depth;
   out->y = ANVIL_HEIGHT * 0.54 - p.y * anvil_camera_focal / p.depth;
   out->depth = p.depth;
-  return 1;
+  return isfinite(out->x) && isfinite(out->y);
 }
 
 static int anvil_project(AnvilVec3 p, AnvilProjected *out) {
@@ -304,11 +304,19 @@ void anvil_circle(double x, double y, double radius, int r, int g, int b,
 
 void anvil_line(double x1, double y1, double x2, double y2, int r, int g, int b,
                 int a, double thickness) {
+  AnvilScreenPoint start = {x1, y1}, end = {x2, y2};
+  if (!isfinite(thickness) ||
+      !anvil_clip_screen_line(&start, &end, ANVIL_WIDTH, ANVIL_HEIGHT))
+    return;
+  x1 = start.x;
+  y1 = start.y;
+  x2 = end.x;
+  y2 = end.y;
   int dx = abs((int)lrint(x2) - (int)lrint(x1)), sx = x1 < x2 ? 1 : -1,
       dy = -abs((int)lrint(y2) - (int)lrint(y1)), sy = y1 < y2 ? 1 : -1,
       err = dx + dy;
   int x = (int)lrint(x1), y = (int)lrint(y1),
-      radius = (int)fmax(0.0, ceil(thickness * .5));
+      radius = (int)fmin(fmax(0.0, ceil(thickness * .5)), ANVIL_WIDTH);
   uint32_t c = anvil_color(r, g, b);
   for (;;) {
     for (int oy = -radius; oy <= radius; ++oy)

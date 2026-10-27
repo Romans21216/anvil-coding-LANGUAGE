@@ -24,6 +24,29 @@ typedef struct {
   double depth;
 } AnvilCameraVertex;
 
+typedef struct {
+  double x;
+  double y;
+} AnvilScreenPoint;
+
+static inline int anvil_interpolation_parameter(double a, double b,
+                                               double target, double *t) {
+  double scale = fmax(fabs(a), fmax(fabs(b), fabs(target)));
+  if (!t || !isfinite(scale) || scale == 0.0)
+    return 0;
+  double scaled_a = a / scale;
+  double scaled_b = b / scale;
+  double denominator = scaled_b - scaled_a;
+  if (denominator == 0.0 || !isfinite(denominator))
+    return 0;
+  *t = (target / scale - scaled_a) / denominator;
+  return isfinite(*t) && *t >= 0.0 && *t <= 1.0;
+}
+
+static inline double anvil_lerp_stable(double a, double b, double t) {
+  return a * (1.0 - t) + b * t;
+}
+
 /* Clip one camera-space segment against the forward near plane. */
 static inline int anvil_clip_segment_near(AnvilCameraVertex *a,
                                           AnvilCameraVertex *b,
@@ -42,14 +65,14 @@ static inline int anvil_clip_segment_near(AnvilCameraVertex *a,
 
   AnvilCameraVertex *outside = a_inside ? b : a;
   const AnvilCameraVertex *inside = a_inside ? a : b;
-  double denominator = inside->depth - outside->depth;
-  if (denominator == 0.0)
+  double t;
+  if (!anvil_interpolation_parameter(outside->depth, inside->depth,
+                                     near_depth, &t))
     return 0;
-  double t = (near_depth - outside->depth) / denominator;
-  outside->x += t * (inside->x - outside->x);
-  outside->y += t * (inside->y - outside->y);
+  outside->x = anvil_lerp_stable(outside->x, inside->x, t);
+  outside->y = anvil_lerp_stable(outside->y, inside->y, t);
   outside->depth = near_depth;
-  return 1;
+  return isfinite(outside->x) && isfinite(outside->y);
 }
 
 /* Clip a camera-space triangle; output contains up to four polygon vertices. */
@@ -72,13 +95,16 @@ static inline int anvil_clip_triangle_near(const AnvilCameraVertex input[3],
       return 0;
     int current_inside = current.depth >= near_depth;
     if (current_inside != previous_inside) {
-      double denominator = current.depth - previous.depth;
-      if (denominator == 0.0)
+      double t;
+      if (!anvil_interpolation_parameter(previous.depth, current.depth,
+                                         near_depth, &t))
         return 0;
-      double t = (near_depth - previous.depth) / denominator;
       output[count++] = (AnvilCameraVertex){
-          previous.x + t * (current.x - previous.x),
-          previous.y + t * (current.y - previous.y), near_depth};
+          anvil_lerp_stable(previous.x, current.x, t),
+          anvil_lerp_stable(previous.y, current.y, t), near_depth};
+      if (!isfinite(output[count - 1].x) ||
+          !isfinite(output[count - 1].y))
+        return 0;
     }
     if (current_inside)
       output[count++] = current;
@@ -86,6 +112,56 @@ static inline int anvil_clip_triangle_near(const AnvilCameraVertex input[3],
     previous_inside = current_inside;
   }
   return count;
+}
+
+/* Clip a finite screen-space line before integer conversion or rasterization. */
+static inline int anvil_clip_screen_line(AnvilScreenPoint *a,
+                                         AnvilScreenPoint *b, int width,
+                                         int height) {
+  if (!a || !b || width <= 0 || height <= 0 || !isfinite(a->x) ||
+      !isfinite(a->y) || !isfinite(b->x) || !isfinite(b->y))
+    return 0;
+
+  for (int iteration = 0; iteration < 8; ++iteration) {
+    int code_a = (a->x < 0.0 ? 1 : a->x > width - 1 ? 2 : 0) |
+                 (a->y < 0.0 ? 4 : a->y > height - 1 ? 8 : 0);
+    int code_b = (b->x < 0.0 ? 1 : b->x > width - 1 ? 2 : 0) |
+                 (b->y < 0.0 ? 4 : b->y > height - 1 ? 8 : 0);
+    if ((code_a | code_b) == 0)
+      return 1;
+    if ((code_a & code_b) != 0)
+      return 0;
+
+    int outside_code = code_a ? code_a : code_b;
+    AnvilScreenPoint clipped;
+    double t;
+    if (outside_code & 4) {
+      if (!anvil_interpolation_parameter(a->y, b->y, 0.0, &t))
+        return 0;
+      clipped = (AnvilScreenPoint){anvil_lerp_stable(a->x, b->x, t), 0.0};
+    } else if (outside_code & 8) {
+      double edge = height - 1.0;
+      if (!anvil_interpolation_parameter(a->y, b->y, edge, &t))
+        return 0;
+      clipped = (AnvilScreenPoint){anvil_lerp_stable(a->x, b->x, t), edge};
+    } else if (outside_code & 1) {
+      if (!anvil_interpolation_parameter(a->x, b->x, 0.0, &t))
+        return 0;
+      clipped = (AnvilScreenPoint){0.0, anvil_lerp_stable(a->y, b->y, t)};
+    } else {
+      double edge = width - 1.0;
+      if (!anvil_interpolation_parameter(a->x, b->x, edge, &t))
+        return 0;
+      clipped = (AnvilScreenPoint){edge, anvil_lerp_stable(a->y, b->y, t)};
+    }
+    if (!isfinite(clipped.x) || !isfinite(clipped.y))
+      return 0;
+    if (outside_code == code_a)
+      *a = clipped;
+    else
+      *b = clipped;
+  }
+  return 0;
 }
 
 /* Intersect a camera ray with a sphere, clipping its surface at the near plane. */

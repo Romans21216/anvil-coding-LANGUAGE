@@ -32,6 +32,14 @@ int main(void) {
     return 1;
   }
 
+  a = (AnvilCameraVertex){-1e308, 0.0, 0.01};
+  b = (AnvilCameraVertex){1e308, 0.0, 0.4};
+  if (!anvil_clip_segment_near(&a, &b, 0.08) || !near_vertex(a) ||
+      !isfinite(a.x) || !isfinite(a.y)) {
+    puts("finite extreme segment coordinates overflowed while clipping");
+    return 10;
+  }
+
   AnvilCameraVertex hidden_a = {0.0, 0.0, 0.01};
   AnvilCameraVertex hidden_b = {1.0, 1.0, 0.07};
   if (anvil_clip_segment_near(&hidden_a, &hidden_b, 0.08)) {
@@ -73,6 +81,37 @@ int main(void) {
   if (anvil_clip_triangle_near(input, 0.08, output) != 3) {
     puts("triangle on the clipping boundary was lost");
     return 6;
+  }
+  input[0] = (AnvilCameraVertex){-1e308, 0.0, 0.01};
+  input[1] = (AnvilCameraVertex){1e308, 0.0, 0.4};
+  input[2] = (AnvilCameraVertex){0.0, 1.0, 0.5};
+  count = anvil_clip_triangle_near(input, 0.08, output);
+  if (count != 4 || !isfinite(output[0].x) || !isfinite(output[1].x)) {
+    puts("finite extreme triangle coordinates overflowed while clipping");
+    return 11;
+  }
+
+  AnvilScreenPoint line_a = {-1e308, 300.0};
+  AnvilScreenPoint line_b = {1e308, 300.0};
+  if (!anvil_clip_screen_line(&line_a, &line_b, 960, 600) ||
+      line_a.x != 0.0 || line_b.x != 959.0 || line_a.y != 300.0 ||
+      line_b.y != 300.0) {
+    puts("extreme screen line was not safely clipped to the viewport");
+    return 12;
+  }
+  line_a = (AnvilScreenPoint){-1e308, -1e308};
+  line_b = (AnvilScreenPoint){1e308, 1e308};
+  if (!anvil_clip_screen_line(&line_a, &line_b, 960, 600) ||
+      line_a.x != 0.0 || line_a.y != 0.0 || line_b.x != 599.0 ||
+      line_b.y != 599.0) {
+    puts("extreme diagonal was not clipped to finite viewport corners");
+    return 13;
+  }
+  line_a = (AnvilScreenPoint){-1e308, 10.0};
+  line_b = (AnvilScreenPoint){-1e308, 590.0};
+  if (anvil_clip_screen_line(&line_a, &line_b, 960, 600)) {
+    puts("screen line fully outside one edge was retained");
+    return 14;
   }
 
   double hit_depth, nx, ny, nz;
