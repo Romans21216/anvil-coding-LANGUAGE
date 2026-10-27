@@ -57,13 +57,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - That review's 90/100 was marked PASS under the then-current 90-point threshold, but it is below the new bar. Historical scores and their original pass/fail labels remain unchanged.
 - Future critic results must be compared with 98/100. Continue engineering against verified evaluator deductions and issue #23's source list.
 
-## Batch 5 — explicit numeric overflow behavior (in progress)
+## Batch 5 — explicit numeric overflow behavior (implementation complete; evaluation follow-up in progress)
 
 - **Features:** Backlog item #47 now rejects numeric expressions that produce NaN or infinity. `anvil_check_number` reports the `.ANVL` source path and line and exits with code 2; arithmetic intermediates are checked before comparisons. Division by zero retains its distinct diagnostic.
-- **Backlog:** #47 is IN PROGRESS pending full-suite validation and independent review.
+- **Backlog:** #47 is COMPLETE after independent behavior review; the overall project still fails the new 98/100 QA threshold.
 - **Files:** `compiler/anvil.py`, runtime C API/implementation, compiler tests, language/compiler/wiki docs, and the compact audited status ledger.
 - **Tests:** Native regression coverage passes for direct multiplication overflow, overflow inside a comparison, invalid `sqrt(-1)`, local add/sub accumulation, `for` step overflow, a UDP NaN datagram, finite UDP value, and no-socket receive. `python -m unittest discover -s tests -q` — 61 passed; `npm test --prefix vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; JSON validation and `git diff --check` — passed.
-- **Review:** Commit `8ae53c4daaed0d2160262aa24a2a0d5178235a96` scored **85/100 — FAIL** against the new 98/100 requirement. The reviewer found UDP `receive()` could bypass the finite-number check and stale verification metadata; both findings are in issues [#30](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/30) and [#31](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/31). This candidate fixes both; independent re-review pending.
-- **Commit/push:** Fixes pushed in `6c52b959dc3d5d13d174e37e57006f63d4cda951` (`fix(runtime): reject non-finite UDP values`); independent re-review pending.
+- **Review:** Candidate `8ae53c4daaed0d2160262aa24a2a0d5178235a96` scored **85/100 — FAIL**. After the NaN receive guard and metadata synchronization, `bcbf22101e4dc2e29e696880111bdc10a4702e50` scored **89/100 — FAIL** against 98. The reviewer confirmed the UDP behavior fix and found one remaining stale `missing_or_limitations` value in `IMPLEMENTATION_STATUS.json`; details are in the latest comment on issue [#31](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/31). Issue [#30](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/30) is closed. The exact metadata wording is corrected in the current worktree, pending fresh verification.
+- **Commit/push:** Numeric behavior fix is in `6c52b959dc3d5d13d174e37e57006f63d4cda951`; QA synchronization reviewed in `bcbf221`. The latest `missing_or_limitations` correction is pending commit/push.
 - **Limitations:** Anvil currently uses doubles; this detects non-finite outcomes but does not detect all finite precision loss or introduce integer overflow semantics.
-- **Next batch:** Request the independent critic on candidate `6c52b95`; update the evaluation and status records after the new score.
+- **Next batch:** Commit/push the metadata wording correction, get independent confirmation, update the evaluation, then continue engine work toward 98/100.

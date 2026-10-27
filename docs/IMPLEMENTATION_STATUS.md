@@ -2,23 +2,23 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27 from independently reviewed baseline `2a745bb9b455baffe9248f24d39970ea31146b23`. Current candidate `6c52b959dc3d5d13d174e37e57006f63d4cda951` is pushed and awaits review; the previous candidate `8ae53c4daaed0d2160262aa24a2a0d5178235a96` scored 85/100 against the 98/100 threshold and its findings are tracked in issues #30 and #31. Item #46 is complete; the earlier QA count finding is fixed and issue #28 is closed.
+Updated 2026-10-27 from independent review of exact commit `bcbf22101e4dc2e29e696880111bdc10a4702e50` (89/100 — below the required 98/100 overall bar). Item #47 is complete and its implementation commit is `6c52b959dc3d5d13d174e37e57006f63d4cda951`; the reviewer confirmed issue #30 is resolved. Issue #31's remaining `missing_or_limitations` wording is corrected in the current worktree and awaits fresh review. Item #46 is complete; the earlier QA count finding is fixed and issue #28 is closed.
 
 ## Status counts
 
-- COMPLETE: 10
+- COMPLETE: 11
 - PARTIALLY IMPLEMENTED: 3
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
 - NEEDS VERIFICATION: 436
-- IN PROGRESS: 1
+- IN PROGRESS: 0
 
 ## Audited current items
 
 | # | Item | Status | Evidence and remaining work |
 |---:|---|---|---|
 | 46 | Add short-circuit Boolean evaluation. | COMPLETE | `compiler/anvil.py` maps `and`/`or` to C `&&`/`||`; the native side-effect test confirms false `and` / true `or` skip calls while true `and` / false `or` execute them. The independent reviewer confirmed behavior on `83cf626` (57 tests passed). The overall QA score was 89/100 due to unrelated stale count text in the QA report; see issue #28. |
-| 47 | Add explicit overflow behavior. | IN PROGRESS | `anvil_check_number` guards arithmetic and all numeric built-in results, including `receive()`. Native cases cover arithmetic, comparison, invalid math, accumulation, loop-step overflow, end-to-end NaN/finite UDP datagrams, and no-socket receive behavior. The full suite passes (61 tests); extension and static checks pass; independent re-review pending. |
+| 47 | Add explicit overflow behavior. | COMPLETE | `anvil_check_number` guards arithmetic and all numeric built-in results, including `receive()`. Native cases cover arithmetic, comparison, invalid math, accumulation, loop-step overflow, end-to-end NaN/finite UDP datagrams, and no-socket receive behavior. The full suite passes (61 tests); extension and static checks pass; independent review of `bcbf221` confirmed the behavior. Overall QA remains below 98/100; issue #31 tracks a metadata correction that now awaits fresh review. |
 | 48 | Add division-by-zero diagnostics. | COMPLETE | `compiler/anvil.py` lowers `/` through `anvil_divide`; `runtime/anvil_runtime.c` reports path/line and exits 2 on zero (including negative zero). Native tests cover zero diagnostic and regular division; the independent reviewer confirmed the behavior on commit `12b4e55` (90/100 PASS). Runtime detection only; no compile-time constant analysis. |
 | 301 | Improve the existing bounded 2D circle physics prototype. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: bounded fixed-step circle/axis-aligned-box solver; docs/ENGINE.md. No CCD, rotation, broad phase, joints, 3D bodies, or complete stability coverage. Issue #8; commit `f7c91b0`. |
 | 302 | Make the current 128-body limit configurable where feasible. | COMPLETE | runtime/anvil_runtime.c: physics_capacity and active-capacity-bounded loops; tests/test_compiler.py: growth, exhaustion, invalid values, refused shrink, shrink after release. The configured active pool still has a fixed compiled maximum of 128 slots. Issue #8; commit `560cee1`. |

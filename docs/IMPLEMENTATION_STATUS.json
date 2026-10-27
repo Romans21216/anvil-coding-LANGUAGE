@@ -1,17 +1,19 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "2a745bb9b455baffe9248f24d39970ea31146b23",
+  "reviewed_implementation_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 436,
     "PARTIALLY IMPLEMENTED": 3,
-    "COMPLETE": 10,
-    "IN PROGRESS": 1
+    "COMPLETE": 11,
+    "IN PROGRESS": 0
   },
-  "latest_verified_commit": "2a745bb9b455baffe9248f24d39970ea31146b23",
-  "current_pushed_candidate_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "8ae53c4daaed0d2160262aa24a2a0d5178235a96",
+  "latest_verified_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
+  "latest_independently_reviewed_candidate_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
+  "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
+  "last_pushed_reviewed_below_threshold_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
+  "latest_followup_status_change": "Corrects the item #47 missing_or_limitations wording identified in issue #31; awaiting independent review.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -46,7 +48,7 @@
       "number": 47,
       "section": "1. CORE LANGUAGE AND SYNTAX",
       "title": "Add explicit overflow behavior.",
-      "status": "IN PROGRESS",
+      "status": "COMPLETE",
       "source_evidence": [
         "compiler/anvil.py: numeric expression generation wraps arithmetic results, operands, and all numeric built-in results in anvil_check_number; division checks finite operands/results.",
         "runtime/anvil_runtime.c: anvil_check_number rejects non-finite doubles with source path/line and exit code 2."
@@ -62,7 +64,7 @@
         "git diff --check: passed",
         "docs/IMPLEMENTATION_STATUS.json and docs/CODEX_AUTONOMOUS_STATE.json: valid JSON"
       ],
-      "missing_or_limitations": "Awaiting full-suite verification and independent review. This policy covers non-finite numeric results in expressions; it does not prevent every finite precision loss or integer-style wraparound because Anvil uses double values.",
+      "missing_or_limitations": "Item #47 behavior passed independent review on bcbf221. Overall QA scored 89/100, below the required 98/100 bar, so broader evaluation work continues and another overall review is pending. This detects non-finite results but does not prevent every finite precision loss or integer-style wraparound because Anvil uses double values.",
       "dependencies": [],
       "priority": "P0 correctness improvement",
       "assigned_agent": "Codex lead (sequential execution)",
@@ -72,9 +74,9 @@
         "Cover direct overflow, non-finite intermediates used in comparisons, and invalid math results.",
         "Document the behavior and get independent review."
       ],
-      "verification_result": "IN PROGRESS: the 61-test suite and static checks pass, including end-to-end NaN and finite UDP payloads and unavailable-socket behavior. Review of the prior candidate 8ae53c4 scored 85/100 and findings #30/#31 are fixed in the current candidate; independent re-review pending.",
+      "verification_result": "COMPLETE: the 61-test suite, extension validation, Python/JSON/diff checks, MSVC numeric demo, and independent review of bcbf221 pass for item #47. The review scored 89/100 overall and found no code defect in this behavior. Issue #30 is resolved; unrelated status-field wording remains tracked under issue #31.",
       "github_issue": "#23",
-      "commit": null
+      "commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951"
     },
     {
       "number": 48,
