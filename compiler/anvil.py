@@ -555,8 +555,7 @@ class ExpressionParser:
                 raise CompileError(f"{self.path}:{self.line}: {value}() expects {expected} argument(s), got {len(args)}")
             name = BUILTIN_C_NAMES.get(value, value)
             call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"
-            if value in {"time", "delta", "rnd", "noise", "fbm", "floor", "ceil",
-                         "sqrt", "sin", "cos", "abs", "min", "max"}:
+            if value in BUILTINS:
                 call = self.checked_number(call)
             left = (call, "number")
         elif kind == "word":

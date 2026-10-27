@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "83cf626b0a5ab370d5a6da476ea47bbc2a9f728a",
+  "reviewed_implementation_commit": "2a745bb9b455baffe9248f24d39970ea31146b23",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 436,
@@ -9,7 +9,8 @@
     "COMPLETE": 10,
     "IN PROGRESS": 1
   },
-  "latest_verified_commit": "83cf626b0a5ab370d5a6da476ea47bbc2a9f728a",
+  "latest_verified_commit": "2a745bb9b455baffe9248f24d39970ea31146b23",
+  "last_pushed_reviewed_below_threshold_commit": "8ae53c4daaed0d2160262aa24a2a0d5178235a96",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -46,15 +47,19 @@
       "title": "Add explicit overflow behavior.",
       "status": "IN PROGRESS",
       "source_evidence": [
-        "compiler/anvil.py: numeric expression generation wraps arithmetic results and operands in anvil_check_number; division checks finite operands/results.",
+        "compiler/anvil.py: numeric expression generation wraps arithmetic results, operands, and all numeric built-in results in anvil_check_number; division checks finite operands/results.",
         "runtime/anvil_runtime.c: anvil_check_number rejects non-finite doubles with source path/line and exit code 2."
       ],
       "tests": [
         "tests/test_compiler.py::CompilerTests::test_non_finite_numeric_results_report_source_location: passed for arithmetic overflow, comparison intermediate, and sqrt(-1)",
         "tests/test_compiler.py::CompilerTests::test_accumulation_and_for_step_overflow_report_source_location: passed for local add, local subtract, and for-loop step overflow",
-        "python -m unittest discover -s tests -q: 59 passed",
+        "tests/test_compiler.py::CompilerTests::test_udp_nan_receive_reports_source_location: passed end-to-end by sending an IEEE NaN UDP payload and checking source path/line and exit code 2",
+        "tests/test_compiler.py::CompilerTests::test_udp_finite_receive_and_missing_socket_remain_supported: passed finite 42.5 payload and unavailable-socket zero behavior",
+        "python -m unittest discover -s tests -q: 61 passed",
+        "npm test --prefix vscode-extension: passed",
         "python -m compileall -q compiler tests: passed",
-        "git diff --check: passed"
+        "git diff --check: passed",
+        "docs/IMPLEMENTATION_STATUS.json and docs/CODEX_AUTONOMOUS_STATE.json: valid JSON"
       ],
       "missing_or_limitations": "Awaiting full-suite verification and independent review. This policy covers non-finite numeric results in expressions; it does not prevent every finite precision loss or integer-style wraparound because Anvil uses double values.",
       "dependencies": [],
@@ -66,7 +71,7 @@
         "Cover direct overflow, non-finite intermediates used in comparisons, and invalid math results.",
         "Document the behavior and get independent review."
       ],
-      "verification_result": "IN PROGRESS: targeted and full native regression suites pass (59 tests); static checks pass; independent review pending.",
+      "verification_result": "IN PROGRESS: the 61-test suite and static checks pass, including end-to-end NaN and finite UDP payloads and unavailable-socket behavior. Review of the prior candidate 8ae53c4 scored 85/100 and findings #30/#31 are fixed in the current candidate; independent re-review pending.",
       "github_issue": "#23",
       "commit": null
     },

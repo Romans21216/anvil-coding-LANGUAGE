@@ -1,7 +1,10 @@
 import pathlib
+import socket
+import struct
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -853,6 +856,90 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_net_host(7777)", generated)
             self.assertIn("anvil_net_send(anvil_local_count)", generated)
             self.assertIn("anvil_net_receive ( )", generated)
+
+    def test_udp_nan_receive_reports_source_location(self):
+        with tempfile.TemporaryDirectory() as temp:
+            port_probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            port_probe.bind(("127.0.0.1", 0))
+            port = port_probe.getsockname()[1]
+            port_probe.close()
+
+            source = pathlib.Path(temp) / "non-finite-network.ANVL"
+            out = pathlib.Path(temp) / "non-finite-network.exe"
+            source.write_text(
+                f"net host({port})\n"
+                "fn(main)\n"
+                "  while 1\n"
+                "    set local(value) = receive()\n"
+                "  end\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+
+            process = subprocess.Popen([str(out)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                payload = struct.pack("<d", float("nan"))
+                deadline = time.monotonic() + 5
+                while process.poll() is None and time.monotonic() < deadline:
+                    sender.sendto(payload, ("127.0.0.1", port))
+                    time.sleep(0.01)
+                stdout, stderr = process.communicate(timeout=1)
+            finally:
+                sender.close()
+                if process.poll() is None:
+                    process.terminate()
+                    process.communicate()
+
+            self.assertEqual(process.returncode, 2, stdout + stderr)
+            self.assertIn(f"{source}:4: numeric overflow or non-finite result", stderr)
+
+    def test_udp_finite_receive_and_missing_socket_remain_supported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            no_socket_source = pathlib.Path(temp) / "no-network.ANVL"
+            no_socket_out = pathlib.Path(temp) / "no-network.exe"
+            no_socket_source.write_text("fn(main)\n  output receive()\nend\ncall fn(main)\n", encoding="utf-8")
+            subprocess.run([sys.executable, str(COMPILER), str(no_socket_source), "--release", "--output", str(no_socket_out)], check=True, capture_output=True, text=True)
+            no_socket_result = subprocess.run([str(no_socket_out)], check=True, capture_output=True, text=True)
+            self.assertEqual(no_socket_result.stdout.strip(), "0")
+
+            port_probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            port_probe.bind(("127.0.0.1", 0))
+            port = port_probe.getsockname()[1]
+            port_probe.close()
+            source = pathlib.Path(temp) / "finite-network.ANVL"
+            out = pathlib.Path(temp) / "finite-network.exe"
+            source.write_text(
+                f"net host({port})\n"
+                "fn(main)\n"
+                "  set local(value) = 0\n"
+                "  while local(value) = 0\n"
+                "    set local(value) = receive()\n"
+                "  end\n"
+                "  output local(value)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            process = subprocess.Popen([str(out)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                payload = struct.pack("<d", 42.5)
+                deadline = time.monotonic() + 5
+                while process.poll() is None and time.monotonic() < deadline:
+                    sender.sendto(payload, ("127.0.0.1", port))
+                    time.sleep(0.01)
+                stdout, stderr = process.communicate(timeout=1)
+            finally:
+                sender.close()
+                if process.poll() is None:
+                    process.terminate()
+                    process.communicate()
+            self.assertEqual(process.returncode, 0, stdout + stderr)
+            self.assertEqual(stdout.strip(), "42.5")
 
     def test_unknown_statement_has_source_location(self):
         with tempfile.TemporaryDirectory() as temp:

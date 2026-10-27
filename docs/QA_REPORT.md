@@ -2,9 +2,9 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **90/100** (commit `2a745bb9b455baffe9248f24d39970ea31146b23`). The reviewer marked it PASS under the then-current 90-point threshold. The user's new required passing score is **98/100**, so this result is below the current threshold.
+**Latest completed independent full review:** **85/100 — FAIL** (commit `8ae53c4daaed0d2160262aa24a2a0d5178235a96`) against the user's **98/100** threshold. It ran 59 Python tests, extension validation, Python compilation, an MSVC release build/run of `numeric_demo.ANVL` (output `17`), and `git diff --check`. It verified issue #23 still holds the full 450-item list. Findings are tracked in [#30](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/30) (non-finite UDP `receive()` bypass) and [#31](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/31) (stale verification metadata). The current candidate fixes both; all 61 Python tests, extension validation, and static checks pass, pending a new review. The previous 90/100 review of `2a745bb` remains historical: it passed the former 90-point bar but is below 98.
 **Current passing threshold:** 98/100, set by the user on 2026-10-27. Historical reviews keep their original scores and results; a historical 90/100 PASS does not meet the new threshold.
-**Review snapshot:** the independent reviewer evaluated exact commit `2a745bb9b455baffe9248f24d39970ea31146b23`, reran all 57 Python tests, VS Code extension validation, and Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), and passed `git diff --check`. It confirmed short-circuit behavior, accurate review history, and that the full 450-item list is in issue #23's body and comment while repository docs contain only an audited subset. It confirmed the item #46 status mismatch from `71b818b` is corrected; issue #29 is resolved and closed. No code defect was found. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
+**Review snapshot:** the latest reviewer evaluated exact commit `8ae53c4daaed0d2160262aa24a2a0d5178235a96`, reran all 59 Python tests, VS Code extension validation, Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), and passed `git diff --check`. It confirmed the full 450-item list remains in issue #23's body and comment, and repository files contain only the audited subset. It found the `receive()` input-validation gap and stale status metadata recorded in issues #30 and #31. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
 
 ## Scope
 
@@ -16,7 +16,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 57 tests, including friction edge cases, division diagnostics, and short-circuit side-effect calls |
+| `python -m unittest discover -s tests -q` | PASS — current candidate: 61 tests, including numeric overflow plus NaN/finite/missing-socket UDP behavior; the latest critic ran 59 tests on `8ae53c4` |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -42,7 +42,11 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Independent 50-criterion review
+## Latest independent review — commit `8ae53c4`
+
+**85/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 16/20; code quality and architecture 17/20; testing and verification 18/20; developer experience and delivery 18/20. The reviewer verified 59 Python tests, VS Code extension validation, Python compilation, MSVC `numeric_demo` build/run (output `17`), `git diff --check`, and issue #23's 450 unique sequential entries. It found: (1) `receive()` can return a NaN/infinity packet without the source-located guard (issue #30); and (2) the structured status files named stale commits and the state file claimed pushed work was local (issue #31). These findings reduce core functionality, input/edge validation, and results-recording scores. The user requires 98/100; this review does not pass.
+
+## Historical independent 50-criterion review — commit `2a745bb`
 
 The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and `51deb5d` scored **90/100 — PASS**. The review of `c4f3ec6` scored **88/100 — FAIL** because four docs contained stale complexity claims. Commit `560cee1` corrected those documents; a fresh independent review confirmed the fix and scored `560cee1` **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The friction feature commit `f7c91b0` scored **87/100 — FAIL** (15/20, 20/20, 17/20, 18/20, 17/20) because of stale high-level feature and QA records plus missing friction edge-case tests. Follow-up commits `e1e3768` and `83891c6` synchronized the records and added those tests. Its independent review scored **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The division-diagnostic commit `12b4e55` also scored **90/100 — PASS** with the same category totals; it reran all 56 tests, extension/Python validation, an MSVC numeric sample build/run, diff check, and verified the 450-item inventory. The reviewer found no defect in the new diagnostic, and item #48 is complete. Remaining deductions concern overall engine scope, compiler structure/platform breadth, and unverified new extension highlighting. See issues #8 and #24.
 
@@ -58,13 +62,13 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 8 | Behavior matches documentation | 2 | Reviewer of `12b4e55` confirmed the runtime division guard, source-located error/exit behavior, regular division, and documentation agree. Earlier friction documentation findings were resolved and independently verified. |
 | 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
 | 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
-| 11 | Core functionality works | 2 | Compiler, native runtime, camera, rendering, CPU BVH ray spheres, and limited 2D circle/axis-aligned-box physics build. |
+| 11 | Core functionality works | 1 | **Latest finding:** `receive()` can return a non-finite UDP value without the promised expression diagnostic; tracked in issue #30. |
 | 12 | Secondary functionality works | 2 | Timing, input, math/noise, networking primitive, and native-tested `while`/`for` loops are covered. |
 | 13 | Primary workflows functional | 2 | Direct source and manifest build/run workflows pass. |
-| 14 | Inputs validated | 2 | Syntax, arity, references, manifest fields, paths, rates, and ports are checked. |
+| 14 | Inputs validated | 1 | **Latest finding:** a full-size UDP NaN/infinity payload bypasses the numeric guard; issue #30. |
 | 15 | Errors handled gracefully | 2 | The 16 MiB active-array budget fails with exit code 2 and a source-located diagnostic instead of exhausting the OS stack. |
-| 16 | Edge cases covered | 2 | Tests cover recursion isolation, allocation limits, array bounds, stale physics handles, capacity, collision timing, numeric clamps, and repeated physics output. |
-| 17 | Invalid inputs controlled | 2 | Malformed inputs are rejected before generating/building C. |
+| 16 | Edge cases covered | 1 | **Latest finding:** non-finite network payloads were not tested or rejected; issue #30. Other recursion, array, and physics edges remain covered. |
+| 17 | Invalid inputs controlled | 1 | **Latest finding:** `receive()` accepts a full-size NaN/infinity packet into the numeric runtime; issue #30. |
 | 18 | Stable across repeated operations | 2 | Compiler/runtime tests and repeatable random/noise checks pass. |
 | 19 | No known critical defects | 2 | The recursive-array stack-exhaustion finding is fixed; the physics reviewer found no critical issue in the reviewed physics paths. |
 | 20 | Components integrate | 2 | Compiler, generated C, runtime, manifest, extension, and networking sample integrate. |
@@ -78,15 +82,15 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 28 | No unfinished placeholders | 2 | Unsupported capabilities are described as future work. |
 | 29 | Configuration understandable | 2 | TOML project settings are explicit and validated. |
 | 30 | Conventions followed | 2 | Current Python, C, TOML, and extension conventions are adequate. |
-| 31 | Automated tests provided | 2 | Independent review of `83cf626` ran 57 Python tests successfully. |
+| 31 | Automated tests provided | 2 | Latest independent review ran 59 Python tests successfully, including overflow, accumulation, and loop-step cases. |
 | 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, circle/box collisions, pool capacity, and generated executable paths are covered. |
 | 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
 | 34 | Edge cases explicitly tested | 2 | The current suite covers recursive allocation exhaustion/cleanup plus physics contact timing, extreme velocity/coordinate bounds, and repeatability. |
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 2 | Review of `2a745bb` confirmed the evaluation says item #46 is complete and accurately preserves the 89-point historical finding on `71b818b`. Issue #29 is closed. |
-| 39 | Regression checks performed | 2 | Independent review reran all 57 tests and extension validation; native integration covers mixed-shape solver, pool capacity, friction, and short-circuit behavior. |
+| 38 | Results recorded accurately | 1 | **Latest finding:** structured status and resumable state disagreed on reviewed/current/pushed commit IDs; issue #31. |
+| 39 | Regression checks performed | 2 | The independent review reran all 59 tests, extension validation, Python compilation, MSVC numeric demo, and diff check. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
@@ -99,11 +103,11 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
 | | **Requirement fulfillment** | **16/20** | |
-| | **Functionality and reliability** | **20/20** | |
+| | **Functionality and reliability** | **16/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **19/20** | |
+| | **Testing and verification** | **18/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **90/100** | Reviewer PASS under the prior 90-point threshold; below the new 98-point requirement. |
+| | **Total** | **85/100** | Latest review FAIL under the 98-point requirement. |
 
 ### Deduction details and follow-up
 

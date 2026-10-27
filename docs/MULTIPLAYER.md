@@ -17,7 +17,7 @@ The Windows loopback smoke check ran both executables at once: the client increm
 
 ## Limits
 
-Packets are unencrypted, unauthenticated, unreliable UDP datagrams containing a platform-native `double`. The runtime currently remembers a single peer and does not implement peer limits, matchmaking, reliability, state replication, interpolation, reconnection, anti-cheat, or malformed-packet policy. Use it only for trusted local-network experiments, not public servers or sensitive data. Network calls are opt-in; offline games do not create a socket.
+Packets are unencrypted, unauthenticated, unreliable UDP datagrams containing a platform-native `double`. A received value that is NaN or infinite is rejected by the numeric-expression guard with the `.ANVL` source path and line and exit code 2. Datagrams with a length other than one `double` are ignored. The runtime currently remembers a single peer and does not implement peer limits, matchmaking, reliability, state replication, interpolation, reconnection, or anti-cheat. Use it only for trusted local-network experiments, not public servers or sensitive data. Network calls are opt-in; offline games do not create a socket.
 
 A production multiplayer layer needs a versioned portable packet format, bounded serialization, peer/session lifecycle, validation, rate limits, and a reviewed transport/security design. That work is not represented as complete here.
 

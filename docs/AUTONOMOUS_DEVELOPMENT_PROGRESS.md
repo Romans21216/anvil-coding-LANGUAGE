@@ -62,8 +62,8 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Features:** Backlog item #47 now rejects numeric expressions that produce NaN or infinity. `anvil_check_number` reports the `.ANVL` source path and line and exits with code 2; arithmetic intermediates are checked before comparisons. Division by zero retains its distinct diagnostic.
 - **Backlog:** #47 is IN PROGRESS pending full-suite validation and independent review.
 - **Files:** `compiler/anvil.py`, runtime C API/implementation, compiler tests, language/compiler/wiki docs, and the compact audited status ledger.
-- **Tests:** Native regression coverage passes for direct multiplication overflow, overflow inside a comparison, invalid `sqrt(-1)`, local add/sub accumulation, and `for` step overflow. `python -m unittest discover -s tests -q` — 59 passed; `python -m compileall -q compiler tests` — passed; `git diff --check` — passed. Root `npm test` is not applicable because this repository has no root `package.json`.
-- **Review:** Pending. The latest 90/100 remains below the new 98/100 requirement; this slice will be evaluated against that threshold.
-- **Commit/push:** Pending.
+- **Tests:** Native regression coverage passes for direct multiplication overflow, overflow inside a comparison, invalid `sqrt(-1)`, local add/sub accumulation, `for` step overflow, a UDP NaN datagram, finite UDP value, and no-socket receive. `python -m unittest discover -s tests -q` — 61 passed; `npm test --prefix vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; JSON validation and `git diff --check` — passed.
+- **Review:** Commit `8ae53c4daaed0d2160262aa24a2a0d5178235a96` scored **85/100 — FAIL** against the new 98/100 requirement. The reviewer found UDP `receive()` could bypass the finite-number check and stale verification metadata; both findings are in issues [#30](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/30) and [#31](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/31). This candidate fixes both; independent re-review pending.
+- **Commit/push:** Fix candidate pending.
 - **Limitations:** Anvil currently uses doubles; this detects non-finite outcomes but does not detect all finite precision loss or introduce integer overflow semantics.
-- **Next batch:** Request the independent critic, then update evaluation and the status ledger against the 98-point bar.
+- **Next batch:** Commit/push this fix and request the independent critic; update the evaluation and status records after the new score.
