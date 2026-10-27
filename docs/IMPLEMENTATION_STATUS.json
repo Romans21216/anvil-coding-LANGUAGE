@@ -10,10 +10,10 @@
     "IN PROGRESS": 0
   },
   "latest_verified_commit": "ed08f43ca0d9beb5440f18fade48faf556694b1f",
-  "latest_independently_reviewed_candidate_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
+  "latest_independently_reviewed_candidate_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
-  "latest_followup_status_change": "Independent review of 727d349 confirmed issues #35/#36 are fixed; the 50-row criterion sum and category total both equal 89, and Markdown/JSON status counts agree.",
+  "last_pushed_reviewed_below_threshold_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
+  "latest_followup_status_change": "Independent review of 702d879 confirmed issues #35/#36 are fixed; the 50-row criterion sum and category total both equal 89, and Markdown/JSON status counts agree.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {

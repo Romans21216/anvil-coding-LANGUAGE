@@ -6,14 +6,14 @@
   "last_completed_backlog_item": 49,
   "current_active_item": 50,
   "current_active_item_status": "Backlog item #49 and critic follow-ups #32–#36 are complete. Documentation review of 727d349 confirmed score arithmetic, Markdown/JSON counts, and the 450-item issue #23 invariant. Latest score is 89/100, below 98; proceed with backlog item #50 and broader deductions.",
-  "current_candidate_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
-  "latest_verified_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
-  "last_pushed_reviewed_below_threshold_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
-  "latest_independently_reviewed_candidate_commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
+  "current_candidate_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
+  "latest_verified_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
+  "last_pushed_reviewed_below_threshold_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
+  "latest_independently_reviewed_candidate_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Exact documentation snapshot 727d349 scored 89/100 against 98/100. Critic confirmed #34–#36 follow-ups are resolved, rubric scores sum to 89, Markdown and JSON counts agree, and issue #23 remains the sole full-list location.",
+  "latest_push_result": "Exact documentation snapshot 702d879 scored 89/100 against 98/100. Critic confirmed #34–#36 follow-ups are resolved, rubric scores sum to 89, Markdown and JSON counts agree, and issue #23 remains the sole full-list location.",
   "latest_independent_review": {
-    "commit": "727d349b94f226e2ff7d4fa76e2828495fda8050",
+    "commit": "702d8792d4270a75c0db67b2300fc03da3409240",
     "score": 89,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
@@ -50,7 +50,7 @@
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "Latest exact review 727d349 scored 89/100 and confirmed score arithmetic, Markdown/JSON status synchronization, and 450-item source-of-truth consistency. Issues #32–#36 are fixed and closed. No documentation review remains pending; continue work toward the 98/100 threshold.",
+  "pending_documentation_review": "Latest exact review 702d879 scored 89/100 and confirmed score arithmetic, Markdown/JSON status synchronization, and 450-item source-of-truth consistency. Issues #32–#36 are fixed and closed. No documentation review remains pending; continue work toward the 98/100 threshold.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
