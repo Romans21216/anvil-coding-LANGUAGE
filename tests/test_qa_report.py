@@ -22,8 +22,20 @@ class QaReportValidationTests(unittest.TestCase):
 
     def test_accepts_valid_rubric_with_zero_point_criterion(self):
         report = REPORT.read_text(encoding="utf-8")
-        score_rows = re.findall(r"^\| (\d+) \| [^\n]*? \| ([012]) \|", report, re.MULTILINE)
-        criterion, old_score = next((int(n), int(score)) for n, score in score_rows if int(score) == 2)
+        start = report.find("| # | Criterion | Score | Evidence, deduction, and status |")
+        end = report.find("### Deduction details and follow-up", start)
+        self.assertGreaterEqual(start, 0)
+        self.assertGreater(end, start)
+        score_rows = re.findall(
+            r"^\| (\d+) \| [^\n]*? \| ([012]) \|",
+            report[start:end],
+            re.MULTILINE,
+        )
+        criterion, old_score = next(
+            (int(number), int(score))
+            for number, score in score_rows
+            if int(score) == 2
+        )
         row = re.compile(rf"^(\| {criterion} \| [^|\n]* \| )2( \|)", re.MULTILINE)
         report, count = row.subn(r"\g<1>0\g<2>", report, count=1)
         self.assertEqual(count, 1)
@@ -72,7 +84,16 @@ class QaReportValidationTests(unittest.TestCase):
 
     def test_rejects_mismatched_category_subtotal(self):
         report = REPORT.read_text(encoding="utf-8")
-        report = report.replace("**Requirement fulfillment** | **16/20**", "**Requirement fulfillment** | **15/20**", 1)
+        row = re.compile(
+            r"^(\| \| \*\*Requirement fulfillment\*\* \| \*\*)(\d+)(/20\*\* \|.*)$",
+            re.MULTILINE,
+        )
+        report, count = row.subn(
+            lambda match: f"{match.group(1)}{int(match.group(2)) - 1}{match.group(3)}",
+            report,
+            count=1,
+        )
+        self.assertEqual(count, 1)
         with tempfile.TemporaryDirectory() as temp_dir:
             report_path = pathlib.Path(temp_dir) / "QA_REPORT.md"
             report_path.write_text(report, encoding="utf-8")

@@ -2,7 +2,7 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27. The latest independent review scored the pre-short-circuit direct-native working-tree candidate 49/100 — FAIL against 98; that review has no commit SHA. The prior exact committed C-backed evaluation remains 92/100 on `c10260483eab6b5adaadd261a66a92a9138b9ed8`. The post-review native short-circuit/for-loop follow-up passes 7 focused tests and the full 86-test suite but has no independent score. Issue #49 tracks fractional output truncation. The earlier BMP candidate `9d9bf90e62e3e75ea94de7828d86800cbd382c99` had 79 tests and an MSVC image sample build; it is not a native backend review.
+Updated 2026-10-27. Latest independent review is exact commit `573cb447b6ebb6e8a9056518300384b0eaebc60e` at 50/100 — FAIL against 98. The review found two QA fixture failures and fractional native output truncation; issue #49 remains open. QA tests were repaired locally and the full 86-test suite now passes; this post-review fix is uncommitted and unreviewed. Prior C-backed score 92/100 remains tied to c102604.
 
 ## Status counts
 

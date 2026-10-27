@@ -39,4 +39,4 @@ The regular build still defaults to the existing C backend. The native backend d
 - Native regression tests cover code generation, PE metadata/fixups, execution, resource lifetime, and engine behavior.
 - Documentation and evaluation reports distinguish implemented native features from migration work still in progress.
 
-The last reviewed committed C-backed project snapshot scored 92/100, below the required 98/100. The pre-short-circuit native working-tree candidate was independently scored 49/100. The short-circuit and `for` loop follow-ups are not yet independently scored; see `docs/ANVIL_EVALUATION.txt`.
+The last reviewed committed C-backed project snapshot scored 92/100, below the required 98/100. The direct-native commit `573cb447b6ebb6e8a9056518300384b0eaebc60e` was independently scored 50/100. QA test fixtures were repaired afterward and all 86 tests pass locally, but the follow-up is not yet independently scored; see `docs/ANVIL_EVALUATION.txt`.
