@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import sys
+import argparse
 from pathlib import Path
 
 
@@ -18,7 +19,13 @@ def fail(message: str) -> int:
 
 
 def main() -> int:
-    report = REPORT.read_text(encoding="utf-8")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--report", type=Path, default=REPORT, help="QA report Markdown file to validate")
+    args = parser.parse_args()
+    try:
+        report = args.report.read_text(encoding="utf-8")
+    except OSError as exc:
+        return fail(f"cannot read {args.report}: {exc}")
     table_start = report.find("| # | Criterion | Score | Evidence, deduction, and status |")
     table_end = report.find("### Deduction details and follow-up", table_start)
     if table_start < 0 or table_end < 0:
@@ -27,7 +34,7 @@ def main() -> int:
     table = report[table_start:table_end]
     criterion_rows = [
         (int(number), int(score))
-        for number, score in re.findall(r"^\| (\d+) \| [^\n]*? \| ([12]) \|", table, re.MULTILINE)
+        for number, score in re.findall(r"^\| (\d+) \| [^\n]*? \| ([012]) \|", table, re.MULTILINE)
     ]
     criteria = dict(criterion_rows)
     if len(criterion_rows) != 50 or set(criteria) != set(range(1, 51)):

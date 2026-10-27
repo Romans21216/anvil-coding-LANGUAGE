@@ -150,3 +150,19 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Confirmed:** All 50 criterion rows total 89; the category subtotals match; the implementation inventory totals 450 (13 complete, 3 partial, 434 needing verification, 0 in progress).
 - **Findings:** QA_REPORT.md still labeled the current candidate as 64 tests instead of 67, described closed issue #43 as open, and had no committed arithmetic validator. Criterion 38 remained 1/2. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) remains open and labeled `Codex Bugs`.
 - **Follow-up prepared:** Corrected the stale lines and added `scripts/validate_qa_report.py`, documented in README. The script checks all 50 criteria, five category subtotals, and total against the current evaluation score. Its first run exposed a parser-pattern issue; that was corrected, and it now reports 50 criteria = 89/100 with matching category subtotals. A fresh critic review is pending.
+
+
+### QA arithmetic validator critic — exact commit `0c75929`
+
+- **Score:** 89/100 — FAIL against 98. Categories: 16/20, 20/20, 17/20, 18/20, 18/20. Criterion 38 remains 1/2.
+- **Confirmed:** The 50 criterion rows and categories sum to 89; status ledgers agree at 450 items; the validator accepts the current rubric and rejects a malformed subtotal.
+- **Finding:** `scripts/validate_qa_report.py` uses a score pattern that excludes valid `0` scores. The critic proved a valid rubric with a zero-scored criterion and matching 98 total is rejected. Tracked in open [issue #44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44), labeled `Codex Bugs`.
+- **Evaluation:** Updated the QA report, full evaluation, implementation ledgers, autonomous state, and this log immediately after the review. Fix the parser and add a zero-score regression before asking for another review.
+
+
+### Issue #44 zero-score correction candidate
+
+- **Fix:** The QA validator now accepts criterion scores from 0 through 2 and provides `--report` for testing alternate report fixtures.
+- **Regression:** Added `tests/test_qa_report.py` cases for a consistent rubric containing a 0-point criterion (total 87) and rejection of a mismatched category subtotal.
+- **Validation:** Targeted QA tests pass (2); full Python suite passes (69); QA validator, Python compilation, extension validation, and `git diff --check` pass.
+- **Review state:** The latest independent result remains 89/100 on `0c75929`; this corrected candidate is not yet reviewed. Issue #44 remains open pending independent confirmation.

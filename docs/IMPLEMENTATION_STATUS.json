@@ -10,10 +10,10 @@
     "IN PROGRESS": 0
   },
   "latest_verified_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
-  "latest_independently_reviewed_candidate_commit": "ff8428d45c8455719e87151e4c4fede4214fef08",
+  "latest_independently_reviewed_candidate_commit": "0c7592944d25123510e197a07ea32040689f1522",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "ff8428d45c8455719e87151e4c4fede4214fef08",
-  "latest_followup_status_change": "Independent review of exact docs commit ff8428d scored 89/100 against 98. It verified 50 rubric rows/category arithmetic and 450 ledger counts, but found stale current-test-count and issue #43 status text plus no persistent arithmetic check. Issue #44 remains open as Codex Bugs.",
+  "last_pushed_reviewed_below_threshold_commit": "0c7592944d25123510e197a07ea32040689f1522",
+  "latest_followup_status_change": "Independent review of exact commit 0c75929 scored 89/100 against 98 and found score-0 parsing missing in the QA arithmetic validator. The follow-up candidate accepts zero and adds tests; the full suite passes 69. Issue #44 remains open pending fresh independent review.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -155,7 +155,8 @@
       "tests": [
         "Independent critic of 65c15bf verified 67 Python tests, npm extension validation, Python compileall, and git diff --check",
         "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37–#43 are resolved",
-        "MSVC release build/run of the specification conformance sample previously produced output 6"
+        "MSVC release build/run of the specification conformance sample previously produced output 6",
+        "QA follow-up candidate: tests/test_qa_report.py verifies valid zero-score rubrics and rejects category subtotal mismatches; full suite 69 passed"
       ],
       "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
       "dependencies": [],

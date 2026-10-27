@@ -1,10 +1,10 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **89/100 — FAIL** (exact commit `ff8428d45c8455719e87151e4c4fede4214fef08`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 17/20, testing 18/20, delivery 18/20.
+**Latest independent evaluation:** **89/100 — FAIL** (exact commit `0c7592944d25123510e197a07ea32040689f1522`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 17/20, testing 18/20, delivery 18/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
-**Latest review evidence:** the critic verified all 50 rubric rows sum to 89 and category totals 16/20, 20/20, 17/20, 18/20, and 18/20. It confirmed the Markdown/JSON inventory totals 450 (13 complete, 3 partial, 434 needing verification, 0 in progress; 16 audited entries), the 67-test result on the prior implementation snapshot, and `git diff --check`. It did not rerun Python or npm suites on this documentation-only commit. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
-**Latest finding:** the reviewer found the table arithmetic corrected, but also found a stale 64-test line, a stale statement that issue #43 is open, and no committed repeatable arithmetic check. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) remains open with label `Codex Bugs`. These follow-ups are being corrected; this new candidate needs review.
+**Latest review evidence:** the critic verified the current report totals 50 criteria = 89 and category totals 16/20, 20/20, 17/20, 18/20, and 18/20; it checked README invocation and ledgers, and tested the validator on both the committed report and a malformed subtotal. It found a validator bug: valid criterion score 0 is excluded by its parser. The critic retained 89/100 (16/20, 20/20, 17/20, 18/20, 18/20). It did not rerun the project test suites on this documentation-only commit. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
+**Latest finding:** review of `0c75929` found that `scripts/validate_qa_report.py` rejected allowed 0-point criteria. The parser now accepts 0, and `tests/test_qa_report.py` verifies a valid zero-score rubric and rejects a mismatched subtotal. The correction candidate has not yet received independent review; issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) remains open until then.
 
 ## Scope
 
@@ -16,7 +16,9 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — latest independently verified implementation snapshot: 67 tests, including numeric overflow, UDP NaN/finite/missing-socket behavior, duplicate display-modifier rejection, and a 5,000-digit size/version diagnostic |
+| `python -m unittest discover -s tests -q` | PASS — 69 tests on the current follow-up candidate; includes numeric overflow, UDP behavior, language-spec regressions, and QA validator tests. The latest independent implementation review ran 67 tests on `65c15bf` |
+| `python -m unittest discover -s tests -p test_qa_report.py -v` | PASS — zero-score rubric accepted; mismatched category subtotal rejected |
+| `python scripts/validate_qa_report.py` | PASS — 50 criteria total 89/100; category subtotals agree |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -43,7 +45,7 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Latest independent review — evaluation synchronization snapshot `ff8428d`
+## Latest independent review — QA validator snapshot `0c75929`
 
 **89/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 18/20; developer experience and delivery 18/20. The critic evaluated exact commit `65c15bf002c1bad268aec2bd68e7b184fd110c33`, ran 67 Python tests, extension validation, Python compilation, and `git diff --check`; all passed. The reviewer confirmed issue #43's duplicate display-modifier correction and the 450-entry sequential issue #23 backlog. It found that this report's narrative said 88 while its displayed criterion/category totals added to 84. The arithmetic mismatch is tracked in [issue #44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44), labeled `Codex Bugs`. The user-set 98-point threshold remains unmet. The reviewer did not rerun MSVC builds on this exact snapshot.
 
@@ -90,7 +92,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 1 | **Finding on `ff8428d`:** the arithmetic had been corrected, but QA still said 64 tests were current, said resolved issue #43 was open, and had no persistent rubric arithmetic check. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) tracks these synchronization gaps. |
+| 38 | Results recorded accurately | 1 | **Finding on `0c75929`:** the committed arithmetic validator rejects valid rubric rows scored 0. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) tracks the validator defect and needed zero-score regression. |
 | 39 | Regression checks performed | 2 | The independent review of `ed08f43` reran 64 tests, extension validation, Python compilation, MSVC numeric demo, and diff check. The previous wording incorrectly reported 61 for `2dd1d8e`, which ran 63. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
@@ -112,7 +114,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 
 ### Deduction details and follow-up
 
-- **Latest critic finding on `ff8428d` (89/100 — FAIL; required pass score 98).** The criterion rows sum to 89 and category totals match, but the critic found stale 64-test/current-candidate wording, an incorrect claim that #43 remains open, and no committed arithmetic validator. These exact follow-ups remain in issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44), labeled `Codex Bugs`.
+- **Latest critic finding on `0c75929` (89/100 — FAIL; required pass score 98).** The report arithmetic and ledgers now agree, but the new validator excludes a valid 0-point criterion row. Add a zero-score regression and fix the parser; issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) remains open and labeled `Codex Bugs`.
 
 - **Previous critic finding on `0abba63` (88/100 — FAIL; required pass score 98; resolved).** Issue [#43](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/43), labeled `Codex Bugs`, records exact reproduction: `display text("Hi") -l(1,2) -l(3,4)` is admitted by the repeated-style grammar but rejected by `emit_display` because a second location modifier remains in the command. Restrict the spec to at most one location and one rotation modifier. The critic confirmed prior findings #37–#42 were fixed; those issues have resolution comments and are closed.
 - **Previous deductions on criteria 8 and 44 — resolved.** The `65c15bf` critic confirmed the duplicate-modifier grammar now matches the compiler. Broader requirement and practical-scope deductions remain because the engine is still a prototype. The latest review corrected input/error/edge-case rows 14–17 to 2 after verifying the new guards and regressions.
