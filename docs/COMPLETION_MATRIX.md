@@ -1,0 +1,35 @@
+# Anvil Request Completion Matrix
+
+This matrix tracks the user's original Anvil language and game-engine request against the current implementation. A high evaluator score measures the quality of the delivered prototype; it does not mean every requested engine system is complete.
+
+Status meanings: **Implemented** means code and verification exist for the stated scope. **Partial** means some usable behavior exists but the requested scope is not met. **Missing** means no working implementation is available.
+
+| Requested capability | Status | Current evidence | Remaining work / tracking |
+|---|---|---|---|
+| Simple BASIC/Lua-inspired language with named functions, parameters, and returns | Partial | `fn(name, parameters...)`, `call fn(...)`, `output`, numeric expressions, branches and loops are parsed and compiled; `tests/test_compiler.py` covers functions and control flow. | Dynamic values, richer types, general strings, and broader language semantics remain. See issue [#9](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9). |
+| Dedicated source format and selected language name | Implemented | Anvil source uses `.ANVL`; VS Code registers language ID `anvil` for `.ANVL` and `.anvl`. | The format is project-specific; no claim is made that no other software uses a similar suffix. |
+| Compiler that translates source to native executable code | Partial | Compiler validates Anvil, emits C, and invokes MSVC to create Windows `.exe` files; samples and integration tests build. | Only Windows/MSVC C output is implemented; Rust output and other host platforms are missing. See issue [#11](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11). |
+| 2D rendering | Partial | Software renderer supports rectangles, circles, lines, and text; examples and runtime integration checks exist. | Fixed 960×600 surface; no resize, GPU rasterization, broad clipping coverage, or production renderer. |
+| 3D worlds and camera controls | Partial | Software-rendered cubes, spheres, planes, perspective camera, FOV, and keyboard movement/turning are implemented. | No mesh/texture pipeline, scene graph, GPU raster backend, or broad performance evidence. |
+| Built-in ray-traced drawing | Partial | `display ray_sphere(x,y,z,radius)` traces up to 32 spheres per batch using CPU BVH traversal, diffuse/specular lighting, and hard shadows. Projection-bound regressions cover off-axis and near-camera silhouettes. | There is no backend selection function. RTX/DXR and Embree implementations are missing. The user requested choosing among DXR, BVH, and Embree. See issue [#5](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5). |
+| Camera and ray-tracing APIs documented as built-ins | Partial | Camera controls and `ray_sphere` are documented in the language and engine guides and included in compiler generation. | Document and implement the requested backend selector and backend availability behavior. |
+| Procedural math (random/noise) | Implemented | Seeded random and deterministic gradient/fractal noise built-ins are implemented and repeatability-tested. | Broader distributions/noise families are not part of the present scope. |
+| Multiplayer support | Partial | Windows UDP host/join can exchange a numeric value; client/host examples link and API generation has tests. | No structured messages, reliable delivery, robust peer lifecycle, validation protocol, or Internet-ready security. See issue [#10](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10). |
+| Physics | Partial | Fixed-step 2D circle bodies support force, gravity, restitution, overlap/collision queries, bounded impulse resolution, and 128 generation-tagged slots; 46-test suite includes native physics cases. | No 3D/polygon shapes, friction, joints, continuous collision detection, or broad phase. See issue [#8](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8). |
+| Assets and audio | Missing | No engine-managed asset import/resource pipeline or audio playback API is present. | Asset loading/packaging is issue [#6](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6); audio is issue [#7](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7). |
+| Wiki, runtime, compiler, and user documentation | Implemented for current scope | `docs/Wiki/` includes Getting Started, language reference, engine runtime, compiler/build, multiplayer, bug reporting, and roadmap. | Documentation must continue to track implementations rather than planned systems. |
+| VS Code support for `.ANVL` | Implemented | Extension 0.1.3 is packaged, installed, and visually checked in VS Code with `examples/physics.ANVL`; automated grammar/package tests pass. | No autocomplete, diagnostics, or debugger integration yet. |
+| Fix sphere silhouettes cut off by a straight edge | Implemented for tested projection path | `tests/test_runtime.py::test_projected_sphere_bounds_contain_off_axis_silhouettes` compiles the production projection helper and checks sampled surfaces across centered/off-axis/near-camera cases. | This does not prove every renderer primitive is clipped correctly. |
+| Exact evaluator findings tracked as GitHub issues | Implemented as process | Findings use the `Codex Bugs` label and detailed reproductions/acceptance criteria; physics and extension findings were updated for current behavior. | Keep issue bodies synchronized as fixes land. Overall requirements tracking is this document and issue [#15](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15). |
+| Performance / “hyper-efficient” claim | Missing evidence | Ahead-of-time C generation and `/O2` builds exist, but no performance measurements support an efficiency claim. | Add reproducible compiler, raster, physics, and ray-tracing benchmarks before describing performance as high. See issue [#14](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14). |
+
+## Verified baseline
+
+- Reviewed implementation: commit `64a4101` (physics release); QA-only review record is in commit `c67bc20`.
+- Independent evaluation: **91/100 — PASS** for the 50-point quality rubric, not a claim that all capabilities above are implemented.
+- `python -m unittest discover -s tests -v`: 46 tests passed.
+- `npm test --prefix vscode-extension`: passed.
+- Native MSVC release build of `examples/physics.ANVL`: passed.
+- VS Code 1.143.1 with extension 0.1.3: Anvil mode and visible syntax highlighting confirmed for `examples/physics.ANVL`.
+
+The overall engine goal remains in progress while any requested row is Partial or Missing. The next engine milestone should implement actual selectable ray-tracing backends, starting with an API and capability contract that reports unsupported hardware truthfully.
