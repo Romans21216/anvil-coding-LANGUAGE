@@ -27,12 +27,12 @@ Status meanings: **Implemented** means code and verification exist for the state
 
 ## Verified baseline
 
-- Last independently reviewed implementation: commit `7efdfb0`; current box-physics change awaits independent evaluation.
-- Previous independent evaluation: **90/100 — PASS** for the 50-point quality rubric, not a claim that all capabilities above are implemented.
-- `python -m unittest discover -s tests -v`: 50 tests passed, including native mixed circle/box and box/box cases.
+- Last independently reviewed implementation: commit `0d3b5ed`.
+- Independent evaluation: **90/100 — PASS** for the 50-criterion quality rubric, not a claim that all capabilities above are implemented. The review records specific remaining scope and editor-verification deductions.
+- `python -m unittest discover -s tests -v`: 50 tests passed, including native mixed circle/box, box/box, and embedded-circle cases.
 - `npm test --prefix vscode-extension`: passed with `body_create_box` token validation.
 - `npm test --prefix vscode-extension`: passed.
 - Native MSVC release build of `examples/physics.ANVL`: passed.
 - VS Code 1.143.1 with extension 0.1.4 remains installed; 0.1.5 is packaged but not installed. Earlier visual verification covered `examples/ray_backends.ANVL` and backend built-ins; box builtin highlighting is grammar-tested but awaits user-approved visible installation verification.
 
-The overall engine goal remains in progress while any requested row is Partial or Missing. Next priorities include broader physics shapes and stability, actual selectable ray-tracing backends, graphics assets, and portability.
+The overall engine goal remains in progress while any requested row is Partial or Missing. Next priorities include broader physics shapes and stability, actual selectable ray-tracing backends, graphics assets, and portability. Extension 0.1.5 is packaged with `body_create_box` highlighting and automated grammar validation; it was not installed, so visible verification is tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24) pending user approval.
