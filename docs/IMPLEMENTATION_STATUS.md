@@ -2,7 +2,7 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27 after independent review of exact commit `65c15bf002c1bad268aec2bd68e7b184fd110c33`; the latest evaluation is 89/100, below the required 98/100 bar. The critic confirmed issue #43 fixed/closed and ran 67 tests plus extension/Python/diff checks. It found QA report arithmetic drift, tracked in open issue #44 labeled `Codex Bugs`. Item #50 is COMPLETE: the critic confirmed the specification matches implemented language behavior. The latest review did not rerun MSVC builds.
+Updated 2026-10-27 after independent review of exact commit `ff8428d45c8455719e87151e4c4fede4214fef08`; the latest evaluation is 89/100, below the required 98/100 bar. The critic confirmed QA rubric arithmetic and ledger totals, but found a stale test count, stale issue #43 status, and no persistent rubric validator. These remain tracked in open issue #44 labeled `Codex Bugs`. Item #50 is COMPLETE: the critic confirmed the specification matches implemented language behavior. The review did not rerun test suites or MSVC builds on the docs-only snapshot.
 
 ## Status counts
 

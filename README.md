@@ -34,6 +34,7 @@ This writes inspectable C and compiles it with MSVC. To only translate Anvil to 
 
 ```powershell
 python -m unittest discover -s tests -v
+python scripts/validate_qa_report.py
 npm ci --prefix vscode-extension
 npm test --prefix vscode-extension
 ```

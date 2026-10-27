@@ -142,3 +142,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Completion:** Item #50 is marked COMPLETE after the critic verified the specification matches the current compiler. Issues #37–#43 are resolved.
 - **Finding:** QA rubric arithmetic was stale: the previous narrative reported 88 while displayed rows summed to 84. Tracked in [issue #44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44), labeled `Codex Bugs`.
 - **Evaluation sync:** Updated this progress log, QA report, full evaluation, Markdown/JSON implementation ledgers, and autonomous state to exact reviewed commit `65c15bf002c1bad268aec2bd68e7b184fd110c33`. Latest category totals: 16/20, 20/20, 17/20, 18/20, 18/20 (89/100). This synchronization commit needs a fresh critic review; 98 remains unmet.
+
+
+### QA follow-up critic — exact commit `ff8428d`
+
+- **Score:** 89/100 — FAIL against the user's 98/100 requirement. Categories: 16/20, 20/20, 17/20, 18/20, 18/20.
+- **Confirmed:** All 50 criterion rows total 89; the category subtotals match; the implementation inventory totals 450 (13 complete, 3 partial, 434 needing verification, 0 in progress).
+- **Findings:** QA_REPORT.md still labeled the current candidate as 64 tests instead of 67, described closed issue #43 as open, and had no committed arithmetic validator. Criterion 38 remained 1/2. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) remains open and labeled `Codex Bugs`.
+- **Follow-up prepared:** Corrected the stale lines and added `scripts/validate_qa_report.py`, documented in README. The script checks all 50 criteria, five category subtotals, and total against the current evaluation score. Its first run exposed a parser-pattern issue; that was corrected, and it now reports 50 criteria = 89/100 with matching category subtotals. A fresh critic review is pending.

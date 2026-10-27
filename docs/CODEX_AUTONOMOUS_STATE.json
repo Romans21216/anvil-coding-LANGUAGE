@@ -5,15 +5,15 @@
   "last_completed_batch": 9,
   "last_completed_backlog_item": 50,
   "current_active_item": null,
-  "current_active_item_status": "Backlog item #50 is complete: critic 65c15bf confirmed the formal specification matches the compiler and verified 67 tests, extension validation, Python compilation, and diff check. The evaluation scored 89/100, below 98; QA arithmetic issue #44 is open.",
+  "current_active_item_status": "Backlog item #50 is complete: critic 65c15bf confirmed the formal specification matches compiler behavior. The latest docs review ff8428d scored 89/100, below 98; issue #44 remains open for stale QA status and a persistent arithmetic validator.",
   "current_candidate_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
   "latest_verified_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
-  "last_pushed_reviewed_below_threshold_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
-  "latest_independently_reviewed_candidate_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
+  "last_pushed_reviewed_below_threshold_commit": "ff8428d45c8455719e87151e4c4fede4214fef08",
+  "latest_independently_reviewed_candidate_commit": "ff8428d45c8455719e87151e4c4fede4214fef08",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Exact review commit 65c15bf scored 89/100 — FAIL against 98/100. The critic verified 67 tests, extension/Python/diff checks, issue #23, and the fix for #43; it found QA arithmetic mismatch #44.",
+  "latest_push_result": "Exact docs review commit ff8428d scored 89/100 — FAIL against 98. Rubric arithmetic and ledger counts match; critic found stale current test-count and issue #43 status text and no persistent arithmetic check, tracked in issue #44.",
   "latest_independent_review": {
-    "commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
+    "commit": "ff8428d45c8455719e87151e4c4fede4214fef08",
     "score": 89,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
@@ -22,7 +22,7 @@
     "findings": [
       {
         "issue": 44,
-        "summary": "QA report narrative and displayed criterion/category arithmetic disagree; latest prior review says 88 while table adds to 84."
+        "summary": "QA report has stale current test-count and issue #43 status statements, and lacks a persistent arithmetic validator; criterion 38 remains partial."
       }
     ],
     "categories": {
@@ -52,17 +52,17 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "67 passed; independently rerun by critic on exact reviewed commit 65c15bf",
-    "vscode_extension_validation": "passed on exact reviewed commit 65c15bf",
-    "python_compile": "passed on exact reviewed commit 65c15bf (python -m compileall -q compiler tests)",
+    "python_unittest": "67 passed on implementation review snapshot 65c15bf; not rerun on docs-only review commit ff8428d",
+    "vscode_extension_validation": "passed on implementation review snapshot 65c15bf; not rerun on docs-only review commit ff8428d",
+    "python_compile": "passed on implementation review snapshot 65c15bf; not rerun on docs-only review commit ff8428d",
     "msvc_numeric_demo": "built and ran successfully; output 17",
     "msvc_language_spec_example": "built with --release and ran successfully; output 6",
-    "git_diff_check": "passed on exact reviewed commit 65c15bf",
+    "git_diff_check": "passed by independent critic on docs review commit ff8428d",
     "implementation_status_inventory": "Issue #23 contains the full 450-item list; compact audited subset has 16 entries. Counts: 13 complete, 3 partial, 0 in progress, 434 needing verification.",
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "The latest exact review 65c15bf scored 89/100 against 98. Issues #37–#43 are resolved; item #50 is complete. QA arithmetic mismatch #44 is open pending this synchronization and fresh review.",
+  "pending_documentation_review": "The latest exact review ff8428d scored 89/100 against 98. The arithmetic is synchronized, but QA still had a stale 64-test line, incorrectly said issue #43 was open, and lacked a persistent arithmetic validator. Fixes are prepared; issue #44 remains open pending independent confirmation.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -74,7 +74,7 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
   "next_recommended_tasks": [
-    "Correct QA report criterion/category arithmetic and synchronized status records for issue #44; review exact synchronization commit against the 98-point threshold.",
+    "Commit and push the QA status corrections and persistent arithmetic validator, then obtain a fresh critic review at the 98-point threshold; close issue #44 only after independent confirmation.",
     "Continue selecting the next high-value unfinished capability directly from issue #23; keep the full item list only in that issue."
   ],
   "master_backlog": {

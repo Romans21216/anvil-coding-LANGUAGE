@@ -10,10 +10,10 @@
     "IN PROGRESS": 0
   },
   "latest_verified_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
-  "latest_independently_reviewed_candidate_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
+  "latest_independently_reviewed_candidate_commit": "ff8428d45c8455719e87151e4c4fede4214fef08",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
-  "latest_followup_status_change": "Independent review of exact commit 65c15bf scored 89/100 against the required 98. It ran 67 tests, extension validation, Python compileall, diff check, confirmed issue #43 resolved and item #50 complete, and found stale QA arithmetic tracked in open Codex Bugs issue #44.",
+  "last_pushed_reviewed_below_threshold_commit": "ff8428d45c8455719e87151e4c4fede4214fef08",
+  "latest_followup_status_change": "Independent review of exact docs commit ff8428d scored 89/100 against 98. It verified 50 rubric rows/category arithmetic and 450 ledger counts, but found stale current-test-count and issue #43 status text plus no persistent arithmetic check. Issue #44 remains open as Codex Bugs.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
