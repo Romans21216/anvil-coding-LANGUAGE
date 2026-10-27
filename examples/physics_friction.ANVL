@@ -1,0 +1,24 @@
+# Demonstrates contact friction on a moving 2D body.
+scene 2d
+clear rgba(12, 17, 29, 255)
+set var(floor) = body_create_box(0, -2, 16, 1, 0)
+set var(box) = body_create_box(-2, 1, 1, 1, 1)
+set var(ok) = body_friction(var(floor), 0.9)
+set var(ok) = body_friction(var(box), 0.75)
+set var(ok) = body_set_velocity(var(box), 5, 0)
+set var(box_x) = body_x(var(box))
+set var(box_y) = body_y(var(box))
+
+fn(update)
+  set var(contacts) = physics_step()
+  set var(box_x) = body_x(var(box))
+  set var(box_y) = body_y(var(box))
+end
+
+fn(draw)
+  display rect(480 + var(box_x) * 40 - 20, 300 - var(box_y) * 40 - 20, 40, 40) -rgb(88, 164, 255)
+  display rect(160, 360, 640, 40) -rgb(89, 101, 123)
+  display text("2D friction demonstration") -l(20, 20) -rgb(237, 243, 255)
+  display text("Surface friction slows horizontal motion") -l(20, 48) -rgb(187, 202, 221)
+  display text("Contacts: " + var(contacts)) -l(20, 76) -rgb(157, 199, 255)
+end

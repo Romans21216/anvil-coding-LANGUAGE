@@ -232,6 +232,39 @@ class CompilerTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("body_create_box() expects 5 argument(s), got 4", result.stderr)
 
+    def test_physics_friction_slows_sliding_body_and_validates_values(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics-friction.ANVL"
+            out = pathlib.Path(temp) / "physics-friction.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  set local(ok) = physics_gravity(0, -9.81)\n"
+                "  set local(floor) = body_create_box(0, 0, 100, 2, 0)\n"
+                "  set local(ball) = body_create(0, 1.5, 0.5, 1)\n"
+                "  if body_friction(local(floor), 1) != 1 or body_friction(local(ball), 1) != 1\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_friction(local(ball), -0.01) != 0 or body_friction(local(ball), 1.01) != 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(ok) = body_set_velocity(local(ball), 5, 0)\n"
+                "  set local(step) = 0\n"
+                "  while local(step) < 180\n"
+                "    set local(ok) = physics_step()\n"
+                "    set local(step) = local(step) + 1\n"
+                "  end\n"
+                "  if abs(body_vx(local(ball))) > 0.000001\n"
+                "    output 0\n"
+                "  end\n"
+                "  output 1\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "1")
+
     def test_physics_body_capacity_can_grow_and_safely_shrink(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "physics-capacity.ANVL"

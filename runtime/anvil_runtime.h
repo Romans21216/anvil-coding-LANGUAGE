@@ -102,6 +102,7 @@ double anvil_body_vy(double handle);
 double anvil_body_set_velocity(double handle, double vx, double vy);
 double anvil_body_force(double handle, double fx, double fy);
 double anvil_body_restitution(double handle, double restitution);
+double anvil_body_friction(double handle, double friction);
 double anvil_body_collision(double first, double second);
 double anvil_physics_gravity(double x, double y);
 double anvil_physics_step(void);

@@ -41,7 +41,7 @@ typedef struct {
 } AnvilProjected;
 typedef struct {
   double x, y, vx, vy, force_x, force_y;
-  double radius, half_width, half_height, mass, restitution;
+  double radius, half_width, half_height, mass, restitution, friction;
   uint32_t generation;
   int active, shape;
 } AnvilPhysicsBody;
@@ -964,6 +964,7 @@ static double anvil_physics_allocate_body(double x, double y, double radius,
     body->half_width = half_width;
     body->half_height = half_height;
     body->mass = mass;
+    body->friction = 0.5;
     return (double)generation * ANVIL_PHYSICS_BODIES + slot;
   }
   return -1.0;
@@ -1070,6 +1071,14 @@ double anvil_body_restitution(double handle, double restitution) {
   if (!body || !isfinite(restitution) || restitution < 0.0 || restitution > 1.0)
     return 0.0;
   body->restitution = restitution;
+  return 1.0;
+}
+
+double anvil_body_friction(double handle, double friction) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body || !isfinite(friction) || friction < 0.0 || friction > 1.0)
+    return 0.0;
+  body->friction = friction;
   return 1.0;
 }
 
@@ -1259,13 +1268,35 @@ double anvil_physics_step(void) {
         double relative_x = b->vx - a->vx;
         double relative_y = b->vy - a->vy;
         double along_normal = relative_x * nx + relative_y * ny;
+        double normal_impulse = 0.0;
         if (along_normal < 0.0) {
           double restitution = fmin(a->restitution, b->restitution);
-          double impulse = -(1.0 + restitution) * along_normal / inverse_sum;
-          a->vx -= impulse * nx * inverse_a;
-          a->vy -= impulse * ny * inverse_a;
-          b->vx += impulse * nx * inverse_b;
-          b->vy += impulse * ny * inverse_b;
+          normal_impulse = -(1.0 + restitution) * along_normal / inverse_sum;
+          a->vx -= normal_impulse * nx * inverse_a;
+          a->vy -= normal_impulse * ny * inverse_a;
+          b->vx += normal_impulse * nx * inverse_b;
+          b->vy += normal_impulse * ny * inverse_b;
+        }
+
+        if (normal_impulse > 0.0) {
+          relative_x = b->vx - a->vx;
+          relative_y = b->vy - a->vy;
+          double tangent_x = relative_x - (relative_x * nx + relative_y * ny) * nx;
+          double tangent_y = relative_y - (relative_x * nx + relative_y * ny) * ny;
+          double tangent_length = hypot(tangent_x, tangent_y);
+          if (tangent_length > 1.0e-12) {
+            tangent_x /= tangent_length;
+            tangent_y /= tangent_length;
+            double tangent_impulse = -(relative_x * tangent_x +
+                                       relative_y * tangent_y) / inverse_sum;
+            double coefficient = sqrt(a->friction * b->friction);
+            double maximum = coefficient * normal_impulse;
+            tangent_impulse = fmax(-maximum, fmin(tangent_impulse, maximum));
+            a->vx -= tangent_impulse * tangent_x * inverse_a;
+            a->vy -= tangent_impulse * tangent_y * inverse_a;
+            b->vx += tangent_impulse * tangent_x * inverse_b;
+            b->vy += tangent_impulse * tangent_y * inverse_b;
+          }
         }
       }
     }

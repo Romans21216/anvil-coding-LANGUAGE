@@ -77,7 +77,7 @@ The current language has `if`/`else`/`end`, `while`/`end`, numeric `for`/`end` l
 - Drawing: `rect`, `circle`, `line`, `text`, `cube`, `sphere`, `ray_sphere`, `plane`.
 - Ray-tracing backend control: `ray_backend(name)`, `ray_backend_available(name)`.
 - Networking prototype: `net host(port)`, `net join("IPv4", port)`, `net send(number)`, `receive()`.
-- Physics: `body_create` (circle), `body_create_box` (axis-aligned box), `physics_capacity` (configure 1–128 slots), `body_destroy`, `body_active`, body position/velocity queries, `body_set_velocity`, `body_force`, `body_restitution`, `body_collision`, `physics_gravity`, and `physics_step` for fixed-step 2D shapes.
+- Physics: `body_create` (circle), `body_create_box` (axis-aligned box), `physics_capacity` (configure 1–128 slots), `body_destroy`, `body_active`, body position/velocity queries, `body_set_velocity`, `body_force`, `body_restitution`, `body_friction` (Coulomb coefficient 0–1; default 0.5), `body_collision`, `physics_gravity`, and `physics_step` for fixed-step 2D shapes.
 
 See `docs/LANGUAGE.md` for the complete current syntax and `docs/ENGINE.md` for graphics details.
 
