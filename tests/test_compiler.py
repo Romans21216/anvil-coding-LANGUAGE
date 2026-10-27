@@ -156,6 +156,77 @@ class CompilerTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("while needs a condition", result.stderr)
 
+    def test_for_loop_ascending_descending_steps_and_nesting(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "for.ANVL"
+            out = pathlib.Path(temp) / "for.exe"
+            source.write_text(
+                "fn(sum_range, first, last, step)\n"
+                "  set local(total) = 0\n"
+                "  for local(index) = var(first) to var(last) step var(step)\n"
+                "    add local(total) local(index)\n"
+                "  end\n"
+                "  output local(total)\n"
+                "end\n"
+                "fn(nested)\n"
+                "  set local(total) = 0\n"
+                "  for local(row) = 1 to 2\n"
+                "    for local(column) = 1 to 3\n"
+                "      add local(total) 1\n"
+                "    end\n"
+                "  end\n"
+                "  output local(total)\n"
+                "end\n"
+                "fn(main)\n"
+                "  output call fn(sum_range, 1, 5, 2) + call fn(sum_range, 5, 1, -2) + call fn(sum_range, 1, 5, 0) + call fn(nested)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "24")
+
+    def test_for_loop_evaluates_bounds_and_step_once(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "for_calls.ANVL"
+            out = pathlib.Path(temp) / "for_calls.exe"
+            source.write_text(
+                "set var(calls) = 0\n"
+                "fn(next-bound)\n"
+                "  add var(calls) 1\n"
+                "  output 2\n"
+                "end\n"
+                "fn(main)\n"
+                "  set local(total) = 0\n"
+                "  for local(index) = call fn(next-bound) to call fn(next-bound) step call fn(next-bound)\n"
+                "    add local(total) local(index)\n"
+                "  end\n"
+                "  output var(calls)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "3")
+
+    def test_nested_for_loop_rejects_reused_control_variable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "bad_nested_for.ANVL"
+            source.write_text(
+                "fn(main)\n"
+                "  for local(index) = 1 to 2\n"
+                "    for local(index) = 1 to 3\n"
+                "    end\n"
+                "  end\n"
+                "end\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("nested for loops must use different local variables", result.stderr)
+
     def test_network_api_emits_native_udp_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             c_file = pathlib.Path(temp) / "network.c"
