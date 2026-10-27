@@ -14,7 +14,7 @@ Anvil is a small BASIC/Lua-inspired game language using `.ANVL` source files. It
 
 ## Current implementation
 
-Working features include numeric global variables, parameterized functions, numeric return values, function-local numeric state, branches, recursion, 2D and basic 3D drawing, keyboard input, camera movement, time, deterministic random/noise helpers, CPU BVH ray-traced spheres, and a one-peer UDP numeric prototype.
+Working features include numeric global variables, parameterized functions, numeric return values, function-local numeric state, branches, `while` loops, recursion, 2D and basic 3D drawing, keyboard input, camera movement, time, deterministic random/noise helpers, CPU BVH ray-traced spheres, and a one-peer UDP numeric prototype.
 
 The implementation is a prototype, not a complete engine. It currently targets Windows/MSVC, uses a fixed-size software rasterizer, supports up to 32 ray-traced spheres per batch, and has no GPU/DXR or Embree backend. The network API is not suitable for public Internet games.
 
