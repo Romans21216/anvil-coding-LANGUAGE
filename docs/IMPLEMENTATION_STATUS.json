@@ -10,10 +10,10 @@
     "IN PROGRESS": 0
   },
   "latest_verified_commit": "65c15bf002c1bad268aec2bd68e7b184fd110c33",
-  "latest_independently_reviewed_candidate_commit": "0c7592944d25123510e197a07ea32040689f1522",
+  "latest_independently_reviewed_candidate_commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "0c7592944d25123510e197a07ea32040689f1522",
-  "latest_followup_status_change": "Independent review of exact commit 0c75929 scored 89/100 against 98 and found score-0 parsing missing in the QA arithmetic validator. The follow-up candidate accepts zero and adds tests; the full suite passes 69. Issue #44 remains open pending fresh independent review.",
+  "last_pushed_reviewed_below_threshold_commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
+  "latest_followup_status_change": "Independent review of exact commit 7c1385c scored 90/100 against 98. It reran 69 tests, extension validation, Python compileall, QA arithmetic validation including valid-zero and malformed fixtures, diff check, and ledger totals. Issue #44 is resolved and closed.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -153,10 +153,10 @@
         "README.md, docs/LANGUAGE.md, docs/Wiki/Home.md, and docs/Wiki/Language-Reference.md link to the formal specification."
       ],
       "tests": [
-        "Independent critic of 65c15bf verified 67 Python tests, npm extension validation, Python compileall, and git diff --check",
+        "Independent critic verified 69 Python tests, npm extension validation, Python compileall, and git diff --check on exact commit 7c1385c",
+        "QA validator accepts a valid zero-point criterion fixture and rejects a mismatched category subtotal fixture",
         "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37–#43 are resolved",
-        "MSVC release build/run of the specification conformance sample previously produced output 6",
-        "QA follow-up candidate: tests/test_qa_report.py verifies valid zero-score rubrics and rejects category subtotal mismatches; full suite 69 passed"
+        "MSVC release build/run of the specification conformance sample previously produced output 6"
       ],
       "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
       "dependencies": [],
@@ -169,7 +169,7 @@
         "Link the specification from the README and language reference/wiki.",
         "Independently review the specification for consistency with implementation."
       ],
-      "verification_result": "COMPLETE: independent critic 65c15bf confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37–#43 are resolved. The review ran 67 tests, extension validation, Python compilation, and diff check. The overall evaluation is 89/100, below 98, due to broader engine scope and QA arithmetic finding #44.",
+      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37–#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
       "github_issue": "#23",
       "commit": "e17eeac505cf12d70363bf658f598cb6d485a45b"
     },
