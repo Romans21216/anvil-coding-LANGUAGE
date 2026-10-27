@@ -419,6 +419,14 @@ void anvil_text_number(double x, double y, const char *format, double value,
 
 double anvil_time(void) { return anvil_elapsed_seconds; }
 double anvil_delta(void) { return anvil_delta_seconds; }
+double anvil_divide(double numerator, double denominator, const char *path,
+                    int line) {
+  if (denominator == 0.0) {
+    fprintf(stderr, "%s:%d: division by zero\n", path ? path : "<Anvil>", line);
+    exit(2);
+  }
+  return numerator / denominator;
+}
 void anvil_set_fixed_hz(int hz) {
   if (hz >= 1 && hz <= 240)
     anvil_fixed_hz = hz;

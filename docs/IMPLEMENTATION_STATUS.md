@@ -2,7 +2,7 @@
 
 This is an initial evidence inventory for all 450 entries mirrored from GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). The issue remains the user-maintained source of truth; it was not modified. Items without an audited implementation are marked NEEDS VERIFICATION rather than guessed complete or missing. See `IMPLEMENTATION_STATUS.json` for evidence, tests, limitations, acceptance checks, priority, linked issue, and commit per item.
 
-Generated 2026-10-27 against independently reviewed commit `83891c6fe801659e350defa2e080b30fb914963b` on `main`.
+Generated 2026-10-27 against work in progress based on `e2a2856` on `main`; backlog item #48 is awaiting independent review.
 
 ## Status counts
 
@@ -10,13 +10,14 @@ Generated 2026-10-27 against independently reviewed commit `83891c6fe801659e350d
 - PARTIALLY IMPLEMENTED: 3
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
-- NEEDS VERIFICATION: 439
-- IN PROGRESS: 0
+- NEEDS VERIFICATION: 438
+- IN PROGRESS: 1
 
 ## Audited current items
 
 | # | Item | Status | Evidence and remaining work |
 |---:|---|---|---|
+| 48 | Add division-by-zero diagnostics. | IN PROGRESS | `compiler/anvil.py` lowers `/` through `anvil_divide`; `runtime/anvil_runtime.c` reports path/line and exits 2 on zero (including negative zero). Native tests cover zero diagnostic and regular division; full suite, extension validation, Python compilation, and diff check pass. Awaiting independent review. |
 | 301 | Improve the existing bounded 2D circle physics prototype. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: bounded fixed-step circle/axis-aligned-box solver; docs/ENGINE.md. No CCD, rotation, broad phase, joints, 3D bodies, or complete stability coverage. Issue #8; commit `f7c91b0`. |
 | 302 | Make the current 128-body limit configurable where feasible. | COMPLETE | runtime/anvil_runtime.c: physics_capacity and active-capacity-bounded loops; tests/test_compiler.py: growth, exhaustion, invalid values, refused shrink, shrink after release. The configured active pool still has a fixed compiled maximum of 128 slots. Issue #8; commit `560cee1`. |
 | 303 | Add rectangle collision bodies. | COMPLETE | runtime/anvil_runtime.c: axis-aligned rectangle bodies and box contacts; examples/physics_boxes.ANVL. Rectangles are axis aligned and cannot rotate. Issue #8; commit `0d3b5ed`. |

@@ -59,7 +59,7 @@ def array_code(name: str, scope: Node | None) -> str:
 
 
 RUNTIME_C_NAMES = {
-    "anvil_run", "anvil_set_scene3d", "anvil_camera_perspective", "anvil_clear",
+    "anvil_run", "anvil_divide", "anvil_set_scene3d", "anvil_camera_perspective", "anvil_clear",
     "anvil_rect", "anvil_circle", "anvil_line", "anvil_cube", "anvil_sphere",
     "anvil_plane", "anvil_text", "anvil_text_number", "anvil_time", "anvil_delta",
     "anvil_pressed", "anvil_held", "anvil_rnd", "anvil_seed", "anvil_noise",
@@ -563,7 +563,9 @@ class ExpressionParser:
                 raise CompileError(f"{self.path}:{self.line}: operator {operator!r} needs a right operand")
             left_code = self.require_number(left)
             right = self.require_number(self.parse(precedence + 1))
-            if operator == "%":
+            if operator == "/":
+                left = (f"anvil_divide({left_code}, {right}, {json.dumps(str(self.path))}, {self.line})", "number")
+            elif operator == "%":
                 left = (f"fmod({left_code}, {right})", "number")
             else:
                 c_operator = {"=": "==", "and": "&&", "or": "||"}.get(operator, operator)

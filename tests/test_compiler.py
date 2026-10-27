@@ -418,6 +418,37 @@ class CompilerTests(unittest.TestCase):
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "numeric_demo.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "17")
 
+    def test_division_by_zero_reports_source_location(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "divide-zero.ANVL"
+            out = pathlib.Path(temp) / "divide-zero.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  output 1 / (3 - 3)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn(f"{source}:2: division by zero", result.stderr)
+
+    def test_regular_division_remains_supported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "division.ANVL"
+            out = pathlib.Path(temp) / "division.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  output 7 / 2\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "3.5")
+
     def test_function_parameters_returns_and_local_scope(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "functions.ANVL"

@@ -26,3 +26,15 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Commit/push:** `e1e3768` (`test(physics): cover friction edge cases and sync tracking`) and `83891c6` (resumable state), pushed to `origin/main`.
 - **Remaining blockers:** Visual verification of VSIX 0.1.7 remains deferred by user preference; 0.1.4 stays installed.
 - **Next batch:** Investigate backlog item #48 (division-by-zero diagnostics), implement source-located behavior and tests, then run the critic and sync reports/issues.
+
+## Batch 3 — source-located division-by-zero diagnostics
+
+- **Features:** Compiler lowering for `/` now calls the runtime `anvil_divide` helper. A zero denominator, including negative zero, prints the source path and line and exits with code 2; normal floating-point division is preserved.
+- **Backlog:** #48 is IN PROGRESS pending independent review. It will be promoted only after the review verifies this implementation and documentation.
+- **Files:** `compiler/anvil.py`, `runtime/anvil_runtime.c`, `runtime/anvil_runtime.h`, compiler tests, language/compiler/wiki docs, and implementation status inventory.
+- **Tests:** `python -m unittest tests.test_compiler -v` — 54 passed (including source-located zero division and regular division); `npm test` in `vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; `git diff --check` — passed.
+- **Review:** Pending. The review will evaluate the exact pushed implementation commit and its test evidence; evaluation files will be updated with that score and any findings afterward.
+- **Commit/push:** Pending.
+- **GitHub issues:** Issue #23 is the user-maintained master list and will be checked after the critic. No issue has been created for this planned work.
+- **Remaining limitations:** This is a runtime check; it does not statically prove a denominator is zero. DXR and Embree remain unavailable, and this work does not change renderer behavior.
+- **Next batch:** Complete the independent review and synchronize evaluation, status, state, and issue records before continuing the 450-item backlog.
