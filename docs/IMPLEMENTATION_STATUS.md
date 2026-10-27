@@ -2,7 +2,7 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27. Latest independent review is exact commit `597867f44a5140db27fdce2e4f2339859ef96af8` at 54/100 — FAIL against 98. The reviewer passed all 86 tests and confirmed the QA fix. The latest working-tree native output helper rounds fractional output to six digits; issue #49 remains open pending independent verification. Prior direct-native score 50/100 applies to 573cb44; prior C-backed 92/100 remains tied to c102604.
+Updated 2026-10-27. Latest independent review is exact commit `f330d4b19225e46c2f32fcefda8e78d8719ef26f` at 55/100 — FAIL against 98. All 87 tests pass. Fractional formatting issue #49 is fixed and closed; large finite outputs beyond signed 64-bit range remain incorrect in issue #52. Prior native reviews scored 54/100 on 597867f and 50/100 on 573cb44; prior C-backed 92/100 remains tied to c102604.
 
 ## Status counts
 

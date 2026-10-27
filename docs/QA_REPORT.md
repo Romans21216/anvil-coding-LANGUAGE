@@ -1,14 +1,14 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **54/100 - FAIL** for exact commit `597867f44a5140db27fdce2e4f2339859ef96af8` against the user's **98/100** threshold. Categories: requirements 9/20, functionality/reliability 8/20, architecture 12/20, testing 14/20, delivery 11/20.
+**Latest independent evaluation:** **55/100 - FAIL** for exact commit `f330d4b19225e46c2f32fcefda8e78d8719ef26f` against the user's **98/100** threshold. Categories: requirements 9/20, functionality/reliability 9/20, architecture 12/20, testing 14/20, delivery 11/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
 
-**Native QA follow-up (reviewed):** the latest review found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. A current unreviewed candidate adds rounded fractional output and regression tests; issue #49 remains open pending independent verification.
+**Native QA follow-up (reviewed):** the latest review found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. Review of `f330d4b` verified fractional formatting and closed issue #49; the reviewer opened issue #52 for large finite values beyond signed 64-bit range.
 
 **Unreviewed implementation candidate:** source commit `9d9bf90e62e3e75ea94de7828d86800cbd382c99` adds bounded 24/32-bit BMP loading, generation-checked handles, image queries/release, and clipped/scaled alpha-blended 2D sprite drawing. The full suite passes (79 tests), the sprite sample builds with MSVC, extension 0.1.9 grammar validation, compileall, QA arithmetic, and diff checks pass. These checks are implementation evidence only. The later direct-native candidate received a 49/100 review on a pre-short-circuit-fix local snapshot; see the current native follow-up and full rubric below. Canonical issue #23 items #201 and #209 are under review, #202 awaits review, and #212 remains partial because rotation is not implemented.
 **Latest review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
-**Current finding:** exact commit `597867f44a5140db27fdce2e4f2339859ef96af8` scored 54/100, below the 98/100 threshold. The reviewer reran all 86 tests successfully and confirmed the QA fixture fix. The current unreviewed candidate fixes fractional output with six-place rounding; issue #49 remains open pending independent verification. The native runtime/game-engine migration remains incomplete.
+**Current finding:** exact commit `f330d4b19225e46c2f32fcefda8e78d8719ef26f` scored 55/100, below the 98/100 threshold. The reviewer reran all 87 tests and confirmed the issue #49 fractional-output fix. Large finite values outside signed 64-bit range remain misformatted; see [issue #52](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/52). The native runtime/game-engine migration remains incomplete.
 
 **Latest reviewed correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
@@ -62,9 +62,9 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 
 **91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 19/20; testing and verification 18/20; developer experience and delivery 18/20. The exact reviewed commit was `bc4db99368b3af2953e49adc4e4cbd8f5706bb4e`. The critic reran 73 Python tests, 3 native runtime tests, extension validation, compileall, the QA validator, and diff check. It verified the viewport geometry helper and inspected the WM_PAINT path, but did not visually launch a resized window. The audited ledgers contain 21 rows and total 450. Criterion 38 scores 1 because the prior ledger labeled dynamic window resizing as #144; canonical issue #23 comment 6451810775 defines it as #172. Issue #46 tracks the correction. Criterion 22 remains 2 after formatting; criterion 23 remains 2 for phase separation. Criterion 27 remains 1 for Windows/MSVC and C-only backend. Criterion 47 remains 1 because newer extension tokens are not visually verified. The 98-point threshold remains unmet; issues #12 and #45 are closed.
 
-## Latest 50-criterion scoring — direct native commit `597867f`
+## Latest 50-criterion scoring — direct native commit `f330d4b`
 
-Independent reviewer evaluated exact pushed commit `597867f44a5140db27fdce2e4f2339859ef96af8`: **54/100 — FAIL** against the active **98/100** threshold. All 86 tests passed. Compared with the prior 50/100 review of `573cb44`, criteria 37, 38, and 39 each improved by one point after the fixture correction was committed and independently verified. Full explanations are in `docs/ANVIL_EVALUATION.txt`.
+Independent reviewer evaluated exact pushed commit `f330d4b19225e46c2f32fcefda8e78d8719ef26f`: **55/100 — FAIL** against the active **98/100** threshold. All 87 tests passed. Relative to the 54/100 review of `597867f`, criterion 19 rose by one point after the reviewer verified the fractional-output fix; the reviewer reproduced a separate large-value formatting bug tracked by issue #52. Full explanations are in `docs/ANVIL_EVALUATION.txt`.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -86,7 +86,7 @@ Independent reviewer evaluated exact pushed commit `597867f44a5140db27fdce2e4f23
 | 16 | Edge cases covered | 1 | Loop, booleans, args and negative integer cases are tested; broader ABI/PE cases are not. |
 | 17 | Invalid inputs controlled | 1 | Parsing rejects malformed inputs; extreme native frames/output are not guarded. |
 | 18 | Stable across repeated operations | 1 | Simple runs work; recursion and stress behavior are not verified. |
-| 19 | No known critical defects | 0 | Issue #49 reproduces output 17.875 as 17. |
+| 19 | No known critical defects | 1 | Fractional output is fixed and issue #49 is closed; finite values above signed 64-bit range remain corrupted (issue #52). |
 | 20 | Components integrate | 1 | Parser/codegen/PE integrate for small numeric programs only. |
 | 21 | Logical project structure | 2 | Compiler phase, native codegen and PE modules are separated. |
 | 22 | Readable and consistently formatted | 1 | Raw instruction bytes and long encodings make changes difficult to review. |
@@ -116,19 +116,19 @@ Independent reviewer evaluated exact pushed commit `597867f44a5140db27fdce2e4f23
 | 46 | Opens in intended environment | 1 | CLI works; native project/editor/runtime integration is incomplete. |
 | 47 | Editor integration works | 1 | Automated grammar test passes; visible installation/highlighting of current package was not checked. |
 | 48 | Deliverables organized | 2 | Exact commit is pushed and files are organized. |
-| 49 | Limitations disclosed | 2 | Unsupported native systems and truncation are disclosed; issue #49 is filed. |
+| 49 | Limitations disclosed | 2 | Unsupported native systems and large-value formatting limits are disclosed; issue #52 is filed and #49 is closed. |
 | 50 | Practical for intended scope | 0 | Not a usable complete game-engine deliverable. |
 | | **Requirement fulfillment** | **9/20** | |
-| | **Functionality and reliability** | **8/20** | |
+| | **Functionality and reliability** | **9/20** | |
 | | **Code quality and architecture** | **12/20** | |
 | | **Testing and verification** | **14/20** | |
 | | **Developer experience and delivery** | **11/20** | |
-| | **Total** | **54/100** | Exact commit `597867f`; FAIL against 98. |
+| | **Total** | **55/100** | Exact commit `f330d4b`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
 - **Criteria 2–6, 8–10:** the full native engine/runtime and native default are missing. Port language/runtime APIs, then switch default/remove C only after parity.
-- **Criteria 11, 19:** native game core is absent; `output 17.875` prints `17` (reproduced and tracked as [issue #49](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/49)). Fix numeric formatting and add fraction tests.
+- **Criteria 11, 19:** native game core is absent. The `17.875` fractional-formatting defect is fixed and issue #49 is closed. Large finite values over signed 64-bit range are misformatted; exact reproduction is tracked as [issue #52](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/52).
 - **Criteria 14–18:** native error paths, zero division diagnostics, stack/ABI limits, recursion and stress cases need coverage.
 - **Criteria 22–30:** raw opcode emission, no typed IR, empty builtin dispatch and missing runtime interfaces impede correctness and growth. Add typed IR, instruction helpers, explicit ABI/layout validation, and engine runtime abstraction.
 - **Criteria 33, 37–39:** exact reviewed commit had 2 failures in `tests.test_qa_report`; fixtures included historical score tables and hardcoded 16/20. Fixed in commit `150a042` by scoping to current table and dynamically mutating subtotal; focused tests and all 86 full-suite tests pass. Independent review of commit `597867f` confirmed this fix and the full-suite pass. Tracking issue [#51](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/51) is closed after local verification.

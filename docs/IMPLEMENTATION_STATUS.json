@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "597867f44a5140db27fdce2e4f2339859ef96af8",
+  "reviewed_implementation_commit": "f330d4b19225e46c2f32fcefda8e78d8719ef26f",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 424,
@@ -9,11 +9,11 @@
     "COMPLETE": 21,
     "IN PROGRESS": 2
   },
-  "latest_verified_commit": "597867f44a5140db27fdce2e4f2339859ef96af8",
-  "latest_independently_reviewed_candidate_commit": "597867f44a5140db27fdce2e4f2339859ef96af8",
+  "latest_verified_commit": "f330d4b19225e46c2f32fcefda8e78d8719ef26f",
+  "latest_independently_reviewed_candidate_commit": "f330d4b19225e46c2f32fcefda8e78d8719ef26f",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "597867f44a5140db27fdce2e4f2339859ef96af8",
-  "latest_followup_status_change": "Independent review of exact commit 597867f scored 54/100. All 86 tests passed, confirming the QA fixture repair; native fractional output truncation remains issue #49.",
+  "last_pushed_reviewed_below_threshold_commit": "f330d4b19225e46c2f32fcefda8e78d8719ef26f",
+  "latest_followup_status_change": "Independent review of exact commit f330d4b scored 55/100. All 87 tests passed. Issue #49 is fixed/closed; issue #52 tracks incorrect output for finite magnitudes beyond signed 64-bit range.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -943,8 +943,8 @@
     "IN PROGRESS": 4
   },
   "resolved_critic_issue_48": "Fixed in the UTF-8 status synchronization after critic review d757c79: both files now parse as strict UTF-8 JSON and evaluation metadata records the exact reviewed candidate SHA. The fresh 91/100 evaluation remains attached to d757c79; a new review is required for the corrected snapshot.",
-  "latest_independent_candidate_score": 54,
-  "latest_independent_candidate_result": "FAIL against 98/100; independent review of exact commit 597867f passed all 86 tests and reproduced native fractional output truncation (#49).",
-  "current_unscored_followup": "The latest working-tree native output helper rounds fractional values to six decimal places; fractional, negative-subunit, sub-micro, and rounding-carry regression cases are included. The full suite passed 87 tests locally; issue #49 awaits independent verification.",
-  "latest_independently_scored_candidate_commit": "597867f44a5140db27fdce2e4f2339859ef96af8"
+  "latest_independent_candidate_score": 55,
+  "latest_independent_candidate_result": "FAIL against 98/100; independent review of exact commit f330d4b passed all 87 tests, confirmed issue #49 fixed, and reproduced large finite output corruption tracked by issue #52.",
+  "current_unscored_followup": "Evaluation/status records are being synchronized after the f330d4b review. No runtime source changed in that documentation follow-up; issue #52 remains open.",
+  "latest_independently_scored_candidate_commit": "f330d4b19225e46c2f32fcefda8e78d8719ef26f"
 }
