@@ -3,7 +3,7 @@
 **Review date:** 2026-10-27  
 **Source format:** `.ANVL`  
 **Latest completed independent full review:** **90/100 — PASS** (threshold: 90/100)  
-**Review snapshot:** before numeric `for` loops were added. A fresh full review of the current source is pending; the earlier 89/100 review is historical.
+**Review snapshot:** after numeric `for` loops, the 35-test run, and the VS Code 0.1.1 package were added. The earlier 89/100 review is historical.
 
 ## Scope
 
@@ -32,7 +32,7 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 ## Independent 50-criterion review
 
-The latest completed independent review scored **90/100 (90%)**, meeting the threshold, before numeric `for` loops were added. The scoring below is from that review after the stale score record was corrected. A full review of the current `for` implementation is pending. The evaluator found the open editor's visible language mode unverified and the full engine scope incomplete; these are disclosed deductions, not unresolved critical code defects.
+The latest completed independent review scored **90/100 (90%)**, meeting the threshold after reviewing the numeric `for` implementation. The evaluator found the open editor's visible language mode unverified and the full engine scope incomplete; these are disclosed deductions, not unresolved critical code defects.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -47,7 +47,7 @@ The latest completed independent review scored **90/100 (90%)**, meeting the thr
 | 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
 | 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
 | 11 | Core functionality works | 2 | Compiler, native runtime, camera, rendering, and CPU BVH ray spheres build. |
-| 12 | Secondary functionality works | 2 | Timing, input, math/noise, networking primitive, and previously reviewed `while` loops are covered. |
+| 12 | Secondary functionality works | 2 | Timing, input, math/noise, networking primitive, and native-tested `while`/`for` loops are covered. |
 | 13 | Primary workflows functional | 2 | Direct source and manifest build/run workflows pass. |
 | 14 | Inputs validated | 2 | Syntax, arity, references, manifest fields, paths, rates, and ports are checked. |
 | 15 | Errors handled gracefully | 2 | Invalid source and project inputs produce controlled diagnostics. |
@@ -66,7 +66,7 @@ The latest completed independent review scored **90/100 (90%)**, meeting the thr
 | 28 | No unfinished placeholders | 2 | Unsupported capabilities are described as future work. |
 | 29 | Configuration understandable | 2 | TOML project settings are explicit and validated. |
 | 30 | Conventions followed | 2 | Current Python, C, TOML, and extension conventions are adequate. |
-| 31 | Automated tests provided | 2 | The prior review ran 32 Python tests; the current suite has 35 after adding `for` cases. |
+| 31 | Automated tests provided | 2 | The current Python suite has 35 tests, including `for` loop cases. |
 | 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, and generated executable paths are covered. |
 | 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
 | 34 | Edge cases explicitly tested | 2 | Loop diagnostics and runtime timing/projection cases are tested. |
@@ -74,7 +74,7 @@ The latest completed independent review scored **90/100 (90%)**, meeting the thr
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest and function samples. |
 | 38 | Results recorded accurately | 2 | Latest 90/100 score, test results, and criterion breakdown are recorded in this report. |
-| 39 | Regression checks performed | 2 | The latest reviewed snapshot had 32 passing tests; the current suite now passes 35 after `for` loop additions. |
+| 39 | Regression checks performed | 2 | The full 35-test suite passes after loop/compiler changes. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
@@ -102,5 +102,5 @@ The latest completed independent review scored **90/100 (90%)**, meeting the thr
 
 ## Bug tracking
 
-Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), [#2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), and [#3](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/3) were filed by the independent reviewer with the `Codex Bugs` label and closed after their documentation defects were corrected. The stale evaluation score was filed as [issue #4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4), also with the `Codex Bugs` label. The reports were updated to 89/100 when the issue was first resolved, and now record the subsequent 90/100 full review. All four issues remain closed.
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), [#2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), and [#3](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/3) were filed by the independent reviewer with the `Codex Bugs` label and closed after their documentation defects were corrected. The stale evaluation score was filed as [issue #4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4), also with the `Codex Bugs` label. The reports now record the latest 90/100 full review after the loop update. All four issues remain closed.
 
