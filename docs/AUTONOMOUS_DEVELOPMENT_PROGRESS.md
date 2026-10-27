@@ -89,7 +89,7 @@ This log records verified implementation batches and is reconciled with Git befo
 
 ## Batch 8 — synchronize QA review counts (in progress)
 
-- **Finding:** Review `ed08f43` reported that `QA_REPORT.md` rubric rows 31 and 39 misstate test totals for review `2dd1d8e` (reported as 59 and 61 instead of 63). Current review `ed08f43` itself ran 64 tests.
-- **Fix:** Updated both rows to identify their exact review commits and counts; the summary distinguishes `2dd1d8e` (63 tests) from `ed08f43` (64 tests).
-- **Tracking:** [Issue #34](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/34) is labeled `Codex Bugs`; change is pending commit/push and independent verification.
-- **Review:** Latest score is 89/100 on `ed08f43`, below the user's 98/100 threshold.
+- **Finding:** Review `ed08f43` identified stale test totals in QA rows 31/39; review `c648ccb` confirmed those were fixed and found rubric arithmetic and Markdown/JSON status drift. Issues #34, #35, and #36 record those findings; #34 is now closed.
+- **Fix:** Rows 31/39 distinguish 63 tests on `2dd1d8e` and 64 on `ed08f43`; criteria 8, 14, 15, and 17 are scored 2 to align verified behavior and sum to 89; the Markdown ledger now matches JSON (12 complete, 0 in progress; review `ed08f43`, score 89).
+- **Tracking:** Issues #35 and #36 are labeled `Codex Bugs`; the corrections are in the current worktree pending commit/push and independent verification.
+- **Review:** Latest score is 89/100 on `c648ccb`, below the user's 98/100 threshold.

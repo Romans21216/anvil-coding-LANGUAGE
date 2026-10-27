@@ -2,16 +2,16 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27 from independent review of exact commit `15439b54cd6e2b7a8165866d6054141f466f1b3e` (90/100 — below the required 98/100 overall bar). Item #47 is complete and its implementation commit is `6c52b959dc3d5d13d174e37e57006f63d4cda951`; the reviewer confirmed issues #30 and #31 are resolved and closed. Item #46 is complete; the earlier QA count finding is fixed and issue #28 is closed.
+Updated 2026-10-27 from independent code review of exact commit `ed08f43ca0d9beb5440f18fade48faf556694b1f`; the latest evaluation is 89/100, below the required 98/100 bar. The critic confirmed the 64-test result and fixes for issues #32/#33; issue #34's historical test-count mismatch is corrected and closed. The latest documentation review of `c648ccb` found that the criterion score arithmetic and Markdown status summary needed synchronization; issues #35/#36 track those corrections.
 
 ## Status counts
 
-- COMPLETE: 11
+- COMPLETE: 12
 - PARTIALLY IMPLEMENTED: 3
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
 - NEEDS VERIFICATION: 435
-- IN PROGRESS: 1
+- IN PROGRESS: 0
 
 ## Audited current items
 
