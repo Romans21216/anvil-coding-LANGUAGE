@@ -267,3 +267,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - Pointer coordinates map through the live centered aspect-preserving viewport to 960×600 virtual pixels; points in letterbox bars return `-1`. Button-down edges and wheel detents are available through one fixed update, and held-button state clears on release or focus loss.
 - Added `examples/mouse_input.ANVL`, language/spec/engine/wiki documentation, extension token checks, and native integration coverage for resized coordinates, letterbox rejection, click edges, button release, and wheel reset.
 - The candidate is not yet independently reviewed; the last verified score remains 92/100 — FAIL against 98. Items #391–394 are recorded as IN PROGRESS until full verification and independent review.
+
+
+### Fresh critic result — mouse input candidate `d757c79`
+
+- **Exact commit reviewed:** `d757c797751f40eee47fd518c3cf6dd3a3ae790c`.
+- **Result:** **91/100 — FAIL** against the current required pass score **98/100**. Categories: requirements 16/20; functionality/reliability 20/20; architecture 19/20; testing/verification 18/20; developer experience/delivery 18/20. Criterion vector 1–50: `2,1,1,2,1,2,2,2,1,2 / 2,2,2,2,2,2,2,2,2,2 / 2,2,2,2,2,2,1,2,2,2 / 2,2,2,2,2,2,2,1,2,1 / 2,2,2,2,2,2,1,2,2,1`.
+- **Finding (criterion 38, P2):** both `docs/IMPLEMENTATION_STATUS.json` and `docs/CODEX_AUTONOMOUS_STATE.json` contain CP1252 bytes and fail strict UTF-8 JSON parsing. Permissive decoding also shows candidate SHA `ddf8c6f...` and pending/uncommitted status despite reviewed HEAD `d757c79...`. This is a report-integrity defect; no mouse code bug was reproduced.
+- **Verification:** 77 Python tests, npm extension test, Python compileall, QA arithmetic validator invocation, and exact-commit diff check passed. Mouse integration tested viewport mapping after resize, letterbox rejection, left/right/middle press/held/release, and wheel capture/reset. The QA validator still printed the previous 92/100 rubric before synchronization. No live mouse window was visually inspected.
+- **Next:** serialize both JSON files explicitly as UTF-8, correct candidate/review references, keep the 98 threshold, and re-review the corrected snapshot.

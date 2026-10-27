@@ -1,19 +1,19 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "eec0608dd6f252090b50fda1027eba14c6af1292",
+  "reviewed_implementation_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 424,
     "PARTIALLY IMPLEMENTED": 3,
-    "COMPLETE": 17,
-    "IN PROGRESS": 6
+    "COMPLETE": 21,
+    "IN PROGRESS": 2
   },
-  "latest_verified_commit": "eec0608dd6f252090b50fda1027eba14c6af1292",
-  "latest_independently_reviewed_candidate_commit": "eec0608dd6f252090b50fda1027eba14c6af1292",
+  "latest_verified_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
+  "latest_independently_reviewed_candidate_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "eec0608dd6f252090b50fda1027eba14c6af1292",
-  "latest_followup_status_change": "Independent critic eec0608 scored 92/100, FAIL vs98. It confirmed fixes for issue #47's finite-coordinate clipping overflow and stale test-count metadata; issue #47 is resolved.",
+  "last_pushed_reviewed_below_threshold_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
+  "latest_followup_status_change": "Critic d757c79 scored 91/100, FAIL vs 98, due to issue #48 report encoding/SHA defect; fixed strict UTF-8 and synced exact evaluation in follow-up. Mouse items #391â€“394 are independently verified complete; work continues toward 98.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -155,7 +155,7 @@
       "tests": [
         "Independent critic verified 69 Python tests, npm extension validation, Python compileall, and git diff --check on exact commit 7c1385c",
         "QA validator accepts a valid zero-point criterion fixture and rejects a mismatched category subtotal fixture",
-        "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37–#43 are resolved",
+        "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37â€“#43 are resolved",
         "Compiler-refactor candidate: the full suite passes 72 tests; the latest independent specification review separately verified 67 tests on 65c15bf"
       ],
       "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
@@ -169,7 +169,7 @@
         "Link the specification from the README and language reference/wiki.",
         "Independently review the specification for consistency with implementation."
       ],
-      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37–#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
+      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37â€“#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
       "github_issue": "#23",
       "commit": "e17eeac505cf12d70363bf658f598cb6d485a45b"
     },
@@ -309,14 +309,14 @@
       "source_evidence": [
         "runtime/anvil_projection.h: anvil_compute_viewport computes a centered, aspect-preserving destination rectangle",
         "runtime/anvil_runtime.c: WM_PAINT fills letterbox bars and scales the fixed frame into the current client rectangle",
-        "docs/ENGINE.md: fixed 960×600 rendering and resizable-window presentation behavior documented"
+        "docs/ENGINE.md: fixed 960Ã—600 rendering and resizable-window presentation behavior documented"
       ],
       "tests": [
         "tests/test_runtime.py: native viewport tests pass for original, wide, tall, centered letterbox, and invalid dimensions",
         "python -m unittest discover -s tests -q: 73 passed locally on unreviewed candidate",
         "python -m unittest discover -s tests -p test_runtime.py -v: 3 native runtime tests passed"
       ],
-      "missing_or_limitations": "Internal framebuffer remains fixed at 960×600. The reviewer did not visually inspect a live resized window. Canonical item #144 is compiler version reporting and remains unverified.",
+      "missing_or_limitations": "Internal framebuffer remains fixed at 960Ã—600. The reviewer did not visually inspect a live resized window. Canonical item #144 is compiler version reporting and remains unverified.",
       "dependencies": [
         "Windows GDI presentation path"
       ],
@@ -613,7 +613,7 @@
       "number": 391,
       "section": "9. INPUT, CONTROLS, AND USER INTERFACE",
       "title": "Add mouse input support.",
-      "status": "IN PROGRESS",
+      "status": "COMPLETE",
       "source_evidence": [
         "runtime/anvil_runtime.c: Win32 mouse events feed the Anvil input state",
         "compiler/expressions.py: mouse input functions are registered as typed built-ins"
@@ -622,7 +622,7 @@
         "tests/test_compiler.py: generated C and string-type validation for mouse built-ins",
         "tests/test_runtime.py: native event test covers button, position, wheel, resize, and letterbox behavior"
       ],
-      "missing_or_limitations": "Candidate implementation has targeted/native coverage and the 77-test suite passes; awaiting independent review and live-window visual inspection.",
+      "missing_or_limitations": "Native integration covers resize-aware coordinates, letterbox rejection, three button edge/held/release states, and signed wheel detent/reset behavior. No live mouse-enabled window was visually inspected.",
       "dependencies": [
         "Win32 native window and fixed 960x600 presentation frame"
       ],
@@ -634,22 +634,22 @@
         "Add compiler and runtime regressions plus a runnable example.",
         "Document behavior and validate VS Code token scopes."
       ],
-      "verification_result": "Candidate validation: python -m unittest discover -s tests -q passed 77 tests; extension validation, compileall, mouse example build, and git diff --check passed. Independent review pending.",
+      "verification_result": "Independent critic on d757c79 verified the implemented items match canonical issue #23; 77 tests including mouse runtime integration pass. The subsequent status synchronization fixes strict UTF-8 and candidate SHA metadata (issue #48).",
       "github_issue": "#23 item 391",
-      "commit": "pending"
+      "commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c"
     },
     {
       "number": 392,
       "section": "9. INPUT, CONTROLS, AND USER INTERFACE",
       "title": "Add mouse position tracking.",
-      "status": "IN PROGRESS",
+      "status": "COMPLETE",
       "source_evidence": [
         "runtime/anvil_runtime.c: mouse_x/mouse_y map client positions into the virtual frame"
       ],
       "tests": [
         "tests/test_runtime.py: resize-aware coordinates and letterbox rejection"
       ],
-      "missing_or_limitations": "Candidate implementation has targeted/native coverage and the 77-test suite passes; awaiting independent review and live-window visual inspection.",
+      "missing_or_limitations": "Native integration covers resize-aware coordinates, letterbox rejection, three button edge/held/release states, and signed wheel detent/reset behavior. No live mouse-enabled window was visually inspected.",
       "dependencies": [
         "Canonical item #391"
       ],
@@ -658,22 +658,22 @@
       "acceptance_criteria": [
         "Expose virtual framebuffer mouse coordinates and reject letterbox-bar positions."
       ],
-      "verification_result": "Candidate validation: python -m unittest discover -s tests -q passed 77 tests; extension validation, compileall, mouse example build, and git diff --check passed. Independent review pending.",
+      "verification_result": "Independent critic on d757c79 verified the implemented items match canonical issue #23; 77 tests including mouse runtime integration pass. The subsequent status synchronization fixes strict UTF-8 and candidate SHA metadata (issue #48).",
       "github_issue": "#23 item 392",
-      "commit": "pending"
+      "commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c"
     },
     {
       "number": 393,
       "section": "9. INPUT, CONTROLS, AND USER INTERFACE",
       "title": "Add mouse button events.",
-      "status": "IN PROGRESS",
+      "status": "COMPLETE",
       "source_evidence": [
         "runtime/anvil_runtime.c: left/right/middle button pressed-edge and held-state tracking"
       ],
       "tests": [
         "tests/test_runtime.py: left-button edge, held, release, and fixed-update boundary cases"
       ],
-      "missing_or_limitations": "Candidate implementation has targeted/native coverage and the 77-test suite passes; awaiting independent review and live-window visual inspection.",
+      "missing_or_limitations": "Native integration covers resize-aware coordinates, letterbox rejection, three button edge/held/release states, and signed wheel detent/reset behavior. No live mouse-enabled window was visually inspected.",
       "dependencies": [
         "Canonical item #391"
       ],
@@ -682,22 +682,22 @@
       "acceptance_criteria": [
         "Expose fixed-update button edges and held state for left, right, and middle buttons."
       ],
-      "verification_result": "Candidate validation: python -m unittest discover -s tests -q passed 77 tests; extension validation, compileall, mouse example build, and git diff --check passed. Independent review pending.",
+      "verification_result": "Independent critic on d757c79 verified the implemented items match canonical issue #23; 77 tests including mouse runtime integration pass. The subsequent status synchronization fixes strict UTF-8 and candidate SHA metadata (issue #48).",
       "github_issue": "#23 item 393",
-      "commit": "pending"
+      "commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c"
     },
     {
       "number": 394,
       "section": "9. INPUT, CONTROLS, AND USER INTERFACE",
       "title": "Add mouse wheel input.",
-      "status": "IN PROGRESS",
+      "status": "COMPLETE",
       "source_evidence": [
         "runtime/anvil_runtime.c: signed WM_MOUSEWHEEL detents are delivered once per fixed update"
       ],
       "tests": [
         "tests/test_runtime.py: wheel detent capture and next-update reset"
       ],
-      "missing_or_limitations": "Candidate implementation has targeted/native coverage and the 77-test suite passes; awaiting independent review and live-window visual inspection.",
+      "missing_or_limitations": "Native integration covers resize-aware coordinates, letterbox rejection, three button edge/held/release states, and signed wheel detent/reset behavior. No live mouse-enabled window was visually inspected.",
       "dependencies": [
         "Canonical item #391"
       ],
@@ -706,9 +706,9 @@
       "acceptance_criteria": [
         "Expose signed wheel detents for one fixed update and reset them at the next update boundary."
       ],
-      "verification_result": "Candidate validation: python -m unittest discover -s tests -q passed 77 tests; extension validation, compileall, mouse example build, and git diff --check passed. Independent review pending.",
+      "verification_result": "Independent critic on d757c79 verified the implemented items match canonical issue #23; 77 tests including mouse runtime integration pass. The subsequent status synchronization fixes strict UTF-8 and candidate SHA metadata (issue #48).",
       "github_issue": "#23 item 394",
-      "commit": "pending"
+      "commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c"
     },
     {
       "number": 449,
@@ -738,42 +738,102 @@
     }
   ],
   "latest_evaluation": {
-    "score": 92,
+    "score": 91,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "eec0608dd6f252090b50fda1027eba14c6af1292",
+    "commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
     "categories": {
       "requirements": "16/20",
       "functionality_reliability": "20/20",
       "code_architecture": "19/20",
-      "testing_verification": "19/20",
+      "testing_verification": "18/20",
       "developer_experience_delivery": "18/20"
     },
+    "criterion_scores": [
+      2,
+      1,
+      1,
+      2,
+      1,
+      2,
+      2,
+      2,
+      1,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      1,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      1,
+      2,
+      1,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      1,
+      2,
+      2,
+      1
+    ],
     "findings": [
-      "Criteria 34 and 38 are restored to 2/2 after independently reproducing and verifying fixes for the finite-coordinate clipping overflow and candidate test-count mismatch in issue #47.",
-      "No live rendered window was visually inspected.",
-      "Windows/MSVC and C-only backend limit platform/backend breadth.",
-      "Newer VS Code grammar highlighting remains unverified by the user preference to retain 0.1.4.",
-      "Broader engine scope remains incomplete."
+      "Criterion 38: strict UTF-8 JSON parsing fails for docs/IMPLEMENTATION_STATUS.json and docs/CODEX_AUTONOMOUS_STATE.json because they contain CP1252 bytes.",
+      "Criterion 38: permissive decoding reveals stale candidate metadata ddf8c6f8b923c6b7f8ee3bca154d0ffd5e5f7309 and pending/uncommitted status, while exact reviewed HEAD is d757c797751f40eee47fd518c3cf6dd3a3ae790c.",
+      "Mouse input implementation had no defect reproduced; native integration covers resized mapping, letterbox rejection, all three button press/held/release states, and wheel capture/reset.",
+      "No live mouse-enabled game window was visually inspected.",
+      "Current total passing threshold is 98/100; fresh score 91/100 is FAIL."
     ]
   },
-  "current_candidate_commit": "ddf8c6f8b923c6b7f8ee3bca154d0ffd5e5f7309",
-  "status_counts_validated_on": "eec0608dd6f252090b50fda1027eba14c6af1292",
+  "current_candidate_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
+  "status_counts_validated_on": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
   "candidate_validation": {
-    "commit": "ddf8c6f8b923c6b7f8ee3bca154d0ffd5e5f7309",
-    "reviewed_score": null,
+    "commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
+    "reviewed_score": 91,
     "previous_reviewed_score": 92,
     "threshold": 98,
-    "result": "PENDING INDEPENDENT REVIEW",
-    "python_unittest": "77 passed",
-    "runtime_tests": "Native mouse integration coverage passed: resize-aware viewport mapping, letterbox exclusion, left/right/middle edge and held states, wheel detents and update reset; live window visual inspection pending.",
-    "status_ledger": "26 audited entries, 424 needing verification, 3 partial, 17 complete, 6 in progress = 450; items #391–394 are the mouse-input candidate.",
-    "finding": "Mouse position, button edge/held states, and signed wheel input were implemented, documented, and covered by native integration tests. Awaiting exact-candidate independent review; required score is 98/100.",
-    "status": "Unreviewed candidate; passing threshold 98/100."
+    "result": "FAIL",
+    "python_unittest": "77 passed; independently rerun on exact candidate",
+    "runtime_tests": "Native mouse integration passed resize mapping, letterbox exclusion, left/right/middle button edges and held/release states, and wheel accumulation/reset. Live mouse window was not visually inspected.",
+    "status_ledger": "26 audited entries; 424 needing verification, 3 partial, 17 complete, 6 in progress = 450; mouse input items 391â€“394 match canonical issue #23.",
+    "finding": "Criterion 38 is 1/2: both status JSON files contain CP1252 bytes and fail strict UTF-8 parsing; permissive decoding shows stale candidate ddf8c6f... and pending/uncommitted status, not reviewed HEAD d757c79. No mouse implementation defect was reproduced.",
+    "status": "91/100 FAIL vs 98/100; strict JSON encoding and candidate metadata need correction."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
   "resolved_critic_issue_47": "The eec0608 critic verified stable finite interpolation for extreme near-plane inputs, safe viewport line clipping before integer conversion, and the corrected 74-test metadata. Issue #47 is documented and closed.",
-  "current_active_item": 391,
-  "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775"
+  "current_active_item": 185,
+  "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775",
+  "implementation_status_counts": {
+    "NEEDS VERIFICATION": 424,
+    "PARTIALLY IMPLEMENTED": 3,
+    "COMPLETE": 21,
+    "IN PROGRESS": 2,
+    "TOTAL": 450
+  },
+  "resolved_critic_issue_48": "Fixed in the UTF-8 status synchronization after critic review d757c79: both files now parse as strict UTF-8 JSON and evaluation metadata records the exact reviewed candidate SHA. The fresh 91/100 evaluation remains attached to d757c79; a new review is required for the corrected snapshot."
 }

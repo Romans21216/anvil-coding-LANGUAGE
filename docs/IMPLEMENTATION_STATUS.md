@@ -2,18 +2,18 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27 after independent review of exact synchronized candidate `eec0608dd6f252090b50fda1027eba14c6af1292`; the latest evaluation is 92/100, below the required 98/100 bar. The critic confirmed the item #185 overflow correction and consistent test count; issues #47's findings are resolved. Issue #46's item mapping fix is also independently verified and closed. Compiler items #101–#104 are COMPLETE; issues #12, #45, #46, and #47 are resolved. Remaining score deductions include broader engine scope, platform/backend limits, and editor verification.
+Updated 2026-10-27 after independent review of exact candidate `d757c797751f40eee47fd518c3cf6dd3a3ae790c`; latest score is 91/100 — FAIL against 98. Criterion 38 lost one point because both status JSON files used CP1252 bytes and carried stale candidate metadata. The critic reran 77 tests and reproduced no mouse code defect; it did not visually inspect a live window. Earlier item #185 and issue #46 fixes remain verified. Compiler items #101–#104 are COMPLETE; issues #12, #45, #46, and #47 are resolved.
 
 ## Status counts
 
-- COMPLETE: 17
+- COMPLETE: 21
 - PARTIALLY IMPLEMENTED: 3
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
 - NEEDS VERIFICATION: 424
-- IN PROGRESS: 6
+- IN PROGRESS: 2
 
-The item #172 resize feature was independently reviewed on `f12c0ac` (92/100). The item #185 correction and synchronized records were reviewed on `eec0608` (92/100), still below the required 98/100 threshold. Issue #47 is resolved.
+Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` (92/100). The latest mouse input candidate `d757c79` scored 91/100, below the 98/100 threshold, due to invalid UTF-8 JSON and a stale candidate SHA; no mouse code defect was reproduced.
 
 ## Audited current items
 
@@ -30,10 +30,10 @@ The item #172 resize feature was independently reviewed on `f12c0ac` (92/100). T
 | 104 | Separate C generation from build orchestration. | COMPLETE | `compiler/codegen.py`, `compiler/build.py`, and `compiler/cli.py` have separate responsibilities. The critic confirmed both CLI invocation forms and the 21-definition legacy facade. Issue #12 is resolved and closed. |
 | 172 | Add dynamic window resizing. | IN PROGRESS | `runtime/anvil_projection.h::anvil_compute_viewport` computes a centered aspect-preserving viewport; `runtime/anvil_runtime.c` paints the fixed 960×600 image into the current client area. `tests/test_runtime.py` covers wide, tall, same-aspect, and invalid client sizes. The game window is already created with `WS_OVERLAPPEDWINDOW`; internal framebuffer resolution remains fixed. Canonical backlog source is issue #23 comment 6451810775; item #144 remains unverified. The critic confirmed the tracking correction on `f12c0ac`; a live resize was not visually inspected. |
 | 185 | Add robust near-plane clipping. | IN PROGRESS | Commit `cfce407` adds camera-space clipping for triangles, grid segments, and sphere hits. Commit `15ac43a` fixes the overflow reproduced by review `4bc8bc3` using stable interpolation, finite-output checks, and pre-raster screen clipping. Critic `eec0608` confirmed the regression fix and all 74 tests. No live window was visually inspected; far-plane and side-frustum clipping remain out of scope. |
-| 391 | Add mouse input support. | IN PROGRESS | `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`, and `mouse_wheel()` are added to the compiler/runtime. Native integration coverage verifies input edges, wheel detents, resize mapping, and letterbox rejection. Full candidate review is pending. |
-| 392 | Add mouse position tracking. | IN PROGRESS | Pointer coordinates are mapped through the current aspect-preserving viewport into the fixed 960×600 frame; letterbox bars return `-1`. Native test coverage is added; independent review is pending. |
-| 393 | Add mouse button events. | IN PROGRESS | Left/right/middle button edges and held state are captured; focus loss clears held state. Native regression covers left click edge, held, release, and edge clearing. Independent review is pending. |
-| 394 | Add mouse wheel input. | IN PROGRESS | Signed wheel detents are exposed for a single fixed update. Native regression covers a positive detent and reset on the next update. Independent review is pending. |
+| 391 | Add mouse input support. | COMPLETE | `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`, and `mouse_wheel()` are added to the compiler/runtime. Native integration coverage verifies input edges, wheel detents, resize mapping, and letterbox rejection. Independent critic verified the implementation and native regressions on `d757c79`; live mouse-window visual inspection remains absent. |
+| 392 | Add mouse position tracking. | COMPLETE | Pointer coordinates are mapped through the current aspect-preserving viewport into the fixed 960×600 frame; letterbox bars return `-1`. Native test coverage is added; independent critic verified the implementation on `d757c79`; live mouse-window visual inspection remains absent. |
+| 393 | Add mouse button events. | COMPLETE | Left/right/middle button edges and held state are captured; focus loss clears held state. Native regression covers left click edge, held, release, and edge clearing. Independent critic verified the implementation on `d757c79`; live mouse-window visual inspection remains absent. |
+| 394 | Add mouse wheel input. | COMPLETE | Signed wheel detents are exposed for a single fixed update. Native regression covers positive and negative signed detents and reset on the next update; independent critic verified the implementation on `d757c79`. Live mouse-window visual inspection remains absent. |
 | 301 | Improve the existing bounded 2D circle physics prototype. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: bounded fixed-step circle/axis-aligned-box solver; docs/ENGINE.md. No CCD, rotation, broad phase, joints, 3D bodies, or complete stability coverage. Issue #8; commit `f7c91b0`. |
 | 302 | Make the current 128-body limit configurable where feasible. | COMPLETE | runtime/anvil_runtime.c: physics_capacity and active-capacity-bounded loops; tests/test_compiler.py: growth, exhaustion, invalid values, refused shrink, shrink after release. The configured active pool still has a fixed compiled maximum of 128 slots. Issue #8; commit `560cee1`. |
 | 303 | Add rectangle collision bodies. | COMPLETE | runtime/anvil_runtime.c: axis-aligned rectangle bodies and box contacts; examples/physics_boxes.ANVL. Rectangles are axis aligned and cannot rotate. Issue #8; commit `0d3b5ed`. |
@@ -52,3 +52,6 @@ The item #172 resize feature was independently reviewed on `f12c0ac` (92/100). T
 - `PARTIALLY IMPLEMENTED` means a working subset exists but one or more listed acceptance parts are missing.
 - The counts summarize the 450 entries in issue #23, but unverified entries are not copied into this ledger. `NEEDS VERIFICATION` is a conservative status, not a claim that a feature is absent.
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
+
+
+Issue #48 is resolved in the UTF-8 follow-up: strict UTF-8 parsing passes for both JSON status records, the exact reviewed candidate SHA and fresh 91/100 result are recorded, and QA rubric arithmetic validates. A follow-up independent review is pending; 98/100 remains the required passing threshold.
