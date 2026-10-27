@@ -1,6 +1,6 @@
 # Language Reference
 
-Anvil files are UTF-8 `.ANVL` text. `#` starts a comment outside quoted strings. Names are case-sensitive. `end` closes functions and `if` blocks; indentation is optional.
+Anvil files are UTF-8 `.ANVL` text. `#` starts a comment outside quoted strings. Names are case-sensitive. `end` closes functions, `if` blocks, and `while` loops; indentation is optional.
 
 ## Functions, parameters, and returns
 
@@ -26,6 +26,20 @@ call fn(main)
 ## Expressions and control flow
 
 Operators are `+`, `-`, `*`, `/`, `%`, comparisons (`=`, `==`, `!=`, `<`, `<=`, `>`, `>=`), and logical `and`/`or`. Multiplication/division/remainder bind more tightly than addition/subtraction, then comparisons, `and`, and `or`. Parentheses group expressions.
+
+`while condition` checks its numeric condition before each pass. The body repeats until the condition evaluates to zero. The body should update state used by the condition so the loop can terminate. Loops may be nested.
+
+```anv
+fn(sum-to, limit)
+  set local(index) = 1
+  set local(total) = 0
+  while local(index) <= var(limit)
+    add local(total) local(index)
+    add local(index) 1
+  end
+  output local(total)
+end
+```
 
 ```anv
 fn(clamp-low, value, lower)
