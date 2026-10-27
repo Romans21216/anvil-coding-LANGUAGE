@@ -5,10 +5,11 @@
   "last_completed_batch": 4,
   "last_completed_backlog_item": 46,
   "current_active_item": 47,
-  "current_active_item_status": "Fixes for review findings #30 and #31 are implemented in the current worktree; 61-test suite and static checks pass; independent re-review pending.",
+  "current_active_item_status": "Fixes for review findings #30 and #31 are committed and pushed in candidate 6c52b959dc3d5d13d174e37e57006f63d4cda951; 61-test suite and static checks pass; independent re-review pending.",
   "latest_verified_commit": "2a745bb9b455baffe9248f24d39970ea31146b23",
   "last_pushed_reviewed_below_threshold_commit": "8ae53c4daaed0d2160262aa24a2a0d5178235a96",
-  "latest_push_result": "Item #47 candidate 8ae53c4 pushed to origin/main; independent review found two issues now tracked by #30 and #31.",
+  "current_pushed_candidate_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
+  "latest_push_result": "Item #47 fixes for issues #30 and #31 are pushed in candidate 6c52b95; independent re-review is pending.",
   "latest_independent_review": {
     "commit": "8ae53c4daaed0d2160262aa24a2a0d5178235a96",
     "score": 85,
@@ -41,7 +42,7 @@
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "Batch 5 (#47) has 61-test/full-validation evidence; fixes for issues #30/#31 await independent re-review.",
+  "pending_documentation_review": "Batch 5 (#47) candidate 6c52b95 has 61-test/full-validation evidence; independent re-review is pending.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",

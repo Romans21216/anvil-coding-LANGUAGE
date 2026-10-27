@@ -10,6 +10,7 @@
     "IN PROGRESS": 1
   },
   "latest_verified_commit": "2a745bb9b455baffe9248f24d39970ea31146b23",
+  "current_pushed_candidate_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "8ae53c4daaed0d2160262aa24a2a0d5178235a96",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
