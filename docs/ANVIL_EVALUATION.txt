@@ -3,94 +3,73 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 
 Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: Review of the language guide, engine/compiler documentation, examples, compiler and runtime source, tests, extension notes, and the existing QA report. This is a source/document review; the checks listed in the QA report were not rerun for this evaluation.
+Basis: independent source and documentation review, with current compiler/runtime tests and build workflows rerun by the reviewer.
 
 SUMMARY
 -------
-Anvil is a real, early-stage domain-specific programming language for making small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. It is not merely pseudocode, and it is not Rust syntax. The compiler currently translates Anvil into ordinary C and can use Microsoft's C compiler to build a native Windows executable.
+Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The compiler translates supported Anvil programs into C and invokes Microsoft's C compiler to build a native Windows executable.
 
-The best description today is: a small game scripting language connected to a Windows software-rendering prototype. It is approachable and has a clear identity, but it is much closer to a learning project or prototype than to a complete engine or a mature language such as Python, Lua, Rust, or C.
+The fairest description is a small game scripting language connected to a Windows software-rendering prototype. Its syntax is approachable and it has a working path from source to executable, but it is much closer to a learning project than to a complete game engine or mature language ecosystem.
 
 WHAT ANVIL IS GOOD AT
 ---------------------
-
-1. A small, readable starting language
-   Programs use named functions such as fn(update) and fn(draw), explicit end markers, simple variable commands, arithmetic, comparisons, and if/else. This is a reasonable shape for a first language: the source is short, and the major pieces are visible without a large amount of syntax.
-
-2. Translating source into understandable native code
-   The compiler emits ordinary C that can be inspected. For supported programs, it links the Anvil runtime and builds a Windows executable. This gives Anvil a direct path from a small script to a native program without requiring users to write C themselves.
-
-3. Basic interactive 2D and 3D scenes
-   The runtime includes screen-space rectangles, circles, lines and text, plus basic 3D cubes, spheres and planes. It has a perspective camera, a fixed-step update loop, keyboard input, and configurable keyboard camera movement and field of view. A scene can combine HUD-style 2D drawing with 3D objects.
-
-4. A few useful built-in math and procedural tools
-   The current language includes time and delta values, seeded random numbers, deterministic gradient noise and fractal noise, and common math operations. These are useful foundations for experiments and simple procedural scenes.
-
-5. A concrete ray-tracing feature
-   display ray_sphere(x, y, z, radius) is documented as a built-in drawing function. It uses CPU ray tracing with a bounding volume hierarchy (BVH) to find sphere hits and cast hard shadows, with diffuse lighting and a specular highlight. This makes it a useful demonstration feature and gives the language a real 3D graphics operation beyond basic rasterized primitives.
-
-6. Early editor and project support
-   The project has a TOML project manifest, a VS Code syntax extension, example programs, compiler/runtime tests, and separate language, engine, multiplayer, and compiler guides. These make the prototype easier to explore than a single isolated compiler file.
+1. Readable source: named functions use a small BASIC/Lua-inspired set of commands, expressions, branches, and explicit end markers.
+2. Native compilation: supported programs are translated into inspectable C and can be built into Windows executables with MSVC.
+3. Small interactive scenes: the runtime provides 2D drawing, basic 3D primitives, a perspective camera, keyboard controls, a fixed-step update loop, and a way to combine a 2D HUD with 3D content.
+4. Reusable numeric functions: functions support parameters, numeric return values, recursion, and function-local numeric state, in addition to global numeric variables.
+5. Procedural math: seeded random values, deterministic gradient/fractal noise, and common math operations are available.
+6. BVH ray tracing: `ray_sphere(x,y,z,radius)` is a built-in drawing function using CPU BVH traversal, diffuse lighting, specular highlights, and hard-shadow queries. The current documented limit is 32 ray-traced spheres per batch.
+7. Early developer tools: TOML project manifests, examples, tests, a VS Code syntax extension, and separate language, engine, compiler, and multiplayer guides are provided.
 
 WHAT ANVIL IS NOT GOOD AT YET
 -----------------------------
-
-1. It is not a complete game engine
-   There is no full asset pipeline, sprite/texture system, audio, physics/collision system, animation framework, scene graph, general-purpose GUI, or full editor. A game that needs these features would need substantial additional code or another engine.
-
-2. The renderer is deliberately limited
-   Conventional drawing uses a fixed-size software renderer. The documented target is a 960 by 600 frame. That is useful for a small sample, but it is not a modern GPU renderer and is not designed for large scenes or high frame rates. Documentation identifies missing resize handling, robust near-plane clipping, mesh import, texture mapping, profiling, and GPU rendering.
-
-3. Ray tracing has one implemented backend
-   BVH-accelerated CPU ray tracing is implemented for ray_sphere, with a documented limit of 32 ray-traced spheres in a batch. Hardware-accelerated RTX/DXR and Embree are not implemented. The current source does not provide a switch for choosing among those three backends. Therefore the practical choice today is to use the built-in BVH path or not use ray_sphere; the other two are future options, not available modes.
-
-4. The language has only a narrow set of programming constructs
-   Functions have no parameters and use global numeric variables. The documented language does not yet have loops, modules/imports, user-defined data structures, static types, a general string model, or a broad standard library. As programs grow, these limits make code reuse and organization difficult.
-
-5. Multiplayer is only a transport experiment
-   The network API exchanges one numeric value over UDP with a single peer. Packets are unauthenticated, unencrypted, unreliable, and platform-native. There is no matchmaking, peer management, reliable delivery, replication, interpolation, reconnect handling, or server security. It is suitable only for a small trusted-LAN experiment, not an online game service.
-
-6. The build target is narrow
-   The verified path targets Windows and MSVC. The generated C is standard-looking C source, but the runtime and build integration are Windows-specific. Rust output is not implemented, and there is no verified cross-platform toolchain.
-
-7. Performance has not been demonstrated
-   Ahead-of-time C generation and release compiler optimization are promising, but the project has no performance benchmark suite or comparison against C, Rust, Lua, or other engines. The word "hyper-efficient" is not currently supported by measurements. The renderer and CPU ray tracer are CPU-bound, and the current scene limits are small.
+1. It is not a complete engine: there is no mature asset pipeline, texture/sprite system, audio engine, physics/collision system, animation framework, scene graph, complete editor, or broad GUI system.
+2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. Resize handling, robust clipping, mesh import, texture mapping, and performance profiling remain future work.
+3. Only one ray-tracing path is implemented: CPU BVH is available. Hardware-accelerated RTX/DXR and Embree are not implemented, and there is no selector between those backends.
+4. The language remains narrow: loops, arrays, user-defined types, modules/imports, static types, and a general string model are not implemented. Function parameters, return values, recursion, and function-local numeric state are implemented.
+5. Multiplayer is experimental: the UDP API exchanges a numeric value with one peer. It lacks reliable delivery, authentication, encryption, matchmaking, replication, and robust peer lifecycle handling; it is only appropriate for trusted LAN experiments.
+6. The build target is narrow: the verified backend is Windows/MSVC with generated C. Rust output and a cross-platform runtime are not implemented.
+7. Efficiency claims are unproven: there is no benchmark suite comparing compile time or runtime performance. The software renderer and ray tracer are CPU-bound, so “hyper-efficient” is not supported by measurements.
 
 HOW CLOSE IS IT TO A REAL PROGRAMMING LANGUAGE?
 ------------------------------------------------
-In the technical sense, Anvil already is a programming language: it defines source syntax and semantics, parses programs, checks supported constructs, reports errors, generates another language, and runs through a runtime. Its C backend is a compiler/transpiler approach similar in broad shape to languages that compile into another target language.
+In the technical sense, Anvil is a programming language: it defines syntax and semantics, parses and validates programs, reports errors, translates code, and executes through a runtime. It is not merely pseudocode. It is a small compiled domain-specific language.
 
-In maturity, Anvil is still at an early prototype stage. It has a small language core and a few usable libraries built into its runtime, but it lacks many features expected for larger software: function parameters and return-value design, local scopes, collections and user-defined types, loops, modules, package management, a stable standard library, portability, a debugger, and mature diagnostics/tooling. Its game engine is even less complete than the language core.
+In maturity, it is still an early prototype. The core can support simple, reusable programs, but it lacks loops, collections, user-defined types, modules, a mature standard library, portability, a debugger, and mature diagnostics. The game engine is less complete than the language implementation.
 
-So the fairest answer is: it is a real but small and incomplete programming language. It is reasonably close to a custom scripting language for simple demos. It is not close yet to a general-purpose language ecosystem or to a production game engine. The language concept is credible; the breadth, portability, tooling, and long-term compatibility still need work.
+Overall, Anvil is close to a custom scripting language for simple demos. It is not close to a general-purpose ecosystem or production game engine. The idea is credible; substantial work remains in language breadth, runtime systems, tooling, portability, and long-term compatibility.
 
 MATURITY SNAPSHOT
 -----------------
+Language syntax, validation, and C generation: Working prototype
+Functions with parameters, returns, recursion, and locals: Implemented for numeric values
+Native Windows executable generation: Implemented for documented MSVC toolchain
+Basic 2D/3D rendering and camera controls: Implemented with notable limits
+BVH CPU ray-traced spheres: Implemented, limited to 32 per batch
+RTX/DXR and Embree: Not implemented
+LAN multiplayer: Minimal UDP prototype
+Internet multiplayer: Not implemented
+Rust backend: Not implemented
+Cross-platform runtime: Not implemented
+Performance evidence: Not available
 
-Language identity and basic compiler pipeline:       Working prototype
-Small numeric programs and conditionals:              Implemented
-Native Windows executable generation:                 Implemented for the documented toolchain
-Basic 2D/3D drawing and camera controls:              Implemented with notable rendering limits
-BVH CPU ray-traced spheres:                           Implemented, limited to 32 per batch
-RTX/DXR and Embree ray tracing:                       Not implemented
-LAN multiplayer:                                      Minimal UDP prototype
-Production Internet multiplayer:                      Not implemented
-Rust backend:                                         Not implemented
-Cross-platform runtime:                               Not implemented
-Production performance evidence:                      Not available
+INDEPENDENT REVIEW AND VERIFICATION
+-----------------------------------
+The latest independent 50-criterion review scored the current project 86/100 (FAIL against a 90-point target). The main deductions concern the intentionally incomplete engine scope, concentrated/compressed compiler architecture, inability to verify the extension installed in the reviewer's editor, and prior evaluation documents that contradicted current implementation and test counts. The reviewer filed the verified documentation inconsistency in the GitHub Issues tab as “Codex Bugs: evaluation documents contradict current compiler and test results” with the `Codex Bugs` label.
+
+The reviewer reran 30 Python tests, the VS Code extension grammar/manifest tests, a manifest-driven native build, and a function sample build/run (output `13`). These checks support the current prototype implementation; they do not establish production readiness or performance.
 
 PRIORITY IMPROVEMENTS
 ---------------------
-
-1. Grow the core language carefully: add parameters, local variables/scopes, loops, structured values, and modules. Keep the syntax small and document the semantics before expanding the feature set.
-2. Split the compiler into parser, validation/type checking, C generation, and build-driver modules. Add compatibility/version rules before the syntax becomes widely used.
-3. Improve the renderer foundations: resizable surfaces, clipping, GPU-backed rendering, textures/assets, and testable camera/projection behavior.
-4. Make ray-tracing backend support explicit. Keep BVH as a portable baseline; add DXR and Embree only with platform detection, clear selection/fallback behavior, and hardware/software test coverage. At present, no backend selector exists.
-5. Treat network messages as structured, versioned, portable packets before expanding multiplayer. Add robust input validation, peer lifecycle and reliability where needed; do not expose the current UDP sample as production networking.
-6. Measure before making speed claims. Add repeatable compile-time and runtime benchmarks for representative 2D, 3D, and ray-tracing workloads.
-7. Keep docs, tests, examples, and generated extension packages synchronized. The existing QA report records 25 passing tests in its summary but says 24 tests in one criterion row; correct that mismatch before using the report as a fresh scorecard. Its recorded 94/100 is a prior evaluation, not a benchmark or a new independent review of this document.
+1. Continue the supplied 360-item improvement backlog in small, testable stages. It includes loops, arrays/types, renderer systems, assets, audio, physics, and multiplayer improvements.
+2. Split parsing, validation, C generation, and build orchestration into maintainable modules; add language compatibility/version rules.
+3. Improve renderer foundations with resize support, clipping, GPU rendering, textures/assets, and broader visual regression coverage.
+4. Add a ray-tracing backend selector only as backends become genuinely available; retain CPU BVH as the current baseline.
+5. Evolve numeric UDP into portable, versioned, validated messages with reliable peer lifecycle before considering public network play.
+6. Add repeatable compiler/runtime benchmarks before making speed claims.
+7. Keep the QA/evaluation report synchronized with compiler features and current test results.
 
 FINAL ASSESSMENT
 ----------------
-Anvil's strengths are simplicity, inspectable C output, approachable examples, and a distinctive set of early graphics features. Its weaknesses are narrow language semantics, a Windows-only implementation, a CPU software renderer, minimal networking, missing production engine systems, and absent performance evidence. It is a promising educational/prototyping foundation and a genuine small language, but it needs substantial engineering before it can replace an established programming language or game engine.
+Anvil's strengths are simplicity, inspectable C output, approachable examples, reusable numeric functions, and a distinctive set of early graphics features. Its weaknesses are limited language constructs, a Windows-only implementation, a CPU software renderer, minimal networking, missing production engine systems, and absent performance evidence. It is a promising educational and prototyping foundation, but it needs substantial engineering before it can replace an established language or game engine.
 
