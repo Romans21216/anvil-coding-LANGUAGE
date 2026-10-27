@@ -23,6 +23,6 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** Targeted zero/mixed friction case passed. Full follow-up: 54 Python tests passed; VS Code extension validation passed; Python compilation passed; native MSVC friction sample build passed; `git diff --check` passed; status JSON parses and contains all 450 backlog entries.
 - **Independent review:** Pending for this follow-up. The last review remains 87/100 on exact commit `f7c91b01ec0b4f91e2cf26c0ea08e95a5669c860`; do not apply that score to this new candidate.
 - **GitHub issues:** #26 updated with the added tests and pending review; #27 documents the stale records from the prior reviewed snapshot. #8 and #15 reflect current verified implementation and the 87-point review. Issue #23 was checked after that review and left unchanged.
-- **Commit/push:** Pending successful commit of this batch.
+- **Commit/push:** `e1e3768` (`test(physics): cover friction edge cases and sync tracking`), pushed to `origin/main`.
 - **Remaining blockers:** Visual verification of VSIX 0.1.7 remains deferred by user preference; 0.1.4 stays installed.
 - **Next batch:** Run independent review on the committed docs/test follow-up, synchronize score/issue statuses, then continue from the highest-priority unblocked backlog entry.
