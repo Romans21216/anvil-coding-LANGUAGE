@@ -1,0 +1,10 @@
+array scores(4)
+
+fn(main)
+  for local(index) = 0 to 3
+    set array(scores, local(index)) = local(index) * 10
+  end
+  output array(scores, 2) + array(scores, 3)
+end
+
+call fn(main)

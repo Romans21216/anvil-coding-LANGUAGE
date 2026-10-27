@@ -87,6 +87,10 @@ int anvil_net_join(const char *address, int port);
 void anvil_net_send(double value);
 double anvil_net_receive(void);
 void anvil_net_close(void);
+double anvil_array_get(const double *values, int size, double index,
+                       const char *source, int line);
+void anvil_array_set(double *values, int size, double index, double value,
+                     const char *source, int line);
 
 #endif
 

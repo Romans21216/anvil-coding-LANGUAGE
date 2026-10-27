@@ -23,6 +23,10 @@ call fn(main)
 
 `set var(name) = expression`, `add var(name) amount`, and `sub var(name) amount` operate on globals, except that a parameter of the same name is used inside that function. Globals are numeric doubles.
 
+## Fixed-size arrays
+
+Top-level declarations use `array name(size)`. Arrays are global, zero-initialized numeric doubles and cannot be resized. Read with `array(name, index)` and write inside a function with `set array(name, index) = expression`. Indexes are zero-based; dynamic invalid, fractional, negative, or out-of-range indexes terminate with a source-location diagnostic. The supported size range is 1 through 1,048,576. See [the language guide](../LANGUAGE.md#fixed-size-numeric-arrays) for a complete sample.
+
 ## Expressions and control flow
 
 Operators are `+`, `-`, `*`, `/`, `%`, comparisons (`=`, `==`, `!=`, `<`, `<=`, `>`, `>=`), and logical `and`/`or`. Multiplication/division/remainder bind more tightly than addition/subtraction, then comparisons, `and`, and `or`. Parentheses group expressions.
@@ -63,7 +67,7 @@ fn(clamp-low, value, lower)
 end
 ```
 
-The current language has `if`/`else`/`end`, `while`/`end`, and numeric `for`/`end` loops, but does not yet have arrays, user-defined structures, static types, modules, or general-purpose strings.
+The current language has `if`/`else`/`end`, `while`/`end`, numeric `for`/`end` loops, and fixed-size numeric arrays. User-defined structures, static types, modules, and general-purpose strings are not implemented.
 
 ## Built-ins
 

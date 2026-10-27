@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 10630)
-Total output lines: 793
-
 #!/usr/bin/env python3
 """Small ahead-of-time Anvil-to-C compiler. C is emitted as ordinary source."""
 from __future__ import annotations
@@ -53,7 +50,7 @@ RUNTIME_C_NAMES = {
     "anvil_plane", "anvil_text", "anvil_text_number", "anvil_time", "anvil_delta",
     "anvil_pressed", "anvil_held", "anvil_rnd", "anvil_seed", "anvil_noise",
     "anvil_fbm", "anvil_net_host", "anvil_net_join", "anvil_net_send",
-    "anvil_net_receive", "anvil_net_close",
+    "anvil_net_receive", "anvil_net_close", "anvil_array_get", "anvil_array_set",
 }
 
 
@@ -107,10 +104,14 @@ def split_keyword(text: str, keyword: str) -> tuple[str, str] | None:
     return None
 
 
-def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node], set[str]]:
+MAX_ARRAY_SIZE = 1_048_576
+
+
+def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node], set[str], dict[str, int]]:
     functions: dict[str, Node] = {}
     top: list[Node] = []
     variables: set[str] = set()
+    arrays: dict[str, int] = {}
     variable_references: list[tuple[str, int, str | None]] = []
     local_references: list[tuple[str, int, str | None]] = []
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
@@ -126,6 +127,18 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
         for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", line):
             local_references.append((reference.group(1), line_no,
                                      current_function.name if current_function else None))
+        array_decl = re.fullmatch(r"array\s+([A-Za-z_][\w-]*)\s*\(\s*(\d+)\s*\)", line)
+        if array_decl:
+            if len(stack) != 1:
+                raise CompileError(f"{path}:{line_no}: arrays must be declared at top level")
+            name, raw_size = array_decl.groups()
+            size = int(raw_size)
+            if not 1 <= size <= MAX_ARRAY_SIZE:
+                raise CompileError(f"{path}:{line_no}: array size must be between 1 and {MAX_ARRAY_SIZE}")
+            if name in arrays:
+                raise CompileError(f"{path}:{line_no}: duplicate array '{name}'")
+            arrays[name] = size
+            continue
         fn = re.fullmatch(r"fn\(([A-Za-z_][\w-]*)(?:\s*,\s*(.*))?\)", line)
         if fn:
             name = fn.group(1)
@@ -210,6 +223,13 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
                 raise CompileError(f"{path}:{line_no}: local variable {match.group(1)!r} conflicts with a function parameter")
             current_function.locals.add(match.group(1))
             node = Node("local_set", line_no, match.group(2), match.group(1))
+        if node is None:
+            match = re.fullmatch(r"set\s+array\(([A-Za-z_][\w-]*)\s*,\s*(.*)\)\s*=\s*(.+)", line)
+            if match:
+                if current_function is None:
+                    raise CompileError(f"{path}:{line_no}: array writes must be inside a function")
+                array_name, index_expr, value_expr = match.groups()
+                node = Node("array_set", line_no, value_expr, array_name, params=[index_expr])
         match = re.fullmatch(r"set\s+var\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
         if node is None and match:
             node = Node("set", line_no, match.group(2), match.group(1))
@@ -282,7 +302,9 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
         if fn is None or name not in fn.locals:
             raise CompileError(f"{path}:{line_no}: unknown local variable {name!r}; declare it with set local({name}) first")
     c_symbols: dict[str, tuple[str, str]] = {}
-    symbols = [(name, "variable") for name in variables] + [(name, "function") for name in functions]
+    symbols = ([(name, "variable") for name in variables]
+               + [(name, "function") for name in functions]
+               + [(name, "array") for name in arrays])
     for name, kind in sorted(symbols):
         generated = c_name(name)
         if generated in RUNTIME_C_NAMES:
@@ -293,9 +315,9 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
             if previous_name != name:
                 raise CompileError(f"{path}: identifiers {previous_name!r} and {name!r} both map to C name {generated!r}")
             if previous_kind != kind:
-                raise CompileError(f"{path}: {kind} {name!r} conflicts with a function/variable of the same name")
+                raise CompileError(f"{path}: {kind} {name!r} conflicts with another declaration of the same name")
         c_symbols[generated] = (name, kind)
-    return functions, top, variables
+    return functions, top, variables, arrays
 
 
 TOKEN = re.compile(r'''\s*(?:(\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)|("(?:\\.|[^"\\])*")|(var\([A-Za-z_][\w-]*\))|(local\([A-Za-z_][\w-]*\))|(<=|>=|!=|==|[(),+\-*/%=<>])|([A-Za-z_][\w-]*))''')
@@ -324,14 +346,17 @@ class ExpressionParser:
                   "+": 5, "-": 5, "*": 6, "/": 6, "%": 6}
 
     def __init__(self, path: pathlib.Path, line: int, source: str,
-                 functions: dict[str, Node] | None, scope: Node | None = None):
+                 functions: dict[str, Node] | None, scope: Node | None = None,
+                 arrays: dict[str, int] | None = None):
         self.path, self.line, self.source, self.functions = path, line, source, functions
         self.scope = scope
+        self.arrays = arrays or {}
         self.tokens: list[tuple[str, str]] = []
         pos = 0
         while pos < len(source):
-            call_prefix = re.match(r"\s*call\s+fn\(", source[pos:])
+            call_prefix = re.match(r"\s*call\s+fn\(|\s*array\(", source[pos:])
             if call_prefix:
+                is_call = "call" in call_prefix.group(0)
                 call_start = pos + call_prefix.start()
                 scan = pos + call_prefix.end()
                 depth, quoted, escaped = 1, False, False
@@ -349,8 +374,9 @@ class ExpressionParser:
                         depth -= 1
                     scan += 1
                 if depth:
-                    raise CompileError(f"{path}:{line}: unclosed function call")
-                self.tokens.append(("call", source[call_start:scan]))
+                    token_name = "function call" if is_call else "array access"
+                    raise CompileError(f"{path}:{line}: unclosed {token_name}")
+                self.tokens.append(("call" if is_call else "array", source[call_start:scan]))
                 pos = scan
                 continue
             match = TOKEN.match(source, pos)
@@ -397,6 +423,18 @@ class ExpressionParser:
             if not self.scope or name not in self.scope.locals:
                 raise CompileError(f"{self.path}:{self.line}: unknown local variable {name!r}")
             left = (c_name(self.scope.name + "__" + name), "number")
+        elif kind == "array":
+            contents = value[value.index("array(") + 6:-1]
+            parts = split_args(contents)
+            if len(parts) != 2 or not re.fullmatch(r"[A-Za-z_][\w-]*", parts[0]):
+                raise CompileError(f"{self.path}:{self.line}: array access expects array(name, index)")
+            name = parts[0]
+            if name not in self.arrays:
+                raise CompileError(f"{self.path}:{self.line}: unknown array {name!r}")
+            index_expr = ExpressionParser(self.path, self.line, parts[1], self.functions,
+                                          self.scope, self.arrays).compile()
+            left = (f"anvil_array_get({c_name(name)}, {self.arrays[name]}, {index_expr}, "
+                    f"{json.dumps(str(self.path))}, {self.line})", "number")
         elif kind == "call":
             contents = value[value.index("fn(") + 3:-1]
             parts = split_args(contents)
@@ -407,7 +445,7 @@ class ExpressionParser:
                 expected = len(self.functions[name].params)
                 raise CompileError(f"{self.path}:{self.line}: function {name!r} expects {expected} argument(s), got {len(raw_args)}")
             args = [ExpressionParser(self.path, self.line, arg, self.functions,
-                                     self.scope).compile() for arg in raw_args]
+                                     self.scope, self.arrays).compile() for arg in raw_args]
             left = (c_name(name) + "(" + ", ".join(args) + ")", "number")
         elif kind == "op" and value in ("+", "-"):
             left = (f"({value}{self.require_number(self.parse(7))})", "number")
@@ -417,7 +455,56 @@ class ExpressionParser:
         elif kind == "word" and value in ("true", "false"):
             left = ("1.0" if value == "true" else "0.0", "number")
         elif kind == "word" and value in ("and", "or"):
-         …630 tokens truncated…    raise CompileError(f"{self.path}:{self.line}: expected {expected}, got {actual}")
+            raise CompileError(f"{self.path}:{self.line}: operator {value!r} needs a left operand")
+        elif kind == "word" and value in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" and len(value) == 1:
+            left = ("ANVIL_KEY_" + value, "number")
+        elif kind == "word" and value in ("SPACE", "UP", "DOWN", "LEFT", "RIGHT", "ENTER", "ESCAPE"):
+            left = ("ANVIL_KEY_" + value, "number")
+        elif kind == "word" and value in BUILTINS:
+            self.expect("(")
+            args = []
+            if not self.peek(")"):
+                while True:
+                    args.append(self.require_number(self.parse()))
+                    if not self.peek(","):
+                        break
+                    self.take()
+            self.expect(")")
+            low, high = BUILTINS[value]
+            if not low <= len(args) <= high:
+                expected = str(low) if low == high else f"{low}..{high}"
+                raise CompileError(f"{self.path}:{self.line}: {value}() expects {expected} argument(s), got {len(args)}")
+            name = BUILTIN_C_NAMES.get(value, value)
+            left = (f"{name} ( {', '.join(args)} )" if args else f"{name} ( )", "number")
+        elif kind == "word":
+            raise CompileError(f"{self.path}:{self.line}: unknown name {value!r}")
+        else:
+            raise CompileError(f"{self.path}:{self.line}: unexpected token {value!r} in expression")
+
+        while self.peek():
+            operator = self.tokens[self.index][1]
+            precedence = self.PRECEDENCE.get(operator, -1)
+            if precedence < minimum:
+                break
+            self.take()
+            if not self.peek() or self.peek(")") or self.peek(","):
+                raise CompileError(f"{self.path}:{self.line}: operator {operator!r} needs a right operand")
+            left_code = self.require_number(left)
+            right = self.require_number(self.parse(precedence + 1))
+            if operator == "%":
+                left = (f"fmod({left_code}, {right})", "number")
+            else:
+                c_operator = {"=": "==", "and": "&&", "or": "||"}.get(operator, operator)
+                left = (f"({left_code} {c_operator} {right})", "number")
+        return left
+
+    def compile(self, expected: str = "number") -> str:
+        result = self.parse()
+        if self.peek():
+            raise CompileError(f"{self.path}:{self.line}: unexpected token {self.tokens[self.index][1]!r} in expression")
+        code, actual = result
+        if actual != expected:
+            raise CompileError(f"{self.path}:{self.line}: expected {expected}, got {actual}")
         return code
 
 
@@ -443,40 +530,43 @@ def split_args(text: str) -> list[str]:
 
 
 def expr(path: pathlib.Path, line: int, source: str, functions: dict[str, Node] | None = None,
-         expected: str = "number", scope: Node | None = None) -> str:
+         expected: str = "number", scope: Node | None = None,
+         arrays: dict[str, int] | None = None) -> str:
     source = source.strip()
     if source.startswith("compute(") and source.endswith(")"):
         source = source[8:-1]
-    return ExpressionParser(path, line, source, functions, scope).compile(expected)
+    return ExpressionParser(path, line, source, functions, scope, arrays).compile(expected)
 
 
-def rgb_style(raw: str, path: pathlib.Path, line: int, functions: dict[str, Node]) -> tuple[list[str], str]:
+def rgb_style(raw: str, path: pathlib.Path, line: int, functions: dict[str, Node],
+              scope: Node | None = None, arrays: dict[str, int] | None = None) -> tuple[list[str], str]:
     color = ["255", "255", "255", "255"]
     m = re.search(r"-rgba?\(([^)]*)\)", raw)
     if m:
         vals = split_args(m.group(1))
         if len(vals) not in (3, 4):
             raise CompileError(f"{path}:{line}: -rgb/-rgba expects 3 or 4 values")
-        color = [expr(path, line, v, functions) for v in vals]
+        color = [expr(path, line, v, functions, scope=scope, arrays=arrays) for v in vals]
         if len(color) == 3: color.append("255")
     raw = re.sub(r"\s+-rgba?\([^)]*\)", "", raw)
     return color, raw
 
 
 def emit_display(path: pathlib.Path, node: Node, ind: str,
-                 functions: dict[str, Node], scope: Node | None = None) -> str:
+                 functions: dict[str, Node], scope: Node | None = None,
+                 arrays: dict[str, int] | None = None) -> str:
     raw = node.value.strip()
-    color, raw = rgb_style(raw, path, node.line, functions)
+    color, raw = rgb_style(raw, path, node.line, functions, scope, arrays)
     rot = ["0", "0", "0"]
     rm = re.search(r"-rotate\(((?:[^()]|\([^()]*\))*)\)", raw)
     if rm:
-        rot = [expr(path, node.line, v, functions, scope=scope) for v in split_args(rm.group(1))]
+        rot = [expr(path, node.line, v, functions, scope=scope, arrays=arrays) for v in split_args(rm.group(1))]
         if len(rot) != 3: raise CompileError(f"{path}:{node.line}: -rotate expects x,y,z")
         raw = raw.replace(rm.group(0), "")
     loc = None
     lm = re.search(r"-l\(((?:[^()]|\([^()]*\))*)\)", raw)
     if lm:
-        loc = [expr(path, node.line, v, functions, scope=scope) for v in split_args(lm.group(1))]
+        loc = [expr(path, node.line, v, functions, scope=scope, arrays=arrays) for v in split_args(lm.group(1))]
         if len(loc) != 2: raise CompileError(f"{path}:{node.line}: -l expects x,y")
         raw = raw.replace(lm.group(0), "")
     call = re.fullmatch(r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+\d+)?", raw.strip())
@@ -488,7 +578,7 @@ def emit_display(path: pathlib.Path, node: Node, ind: str,
         dynamic = re.fullmatch(r'\s*("(?:\\.|[^"\\])*")\s*\+\s*(var\([A-Za-z_][\w-]*\))\s*', arg_text)
         if dynamic:
             prefix = dynamic.group(1)[:-1].replace("%", "%%")
-            value = expr(path, node.line, dynamic.group(2), functions, scope=scope)
+            value = expr(path, node.line, dynamic.group(2), functions, scope=scope, arrays=arrays)
             separator = "" if prefix.endswith((" ", "\t")) else " "
             fmt = prefix + separator + "%.0f\""
             return f"{ind}anvil_text_number({', '.join(loc)}, {fmt}, {value}, {', '.join(color)});"
@@ -516,35 +606,47 @@ def emit_display(path: pathlib.Path, node: Node, ind: str,
 
 
 def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node],
-               indent: str, scope: Node | None = None) -> list[str]:
+               indent: str, scope: Node | None = None,
+               arrays: dict[str, int] | None = None) -> list[str]:
+    arrays = arrays or {}
     out = []
     for n in nodes:
-        if n.kind == "set": out.append(f"{indent}{variable_code(n.name, scope)} = {expr(path, n.line, n.value, functions, scope=scope)};")
-        elif n.kind == "local_set": out.append(f"{indent}{c_name(scope.name + '__' + n.name)} = {expr(path, n.line, n.value, functions, scope=scope)};")
+        if n.kind == "set": out.append(f"{indent}{variable_code(n.name, scope)} = {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
+        elif n.kind == "local_set": out.append(f"{indent}{c_name(scope.name + '__' + n.name)} = {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
+        elif n.kind == "array_set":
+            if n.name not in arrays:
+                raise CompileError(f"{path}:{n.line}: unknown array {n.name!r}")
+            suffix = f"{c_name(scope.name if scope else 'top')}_{n.line}"
+            index_var, value_var = f"_anvil_array_index_{suffix}", f"_anvil_array_value_{suffix}"
+            out.extend([f"{indent}{{",
+                        f"{indent}    const double {index_var} = {expr(path, n.line, n.params[0], functions, scope=scope, arrays=arrays)};",
+                        f"{indent}    const double {value_var} = {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};",
+                        f"{indent}    anvil_array_set({c_name(n.name)}, {arrays[n.name]}, {index_var}, {value_var}, {json.dumps(str(path))}, {n.line});",
+                        f"{indent}}}"])
         elif n.kind in ("add", "sub"):
             op = "+=" if n.kind == "add" else "-="
-            out.append(f"{indent}{variable_code(n.name, scope)} {op} {expr(path, n.line, n.value, functions, scope=scope)};")
+            out.append(f"{indent}{variable_code(n.name, scope)} {op} {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
         elif n.kind in ("local_add", "local_sub"):
             op = "+=" if n.kind == "local_add" else "-="
-            out.append(f"{indent}{c_name(scope.name + '__' + n.name)} {op} {expr(path, n.line, n.value, functions, scope=scope)};")
-        elif n.kind == "output": out.append(f"{indent}return {expr(path, n.line, n.value, functions, scope=scope)};")
+            out.append(f"{indent}{c_name(scope.name + '__' + n.name)} {op} {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
+        elif n.kind == "output": out.append(f"{indent}return {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
         elif n.kind == "call":
             if n.name not in functions: raise CompileError(f"{path}:{n.line}: unknown function {n.name!r}")
             args = split_args(n.value)
             if len(args) != len(functions[n.name].params):
                 raise CompileError(f"{path}:{n.line}: function {n.name!r} expects {len(functions[n.name].params)} argument(s), got {len(args)}")
-            values = [expr(path, n.line, arg, functions, scope=scope) for arg in args]
+            values = [expr(path, n.line, arg, functions, scope=scope, arrays=arrays) for arg in args]
             out.append(f"{indent}(void){c_name(n.name)}({', '.join(values)});")
         elif n.kind == "if":
-            out.append(f"{indent}if ({expr(path, n.line, n.value, functions, scope=scope)} != 0.0) {{")
-            out.extend(emit_nodes(path, n.body, functions, indent + "    ", scope))
+            out.append(f"{indent}if ({expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)} != 0.0) {{")
+            out.extend(emit_nodes(path, n.body, functions, indent + "    ", scope, arrays))
             if n.otherwise:
                 out.append(f"{indent}}} else {{")
-                out.extend(emit_nodes(path, n.otherwise, functions, indent + "    ", scope))
+                out.extend(emit_nodes(path, n.otherwise, functions, indent + "    ", scope, arrays))
             out.append(f"{indent}}}")
         elif n.kind == "while":
-            out.append(f"{indent}while ({expr(path, n.line, n.value, functions, scope=scope)} != 0.0) {{")
-            out.extend(emit_nodes(path, n.body, functions, indent + "    ", scope))
+            out.append(f"{indent}while ({expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)} != 0.0) {{")
+            out.extend(emit_nodes(path, n.body, functions, indent + "    ", scope, arrays))
             out.append(f"{indent}}}")
         elif n.kind == "for":
             if scope is None:
@@ -557,14 +659,14 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
             start_expr, end_expr, step_expr = n.params
             inner = indent + "    "
             out.append(f"{indent}{{")
-            out.append(f"{inner}const double {start_var} = {expr(path, n.line, start_expr, functions, scope=scope)};")
-            out.append(f"{inner}const double {end_var} = {expr(path, n.line, end_expr, functions, scope=scope)};")
-            out.append(f"{inner}const double {step_var} = {expr(path, n.line, step_expr, functions, scope=scope)};")
+            out.append(f"{inner}const double {start_var} = {expr(path, n.line, start_expr, functions, scope=scope, arrays=arrays)};")
+            out.append(f"{inner}const double {end_var} = {expr(path, n.line, end_expr, functions, scope=scope, arrays=arrays)};")
+            out.append(f"{inner}const double {step_var} = {expr(path, n.line, step_expr, functions, scope=scope, arrays=arrays)};")
             out.append(f"{inner}{loop_var} = {start_var};")
             out.append(f"{inner}if ({step_var} != 0.0) {{")
             condition = f"(({step_var} > 0.0 && {loop_var} <= {end_var}) || ({step_var} < 0.0 && {loop_var} >= {end_var}))"
             out.append(f"{inner}    for (; {condition}; {loop_var} += {step_var}) {{")
-            out.extend(emit_nodes(path, n.body, functions, inner + "        ", scope))
+            out.extend(emit_nodes(path, n.body, functions, inner + "        ", scope, arrays))
             out.append(f"{inner}    }}")
             out.append(f"{inner}}}")
             out.append(f"{indent}}}")
@@ -572,26 +674,26 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
         elif n.kind == "camera":
             vals = n.value.split()
             if len(vals) != 3: raise CompileError(f"{path}:{n.line}: camera perspective expects x y z")
-            out.append(f"{indent}anvil_camera_perspective({', '.join(expr(path,n.line,x,functions,scope=scope) for x in vals)});")
+            out.append(f"{indent}anvil_camera_perspective({', '.join(expr(path,n.line,x,functions,scope=scope,arrays=arrays) for x in vals)});")
         elif n.kind == "camera_fov":
             vals = split_args(n.value)
             if len(vals) != 1: raise CompileError(f"{path}:{n.line}: camera fov expects one value")
-            out.append(f"{indent}anvil_camera_fov({expr(path,n.line,vals[0],functions,scope=scope)});")
+            out.append(f"{indent}anvil_camera_fov({expr(path,n.line,vals[0],functions,scope=scope,arrays=arrays)});")
         elif n.kind == "camera_control":
             vals = split_args(n.value)
             if len(vals) != 2: raise CompileError(f"{path}:{n.line}: camera control expects speed and turn rate")
-            out.append(f"{indent}anvil_camera_control({expr(path,n.line,vals[0],functions,scope=scope)}, {expr(path,n.line,vals[1],functions,scope=scope)});")
+            out.append(f"{indent}anvil_camera_control({expr(path,n.line,vals[0],functions,scope=scope,arrays=arrays)}, {expr(path,n.line,vals[1],functions,scope=scope,arrays=arrays)});")
         elif n.kind == "clear":
             args = split_args(n.value[1:-1])
             if len(args) != 4: raise CompileError(f"{path}:{n.line}: clear rgba expects 4 values")
-            out.append(f"{indent}anvil_clear({', '.join(expr(path,n.line,x,functions,scope=scope) for x in args)});")
+            out.append(f"{indent}anvil_clear({', '.join(expr(path,n.line,x,functions,scope=scope,arrays=arrays) for x in args)});")
         elif n.kind == "display":
-            statement = emit_display(path, n, indent, functions, scope)
+            statement = emit_display(path, n, indent, functions, scope, arrays)
             if "anvil_trace_sphere(" not in statement:
                 out.append(f"{indent}anvil_trace_finish();")
             out.append(statement)
-        elif n.kind == "seed": out.append(f"{indent}anvil_seed((unsigned long long)({expr(path,n.line,n.value,functions,scope=scope)}));")
-        elif n.kind == "net_send": out.append(f"{indent}anvil_net_send({expr(path,n.line,n.value,functions,scope=scope)});")
+        elif n.kind == "seed": out.append(f"{indent}anvil_seed((unsigned long long)({expr(path,n.line,n.value,functions,scope=scope,arrays=arrays)}));")
+        elif n.kind == "net_send": out.append(f"{indent}anvil_net_send({expr(path,n.line,n.value,functions,scope=scope,arrays=arrays)});")
         elif n.kind == "net_host": out.append(f"{indent}(void)anvil_net_host({n.value});")
         elif n.kind == "net_join":
             address, port = n.value.rsplit(",", 1)
@@ -600,9 +702,12 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
 
 
 def emit_c(path: pathlib.Path, functions: dict[str, Node], top: list[Node], variables: set[str],
-           fixed_hz: int = 60, project_name: str = "Anvil Game") -> str:
+           arrays: dict[str, int] | None = None, fixed_hz: int = 60,
+           project_name: str = "Anvil Game") -> str:
+    arrays = arrays or {}
     lines = ["/* Generated from Anvil source. The .ANVL source remains the program. */", '#include "anvil_runtime.h"', "#include <math.h>", "#include <stdio.h>", ""]
     lines += [f"static double {c_name(name)};" for name in sorted(variables)]
+    lines += [f"static double {c_name(name)}[{size}];" for name, size in sorted(arrays.items())]
     for name, fn in functions.items():
         if name in ("draw", "update") and fn.params:
             raise CompileError(f"{path}:{fn.line}: engine callback '{name}' cannot have parameters")
@@ -613,7 +718,7 @@ def emit_c(path: pathlib.Path, functions: dict[str, Node], top: list[Node], vari
         params = ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params) or "void"
         lines.append(f"static double {c_name(name)}({params}) {{")
         lines.extend(f"    double {c_name(name + '__' + local)} = 0.0;" for local in sorted(fn.locals))
-        body = emit_nodes(path, fn.body, functions, "    ", fn)
+        body = emit_nodes(path, fn.body, functions, "    ", fn, arrays)
         lines.extend(body or ["    return 0.0;"])
         if not any(n.kind == "output" for n in fn.body): lines.append("    return 0.0;")
         lines.extend(["}", ""])
@@ -631,7 +736,7 @@ def emit_c(path: pathlib.Path, functions: dict[str, Node], top: list[Node], vari
         raise CompileError(f"{path}:{functions['main'].line}: main cannot have parameters when used as an engine callback program")
     lines.append("int main(void) {")
     lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
-    lines.extend(emit_nodes(path, setup, functions, "    "))
+    lines.extend(emit_nodes(path, setup, functions, "    ", arrays=arrays))
     if has_engine:
         lines.append(f"    anvil_run({c_name('update') if 'update' in functions else 'NULL'}, {c_name('draw') if 'draw' in functions else 'NULL'}, {json.dumps(project_name, ensure_ascii=True)});")
     elif calls:
@@ -670,7 +775,7 @@ def build_c(compiler: str, generated: pathlib.Path, output: pathlib.Path, releas
         devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
         if os.name == "nt" and devcmd.exists():
             helper = output.parent / (output.stem + ".build.cmd")
-            helper.write_text('@echo off\r\ncall "' + str(devcmd) + '" -arch=x64 >nul\r\nif errorlevel 1 exit /b %errorlevel%\r\n' + subprocess.list2cmdline(args) + '\r\nexit /b %errorlevel%\r\n', encoding="utf-8")
+            helper.write_text('@echo off\ncall "' + str(devcmd) + '" -arch=x64 >nul\nif errorlevel 1 exit /b %errorlevel%\n' + subprocess.list2cmdline(args) + '\nexit /b %errorlevel%\n', encoding="utf-8")
             try: subprocess.run(["cmd.exe", "/d", "/c", str(helper)], check=True)
             finally: helper.unlink(missing_ok=True)
         else: subprocess.run(args, check=True)
@@ -722,8 +827,8 @@ def main() -> int:
             except ValueError as exc:
                 raise CompileError(f"{args.source}: entry must resolve inside the project folder") from exc
         source = source_path.read_text(encoding="utf-8")
-        funcs, top, variables = parse(source_path, source)
-        generated = emit_c(source_path, funcs, top, variables, fixed_hz, project_name)
+        funcs, top, variables, arrays = parse(source_path, source)
+        generated = emit_c(source_path, funcs, top, variables, arrays, fixed_hz, project_name)
         c_path = args.emit_c or args.generated_c or source_path.with_suffix(".generated.c")
         c_path.parent.mkdir(parents=True, exist_ok=True)
         c_path.write_text(generated, encoding="utf-8", newline="\n")

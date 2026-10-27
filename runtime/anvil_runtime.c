@@ -1017,3 +1017,27 @@ failed_startup:
   UnregisterClassA(wc.lpszClassName, instance);
 }
 
+static size_t anvil_array_checked_index(const double *values, int size,
+                                        double index, const char *source,
+                                        int line) {
+  if (!values || size <= 0 || !isfinite(index) || index < 0.0 ||
+      index >= (double)size || floor(index) != index) {
+    fprintf(stderr,
+            "%s:%d: array index %.15g is invalid; expected an integer from 0 "
+            "through %d\n",
+            source ? source : "<generated>", line, index, size - 1);
+    exit(2);
+  }
+  return (size_t)index;
+}
+
+double anvil_array_get(const double *values, int size, double index,
+                       const char *source, int line) {
+  return values[anvil_array_checked_index(values, size, index, source, line)];
+}
+
+void anvil_array_set(double *values, int size, double index, double value,
+                     const char *source, int line) {
+  values[anvil_array_checked_index(values, size, index, source, line)] = value;
+}
+

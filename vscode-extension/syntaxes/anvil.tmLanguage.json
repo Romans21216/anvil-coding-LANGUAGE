@@ -6,6 +6,7 @@
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#function-definition" },
+    { "include": "#array-declaration" },
     { "include": "#function-call" },
     { "include": "#variables" },
     { "include": "#engine-commands" },
@@ -54,6 +55,16 @@
         "6": { "name": "variable.function.anvil" }
       }
     },
+    "array-declaration": {
+      "match": "\\b(array)(\\s+)([A-Za-z_][A-Za-z0-9_-]*)(\\s*)(\\()([0-9]+)(\\))",
+      "captures": {
+        "1": { "name": "storage.type.array.anvil" },
+        "3": { "name": "variable.other.array.anvil" },
+        "5": { "name": "punctuation.section.group.begin.anvil" },
+        "6": { "name": "constant.numeric.integer.anvil" },
+        "7": { "name": "punctuation.section.group.end.anvil" }
+      }
+    },
     "variables": {
       "patterns": [
         { "match": "\\b(var|local|flag)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))", "captures": { "1": { "name": "support.type.anvil" }, "2": { "name": "punctuation.section.group.begin.anvil" }, "3": { "name": "variable.other.anvil" }, "4": { "name": "punctuation.section.group.end.anvil" } } },
@@ -73,7 +84,7 @@
       "name": "constant.language.anvil"
     },
     "builtins": {
-      "match": "\\b(compute|floor|ceil|sqrt|sin|cos|abs|min|max|clamp|rnd|noise|fbm|time|delta|axis|rgba|rgb|cube|sphere|ray_sphere|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave)\\b(?=\\s*\\()",
+      "match": "\\b(array|compute|floor|ceil|sqrt|sin|cos|abs|min|max|clamp|rnd|noise|fbm|time|delta|axis|rgba|rgb|cube|sphere|ray_sphere|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave)\\b(?=\\s*\\()",
       "name": "support.function.anvil"
     },
     "numbers": {

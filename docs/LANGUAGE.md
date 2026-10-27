@@ -26,6 +26,23 @@ Comments begin with `#` outside a quoted string. Names are case-sensitive. Funct
 
 `var(name)` reads a global numeric variable, except that a function parameter with the same name takes precedence inside that function. `set local(name) = expression` declares function-local numeric state, initialized to `0` at function entry; `local(name)` reads it, and `add local(name) amount` / `sub local(name) amount` update it. Local names are visible only in their declaring function. Existing `set var(name)` assignments continue to use global state unless `name` is a parameter of the current function. The compiler validates local/global references and function-call arity before generating C.
 
+## Fixed-size numeric arrays
+
+Declare a global numeric array at top level with `array name(size)`. Arrays start with every element set to zero. Read an element using `array(name, index)` in any numeric expression and write it inside a function with `set array(name, index) = expression`. Indexes are zero-based and must be finite whole numbers from zero through `size - 1`; an invalid runtime index prints the source path and line and exits with code 2. Sizes must be from 1 through 1,048,576 elements. Arrays are global and fixed-size; resizing, local arrays, strings, and structures are not supported yet.
+
+```anv
+array scores(4)
+
+fn(main)
+  for local(index) = 0 to 3
+    set array(scores, local(index)) = local(index) * 10
+  end
+  output array(scores, 2) + array(scores, 3) # prints 50
+end
+
+call fn(main)
+```
+
 ## Expressions
 
 Supported arithmetic operators are `+`, `-`, `*`, `/`, and `%`; comparison operators are `=`, `==`, `!=`, `<`, `<=`, `>`, and `>=`; conditions can use `and` and `or`. Arithmetic binds more tightly than comparisons, then `and`, then `or`. Numeric literals may be integers or decimals. `var(name)` reads a global or shadowing parameter; `local(name)` reads function-local state; `call fn(name, arguments...)` calls a function and evaluates to its numeric return value.
@@ -93,5 +110,5 @@ fixed_hz = 60
 
 ## Not implemented yet
 
-Static types, arrays, structures, modules/imports, assets/sprites, audio, collision/physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables, `while` loops, and inclusive numeric `for` loops are supported, but the language and engine remain much smaller than a general-purpose game engine today.
+Static types, dynamic/local arrays, structures, modules/imports, assets/sprites, audio, collision/physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables, `while`/inclusive numeric `for` loops, and fixed-size global numeric arrays are supported, but the language and engine remain much smaller than a general-purpose game engine today.
 

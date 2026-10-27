@@ -4,7 +4,7 @@
 
 ## What works now
 
-- A Windows C backend for numeric globals and function-local variables, parameterized and recursive functions with numeric return values, calls, branches, inclusive `for`/`while` loops, input, time, seeded random numbers, gradient noise, and fractal noise.
+- A Windows C backend for numeric globals, checked fixed-size arrays, and function-local variables, parameterized and recursive functions with numeric return values, calls, branches, inclusive `for`/`while` loops, input, time, seeded random numbers, gradient noise, and fractal noise.
 - A small native software renderer for 2D rectangles, circles, lines and text, plus shaded 3D cubes, spheres, and grid planes with a perspective camera and depth buffer.
 - Keyboard camera movement/look, adjustable field of view, and a built-in BVH-accelerated CPU ray-traced sphere with shadows and specular lighting.
 - Keyboard edge/held state, configurable fixed-step updates, deterministic RNG and noise helpers.
@@ -21,6 +21,7 @@ On Windows, install Python 3.11 or newer and Visual Studio 2022 Build Tools with
 python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
 python compiler/anvil.py examples/loops.ANVL --release --output build/loops.exe
+python compiler/anvil.py examples/arrays.ANVL --release --output build/arrays.exe
 ```
 
 This writes inspectable C and compiles it with MSVC. To only translate Anvil to C, add `--emit-c build/first_world.c`. The generated C is ordinary C, while the runtime currently targets Windows.
@@ -47,6 +48,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Numeric compiler sample](examples/numeric_demo.ANVL)
 - [Function parameters and local variables sample](examples/functions.ANVL)
 - [While and numeric for loop sample](examples/loops.ANVL)
+- [Fixed-size arrays sample](examples/arrays.ANVL)
 - [VS Code extension](vscode-extension/README.md)
 - [Full improvement backlog](docs/IMPROVEMENT_BACKLOG.md)
 - [Wiki pages](docs/Wiki/Home.md)

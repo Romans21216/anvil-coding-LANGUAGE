@@ -8,10 +8,12 @@ const manifestPath = path.join(root, 'package.json');
 const configPath = path.join(root, 'language-configuration.json');
 const grammarPath = path.join(root, 'syntaxes', 'anvil.tmLanguage.json');
 const samplePath = path.resolve(root, '..', 'examples', 'first_world.ANVL');
+const arraysSamplePath = path.resolve(root, '..', 'examples', 'arrays.ANVL');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 JSON.parse(fs.readFileSync(grammarPath, 'utf8'));
 const sample = fs.readFileSync(samplePath, 'utf8');
+const arraysSample = fs.readFileSync(arraysSamplePath, 'utf8');
 const check = (condition, message) => { if (!condition) throw new Error(message); };
 
 check(manifest.contributes.languages.some(x => x.id === 'anvil' && x.extensions.includes('.ANVL')), 'Anvil language or extension is not registered');
@@ -56,6 +58,9 @@ async function main() {
   expect('for local(index) = 1 to 5 step 2', 'for', 'keyword.control.anvil');
   expect('for local(index) = 1 to 5 step 2', 'to', 'keyword.control.anvil');
   expect('for local(index) = 1 to 5 step 2', 'step', 'keyword.control.anvil');
+  expect('array scores(4)', 'array', 'storage.type.array.anvil');
+  expect('array scores(4)', 'scores', 'variable.other.array.anvil');
+  expect('array(scores, local(index))', 'array', 'support.function.anvil');
   expect('set var(player-health) = 24', 'player-health', 'variable.other.anvil');
   expect('set local(temporary) = 1', 'temporary', 'variable.other.anvil');
   expect('set flag(game-running) = true', 'game-running', 'variable.other.anvil');
@@ -72,6 +77,9 @@ async function main() {
 
   for (const required of ['fn(update)', 'var(spin)', '"Anvil Engine"', 'scene 3d', 'ray_sphere(', 'camera control(']) {
     check(sample.includes(required), `sample does not demonstrate ${required}`);
+  }
+  for (const required of ['array scores(4)', 'array(scores, local(index))']) {
+    check(arraysSample.includes(required), `array sample does not demonstrate ${required}`);
   }
   console.log('PASS: VS Code manifest/config are valid; TextMate grammar loads and token scopes match Anvil samples.');
   registry.dispose();

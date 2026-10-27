@@ -227,6 +227,91 @@ class CompilerTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("nested for loops must use different local variables", result.stderr)
 
+    def test_fixed_numeric_arrays_support_dynamic_reads_and_writes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "arrays.ANVL"
+            out = pathlib.Path(temp) / "arrays.exe"
+            source.write_text(
+                "array values(4)\n"
+                "fn(double, value)\n"
+                "  output var(value) * 2\n"
+                "end\n"
+                "fn(main)\n"
+                "  for local(index) = 0 to 3\n"
+                "    set array(values, local(index)) = call fn(double, local(index))\n"
+                "  end\n"
+                "  output array(values, 2) + array(values, 3)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "10")
+
+    def test_array_index_is_checked_at_runtime(self):
+        for index in ("-1", "2", "0.5"):
+            with self.subTest(index=index), tempfile.TemporaryDirectory() as temp:
+                source = pathlib.Path(temp) / "array-bounds.ANVL"
+                out = pathlib.Path(temp) / "array-bounds.exe"
+                source.write_text(
+                    "array values(2)\n"
+                    "fn(main)\n"
+                    f"  output array(values, {index})\n"
+                    "end\n"
+                    "call fn(main)\n",
+                    encoding="utf-8",
+                )
+                subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+                result = subprocess.run([str(out)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("array index", result.stderr)
+                self.assertIn("array-bounds.ANVL:3:", result.stderr)
+
+    def test_array_index_side_effect_evaluates_once(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "array-once.ANVL"
+            out = pathlib.Path(temp) / "array-once.exe"
+            source.write_text(
+                "array values(3)\n"
+                "set var(calls) = 0\n"
+                "fn(next-index)\n"
+                "  add var(calls) 1\n"
+                "  output 1\n"
+                "end\n"
+                "fn(next-value)\n"
+                "  add var(calls) 1\n"
+                "  output 7\n"
+                "end\n"
+                "fn(main)\n"
+                "  set array(values, call fn(next-index)) = call fn(next-value)\n"
+                "  output array(values, 1) + var(calls)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "9")
+
+    def test_array_declarations_and_references_are_validated(self):
+        cases = (
+            ("array values(0)\nfn(main)\n output 0\nend\n", "array size must be"),
+            ("array values(2)\narray values(3)\nfn(main)\n output 0\nend\n", "duplicate array 'values'"),
+            ("array values(1048577)\nfn(main)\n output 0\nend\n", "array size must be"),
+            ("fn(main)\n output array(missing, 0)\nend\n", "unknown array 'missing'"),
+            ("fn(main)\n array values(2)\n output 0\nend\n", "arrays must be declared at top level"),
+            ("array values(2)\nfn(values)\n output 0\nend\n", "conflicts with another declaration"),
+            ("fn(array_get)\n output 0\nend\n", "conflicts with a reserved runtime name"),
+        )
+        for program, diagnostic in cases:
+            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory() as temp:
+                source = pathlib.Path(temp) / "bad-array.ANVL"
+                source.write_text(program, encoding="utf-8")
+                result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(diagnostic, result.stderr)
+
     def test_network_api_emits_native_udp_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             c_file = pathlib.Path(temp) / "network.c"
