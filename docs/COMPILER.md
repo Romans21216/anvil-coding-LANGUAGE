@@ -3,10 +3,10 @@
 ## What the compiler does
 
 ```text
-.ANVL source → parser and source-located validation → ordinary C source → C compiler/linker → Windows .exe
+.ANVL source → parser and source-located validation → backend → Windows .exe
 ```
 
-`compiler/anvil.py` is the current command-line compiler. It translates Anvil statements to direct C function calls and links `runtime/anvil_runtime.c`. The generated file is ordinary inspectable C; the game program itself is not Rust and is not an extension to Rust. A Rust backend is not implemented yet.
+`compiler/anvil.py` is the command-line compiler. The default backend remains the existing C implementation for full current engine coverage. An experimental `--backend native` path writes x64 machine code and a PE32+ executable directly, without generating C/Rust or invoking another compiler. Its language coverage is currently limited; see [the native compiler migration status](NATIVE_X64_COMPILER_MIGRATION.md). The target direction is a complete Anvil-owned native backend and runtime, with no C or Rust dependency.
 
 ## Compiler architecture
 
@@ -21,9 +21,11 @@ The command-line path remains `compiler/anvil.py`; it is now a small compatibili
 | `compiler/codegen.py` | Emit C statements, runtime calls, and complete translation units from validated nodes. |
 | `compiler/build.py` | Discover MSVC and invoke the native compiler/linker. |
 | `compiler/cli.py` | Parse CLI/project settings and orchestrate source loading, semantic validation, C generation, and build output. |
+| `compiler/native_codegen.py` | Experimental direct x64 code generation for a limited numeric Anvil subset. |
+| `compiler/native_x64.py` | Anvil-owned x64 code fixups and PE32+ executable image writing. |
 | `compiler/common.py` | Shared AST/data types, language limits, runtime names, and repository paths. |
 
-The CLI order is source reading → syntax parsing → semantic validation → C generation → optional native build. The parser and semantic checker expose phase-level entry points for focused tests, while existing `compiler/anvil.py` commands and importable functions remain compatible. The phase boundary regression tests live in `tests/test_compiler_modules.py`.
+The C CLI order is source reading → syntax parsing → semantic validation → C generation → optional MSVC build. The native order is source reading → syntax parsing and validation → x64 code generation → PE writing. The parser and semantic checker expose phase-level entry points for focused tests, while existing `compiler/anvil.py` commands and importable functions remain compatible. The phase boundary regression tests live in `tests/test_compiler_modules.py`.
 
 Python compiler files use Black's default 88-column formatting. Contributors can check formatting with `python -m black --check compiler tests/test_compiler_modules.py` when Black is installed. The project does not require Black to run or build Anvil.
 
@@ -31,9 +33,10 @@ Python compiler files use Black's default 88-column formatting. Contributors can
 python compiler/anvil.py examples/first_world.ANVL --emit-c build/first_world.c
 python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
+python compiler/anvil.py examples/functions.ANVL --backend native --output build/functions-native.exe
 ```
 
-The compiler requires Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC `cl` is the verified native compiler and is the only automatic compiler choice. Numeric-only programs use the same compiler and native C backend. `--emit-c` stops after generation so the intermediate code can be inspected or built separately.
+The existing C backend requires Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC `cl` is the verified native compiler and is the only automatic compiler choice. `--emit-c` stops after C generation. The experimental `--backend native` path requires only Python and Windows; it supports a limited numeric subset and writes an EXE directly.
 
 ## Current language slice
 
@@ -45,7 +48,7 @@ The current parser checks expression structure and operator precedence, built-in
 
 Ahead-of-time compilation removes VM dispatch from generated function calls. MSVC release builds use `/O2`. No benchmark suite or cross-language comparison exists yet, so the compiler makes no speed claim. The conventional software rasterizer and CPU BVH ray tracing are both CPU-bound; there is no GPU/DXR backend.
 
-## Rust output
+## Native backend limits
 
-A future Rust backend can emit a normal `.rs` program and use `rustc` as the system compiler. The C backend is the only working backend in this project today. Output formats are backends, not syntax extensions: each takes Anvil source, emits standard target-language source, and invokes that language's compiler/linker.
+The direct backend currently handles simple numeric functions, up to four numeric parameters, arithmetic except remainder, comparisons, short-circuit Boolean operators, `if`, `while`, inclusive ascending/descending `for` loops, numeric locals/globals, and integer console output. It does not yet include arrays, project files, 2D/3D graphics, camera/input, ray tracing, physics, noise, multiplayer, or the engine runtime. It is not the default until those features are ported and verified.
 

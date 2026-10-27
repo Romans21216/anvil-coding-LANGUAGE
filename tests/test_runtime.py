@@ -170,6 +170,10 @@ static int release_posted;
 static const char *button_names[3] = {"left", "right", "middle"};
 
 static double update(void) {
+  /* The first draw runs after one possible fixed update. Wait until draw has
+     posted the synthetic mouse messages so the first sample is deterministic. */
+  if (!events_posted)
+    return 0.0;
   update_count++;
   if (update_count == 1) {
     for (int i = 0; i < 3; ++i) {

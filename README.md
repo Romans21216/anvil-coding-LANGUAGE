@@ -1,10 +1,11 @@
 # Anvil
 
-**Anvil** is a small BASIC/Lua-inspired game language with its own `.ANVL` source format. The compiler reads Anvil, emits ordinary C source, and invokes MSVC to produce a native Windows `.exe`. Anvil is not Rust syntax and does not extend Rust.
+**Anvil** is a small BASIC/Lua-inspired game language with its own `.ANVL` source format. The current default compiler emits C and invokes MSVC for full engine coverage. An experimental direct x64 backend (`--backend native`) writes a Windows `.exe` without emitting C/Rust or invoking another compiler; it currently supports a limited numeric subset. The project target is a complete Anvil-owned compiler and runtime with no C or Rust dependency.
 
 ## What works now
 
 - A Windows C backend for numeric globals, checked fixed-size global and function-local arrays, function-local variables, parameterized and recursive functions with numeric return values, calls, branches, inclusive `for`/`while` loops, input, time, seeded random numbers, gradient noise, and fractal noise.
+- An experimental direct x64/PE32+ backend for numeric functions, arithmetic, comparisons, branches, loops, and integer console output.
 - A small native software renderer for 2D rectangles, circles, lines and text, plus shaded 3D cubes, spheres, and grid planes with a perspective camera and depth buffer.
 - Keyboard camera movement/look, adjustable field of view, and a built-in BVH-accelerated CPU ray-traced sphere with shadows and specular lighting.
 - Keyboard edge/held state, configurable fixed-step updates, deterministic RNG and noise helpers.
@@ -32,6 +33,14 @@ python compiler/anvil.py examples/image_sprite.ANVL --release --output build/ima
 ```
 
 This writes inspectable C and compiles it with MSVC. To only translate Anvil to C, add `--emit-c build/first_world.c`. The generated C is ordinary C, while the runtime currently targets Windows.
+
+To try the experimental no-C native backend on supported numeric programs:
+
+```powershell
+python compiler/anvil.py examples/functions.ANVL --backend native --output build/functions-native.exe
+```
+
+This backend writes x64 machine code and a PE32+ executable directly. It does not yet support the game-engine runtime. See [the native compiler migration plan](docs/NATIVE_X64_COMPILER_MIGRATION.md) for its exact limits and status.
 
 ## Run checks
 

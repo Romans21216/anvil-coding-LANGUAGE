@@ -1,0 +1,556 @@
+"""Direct x64 code generation for the first native Anvil compiler milestone."""
+
+from __future__ import annotations
+
+import math
+import struct
+from dataclasses import dataclass
+
+from compiler.common import CompileError, Node
+from compiler.expressions import ExpressionParser, split_args
+from compiler.native_x64 import Pe32Plus, X64Code
+
+
+@dataclass(frozen=True)
+class _Value:
+    kind: str
+    text: str
+
+
+class _Expression:
+    PRECEDENCE = {
+        "or": 1,
+        "and": 2,
+        "=": 3,
+        "==": 3,
+        "!=": 3,
+        "<": 4,
+        "<=": 4,
+        ">": 4,
+        ">=": 4,
+        "+": 5,
+        "-": 5,
+        "*": 6,
+        "/": 6,
+        "%": 6,
+    }
+
+    def __init__(self, owner: "NativeCodegen", line: int, raw: str, scope: Node | None):
+        self.owner = owner
+        self.line = line
+        self.scope = scope
+        self.tokens = ExpressionParser(
+            owner.path, line, raw, owner.functions, scope, owner.arrays
+        ).tokens
+        self.index = 0
+
+    def _peek(self, value: str | None = None) -> bool:
+        return self.index < len(self.tokens) and (
+            value is None or self.tokens[self.index][1] == value
+        )
+
+    def _take(self) -> tuple[str, str]:
+        token = self.tokens[self.index]
+        self.index += 1
+        return token
+
+    def emit(self, minimum: int = 0) -> _Value:
+        if not self._peek():
+            raise CompileError(f"{self.owner.path}:{self.line}: expected expression")
+        kind, value = self._take()
+        if kind == "number":
+            number = float(value)
+            if not math.isfinite(number):
+                raise CompileError(f"{self.owner.path}:{self.line}: numeric literal must be finite")
+            self.owner.emit_float(number)
+            left = _Value("number", value)
+        elif kind == "variable":
+            name = value[4:-1]
+            self.owner.load_variable(name, self.scope, self.line)
+            left = _Value("number", name)
+        elif kind == "local":
+            name = value[6:-1]
+            self.owner.load_local(name, self.scope, self.line)
+            left = _Value("number", name)
+        elif kind == "op" and value in ("+", "-"):
+            operand = self.emit(7)
+            self._require_number(operand)
+            if value == "-":
+                self.owner.emit_negate()
+            left = _Value("number", "unary")
+        elif kind == "op" and value == "(":
+            left = self.emit()
+            self._expect(")")
+        elif kind == "word" and value in ("true", "false"):
+            self.owner.emit_float(1.0 if value == "true" else 0.0)
+            left = _Value("number", value)
+        elif kind == "call":
+            self._emit_user_call(value)
+            left = _Value("number", "call")
+        elif kind == "word" and value in self.owner.builtin_names:
+            self._emit_builtin(value)
+            left = _Value("number", value)
+        elif kind == "array":
+            raise CompileError(
+                f"{self.owner.path}:{self.line}: native fixed-array code generation is not available yet"
+            )
+        elif kind == "string":
+            raise CompileError(
+                f"{self.owner.path}:{self.line}: string expressions are not available in the native numeric backend"
+            )
+        elif kind == "word" and value in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" and len(value) == 1:
+            raise CompileError(
+                f"{self.owner.path}:{self.line}: key constants require the native input runtime"
+            )
+        else:
+            raise CompileError(f"{self.owner.path}:{self.line}: unsupported native expression token {value!r}")
+
+        while self._peek():
+            operator = self.tokens[self.index][1]
+            precedence = self.PRECEDENCE.get(operator, -1)
+            if precedence < minimum:
+                break
+            self.index += 1
+            self._require_number(left)
+            if operator in ("and", "or"):
+                short = self.owner.label("logic_short")
+                done = self.owner.label("logic_done")
+                self.owner.code.bytes(b"\x66\x0f\xef\xc9\x66\x0f\x2e\xc1")
+                self.owner.code.conditional_jump(0x84 if operator == "and" else 0x85, short)
+                right = self.emit(precedence + 1)
+                self._require_number(right)
+                self.owner.code.bytes(b"\x66\x0f\xef\xc9\x66\x0f\x2e\xc1")
+                self.owner.code.bytes(b"\x0f\x95\xc0\x0f\xb6\xc0\xf2\x48\x0f\x2a\xc0")
+                self.owner.code.jump(done)
+                self.owner.code.label(short)
+                self.owner.emit_float(0.0 if operator == "and" else 1.0)
+                self.owner.code.label(done)
+                left = _Value("number", operator)
+                continue
+            temp = self.owner.push_temp()
+            self.owner.store_local(temp)
+            right = self.emit(precedence + 1)
+            self._require_number(right)
+            self.owner.emit_binary(operator, temp, self.line)
+            self.owner.pop_temp()
+            left = _Value("number", operator)
+        return left
+
+    def compile(self) -> None:
+        result = self.emit()
+        self._require_number(result)
+        if self._peek():
+            raise CompileError(
+                f"{self.owner.path}:{self.line}: unexpected token {self.tokens[self.index][1]!r}"
+            )
+
+    def _emit_user_call(self, token: str) -> None:
+        contents = token[token.index("fn(") + 3:-1]
+        parts = split_args(contents)
+        if not parts:
+            raise CompileError(f"{self.owner.path}:{self.line}: empty function call")
+        name, raw_args = parts[0], parts[1:]
+        target = self.owner.functions.get(name)
+        if target is None:
+            raise CompileError(f"{self.owner.path}:{self.line}: unknown function {name!r}")
+        if len(raw_args) != len(target.params):
+            raise CompileError(
+                f"{self.owner.path}:{self.line}: function {name!r} expects "
+                f"{len(target.params)} argument(s), got {len(raw_args)}"
+            )
+        self.owner.emit_call(name, raw_args, self.scope, self.line)
+
+    def _emit_builtin(self, name: str) -> None:
+        raise CompileError(
+            f"{self.owner.path}:{self.line}: built-in {name} is not available in the direct x64 backend yet"
+        )
+
+    def _peek_expected(self, value: str) -> bool:
+        return self._peek(value)
+
+    def _expect(self, value: str) -> None:
+        if not self._peek_expected(value):
+            raise CompileError(f"{self.owner.path}:{self.line}: expected {value!r}")
+        self.index += 1
+
+    def _require_number(self, value: _Value) -> None:
+        if value.kind != "number":
+            raise CompileError(f"{self.owner.path}:{self.line}: expected a number")
+
+
+class NativeCodegen:
+    """Emit native x64 instructions and a PE executable without C/Rust output."""
+
+    IMPORTS = [("KERNEL32.dll", "GetStdHandle"),
+               ("KERNEL32.dll", "WriteFile"),
+               ("KERNEL32.dll", "ExitProcess")]
+    BUILTIN_NAMES: set[str] = set()
+
+    def __init__(self, path, functions, top, variables, arrays=None):
+        self.path = path
+        self.functions = functions
+        self.top = top
+        self.variables = variables
+        self.arrays = arrays or {}
+        self.code = X64Code()
+        self._label_counter = 0
+        self._frame_slots: dict[str, int] = {}
+        self._scratch_base = 0
+        self._scratch_depth = 0
+        self._frame_size = 0
+        self._scope: Node | None = None
+        self._data_offsets = {
+            name: index * 8 for index, name in enumerate(sorted(variables))
+        }
+        self._data_size = max(8, len(self._data_offsets) * 8)
+
+    def label(self, stem: str) -> str:
+        self._label_counter += 1
+        return f"{stem}_{self._label_counter}"
+
+    def emit_float(self, value: float) -> None:
+        self.code.bytes(b"\x48\xb8" + struct.pack("<Q", struct.unpack("<Q", struct.pack("<d", value))[0]))
+        self.code.bytes(b"\x66\x48\x0f\x6e\xc0")  # movq xmm0, rax
+
+    @staticmethod
+    def _memory_operand(register: int, base: int, displacement: int) -> bytes:
+        if not -128 <= displacement <= 127:
+            raise CompileError("native stack frame exceeds the first x64 encoder limit")
+        # F2 0F 10/11 mod=01 reg=XMM rm=RBP disp8.
+        return bytes((0xF2, 0x0F, 0x10, 0x45 | (register << 3), displacement & 0xFF))
+
+    @staticmethod
+    def _store_xmm_operand(register: int, displacement: int) -> bytes:
+        if not -128 <= displacement <= 127:
+            raise CompileError("native stack frame exceeds the first x64 encoder limit")
+        return bytes((0xF2, 0x0F, 0x11, 0x45 | (register << 3), displacement & 0xFF))
+
+    def load_local(self, name: str, scope: Node | None, line: int) -> None:
+        if name.startswith("_temporary_"):
+            index = int(name.rsplit("_", 1)[1])
+            displacement = -(self._scratch_base + index * 8)
+        elif scope is None or name not in self._frame_slots:
+            raise CompileError(f"{self.path}:{line}: unknown local variable {name!r}")
+        else:
+            displacement = -self._frame_slots[name]
+        self.code.bytes(self._memory_operand(0, 5, displacement))
+
+    def store_local(self, name: str) -> None:
+        if name.startswith("_temporary_"):
+            index = int(name.rsplit("_", 1)[1])
+            if index > 16:
+                raise CompileError(f"{self.path}: native expression needs more than 16 temporary slots")
+            offset = -(self._scratch_base + index * 8)
+        elif name in self._frame_slots:
+            offset = -self._frame_slots[name]
+        else:
+            raise CompileError(f"native compiler internal error: local slot {name!r} missing")
+        self.code.bytes(self._store_xmm_operand(0, offset))
+
+    def load_variable(self, name: str, scope: Node | None, line: int) -> None:
+        if scope is not None and name in self._frame_slots:
+            self.load_local(name, scope, line)
+            return
+        offset = self._data_offsets.get(name)
+        if offset is None:
+            raise CompileError(f"{self.path}:{line}: unknown global variable {name!r}")
+        self.code.rip_load_data(0, offset)
+
+    def store_variable(self, name: str, scope: Node | None, line: int) -> None:
+        if scope is not None and name in self._frame_slots:
+            self.store_local(name)
+            return
+        offset = self._data_offsets.get(name)
+        if offset is None:
+            raise CompileError(f"{self.path}:{line}: unknown global variable {name!r}")
+        self.code.rip_store_data(0, offset)
+
+    def push_temp(self) -> str:
+        self._scratch_depth += 1
+        if self._scratch_depth > 16:
+            raise CompileError(f"{self.path}: native expression needs more than 16 temporary slots")
+        return f"_temporary_{self._scratch_depth}"
+
+    def pop_temp(self) -> None:
+        self._scratch_depth -= 1
+
+    def _alloc_slot(self, name: str) -> None:
+        if name not in self._frame_slots:
+            self._frame_slots[name] = (len(self._frame_slots) + 1) * 8
+
+    def emit_binary(self, operator: str, left_slot: str | None = None, line: int = 0) -> None:
+        if left_slot is not None:
+            temp_index = int(left_slot.rsplit("_", 1)[1])
+            displacement = -(self._scratch_base + temp_index * 8)
+            # movapd xmm1, xmm0; load the saved left operand into xmm0.
+            self.code.bytes(b"\x66\x0f\x28\xc8")
+            self.code.bytes(self._memory_operand(0, 5, displacement))
+        opcodes = {
+            "+": b"\xf2\x0f\x58\xc1",
+            "-": b"\xf2\x0f\x5c\xc1",
+            "*": b"\xf2\x0f\x59\xc1",
+            "/": b"\xf2\x0f\x5e\xc1",
+        }
+        if operator in opcodes:
+            self.code.bytes(opcodes[operator])
+            if line:
+                self.emit_finite_check(line)
+            return
+        if operator in ("=", "==", "!=", "<", "<=", ">", ">="):
+            self.code.bytes(b"\x66\x0f\x2e\xc1")  # ucomisd xmm0, xmm1
+            setcc = {"=": 0x94, "==": 0x94, "!=": 0x95,
+                     "<": 0x92, "<=": 0x96, ">": 0x97, ">=": 0x93}[operator]
+            self.code.bytes(bytes((0x0F, setcc, 0xC0)))  # setcc al
+            self.code.bytes(b"\x0f\xb6\xc0\xf2\x48\x0f\x2a\xc0")
+            return
+        if operator in ("and", "or"):
+            self.code.bytes(b"\x66\x0f\xef\xd2")  # zero xmm2
+            self.code.bytes(b"\x66\x0f\x2e\xc2\x0f\x95\xc0")  # left != 0 -> al
+            self.code.bytes(b"\x66\x0f\x2e\xca\x0f\x95\xc1")  # right != 0 -> cl
+            self.code.bytes(b"\x20\xc8" if operator == "and" else b"\x08\xc8")
+            self.code.bytes(b"\x0f\xb6\xc0\xf2\x48\x0f\x2a\xc0")
+            return
+        raise CompileError(f"{self.path}:{line}: operator {operator!r} is not supported by native x64 yet")
+
+    def emit_negate(self) -> None:
+        self.code.bytes(b"\x66\x48\x0f\x7e\xc0")
+        self.code.bytes(b"\x48\xb9\x00\x00\x00\x00\x00\x00\x00\x80")
+        self.code.bytes(b"\x48\x31\xc8\x66\x48\x0f\x6e\xc0")
+
+    def emit_finite_check(self, line: int) -> None:
+        failure = self.label("nonfinite")
+        done = self.label("finite")
+        self.code.bytes(b"\x66\x48\x0f\x7e\xc0")  # movq rax, xmm0
+        self.code.bytes(b"\x48\xc1\xe8\x34\x25\xff\x07\x00\x00")
+        self.code.bytes(b"\x3d\xff\x07\x00\x00")  # cmp eax, 0x7ff
+        self.code.conditional_jump(0x84, failure)  # je
+        self.code.jump(done)
+        self.code.label(failure)
+        self.code.bytes(b"\xb9\x02\x00\x00\x00\x48\x83\xec\x20")
+        self.code.rip_call_import("ExitProcess")
+        self.code.bytes(b"\xcc")
+        self.code.label(done)
+
+    def emit_call(self, name: str, raw_args: list[str], scope: Node | None, line: int) -> None:
+        target = self.functions.get(name)
+        if target is None:
+            raise CompileError(f"{self.path}:{line}: unknown function {name!r}")
+        if len(raw_args) != len(target.params):
+            raise CompileError(
+                f"{self.path}:{line}: function {name!r} expects "
+                f"{len(target.params)} argument(s), got {len(raw_args)}"
+            )
+        if len(raw_args) > 4:
+            raise CompileError(f"{self.path}:{line}: native x64 backend currently supports at most four parameters")
+        base_depth = self._scratch_depth
+        slots = []
+        for argument in raw_args:
+            self.emit_expression(argument, line, scope)
+            slot = self.push_temp()
+            self.store_local(slot)
+            slots.append(slot)
+        shadow = 0x20
+        self.code.bytes(b"\x48\x83\xec" + bytes((shadow,)))
+        for index, slot in enumerate(slots):
+            displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+            self.code.bytes(self._memory_operand(index, 5, displacement))
+        self.code.call(f"function:{name}")
+        self.code.bytes(b"\x48\x83\xc4" + bytes((shadow,)))
+        self._scratch_depth = base_depth
+
+    def emit_expression(self, raw: str, line: int, scope: Node | None) -> None:
+        _Expression(self, line, raw, scope).compile()
+
+    def emit_nodes(self, nodes: list[Node], scope: Node | None) -> None:
+        for node in nodes:
+            if node.kind == "set":
+                self.emit_expression(node.value, node.line, scope)
+                self.store_variable(node.name, scope, node.line)
+            elif node.kind == "local_set":
+                self.emit_expression(node.value, node.line, scope)
+                self.store_local(node.name)
+            elif node.kind in ("add", "sub", "local_add", "local_sub"):
+                name = node.name
+                self.load_variable(name, scope, node.line)
+                temp = self.push_temp()
+                self.store_local(temp)
+                self.emit_expression(node.value, node.line, scope)
+                self.emit_binary("+" if node.kind in ("add", "local_add") else "-", temp, node.line)
+                self.pop_temp()
+                self.store_variable(name, scope, node.line)
+            elif node.kind == "output":
+                self.emit_expression(node.value, node.line, scope)
+                self.code.bytes(b"\xc9\xc3")  # leave; ret
+            elif node.kind == "if":
+                else_label = self.label("else")
+                end_label = self.label("endif")
+                self.emit_expression(node.value, node.line, scope)
+                self.code.bytes(b"\x66\x0f\xef\xc9\x66\x0f\x2e\xc1")
+                self.code.conditional_jump(0x84, else_label)
+                self.emit_nodes(node.body, scope)
+                if node.otherwise:
+                    self.code.jump(end_label)
+                self.code.label(else_label)
+                if node.otherwise:
+                    self.emit_nodes(node.otherwise, scope)
+                    self.code.label(end_label)
+            elif node.kind == "while":
+                start = self.label("while_start")
+                end = self.label("while_end")
+                self.code.label(start)
+                self.emit_expression(node.value, node.line, scope)
+                self.code.bytes(b"\x66\x0f\xef\xc9\x66\x0f\x2e\xc1")
+                self.code.conditional_jump(0x84, end)
+                self.emit_nodes(node.body, scope)
+                self.code.jump(start)
+                self.code.label(end)
+            elif node.kind == "for":
+                if scope is None:
+                    raise CompileError(f"{self.path}:{node.line}: native for loops require a function")
+                start_slot = self.push_temp()
+                end_slot = self.push_temp()
+                step_slot = self.push_temp()
+                self.emit_expression(node.params[0], node.line, scope)
+                self.store_local(node.name)
+                self.emit_expression(node.params[1], node.line, scope)
+                self.store_local(end_slot)
+                self.emit_expression(node.params[2], node.line, scope)
+                self.store_local(step_slot)
+                check_step = self.label("for_step_check")
+                positive = self.label("for_positive")
+                body = self.label("for_body")
+                end = self.label("for_end")
+                self.code.label(check_step)
+                self.load_local(step_slot, scope, node.line)
+                self.code.bytes(b"\x66\x0f\xef\xc9\x66\x0f\x2e\xc1")
+                self.code.conditional_jump(0x84, end)  # a zero step performs no iterations
+                self.code.conditional_jump(0x87, positive)  # step > 0
+                self.load_local(node.name, scope, node.line)
+                self.code.bytes(self._memory_operand(1, 5, -(self._scratch_base + int(end_slot.rsplit("_", 1)[1]) * 8)))
+                self.code.bytes(b"\x66\x0f\x2e\xc1")
+                self.code.conditional_jump(0x82, end)  # current < end for negative step
+                self.code.jump(body)
+                self.code.label(positive)
+                self.load_local(node.name, scope, node.line)
+                self.code.bytes(self._memory_operand(1, 5, -(self._scratch_base + int(end_slot.rsplit("_", 1)[1]) * 8)))
+                self.code.bytes(b"\x66\x0f\x2e\xc1")
+                self.code.conditional_jump(0x87, end)  # current > end for positive step
+                self.code.label(body)
+                self.emit_nodes(node.body, scope)
+                self.load_local(node.name, scope, node.line)
+                self.store_local(start_slot)
+                self.load_local(step_slot, scope, node.line)
+                self.emit_binary("+", start_slot, node.line)
+                self.store_local(node.name)
+                self.code.jump(check_step)
+                self.code.label(end)
+                self.pop_temp()
+                self.pop_temp()
+                self.pop_temp()
+            elif node.kind == "call":
+                self.emit_call(node.name, split_args(node.value), scope, node.line)
+            else:
+                raise CompileError(
+                    f"{self.path}:{node.line}: statement {node.kind!r} is not supported by the native x64 backend yet"
+                )
+
+    def _emit_function(self, name: str, fn: Node) -> None:
+        if fn.local_arrays:
+            raise CompileError(f"{self.path}:{fn.line}: native local arrays are not implemented yet")
+        self._scope = fn
+        self._frame_slots = {}
+        for local in sorted(fn.locals | set(fn.params)):
+            self._alloc_slot(local)
+        self._scratch_base = len(self._frame_slots) * 8
+        self._frame_size = ((self._scratch_base + 128 + 15) // 16) * 16
+        self._scratch_depth = 0
+        self.code.label(f"function:{name}")
+        self.code.bytes(b"\x55\x48\x89\xe5")  # push rbp; mov rbp,rsp
+        self.code.bytes(b"\x48\x81\xec" + struct.pack("<I", self._frame_size))
+        for index, param in enumerate(fn.params):
+            if index < 4:
+                offset = -self._frame_slots[param]
+                self.code.bytes(self._store_xmm_operand(index, offset))
+            else:
+                raise CompileError(f"{self.path}:{fn.line}: native backend currently supports at most four parameters")
+        self.emit_nodes(fn.body, fn)
+        self.code.bytes(b"\x0f\x57\xc0\xc9\xc3")  # zero return; leave; ret
+
+    def _emit_print_helper(self) -> None:
+        """Write a signed, truncated integer and newline using Kernel32 only."""
+        self.code.label("function:anvil_print_number")
+        self.code.bytes(b"\x48\x83\xec\x58")  # 32-byte shadow area and locals; aligned for calls
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")  # cvttsd2si rax,xmm0
+        self.code.bytes(b"\x4c\x8d\x54\x24\x50")  # lea r10,[rsp+50h], end of buffer
+        self.code.bytes(b"\x45\x31\xdb")  # xor r11d,r11d (negative flag)
+        self.code.bytes(b"\x48\x85\xc0")  # test rax,rax
+        nonzero = self.label("print_nonzero")
+        positive = self.label("print_positive")
+        digits = self.label("print_digits")
+        have_digits = self.label("print_have_digits")
+        have_sign = self.label("print_have_sign")
+        self.code.conditional_jump(0x85, nonzero)
+        self.code.bytes(b"\x49\xff\xca\x41\xc6\x02\x30")  # zero digit
+        self.code.jump(have_digits)
+        self.code.label(nonzero)
+        self.code.bytes(b"\x48\x85\xc0")
+        self.code.conditional_jump(0x89, positive)  # jns
+        self.code.bytes(b"\x49\xff\xc3\x48\xf7\xd8")  # negative flag; abs(value)
+        self.code.label(positive)
+        self.code.label(digits)
+        self.code.bytes(b"\x31\xd2\x49\xb8\x0a\x00\x00\x00\x00\x00\x00\x00")
+        self.code.bytes(b"\x49\xf7\xf0")  # div r8
+        self.code.bytes(b"\x80\xc2\x30\x49\xff\xca\x41\x88\x12")  # store digit backwards
+        self.code.bytes(b"\x48\x85\xc0")
+        self.code.conditional_jump(0x85, digits)
+        self.code.label(have_digits)
+        self.code.bytes(b"\x45\x85\xdb")
+        self.code.conditional_jump(0x84, have_sign)
+        self.code.bytes(b"\x49\xff\xca\x41\xc6\x02\x2d")  # minus sign
+        self.code.label(have_sign)
+        self.code.bytes(b"\xc6\x44\x24\x50\x0a")  # newline after the digits
+        self.code.bytes(b"\x4c\x89\x54\x24\x20")  # start pointer in local
+        self.code.bytes(b"\x48\x8d\x54\x24\x51\x4c\x29\xd2\x89\x54\x24\x28")  # end + newline - start
+        self.code.bytes(b"\xb9\xf5\xff\xff\xff")  # STD_OUTPUT_HANDLE
+        self.code.rip_call_import("GetStdHandle")
+        self.code.bytes(b"\x48\x89\xc1\x48\x8b\x54\x24\x20")
+        self.code.bytes(b"\x8b\x44\x24\x28\x49\x89\xc0\x4c\x8d\x4c\x24\x30")
+        self.code.bytes(b"\x48\xc7\x44\x24\x20\x00\x00\x00\x00")
+        self.code.rip_call_import("WriteFile")
+        self.code.bytes(b"\x48\x83\xc4\x58\xc3")
+
+    def generate(self) -> bytes:
+        if self.arrays:
+            raise CompileError(f"{self.path}: global arrays are not implemented in the direct x64 backend yet")
+        calls = [node for node in self.top if node.kind == "call"]
+        if any(node.kind != "call" for node in self.top):
+            unsupported = next(node for node in self.top if node.kind != "call")
+            raise CompileError(
+                f"{self.path}:{unsupported.line}: top-level configuration is not implemented by the native x64 backend yet"
+            )
+        for name, fn in self.functions.items():
+            self._emit_function(name, fn)
+        self._emit_print_helper()
+        self.code.label("entry")
+        self.code.bytes(b"\x48\x83\xec\x28")
+        if calls:
+            if len(calls) != 1 or calls[0].name not in self.functions or calls[0].name != "main":
+                raise CompileError(f"{self.path}:{calls[0].line}: direct native entry currently accepts only call fn(main)")
+            self.code.call("function:main")
+        elif "main" in self.functions:
+            if self.functions["main"].params:
+                raise CompileError(f"{self.path}:{self.functions['main'].line}: main cannot have parameters")
+            self.code.call("function:main")
+        else:
+            raise CompileError(f"{self.path}: native executable needs fn(main)")
+        self.code.call("function:anvil_print_number")
+        self.code.bytes(b"\x31\xc9")
+        self.code.rip_call_import("ExitProcess")
+        self.code.bytes(b"\xcc")
+        imports = list(self.IMPORTS)
+        pe = Pe32Plus(bytes(self.code.code), imports)
+        targets = pe.fixup_targets(len(self.code.code))
+        text = self.code.finish(targets)
+        return Pe32Plus(text, imports).build(
+            entry_offset=self.code.labels["entry"], data=b"\0" * self._data_size
+        )

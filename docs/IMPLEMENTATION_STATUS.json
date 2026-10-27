@@ -13,7 +13,7 @@
   "latest_independently_reviewed_candidate_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
-  "latest_followup_status_change": "BMP image/sprite feature implemented in 9d9bf90 and verified locally: 79 tests, MSVC release build, extension grammar, compileall, QA arithmetic, and diff check pass. Canonical issue #23 items 201/202/209/212 are audited below; independent review pending. Latest scored commit remains c102604 at 92/100, below 98.",
+  "latest_followup_status_change": "Independent native-backend review scored its pre-fix local snapshot 49/100. The follow-up adds short-circuit boolean operators, inclusive ascending/descending/zero-step for loops, and a deterministic mouse integration test harness. Seven native tests and the full 86-test suite pass; post-review changes are not yet independently scored.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -942,5 +942,8 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "resolved_critic_issue_48": "Fixed in the UTF-8 status synchronization after critic review d757c79: both files now parse as strict UTF-8 JSON and evaluation metadata records the exact reviewed candidate SHA. The fresh 91/100 evaluation remains attached to d757c79; a new review is required for the corrected snapshot."
+  "resolved_critic_issue_48": "Fixed in the UTF-8 status synchronization after critic review d757c79: both files now parse as strict UTF-8 JSON and evaluation metadata records the exact reviewed candidate SHA. The fresh 91/100 evaluation remains attached to d757c79; a new review is required for the corrected snapshot.",
+  "latest_independent_candidate_score": 49,
+  "latest_independent_candidate_result": "FAIL against 98/100; local working-tree snapshot before native short-circuit and for-loop follow-up; no commit SHA",
+  "current_unscored_followup": "Direct x64 backend: short-circuit and inclusive for loops added; 7 focused native tests and all 86 repository tests pass. Fractional output truncation remains tracked in GitHub issue #49."
 }

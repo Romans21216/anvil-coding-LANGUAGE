@@ -12,6 +12,7 @@ import tomllib
 from compiler.build import build_c, find_compiler
 from compiler.codegen import emit_c
 from compiler.common import CompileError
+from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
 
@@ -37,12 +38,22 @@ def main() -> int:
         ),
     )
     ap.add_argument("--release", action="store_true", help="enable native optimization")
+    ap.add_argument(
+        "--backend",
+        choices=("c", "native"),
+        default="c",
+        help="select the C toolchain or experimental Anvil-owned x64 PE backend",
+    )
     args = ap.parse_args()
     try:
         source_path = args.source
         fixed_hz = 60
         project_name = "Anvil Game"
         if args.source.suffix.lower() == ".anvlproj":
+            if args.backend == "native":
+                raise CompileError(
+                    "--backend native does not support .ANVLproj manifests yet; compile the entry .ANVL file directly"
+                )
             manifest_text = args.source.read_text(encoding="utf-8")
             manifest = tomllib.loads(manifest_text)
             unknown_keys = set(manifest) - {"name", "entry", "engine"}
@@ -96,6 +107,19 @@ def main() -> int:
                 ) from exc
         source = source_path.read_text(encoding="utf-8")
         funcs, top, variables, arrays = parse(source_path, source)
+        if args.backend == "native":
+            if args.emit_c or args.generated_c or args.cc or args.release:
+                raise CompileError(
+                    "--emit-c, --generated-c, --cc, and --release apply only to --backend c"
+                )
+            executable = NativeCodegen(
+                source_path, funcs, top, variables, arrays
+            ).generate()
+            out = args.output or source_path.with_suffix(".exe")
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(executable)
+            print(f"Built {out} as native AMD64 PE (no C/Rust compiler)")
+            return 0
         generated = emit_c(
             source_path, funcs, top, variables, arrays, fixed_hz, project_name
         )

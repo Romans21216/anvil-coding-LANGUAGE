@@ -1,12 +1,14 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **92/100 — FAIL** (exact commit `c10260483eab6b5adaadd261a66a92a9138b9ed8`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 19/20, testing 19/20, delivery 18/20.
+**Latest independent evaluation:** **49/100 - FAIL** for the direct-native-backend local working-tree snapshot before the short-circuit follow-up fix. Categories: requirements 7/20, functionality/reliability 8/20, architecture 12/20, testing 12/20, delivery 10/20. The reviewed snapshot has no commit SHA. The previous committed review remains 92/100 on `c10260483eab6b5adaadd261a66a92a9138b9ed8`; that score does not apply to native compiler work.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
 
-**Unreviewed implementation candidate:** source commit `9d9bf90e62e3e75ea94de7828d86800cbd382c99` adds bounded 24/32-bit BMP loading, generation-checked handles, image queries/release, and clipped/scaled alpha-blended 2D sprite drawing. The full suite passes (79 tests), the sprite sample builds with MSVC, extension 0.1.9 grammar validation, compileall, QA arithmetic, and diff checks pass. These checks are implementation evidence only; the latest independent score remains 92/100 until the candidate is reviewed. Canonical issue #23 items #201 and #209 are under review, #202 awaits review, and #212 remains partial because rotation is not implemented.
+**Unscored native follow-up:** after the 49/100 pre-fix review, the native backend gained true short-circuit `and`/`or` and inclusive ascending/descending/zero-step `for` loops. Seven focused native tests pass. The full current suite passes 86 tests, including the deterministic mouse-event integration harness. These post-review changes have not received a new independent score. Fractional output truncation remains open as GitHub issue #49 (`Codex Bugs`).
+
+**Unreviewed implementation candidate:** source commit `9d9bf90e62e3e75ea94de7828d86800cbd382c99` adds bounded 24/32-bit BMP loading, generation-checked handles, image queries/release, and clipped/scaled alpha-blended 2D sprite drawing. The full suite passes (79 tests), the sprite sample builds with MSVC, extension 0.1.9 grammar validation, compileall, QA arithmetic, and diff checks pass. These checks are implementation evidence only. The later direct-native candidate received a 49/100 review on a pre-short-circuit-fix local snapshot; see the current native follow-up and full rubric below. Canonical issue #23 items #201 and #209 are under review, #202 awaits review, and #212 remains partial because rotation is not implemented.
 **Latest review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
-**Current finding:** the latest score is 92/100, six points below the 98/100 pass threshold. Partial criteria are 2, 3, 5, 9, 27, 40, 47, and 50; issue #48 and criterion 38 are resolved in the corrected status snapshot. Remaining deductions reflect incomplete engine scope, platform/backend limits, and unverified editor highlighting.
+**Current finding:** the latest native-candidate score is 49/100, below the 98/100 threshold. This historical review predates the short-circuit fix and `for`-loop work. The post-review worktree has 7 passing native tests and the full 86-test suite passes, but has no revised independent score. Fractional numeric output truncation remains open as GitHub issue #49 (`Codex Bugs`). Full criterion scoring is in `docs/ANVIL_EVALUATION.txt`.
 
 **Latest reviewed correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
@@ -59,6 +61,73 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 ## Historical independent review — window resize snapshot `bc4db99`
 
 **91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 19/20; testing and verification 18/20; developer experience and delivery 18/20. The exact reviewed commit was `bc4db99368b3af2953e49adc4e4cbd8f5706bb4e`. The critic reran 73 Python tests, 3 native runtime tests, extension validation, compileall, the QA validator, and diff check. It verified the viewport geometry helper and inspected the WM_PAINT path, but did not visually launch a resized window. The audited ledgers contain 21 rows and total 450. Criterion 38 scores 1 because the prior ledger labeled dynamic window resizing as #144; canonical issue #23 comment 6451810775 defines it as #172. Issue #46 tracks the correction. Criterion 22 remains 2 after formatting; criterion 23 remains 2 for phase separation. Criterion 27 remains 1 for Windows/MSVC and C-only backend. Criterion 47 remains 1 because newer extension tokens are not visually verified. The 98-point threshold remains unmet; issues #12 and #45 are closed.
+
+## Latest 50-criterion scoring — native backend pre-fix snapshot
+
+This independent review scored the local pre-short-circuit-fix candidate 49/100. Full criterion evidence and recommended fixes are recorded in `docs/ANVIL_EVALUATION.txt`. The score does not apply to later unscored edits.
+
+| # | Criterion | Score | Evidence, deduction, and status |
+|---:|---|:---:|---|
+| 1 | Explicit requirements identified | 1 | Partial migration documented; not the complete 450-item scope. |
+| 2 | Implicit requirements addressed | 1 | Runtime requirements are identified but mostly absent. |
+| 3 | Functionality matches intended goal | 0 | Native backend is numeric console-only; requested game engine is missing. |
+| 4 | Required deliverables present | 1 | Compiler/PE writer/tests/docs exist, but native runtime parity is absent. |
+| 5 | No essential feature missing | 0 | Major engine systems are missing. |
+| 6 | Stated constraints respected | 1 | Native option avoids C/Rust, but default remains C/MSVC. |
+| 7 | Ambiguity resolved logically | 1 | Direct x64 target documented; full scope incomplete. |
+| 8 | Behavior matches documentation | 1 | Limits disclosed; C-default docs conflict with final no-C requirement. |
+| 9 | Important use cases supported | 1 | Only simple numeric programs run natively. |
+| 10 | Usable for intended purpose | 0 | Cannot build intended game engine in native mode. |
+| 11 | Core functionality works | 0 | Native game-engine core is absent. |
+| 12 | Secondary functionality works | 1 | Numeric native functions and output work. |
+| 13 | Primary workflows functional | 1 | Native source sample works; project and engine workflow unsupported. |
+| 14 | Inputs validated | 1 | Parser validation exists; unsupported native constructs remain. |
+| 15 | Errors handled gracefully | 1 | Some diagnostics exist; raw internal errors possible. |
+| 16 | Edge cases covered | 1 | Narrow arithmetic/function cases tested. |
+| 17 | Invalid inputs controlled | 1 | Some unsupported syntax errors cleanly; internal errors may leak. |
+| 18 | Stable across repeated operations | 1 | Only repeated simple runs verified. |
+| 19 | No known critical defects | 0 | Pre-fix eager booleans and integer truncation; short-circuit fixed afterward, fractional output remains issue #49. |
+| 20 | Components integrate | 1 | Parser-to-PE works for narrow programs. |
+| 21 | Logical project structure | 2 | Compiler files have clear broad separation. |
+| 22 | Readable and consistently formatted | 1 | Raw opcode bytes and long encodings impede review. |
+| 23 | Clear module responsibilities | 1 | No typed IR; codegen combines logic and emission. |
+| 24 | Consistent descriptive naming | 2 | Names generally descriptive. |
+| 25 | Duplication minimized | 1 | Repeated opcode/layout code is hard to maintain. |
+| 26 | Dependencies appropriate | 2 | No external compiler or runtime dependency in native path. |
+| 27 | Supports future extensions | 1 | No IR/register allocator/relocation expansion model. |
+| 28 | No unfinished placeholders | 0 | Builtin dispatch and major capabilities are stubs/unsupported. |
+| 29 | Configuration understandable | 1 | Minimal backend/ABI configuration. |
+| 30 | Conventions followed | 1 | Hand-coded ABI/frame/PE validation needs more conventions. |
+| 31 | Automated tests provided | 2 | Native tests exist. |
+| 32 | Core tests covered | 1 | Tests cover a narrow subset. |
+| 33 | Failure scenarios tested | 1 | Few invalid-source, arithmetic-fault, malformed-PE cases. |
+| 34 | Edge cases explicitly tested | 1 | NaN, stack-limit and fractional output edges absent. |
+| 35 | Integration behavior tested | 1 | CLI works for one native sample; no engine integration. |
+| 36 | Documented test commands work | 1 | Basic commands are documented. |
+| 37 | Builds and compilation pass | 2 | 83-test suite and native sample passed on reviewed snapshot. |
+| 38 | Results recorded accurately | 1 | No candidate evaluation artifact existed then. |
+| 39 | Regression checks performed | 2 | Regression checks passed for reviewed snapshot. |
+| 40 | Verified against original goal | 0 | Original broad goal unfulfilled. |
+| 41 | Installation instructions accurate | 1 | Native command documented; full no-C setup absent. |
+| 42 | Setup reproducible | 1 | Basic setup only; runtime migration incomplete. |
+| 43 | Usage understandable | 1 | Narrow native workflow documented. |
+| 44 | Design decisions documented | 2 | Migration phases and limits documented. |
+| 45 | Troubleshooting available | 0 | No native troubleshooting guide. |
+| 46 | Opens in intended environment | 1 | CLI works, but not native engine/project workflow. |
+| 47 | Editor integration works | 1 | Grammar automation passed; live editor not verified. |
+| 48 | Deliverables organized | 1 | Candidate was uncommitted/unreleased at review. |
+| 49 | Limitations disclosed | 2 | Limits disclosed candidly. |
+| 50 | Practical for intended scope | 0 | Not a practical full engine deliverable. |
+| | **Requirement fulfillment** | **7/20** | |
+| | **Functionality and reliability** | **8/20** | |
+| | **Code quality and architecture** | **12/20** | |
+| | **Testing and verification** | **12/20** | |
+| | **Developer experience and delivery** | **10/20** | |
+| | **Total** | **49/100** | Pre-fix local candidate; FAIL against 98. |
+
+### Deduction details and follow-up
+
+The 50-criterion problems, evidence, impact, fixes, and post-review statuses are documented in the matching evaluator section in `docs/ANVIL_EVALUATION.txt`. Issue #49 tracks fractional numeric output truncation. The evaluator’s short-circuit finding was fixed after review; seven focused native tests and the full 86-test suite pass on later local edits, which remain unscored.
 
 ## Latest 50-criterion scoring for review `c102604`
 
