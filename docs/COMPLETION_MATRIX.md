@@ -27,12 +27,11 @@ Status meanings: **Implemented** means code and verification exist for the state
 
 ## Verified baseline
 
-- Last independently reviewed implementation: commit `51deb5d`.
-- Independent evaluation: **90/100 — PASS** for the 50-criterion quality rubric, not a claim that all capabilities above are implemented. The review records specific remaining scope and editor-verification deductions.
+- Last independently reviewed implementation: commit `560cee133023ca0cb737669bb6841509d7f503d3` (`560cee1`).
+- Independent evaluation: **90/100 — PASS** for the 50-criterion quality rubric, not a claim that all capabilities above are implemented. Category scores: 16/20 requirements, 20/20 functionality/reliability, 17/20 code/architecture, 19/20 testing/verification, and 18/20 developer experience/delivery. The review records specific remaining scope and editor-verification deductions.
 - `python -m unittest discover -s tests -v`: 52 tests passed, including native mixed circle/box, box/box, embedded-circle, and capacity-boundary cases.
-- `npm test --prefix vscode-extension`: passed with `body_create_box` token validation.
-- `npm test --prefix vscode-extension`: passed.
+- `npm test --prefix vscode-extension`: passed with `body_create_box` and `physics_capacity` token validation.
 - Native MSVC release build of `examples/physics.ANVL`: passed.
 - VS Code 1.143.1 with extension 0.1.4 remains installed; 0.1.6 is packaged but not installed. Earlier visual verification covered `examples/ray_backends.ANVL` and backend built-ins; the newer physics built-ins are grammar-tested but not visibly verified in the editor.
 
-The overall engine goal remains in progress while any requested row is Partial or Missing. Next priorities include broader physics shapes and stability, actual selectable ray-tracing backends, graphics assets, and portability. Physics integration, contact, solver, and bounds loops now use the configured active capacity; the backing table remains limited to 128 slots. See issue [#8](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8). Extension 0.1.6 is packaged with physics-builtin highlighting and automated grammar validation; it is not installed, so visible verification remains pending in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24).
+The overall engine goal remains in progress while any requested row is Partial or Missing. Next priorities include broader physics shapes and stability, actual selectable ray-tracing backends, graphics assets, and portability. Physics integration, contact, solver, and bounds loops now use the configured active capacity; the backing table remains limited to 128 slots. The independent reviewer verified that documentation accurately describes those active bounds; issue [#25](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/25) is resolved. See issue [#8](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8). Extension 0.1.6 is packaged with physics-builtin highlighting and automated grammar validation; it is not installed, so visible verification remains pending in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24).
