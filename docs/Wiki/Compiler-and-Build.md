@@ -14,7 +14,7 @@ The experimental `native` backend emits x64 instructions and writes the PE32+ ex
 python compiler/anvil.py examples/functions.ANVL --backend native --output build/functions-native.exe
 ```
 
-The supported native subset includes simple numeric functions with up to four parameters, arithmetic except remainder, comparisons, short-circuit `and`/`or`, `if`, `while`, inclusive ascending/descending `for`, numeric variables, and integer console output. Graphics, input, arrays, project manifests, and other engine APIs are not supported by this backend yet.
+The supported native subset includes simple numeric functions with up to four parameters, arithmetic except remainder, comparisons, short-circuit `and`/`or`, `if`, `while`, inclusive ascending/descending `for`, numeric variables, and console output rounded to six fractional digits. Graphics, input, arrays, project manifests, and other engine APIs are not supported by this backend yet.
 
 ## Direct source build
 

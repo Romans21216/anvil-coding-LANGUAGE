@@ -945,6 +945,6 @@
   "resolved_critic_issue_48": "Fixed in the UTF-8 status synchronization after critic review d757c79: both files now parse as strict UTF-8 JSON and evaluation metadata records the exact reviewed candidate SHA. The fresh 91/100 evaluation remains attached to d757c79; a new review is required for the corrected snapshot.",
   "latest_independent_candidate_score": 54,
   "latest_independent_candidate_result": "FAIL against 98/100; independent review of exact commit 597867f passed all 86 tests and reproduced native fractional output truncation (#49).",
-  "current_unscored_followup": "Documentation is being synchronized after the 597867f review; no runtime source changed. The reviewed native backend still truncates fractional output (#49).",
+  "current_unscored_followup": "The latest working-tree native output helper rounds fractional values to six decimal places; fractional, negative-subunit, sub-micro, and rounding-carry regression cases are included. The full suite passed 87 tests locally; issue #49 awaits independent verification.",
   "latest_independently_scored_candidate_commit": "597867f44a5140db27fdce2e4f2339859ef96af8"
 }

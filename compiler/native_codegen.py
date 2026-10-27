@@ -477,12 +477,61 @@ class NativeCodegen:
         self.code.bytes(b"\x0f\x57\xc0\xc9\xc3")  # zero return; leave; ret
 
     def _emit_print_helper(self) -> None:
-        """Write a signed, truncated integer and newline using Kernel32 only."""
+        """Write a signed number with up to six fractional digits via Kernel32."""
         self.code.label("function:anvil_print_number")
-        self.code.bytes(b"\x48\x83\xec\x58")  # 32-byte shadow area and locals; aligned for calls
+        self.code.bytes(b"\x48\x83\xec\x58")  # shadow space and aligned locals
+        self.code.bytes(b"\x66\x48\x0f\x7e\xc0")  # movq rax,xmm0
+        self.code.bytes(b"\x48\xc1\xe8\x3f\x41\x89\xc3")  # sign bit -> r11d
+        self.code.bytes(b"\x66\x0f\x28\xc8")  # movapd xmm1,xmm0
+        nonnegative = self.label("print_nonnegative")
+        self.code.bytes(b"\x45\x85\xdb")
+        self.code.conditional_jump(0x84, nonnegative)
+        self.code.bytes(b"\x66\x0f\x57\xc0\xf2\x0f\x5c\xc1")  # abs(x) via 0-x
+        self.code.label(nonnegative)
         self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")  # cvttsd2si rax,xmm0
-        self.code.bytes(b"\x4c\x8d\x54\x24\x50")  # lea r10,[rsp+50h], end of buffer
-        self.code.bytes(b"\x45\x31\xdb")  # xor r11d,r11d (negative flag)
+        self.code.bytes(b"\x48\x89\x44\x24\x28")  # save integer part
+        self.code.bytes(b"\xf2\x48\x0f\x2a\xc8")  # cvtsi2sd xmm1,rax
+        self.code.bytes(b"\x66\x0f\x28\xd0\xf2\x0f\x5c\xd1")  # fraction in xmm2
+        self.code.bytes(b"\x48\xb8\x40\x42\x0f\x00\x00\x00\x00\x00")  # 1,000,000
+        self.code.bytes(b"\xf2\x48\x0f\x2a\xc8\xf2\x0f\x59\xd1")  # scale fraction
+        self.code.bytes(b"\x48\xb8\x00\x00\x00\x00\x00\x00\xe0\x3f")  # 0.5
+        self.code.bytes(b"\x66\x48\x0f\x6e\xc8\xf2\x0f\x58\xd1")  # round to nearest
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc2")  # cvttsd2si rax,xmm2
+        fraction_carry = self.label("print_fraction_carry")
+        fraction_ready = self.label("print_fraction_ready")
+        self.code.bytes(b"\x48\x3d\x40\x42\x0f\x00")  # cmp rax,1,000,000
+        self.code.conditional_jump(0x84, fraction_carry)
+        self.code.jump(fraction_ready)
+        self.code.label(fraction_carry)
+        self.code.bytes(b"\x48\xff\x44\x24\x28\x31\xc0")  # carry into integer; fraction = 0
+        self.code.label(fraction_ready)
+        self.code.bytes(b"\x44\x89\x5c\x24\x20")  # preserve negative flag
+        self.code.bytes(b"\x45\x31\xdb")  # r11d = fraction-started flag
+        self.code.bytes(b"\x4c\x8d\x54\x24\x50")  # lea r10,[rsp+50h]
+        self.code.bytes(b"\xc6\x44\x24\x50\x0a")  # newline
+        self.code.bytes(b"\x49\xb8\x0a\x00\x00\x00\x00\x00\x00\x00")  # divisor 10
+        self.code.bytes(b"\x41\xb9\x06\x00\x00\x00")  # six decimal digits
+        fraction_loop = self.label("print_fraction_digit")
+        fraction_write = self.label("print_fraction_write")
+        fraction_done = self.label("print_fraction_done")
+        self.code.label(fraction_loop)
+        self.code.bytes(b"\x31\xd2\x49\xf7\xf0")  # div r8; remainder in edx
+        self.code.bytes(b"\x45\x85\xdb")
+        self.code.conditional_jump(0x85, fraction_write)
+        self.code.bytes(b"\x85\xd2")
+        self.code.conditional_jump(0x84, fraction_done)
+        self.code.bytes(b"\x41\xbb\x01\x00\x00\x00")  # first nonzero digit
+        self.code.label(fraction_write)
+        self.code.bytes(b"\x80\xc2\x30\x49\xff\xca\x41\x88\x12")  # store digit backwards
+        self.code.label(fraction_done)
+        self.code.bytes(b"\x41\xff\xc9")  # dec r9d
+        self.code.conditional_jump(0x85, fraction_loop)
+        no_decimal = self.label("print_no_decimal")
+        self.code.bytes(b"\x45\x85\xdb")
+        self.code.conditional_jump(0x84, no_decimal)
+        self.code.bytes(b"\x49\xff\xca\x41\xc6\x02\x2e")  # decimal point
+        self.code.label(no_decimal)
+        self.code.bytes(b"\x48\x8b\x44\x24\x28")  # restore integer part
         self.code.bytes(b"\x48\x85\xc0")  # test rax,rax
         nonzero = self.label("print_nonzero")
         positive = self.label("print_positive")
@@ -504,13 +553,12 @@ class NativeCodegen:
         self.code.bytes(b"\x48\x85\xc0")
         self.code.conditional_jump(0x85, digits)
         self.code.label(have_digits)
-        self.code.bytes(b"\x45\x85\xdb")
+        self.code.bytes(b"\x44\x8b\x5c\x24\x20\x45\x85\xdb")  # restore/test sign
         self.code.conditional_jump(0x84, have_sign)
         self.code.bytes(b"\x49\xff\xca\x41\xc6\x02\x2d")  # minus sign
         self.code.label(have_sign)
-        self.code.bytes(b"\xc6\x44\x24\x50\x0a")  # newline after the digits
         self.code.bytes(b"\x4c\x89\x54\x24\x20")  # start pointer in local
-        self.code.bytes(b"\x48\x8d\x54\x24\x51\x4c\x29\xd2\x89\x54\x24\x28")  # end + newline - start
+        self.code.bytes(b"\x48\x8d\x54\x24\x51\x4c\x29\xd2\x89\x54\x24\x28")  # length
         self.code.bytes(b"\xb9\xf5\xff\xff\xff")  # STD_OUTPUT_HANDLE
         self.code.rip_call_import("GetStdHandle")
         self.code.bytes(b"\x48\x89\xc1\x48\x8b\x54\x24\x20")

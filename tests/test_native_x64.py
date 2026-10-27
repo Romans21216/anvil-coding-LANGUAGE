@@ -47,6 +47,21 @@ call fn(main)
 """
         self.assertEqual(self._run_source(source), "-42\n")
 
+    def test_native_backend_prints_fractional_numbers(self):
+        cases = {
+            "17.875": "17.875\n",
+            "-0.75": "-0.75\n",
+            "0.000005": "0.000005\n",
+            "0.123456789": "0.123457\n",
+            "12.5": "12.5\n",
+            "12.9999999": "13\n",
+            "-1.9999999": "-2\n",
+        }
+        for expression, expected in cases.items():
+            with self.subTest(expression=expression):
+                source = f"fn(main)\n  output {expression}\nend\ncall fn(main)\n"
+                self.assertEqual(self._run_source(source), expected)
+
     def test_native_backend_compiles_loop_and_boolean_operators(self):
         source = """\
 fn(main)

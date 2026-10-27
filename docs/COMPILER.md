@@ -50,5 +50,5 @@ Ahead-of-time compilation removes VM dispatch from generated function calls. MSV
 
 ## Native backend limits
 
-The direct backend currently handles simple numeric functions, up to four numeric parameters, arithmetic except remainder, comparisons, short-circuit Boolean operators, `if`, `while`, inclusive ascending/descending `for` loops, numeric locals/globals, and integer console output. It does not yet include arrays, project files, 2D/3D graphics, camera/input, ray tracing, physics, noise, multiplayer, or the engine runtime. It is not the default until those features are ported and verified.
+The direct backend currently handles simple numeric functions, up to four numeric parameters, arithmetic except remainder, comparisons, short-circuit Boolean operators, `if`, `while`, inclusive ascending/descending `for` loops, numeric locals/globals, and console output rounded to six fractional digits. It does not yet include arrays, project files, 2D/3D graphics, camera/input, ray tracing, physics, noise, multiplayer, or the engine runtime. This fractional-output change is an unreviewed candidate; its regression tests pass locally. The backend is not the default until the remaining features are ported and verified.
 
