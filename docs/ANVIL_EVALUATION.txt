@@ -3,7 +3,7 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 
 Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: independent source and documentation review, with current compiler/runtime tests and build workflows rerun by the reviewer.
+Basis: independent source and documentation review of commit 7efdfb08df7f647c3af214031cb0ea26226674ac, with current compiler/runtime tests and build workflows rerun by the reviewer.
 
 SUMMARY
 -------
@@ -25,7 +25,7 @@ WHAT ANVIL IS NOT GOOD AT YET
 -----------------------------
 1. It is not a complete engine: physics is limited to 128 2D circles with fixed-step force/gravity integration and basic pairwise contacts. There is no continuous collision detection, polygon or 3D bodies, friction, or joints. A mature asset pipeline, texture/sprite system, audio engine, animation framework, scene graph, complete editor, and broad GUI system are also absent.
 2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. Resize handling, robust clipping, mesh import, texture mapping, and performance profiling remain future work.
-3. Only one ray-tracing path is implemented: CPU BVH is available. The runtime exposes `ray_backend(name)` and `ray_backend_available(name)`, but hardware-accelerated RTX/DXR and Embree are not implemented and cannot be selected successfully.
+3. Only one ray-tracing path is implemented: CPU BVH is available. The runtime exposes `ray_backend(name)` and `ray_backend_available(name)`. The selector successfully chooses BVH; hardware-accelerated RTX/DXR and Embree are not implemented and cannot be selected successfully.
 4. The language remains narrow: fixed-size global and function-local numeric arrays are now implemented, but dynamic arrays, user-defined types, modules/imports, static types, and a general string model are not. Function parameters, return values, recursion, function-local numeric state, numeric `while`/`for` loops, and array bounds checks are implemented.
 5. Multiplayer is experimental: the UDP API exchanges a numeric value with one peer. It lacks reliable delivery, authentication, encryption, matchmaking, replication, and robust peer lifecycle handling; it is only appropriate for trusted LAN experiments.
 6. The build target is narrow: the verified backend is Windows/MSVC with generated C. Rust output and a cross-platform runtime are not implemented.
@@ -49,7 +49,7 @@ Fixed-size function-local numeric arrays: Implemented with zero-initialized per-
 Native Windows executable generation: Implemented for documented MSVC toolchain
 Basic 2D/3D rendering and camera controls: Implemented with notable limits
 BVH CPU ray-traced spheres: Implemented, limited to 32 per batch
-Ray backend selection and availability built-ins: Implemented; only BVH is available
+Ray backend selection and availability built-ins: Implemented and verified; only BVH is available; DXR/Embree unavailable
 Fixed-step 2D circle physics: Implemented as a bounded prototype (128 bodies; no CCD, friction, joints, or 3D/polygon bodies)
 RTX/DXR and Embree: Not implemented
 LAN multiplayer: Minimal UDP prototype
@@ -60,11 +60,11 @@ Performance evidence: Not available
 
 INDEPENDENT REVIEW AND VERIFICATION
 -----------------------------------
-Latest independent review: commit `ff88152`, **91/100 — PASS**. The reviewer ran all 46 tests, VS Code extension validation, Python compilation, built the physics sample, and built/ran the local-array sample (output `27`). Category totals were 16/20 requirement fulfillment, 20/20 functionality and reliability, 17/20 code quality and architecture, 19/20 testing and verification, and 19/20 developer experience and delivery. All 50 individual criterion scores matched the detailed table in `docs/QA_REPORT.md`. The reviewer confirmed that major requested systems remain incomplete; the score is not a completion claim.
+Latest independent review: commit `7efdfb08df7f647c3af214031cb0ea26226674ac`, **90/100 — PASS** (exactly the 90-point threshold). The reviewer ran all 48 tests, VS Code extension validation, confirmed extension 0.1.4 installed, built and ran `examples/ray_backends.ANVL` with MSVC (output `1`), and passed `git diff --check`. Category totals were 16/20 requirement fulfillment, 20/20 functionality and reliability, 17/20 code quality and architecture, 18/20 testing and verification, and 19/20 developer experience and delivery. Criterion 38 lost one point because the evaluation records were stale at review time; this report and `docs/QA_REPORT.md` now record the reviewed baseline and evidence. All 50 individual scores are tabulated in `docs/QA_REPORT.md`. The reviewer confirmed major requested engine systems remain incomplete; the score is not a completion claim.
 
 The independent 50-criterion review of `f96a212` scored **87/100 — FAIL** (threshold: 90) after reproducing Windows stack-overflow status 0xC00000FD for recursive functions with maximum-size local arrays. The fix in `8f82f1c` moved local arrays to zero-initialized heap storage, frees them on generated returns, and reports allocation failures or a 16 MiB active-memory limit with a source location. An independent reviewer evaluated that exact commit and scored it **91/100 — PASS**. The pre-synchronization physics working tree (based on `b00f35a`) received a corrected **88/100 — FAIL** after the evaluator's category arithmetic was recalculated. The fresh review of commit `64a4101` reran 46 tests and extension validation and scored **91/100 — PASS**. Category scores were requirement fulfillment 16/20, functionality and reliability 20/20, code quality and architecture 17/20, testing and verification 19/20, and developer experience and delivery 19/20. The issue #21 record covers the recursive-array fix; issue #8 tracks the implemented but limited physics system; issue #22 records and closes the QA synchronization finding; issue #13 now records the 0.1.3 install and visible highlighting verification. The full 50-criterion breakdown is in `docs/QA_REPORT.md`.
 
-The current verification passes 46 Python tests, VS Code extension package/grammar validation, Python compilation, and an MSVC release build of `examples/physics.ANVL`. Physics regressions exercise collision/contact timing, solver bounds, and repeatability as well as the initial API integration. VS Code 1.143.1 reports installed `anvil-engine.anvil-language-support@0.1.3`; its open `examples/physics.ANVL` tab visibly colors language keywords, physics built-ins, strings, and numeric literals, and the status bar identifies Anvil mode. The independent reviewer of `64a4101` confirmed the test suite, extension validation, QA score arithmetic, and clean tree. These checks support the prototype implementation; they do not establish production readiness or performance.
+The latest independent verification passes 48 Python tests and VS Code extension package/grammar validation. It confirms `anvil-engine.anvil-language-support@0.1.4` installed and a successful MSVC release build and execution of `examples/ray_backends.ANVL` (output `1`). The VS Code 0.1.4 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json`; visible highlighting for both backend built-ins was checked during installation verification. The reviewer did not independently recapture a screenshot. Earlier reviews verified Python compilation and the physics/local-array samples. These checks support the prototype implementation; they do not establish production readiness or performance.
 
 PRIORITY IMPROVEMENTS
 ---------------------
