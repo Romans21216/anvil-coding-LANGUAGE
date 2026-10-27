@@ -1,0 +1,15 @@
+# Load the bundled 32-bit BMP from the repository root and draw it as a 2D sprite.
+scene 2d
+clear rgba(15, 21, 35, 255)
+set var(sprite) = image_load("examples/assets/anvil_sprite.bmp")
+set var(sprite_width) = image_width(var(sprite))
+
+fn(update)
+end
+
+fn(draw)
+  display rect(80, 80, 800, 440) -rgba(29, 41, 62, 255)
+  display text("Anvil BMP sprite") -l(110, 110) -rgb(235, 243, 255)
+  set var(draw_ok) = image_draw_scaled(var(sprite), 360, 210, 240, 240)
+  display text("Native width: " + var(sprite_width)) -l(110, 540) -rgb(164, 190, 224)
+end

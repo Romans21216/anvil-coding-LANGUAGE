@@ -61,6 +61,13 @@ double anvil_mouse_y(void);
 double anvil_mouse_pressed(const char *button);
 double anvil_mouse_held(const char *button);
 double anvil_mouse_wheel(void);
+double anvil_image_load(const char *path);
+double anvil_image_width(double handle);
+double anvil_image_height(double handle);
+double anvil_image_destroy(double handle);
+double anvil_image_draw(double handle, double x, double y);
+double anvil_image_draw_scaled(double handle, double x, double y, double width,
+                               double height);
 void anvil_trace_sphere(double x, double y, double z, double radius, int r,
                         int g, int b, int a);
 void anvil_trace_finish(void);

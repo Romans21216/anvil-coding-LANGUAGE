@@ -11,6 +11,7 @@ const samplePath = path.resolve(root, '..', 'examples', 'first_world.ANVL');
 const arraysSamplePath = path.resolve(root, '..', 'examples', 'arrays.ANVL');
 const physicsSamplePath = path.resolve(root, '..', 'examples', 'physics.ANVL');
 const mouseSamplePath = path.resolve(root, '..', 'examples', 'mouse_input.ANVL');
+const imageSamplePath = path.resolve(root, '..', 'examples', 'image_sprite.ANVL');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 JSON.parse(fs.readFileSync(grammarPath, 'utf8'));
@@ -18,6 +19,7 @@ const sample = fs.readFileSync(samplePath, 'utf8');
 const arraysSample = fs.readFileSync(arraysSamplePath, 'utf8');
 const physicsSample = fs.readFileSync(physicsSamplePath, 'utf8');
 const mouseSample = fs.readFileSync(mouseSamplePath, 'utf8');
+const imageSample = fs.readFileSync(imageSamplePath, 'utf8');
 const check = (condition, message) => { if (!condition) throw new Error(message); };
 
 check(manifest.contributes.languages.some(x => x.id === 'anvil' && x.extensions.includes('.ANVL')), 'Anvil language or extension is not registered');
@@ -86,6 +88,12 @@ async function main() {
   expect('set var(clicked) = mouse_pressed("left")', 'mouse_pressed', 'support.function.anvil');
   expect('set var(held) = mouse_held("right")', 'mouse_held', 'support.function.anvil');
   expect('set var(wheel) = mouse_wheel()', 'mouse_wheel', 'support.function.anvil');
+  expect('set var(handle) = image_load("assets/player.bmp")', 'image_load', 'support.function.anvil');
+  expect('set var(width) = image_width(var(handle))', 'image_width', 'support.function.anvil');
+  expect('set var(height) = image_height(var(handle))', 'image_height', 'support.function.anvil');
+  expect('set var(ok) = image_destroy(var(handle))', 'image_destroy', 'support.function.anvil');
+  expect('set var(ok) = image_draw(var(handle), 1, 2)', 'image_draw', 'support.function.anvil');
+  expect('set var(ok) = image_draw_scaled(var(handle), 1, 2, 4, 5)', 'image_draw_scaled', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
   expect('set var(size) = 3 + 4', '+', 'keyword.operator.anvil');
@@ -105,6 +113,9 @@ async function main() {
   }
   for (const required of ['mouse_x()', 'mouse_y()', 'mouse_pressed("left")', 'mouse_wheel()']) {
     check(mouseSample.includes(required), `mouse sample does not demonstrate ${required}`);
+  }
+  for (const required of ['image_load(', 'image_width(', 'image_draw_scaled(']) {
+    check(imageSample.includes(required), `image sample does not demonstrate ${required}`);
   }
   console.log('PASS: VS Code manifest/config are valid; TextMate grammar loads and token scopes match Anvil samples.');
   registry.dispose();

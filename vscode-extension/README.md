@@ -1,6 +1,6 @@
 # Anvil Language Support for Visual Studio Code
 
-This extension registers the Anvil language identifier (`anvil`) for `.ANVL` files and provides TextMate syntax colors plus editor pairing, comments, indentation, and folding rules. It highlights function declarations and parameters, calls, global/local variables, fixed-array declarations/indexing, engine commands, ray-tracing backend selection, mouse and keyboard input, ray-tracing and 2D physics built-ins, operators, and literals. It targets **Visual Studio Code**, not the separate Visual Studio IDE.
+This extension registers the Anvil language identifier (`anvil`) for `.ANVL` files and provides TextMate syntax colors plus editor pairing, comments, indentation, and folding rules. It highlights function declarations and parameters, calls, global/local variables, fixed-array declarations/indexing, engine commands, ray-tracing backend selection, mouse and keyboard input, image/sprite, ray-tracing, and 2D physics built-ins, operators, and literals. It targets **Visual Studio Code**, not the separate Visual Studio IDE.
 
 ## Install locally
 
@@ -12,7 +12,7 @@ To install the included package, use **Extensions: Install from VSIX...** and se
 
 ## Highlighted constructs
 
-The grammar scopes comments, escaped strings, `fn(name)` declarations, `call fn(name)` calls, `array name(size)` declarations and `array(name,index)` accesses, `var(...)` and `flag(...)` bindings, engine commands, control keywords, constants, rendering, ray backend, keyboard and mouse input built-ins, networking, and physics built-ins including `physics_capacity` and `body_friction`, numbers, operators, and punctuation. Standard TextMate scopes are used so installed themes supply the colors.
+The grammar scopes comments, escaped strings, `fn(name)` declarations, `call fn(name)` calls, `array name(size)` declarations and `array(name,index)` accesses, `var(...)` and `flag(...)` bindings, engine commands, control keywords, constants, rendering, ray backend, keyboard and mouse input built-ins, image/sprite resource built-ins, networking, and physics built-ins including `physics_capacity` and `body_friction`, numbers, operators, and punctuation. Standard TextMate scopes are used so installed themes supply the colors.
 
 ## Validation
 

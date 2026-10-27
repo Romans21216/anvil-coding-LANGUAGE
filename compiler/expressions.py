@@ -43,6 +43,12 @@ BUILTINS = {
     "mouse_pressed": (1, 1),
     "mouse_held": (1, 1),
     "mouse_wheel": (0, 0),
+    "image_load": (1, 1),
+    "image_width": (1, 1),
+    "image_height": (1, 1),
+    "image_destroy": (1, 1),
+    "image_draw": (3, 3),
+    "image_draw_scaled": (5, 5),
     "receive": (0, 0),
     "body_create": (4, 4),
     "body_create_box": (5, 5),
@@ -77,6 +83,12 @@ BUILTIN_C_NAMES = {
     "mouse_pressed": "anvil_mouse_pressed",
     "mouse_held": "anvil_mouse_held",
     "mouse_wheel": "anvil_mouse_wheel",
+    "image_load": "anvil_image_load",
+    "image_width": "anvil_image_width",
+    "image_height": "anvil_image_height",
+    "image_destroy": "anvil_image_destroy",
+    "image_draw": "anvil_image_draw",
+    "image_draw_scaled": "anvil_image_draw_scaled",
     "receive": "anvil_net_receive",
     "abs": "fabs",
     "min": "fmin",
@@ -106,6 +118,7 @@ BUILTIN_STRING_ARGUMENTS = {
     "ray_backend_available",
     "mouse_pressed",
     "mouse_held",
+    "image_load",
 }
 
 

@@ -93,7 +93,7 @@
       "name": "constant.language.anvil"
     },
     "builtins": {
-      "match": "\\b(array|compute|floor|ceil|sqrt|sin|cos|abs|min|max|clamp|rnd|noise|fbm|time|delta|pressed|held|mouse_x|mouse_y|mouse_pressed|mouse_held|mouse_wheel|axis|rgba|rgb|cube|sphere|ray_sphere|ray_backend|ray_backend_available|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave|body_create|body_create_box|body_destroy|body_active|body_x|body_y|body_vx|body_vy|body_set_velocity|body_force|body_restitution|body_friction|body_collision|physics_capacity|physics_gravity|physics_step)\\b(?=\\s*\\()",
+      "match": "\\b(array|compute|floor|ceil|sqrt|sin|cos|abs|min|max|clamp|rnd|noise|fbm|time|delta|pressed|held|mouse_x|mouse_y|mouse_pressed|mouse_held|mouse_wheel|image_load|image_width|image_height|image_destroy|image_draw|image_draw_scaled|axis|rgba|rgb|cube|sphere|ray_sphere|ray_backend|ray_backend_available|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave|body_create|body_create_box|body_destroy|body_active|body_x|body_y|body_vx|body_vy|body_set_velocity|body_force|body_restitution|body_friction|body_collision|physics_capacity|physics_gravity|physics_step)\\b(?=\\s*\\()",
       "name": "support.function.anvil"
     },
     "numbers": {

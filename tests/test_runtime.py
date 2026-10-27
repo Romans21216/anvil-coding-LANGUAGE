@@ -8,6 +8,140 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
+    def test_bmp_image_loading_scaling_clipping_and_release(self):
+        import struct
+
+        from compiler.anvil import build_c, find_compiler
+
+        compiler = find_compiler(None)
+        if not compiler:
+            self.skipTest("MSVC is required to run the Windows image probe")
+
+        def write_bmp(path, width, height, bits_per_pixel, rows):
+            bytes_per_pixel = bits_per_pixel // 8
+            row_bytes = width * bytes_per_pixel
+            stride = (row_bytes + 3) & ~3
+            pixel_data = bytearray()
+            storage_rows = rows if height < 0 else reversed(rows)
+            for row in storage_rows:
+                encoded = bytearray()
+                for red, green, blue, alpha in row:
+                    encoded.extend((blue, green, red))
+                    if bits_per_pixel == 32:
+                        encoded.append(alpha)
+                encoded.extend(b"\0" * (stride - len(encoded)))
+                pixel_data.extend(encoded)
+            dib = struct.pack(
+                "<IiiHHIIiiII", 40, width, height, 1, bits_per_pixel, 0,
+                len(pixel_data), 2835, 2835, 0, 0
+            )
+            file_header = struct.pack("<2sIHHI", b"BM", 14 + len(dib) + len(pixel_data), 0, 0, 14 + len(dib))
+            path.write_bytes(file_header + dib + pixel_data)
+
+        harness = r'''#include "anvil_runtime.h"
+#include <stdio.h>
+
+static double image;
+static double top_down_image;
+static double natural_draw;
+static double top_down_draw;
+static double scaled_draw;
+static double clipped_draw;
+static double destroyed;
+static double top_down_destroyed;
+static double width_after_destroy;
+static double replacement;
+static double stale_width;
+static double replacement_width;
+static double stale_draw;
+static const char *image_path;
+
+static double draw(void) {
+  natural_draw = anvil_image_draw(image, 12, 14);
+  top_down_draw = anvil_image_draw(top_down_image, 15, 14);
+  scaled_draw = anvil_image_draw_scaled(image, 20, 20, 40, 30);
+  clipped_draw = anvil_image_draw_scaled(image, -5, -5, 10, 10);
+  destroyed = anvil_image_destroy(image);
+  top_down_destroyed = anvil_image_destroy(top_down_image);
+  width_after_destroy = anvil_image_width(image);
+  replacement = anvil_image_load(image_path);
+  stale_width = anvil_image_width(image);
+  replacement_width = anvil_image_width(replacement);
+  stale_draw = anvil_image_draw(image, 0, 0);
+  anvil_image_destroy(replacement);
+  PostQuitMessage(0);
+  return 0.0;
+}
+
+int main(int argc, char **argv) {
+  if (argc != 5)
+    return 2;
+  image = anvil_image_load(argv[1]);
+  image_path = argv[1];
+  top_down_image = anvil_image_load(argv[2]);
+  double bad = anvil_image_load(argv[3]);
+  double oversized = anvil_image_load(argv[4]);
+  double width = anvil_image_width(image);
+  double height = anvil_image_height(image);
+  double second_width = anvil_image_width(top_down_image);
+  double second_height = anvil_image_height(top_down_image);
+  double fractional = anvil_image_width(image + 0.5);
+  double missing = anvil_image_height(64);
+  anvil_run(NULL, draw, "Anvil Image Probe");
+  printf("load=%.0f size=%.0f,%.0f second=%.0f second_size=%.0f,%.0f "
+         "bad=%.0f oversized=%.0f fractional=%.0f missing=%.0f "
+         "draw=%.0f top_down_draw=%.0f scaled=%.0f clipped=%.0f "
+         "release=%.0f second_release=%.0f after=%.0f replacement=%.0f "
+         "stale_width=%.0f replacement_width=%.0f stale_draw=%.0f\n",
+         image, width, height, top_down_image, second_width, second_height,
+         bad, oversized, fractional, missing, natural_draw, top_down_draw,
+         scaled_draw, clipped_draw, destroyed, top_down_destroyed,
+         width_after_destroy, replacement, stale_width, replacement_width,
+         stale_draw);
+  return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            bitmap = temp_path / "sprite.bmp"
+            top_down_bitmap = temp_path / "top_down_alpha.bmp"
+            malformed = temp_path / "invalid.bmp"
+            oversized = temp_path / "oversized.bmp"
+            c_file = temp_path / "image_probe.c"
+            executable = temp_path / "image_probe.exe"
+            write_bmp(bitmap, 2, 2, 24, [
+                [(255, 0, 0, 255), (0, 255, 0, 255)],
+                [(0, 0, 255, 255), (255, 255, 255, 255)],
+            ])
+            write_bmp(top_down_bitmap, 1, -2, 32, [
+                [(255, 0, 0, 0)],
+                [(0, 0, 255, 128)],
+            ])
+            malformed.write_bytes(b"BM\x00\x00\x00")
+            oversized.write_bytes(
+                b"BM" + struct.pack("<IHHI", 54, 0, 0, 54)
+                + struct.pack("<IiiHHIIiiII", 40, 8193, 1, 1, 24, 0, 0,
+                              2835, 2835, 0, 0)
+            )
+            c_file.write_text(harness, encoding="utf-8")
+            build_c(compiler[1], c_file, executable, release=True)
+            result = subprocess.run(
+                [str(executable), str(bitmap), str(top_down_bitmap),
+                 str(malformed), str(oversized)],
+                capture_output=True,
+                text=True,
+                timeout=8,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertRegex(
+            result.stdout,
+            r"load=1 size=2,2 second=2 second_size=1,2 bad=0 oversized=0 "
+            r"fractional=0 missing=0 draw=1 top_down_draw=1 scaled=1 "
+            r"clipped=1 release=1 second_release=1 after=0 replacement=65 "
+            r"stale_width=0 replacement_width=2 stale_draw=0",
+        )
+
     def test_mouse_events_map_to_virtual_frame_and_preserve_update_edges(self):
         from compiler.anvil import build_c, find_compiler
 

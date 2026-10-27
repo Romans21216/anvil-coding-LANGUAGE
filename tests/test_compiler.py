@@ -227,6 +227,50 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_mouse_y ( )", emitted)
             self.assertIn("anvil_mouse_wheel ( )", emitted)
 
+    def test_image_builtins_emit_calls_and_require_a_path_string(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "images.ANVL"
+            generated = pathlib.Path(temp) / "images.c"
+            source.write_text(
+                'fn(draw)\n'
+                '  set var(sprite) = image_load("assets/player.bmp")\n'
+                '  set var(width) = image_width(var(sprite))\n'
+                '  set var(height) = image_height(var(sprite))\n'
+                '  set var(ok) = image_draw(var(sprite), 20, 30)\n'
+                '  set var(scaled) = image_draw_scaled(var(sprite), 20, 30, 64, 64)\n'
+                '  set var(released) = image_destroy(var(sprite))\n'
+                'end\n',
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            emitted = generated.read_text(encoding="utf-8")
+            for call in (
+                'anvil_image_load ( "assets/player.bmp" )',
+                "anvil_image_width ( anvil_sprite )",
+                "anvil_image_height ( anvil_sprite )",
+                "anvil_image_draw ( anvil_sprite, 20.0, 30.0 )",
+                "anvil_image_draw_scaled ( anvil_sprite, 20.0, 30.0, 64.0, 64.0 )",
+                "anvil_image_destroy ( anvil_sprite )",
+            ):
+                with self.subTest(call=call):
+                    self.assertIn(call, emitted)
+
+            source.write_text(
+                'fn(main)\n  output image_load(123)\nend\n', encoding="utf-8"
+            )
+            invalid = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertIn("expected a string, got a number", invalid.stderr)
+
     def test_starter_game_links_native_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / "world.exe"

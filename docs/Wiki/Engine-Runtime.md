@@ -22,3 +22,5 @@ BVH CPU ray tracing is the only implemented ray-tracing backend. DXR and Embree 
 
 Mouse input is available as `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held(...)`, and `mouse_wheel()`. Pointer coordinates map through the centered aspect-preserving viewport to the virtual 960×600 framebuffer; a pointer in letterbox space returns `-1`. Button edges and wheel detents are consumed at fixed-update boundaries. `examples/mouse_input.ANVL` shows a click counter and cursor marker.
 
+2D image sprites use `image_load(path)`, `image_width(handle)`, `image_height(handle)`, `image_draw(handle,x,y)`, `image_draw_scaled(handle,x,y,width,height)`, and `image_destroy(handle)`. This runtime currently decodes uncompressed 24-bit or 32-bit BMP files and uses nearest-neighbor scaling with alpha blending. See [image resource constraints and return values](../LANGUAGE.md#drawing-and-input) and `examples/image_sprite.ANVL`.
+

@@ -9,11 +9,12 @@
 - Keyboard camera movement/look, adjustable field of view, and a built-in BVH-accelerated CPU ray-traced sphere with shadows and specular lighting.
 - Keyboard edge/held state, configurable fixed-step updates, deterministic RNG and noise helpers.
 - Resize-aware mouse position, per-update button edges, held buttons, and signed wheel input in virtual framebuffer coordinates.
+- 2D sprite resources loaded from bounded uncompressed 24-bit/32-bit BMP files, with alpha blending, nearest-neighbor scaling, clipping, and explicit release.
 - A first LAN multiplayer primitive: opt-in UDP host/join and exchanging one numeric value.
 - A configurable fixed-step 2D circle and axis-aligned box-body system (up to 128 slots) with forces, gravity, restitution, mixed-shape collision response, and Coulomb friction.
 - A VS Code language extension and a browser-based preview workbench.
 
-This is an early prototype. Conventional primitives use a fixed-size software rasterizer, and ray-traced spheres use CPU BVH traversal; hardware DXR is not implemented. Physics supports up to 128 fixed-step 2D circles and axis-aligned boxes, including mixed-shape contacts and per-body Coulomb friction, but has no rotation, continuous collision detection, or broad phase. The networking sample is a bare LAN prototype, not a secure or reliable Internet multiplayer stack. Rust output, assets, audio, 3D physics, a full editor, portability, and performance benchmarks are future work. “Hyper-efficient” is a design goal, not a measured result.
+This is an early prototype. Conventional primitives use a fixed-size software rasterizer, and ray-traced spheres use CPU BVH traversal; hardware DXR is not implemented. Image loading supports uncompressed BMP only; 3D mesh textures, image compression, and sprite animation are not implemented. Physics supports up to 128 fixed-step 2D circles and axis-aligned boxes, including mixed-shape contacts and per-body Coulomb friction, but has no rotation, continuous collision detection, or broad phase. The networking sample is a bare LAN prototype, not a secure or reliable Internet multiplayer stack. Rust output, audio, 3D physics, a full editor, portability, and performance benchmarks are future work. “Hyper-efficient” is a design goal, not a measured result.
 
 ## Build an EXE
 
@@ -27,6 +28,7 @@ python compiler/anvil.py examples/arrays.ANVL --release --output build/arrays.ex
 python compiler/anvil.py examples/physics.ANVL --release --output build/physics.exe
 python compiler/anvil.py examples/physics_boxes.ANVL --release --output build/physics_boxes.exe
 python compiler/anvil.py examples/physics_friction.ANVL --release --output build/physics_friction.exe
+python compiler/anvil.py examples/image_sprite.ANVL --release --output build/image_sprite.exe
 ```
 
 This writes inspectable C and compiles it with MSVC. To only translate Anvil to C, add `--emit-c build/first_world.c`. The generated C is ordinary C, while the runtime currently targets Windows.
@@ -62,6 +64,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [2D circle physics sample](examples/physics.ANVL)
 - [2D boxes and mixed-shape physics sample](examples/physics_boxes.ANVL)
 - [Mouse input sample](examples/mouse_input.ANVL)
+- [BMP image sprite sample](examples/image_sprite.ANVL)
 - [VS Code extension](vscode-extension/README.md)
 - [Full improvement backlog](docs/IMPROVEMENT_BACKLOG.md)
 - [Wiki pages](docs/Wiki/Home.md)
