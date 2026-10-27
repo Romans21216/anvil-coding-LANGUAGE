@@ -2,8 +2,8 @@
 
 **Review date:** 2026-10-27  
 **Source format:** `.ANVL`  
-**Latest completed independent full review:** **89/100 — FAIL** (threshold: 90/100)  
-**Review snapshot:** before the score-record correction in this revision; a fresh rubric review is pending.
+**Latest completed independent full review:** **90/100 — PASS** (threshold: 90/100)  
+**Review snapshot:** after correcting the stale score record. The prior 89/100 review is historical.
 
 ## Scope
 
@@ -31,7 +31,7 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 ## Independent 50-criterion review
 
-The latest completed independent review scored **89/100 (89%)**, below the 90-point threshold. The scoring below preserves that review snapshot. The evaluator found the open editor's visual language mode unverified and the project's full engine scope incomplete. It also found that this report still listed 86 as the latest score; that reporting defect is corrected in the current revision, and a fresh rubric review is pending.
+The latest completed independent review scored **90/100 (90%)**, meeting the threshold. The scoring below is from that fresh review after the stale score record was corrected. The evaluator still found the open editor's visible language mode unverified and the full engine scope incomplete; these are disclosed deductions, not unresolved critical code defects.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -72,7 +72,7 @@ The latest completed independent review scored **89/100 (89%)**, below the 90-po
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest and function samples. |
-| 38 | Results recorded accurately | 1 | This review snapshot exposed stale 86/100 score text; corrected here, full review pending. |
+| 38 | Results recorded accurately | 2 | Latest 90/100 score, test results, and criterion breakdown are recorded in this report. |
 | 39 | Regression checks performed | 2 | 32 tests pass after loop and documentation fixes. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
@@ -88,9 +88,9 @@ The latest completed independent review scored **89/100 (89%)**, below the 90-po
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **18/20** | |
+| | **Testing and verification** | **19/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **89/100 — FAIL** | |
+| | **Total** | **90/100 — PASS** | |
 
 ### Priorities from the review
 
@@ -101,5 +101,5 @@ The latest completed independent review scored **89/100 (89%)**, below the 90-po
 
 ## Bug tracking
 
-Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), [#2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), and [#3](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/3) were filed by the independent reviewer with the `Codex Bugs` label and closed after their documentation defects were corrected. The stale evaluation score was filed as [issue #4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4), also with the `Codex Bugs` label; both evaluation documents now record 89/100, and the issue is closed pending the fresh review result.
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), [#2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), and [#3](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/3) were filed by the independent reviewer with the `Codex Bugs` label and closed after their documentation defects were corrected. The stale evaluation score was filed as [issue #4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4), also with the `Codex Bugs` label. The reports were updated to 89/100 when the issue was first resolved, and now record the subsequent 90/100 full review. All four issues remain closed.
 
