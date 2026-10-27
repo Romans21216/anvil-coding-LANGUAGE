@@ -1,0 +1,13 @@
+fn(sum-offset, offset)
+  array values(3)
+  for local(index) = 0 to 2
+    set array(values, local(index)) = var(offset) + local(index)
+  end
+  output array(values, 0) + array(values, 1) + array(values, 2)
+end
+
+fn(main)
+  output call fn(sum-offset, 2) + call fn(sum-offset, 5) # prints 27
+end
+
+call fn(main)

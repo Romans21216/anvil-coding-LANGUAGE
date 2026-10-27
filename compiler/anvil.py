@@ -28,6 +28,7 @@ class Node:
     otherwise: list["Node"] = field(default_factory=list)
     params: list[str] = field(default_factory=list)
     locals: set[str] = field(default_factory=set)
+    local_arrays: dict[str, int] = field(default_factory=dict)
 
 
 class CompileError(Exception):
@@ -40,6 +41,18 @@ def c_name(name: str) -> str:
 
 def variable_code(name: str, scope: Node | None = None) -> str:
     if scope and name in scope.params:
+        return c_name(scope.name + "__" + name)
+    return c_name(name)
+
+
+def array_size(name: str, scope: Node | None, arrays: dict[str, int]) -> int | None:
+    if scope is not None and name in scope.local_arrays:
+        return scope.local_arrays[name]
+    return arrays.get(name)
+
+
+def array_code(name: str, scope: Node | None) -> str:
+    if scope is not None and name in scope.local_arrays:
         return c_name(scope.name + "__" + name)
     return c_name(name)
 
@@ -105,6 +118,7 @@ def split_keyword(text: str, keyword: str) -> tuple[str, str] | None:
 
 
 MAX_ARRAY_SIZE = 1_048_576
+MAX_LOCAL_ARRAY_ELEMENTS = 8_192
 
 
 def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node], set[str], dict[str, int]]:
@@ -129,15 +143,22 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
                                      current_function.name if current_function else None))
         array_decl = re.fullmatch(r"array\s+([A-Za-z_][\w-]*)\s*\(\s*(\d+)\s*\)", line)
         if array_decl:
-            if len(stack) != 1:
-                raise CompileError(f"{path}:{line_no}: arrays must be declared at top level")
             name, raw_size = array_decl.groups()
             size = int(raw_size)
             if not 1 <= size <= MAX_ARRAY_SIZE:
                 raise CompileError(f"{path}:{line_no}: array size must be between 1 and {MAX_ARRAY_SIZE}")
-            if name in arrays:
-                raise CompileError(f"{path}:{line_no}: duplicate array '{name}'")
-            arrays[name] = size
+            if current_function is None:
+                if len(stack) != 1:
+                    raise CompileError(f"{path}:{line_no}: global arrays must be declared at top level")
+                if name in arrays:
+                    raise CompileError(f"{path}:{line_no}: duplicate array '{name}'")
+                arrays[name] = size
+            else:
+                if name in current_function.local_arrays:
+                    raise CompileError(f"{path}:{line_no}: duplicate local array '{name}' in function '{current_function.name}'")
+                if sum(current_function.local_arrays.values()) + size > MAX_LOCAL_ARRAY_ELEMENTS:
+                    raise CompileError(f"{path}:{line_no}: local arrays in a function may contain at most {MAX_LOCAL_ARRAY_ELEMENTS} elements total")
+                current_function.local_arrays[name] = size
             continue
         fn = re.fullmatch(r"fn\(([A-Za-z_][\w-]*)(?:\s*,\s*(.*))?\)", line)
         if fn:
@@ -301,10 +322,17 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
         fn = functions.get(function_name) if function_name else None
         if fn is None or name not in fn.locals:
             raise CompileError(f"{path}:{line_no}: unknown local variable {name!r}; declare it with set local({name}) first")
+    for fn in functions.values():
+        for name in fn.local_arrays:
+            if name in fn.params or name in fn.locals:
+                raise CompileError(f"{path}:{fn.line}: local array {name!r} conflicts with a local variable or parameter in function '{fn.name}'")
     c_symbols: dict[str, tuple[str, str]] = {}
     symbols = ([(name, "variable") for name in variables]
                + [(name, "function") for name in functions]
                + [(name, "array") for name in arrays])
+    for fn in functions.values():
+        symbols.extend((fn.name + "__" + name, "function-local")
+                       for name in fn.params + sorted(fn.locals) + sorted(fn.local_arrays))
     for name, kind in sorted(symbols):
         generated = c_name(name)
         if generated in RUNTIME_C_NAMES:
@@ -429,11 +457,12 @@ class ExpressionParser:
             if len(parts) != 2 or not re.fullmatch(r"[A-Za-z_][\w-]*", parts[0]):
                 raise CompileError(f"{self.path}:{self.line}: array access expects array(name, index)")
             name = parts[0]
-            if name not in self.arrays:
+            size = array_size(name, self.scope, self.arrays)
+            if size is None:
                 raise CompileError(f"{self.path}:{self.line}: unknown array {name!r}")
             index_expr = ExpressionParser(self.path, self.line, parts[1], self.functions,
                                           self.scope, self.arrays).compile()
-            left = (f"anvil_array_get({c_name(name)}, {self.arrays[name]}, {index_expr}, "
+            left = (f"anvil_array_get({array_code(name, self.scope)}, {size}, {index_expr}, "
                     f"{json.dumps(str(self.path))}, {self.line})", "number")
         elif kind == "call":
             contents = value[value.index("fn(") + 3:-1]
@@ -614,14 +643,15 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
         if n.kind == "set": out.append(f"{indent}{variable_code(n.name, scope)} = {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
         elif n.kind == "local_set": out.append(f"{indent}{c_name(scope.name + '__' + n.name)} = {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
         elif n.kind == "array_set":
-            if n.name not in arrays:
+            size = array_size(n.name, scope, arrays)
+            if size is None:
                 raise CompileError(f"{path}:{n.line}: unknown array {n.name!r}")
             suffix = f"{c_name(scope.name if scope else 'top')}_{n.line}"
             index_var, value_var = f"_anvil_array_index_{suffix}", f"_anvil_array_value_{suffix}"
             out.extend([f"{indent}{{",
                         f"{indent}    const double {index_var} = {expr(path, n.line, n.params[0], functions, scope=scope, arrays=arrays)};",
                         f"{indent}    const double {value_var} = {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};",
-                        f"{indent}    anvil_array_set({c_name(n.name)}, {arrays[n.name]}, {index_var}, {value_var}, {json.dumps(str(path))}, {n.line});",
+                        f"{indent}    anvil_array_set({array_code(n.name, scope)}, {size}, {index_var}, {value_var}, {json.dumps(str(path))}, {n.line});",
                         f"{indent}}}"])
         elif n.kind in ("add", "sub"):
             op = "+=" if n.kind == "add" else "-="
@@ -718,6 +748,7 @@ def emit_c(path: pathlib.Path, functions: dict[str, Node], top: list[Node], vari
         params = ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params) or "void"
         lines.append(f"static double {c_name(name)}({params}) {{")
         lines.extend(f"    double {c_name(name + '__' + local)} = 0.0;" for local in sorted(fn.locals))
+        lines.extend(f"    double {c_name(name + '__' + local)}[{size}] = {{0}};" for local, size in sorted(fn.local_arrays.items()))
         body = emit_nodes(path, fn.body, functions, "    ", fn, arrays)
         lines.extend(body or ["    return 0.0;"])
         if not any(n.kind == "output" for n in fn.body): lines.append("    return 0.0;")

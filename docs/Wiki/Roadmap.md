@@ -10,7 +10,7 @@ Implemented in the current prototype:
 - Numeric function parameters, numeric return values, recursion, and function-local state.
 - `while condition ... end` loops, with compiler validation and native execution tests.
 - Inclusive numeric `for local(name) = start to end [step amount] ... end` loops with ascending/descending steps and nested-loop checks.
-- Fixed-size global numeric arrays declared with `array name(size)`, with zero initialization and runtime-checked zero-based reads/writes.
+- Fixed-size global and function-local numeric arrays declared with `array name(size)`, with zero initialization, per-call stack storage for local arrays, and runtime-checked zero-based reads/writes.
 - Basic 2D and 3D software-rendered scenes, camera movement, and field of view.
 - Built-in `ray_sphere` with CPU BVH, plus projected sphere bounds regression coverage.
 - Basic Windows UDP host/join exchanging one numeric value.
@@ -20,7 +20,7 @@ Implemented in the current prototype:
 
 1. Modularize the compiler into lexer/tokenization, parser/AST, semantic checks, C backend, and build driver.
 2. Define stable lexical, scoping, initialization, type, return, and error rules in a versioned language specification.
-3. Add collections beyond fixed numeric arrays, user-defined structures, and basic static data types with tests before growing the game API.
+3. Add dynamically sized collections, user-defined structures, and basic static data types with tests before growing the game API.
 4. Extract a platform abstraction and configurable render-surface/window layer; preserve the CPU renderer as a first-class backend.
 5. Add a true GPU raster backend only after defining parity and fallback contracts. Keep CPU BVH ray tracing independent; add DXR or Embree only as optional backends.
 6. Replace numeric UDP with versioned bounded messages and peer/session lifecycle before expanding online play.

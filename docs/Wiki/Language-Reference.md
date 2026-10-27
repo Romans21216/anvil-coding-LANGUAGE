@@ -25,7 +25,7 @@ call fn(main)
 
 ## Fixed-size arrays
 
-Top-level declarations use `array name(size)`. Arrays are global, zero-initialized numeric doubles and cannot be resized. Read with `array(name, index)` and write inside a function with `set array(name, index) = expression`. Indexes are zero-based; dynamic invalid, fractional, negative, or out-of-range indexes terminate with a source-location diagnostic. The supported size range is 1 through 1,048,576. See [the language guide](../LANGUAGE.md#fixed-size-numeric-arrays) for a complete sample.
+Declare a global array at top level or a local array inside a function with `array name(size)`. Arrays are zero-initialized numeric doubles and cannot be resized. Local arrays have per-call stack storage, including for recursion, and are only visible in their declaring function. Local array storage is capped at 8,192 elements per function call; each global array can contain up to 1,048,576 elements. Read with `array(name, index)` and write inside a function with `set array(name, index) = expression`. Indexes are zero-based; dynamic invalid, fractional, negative, or out-of-range indexes terminate with a source-location diagnostic. See [the language guide](../LANGUAGE.md#fixed-size-numeric-arrays) for a complete sample.
 
 ## Expressions and control flow
 

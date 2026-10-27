@@ -299,14 +299,87 @@ class CompilerTests(unittest.TestCase):
             ("array values(0)\nfn(main)\n output 0\nend\n", "array size must be"),
             ("array values(2)\narray values(3)\nfn(main)\n output 0\nend\n", "duplicate array 'values'"),
             ("array values(1048577)\nfn(main)\n output 0\nend\n", "array size must be"),
+            ("fn(main)\n array values(8193)\n output 0\nend\n", "local arrays in a function may contain at most 8192 elements total"),
             ("fn(main)\n output array(missing, 0)\nend\n", "unknown array 'missing'"),
-            ("fn(main)\n array values(2)\n output 0\nend\n", "arrays must be declared at top level"),
+            ("if 1\n array values(2)\nend\nfn(main)\n output 0\nend\n", "global arrays must be declared at top level"),
             ("array values(2)\nfn(values)\n output 0\nend\n", "conflicts with another declaration"),
             ("fn(array_get)\n output 0\nend\n", "conflicts with a reserved runtime name"),
         )
         for program, diagnostic in cases:
             with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory() as temp:
                 source = pathlib.Path(temp) / "bad-array.ANVL"
+                source.write_text(program, encoding="utf-8")
+                result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(diagnostic, result.stderr)
+
+    def test_function_local_arrays_are_zeroed_and_isolated_per_call(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "local-arrays.ANVL"
+            out = pathlib.Path(temp) / "local-arrays.exe"
+            source.write_text(
+                "fn(sum-offset, offset)\n"
+                "  array values(3)\n"
+                "  for local(index) = 0 to 2\n"
+                "    set array(values, local(index)) = var(offset) + local(index)\n"
+                "  end\n"
+                "  output array(values, 0) + array(values, 1) + array(values, 2)\n"
+                "end\n"
+                "fn(zero-local-array)\n"
+                "  array empty(2)\n"
+                "  output array(empty, 0) + array(empty, 1)\n"
+                "end\n"
+                "fn(recursive-sum, count)\n"
+                "  array frame(1)\n"
+                "  set array(frame, 0) = var(count)\n"
+                "  if var(count) <= 1\n"
+                "    output array(frame, 0)\n"
+                "  else\n"
+                "    output array(frame, 0) + call fn(recursive-sum, var(count) - 1)\n"
+                "  end\n"
+                "end\n"
+                "fn(main)\n"
+                "  output call fn(zero-local-array) + call fn(sum-offset, 2) + call fn(sum-offset, 5) + call fn(recursive-sum, 3)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            generated = pathlib.Path(temp) / "local-arrays.generated.c"
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(generated), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "33")
+            generated_c = generated.read_text(encoding="utf-8")
+            self.assertIn("double anvil_sum_offset__values[3] = {0};", generated_c)
+            self.assertIn("double anvil_recursive_sum__frame[1] = {0};", generated_c)
+            self.assertIn("double anvil_zero_local_array__empty[2] = {0};", generated_c)
+
+    def test_function_local_array_bounds_are_checked_at_runtime(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "local-array-bounds.ANVL"
+            out = pathlib.Path(temp) / "local-array-bounds.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  array values(1)\n"
+                "  output array(values, 1)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(pathlib.Path(temp) / "local-array-bounds.generated.c"), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("array index", result.stderr)
+            self.assertIn("local-array-bounds.ANVL:3:", result.stderr)
+
+    def test_local_array_references_are_function_scoped_and_name_checked(self):
+        cases = (
+            ("fn(first)\n array hidden(1)\n set array(hidden, 0) = 3\n output 0\nend\nfn(second)\n output array(hidden, 0)\nend\n", "unknown array 'hidden'"),
+            ("fn(main)\n array items(2)\n set local(items) = 1\n output array(items, 0)\nend\n", "conflicts with a local variable or parameter"),
+            ("fn(main, items)\n array items(2)\n output array(items, 0)\nend\n", "conflicts with a local variable or parameter"),
+        )
+        for program, diagnostic in cases:
+            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory() as temp:
+                source = pathlib.Path(temp) / "bad-local-array.ANVL"
                 source.write_text(program, encoding="utf-8")
                 result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0)

@@ -3,19 +3,19 @@
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
 **Latest completed independent full review:** **91/100 — PASS** (commit `d89763f`; threshold: 90/100)
-**Review snapshot:** this 50-criterion table records the independent rescore of `d89763f`. The reviewer reran the full test suite, extension tests, and Python compile check; confirmed all six tracked generated C files were unchanged and the worktree stayed clean; and verified the installed VS Code 0.1.2 extension and Anvil mode. Earlier delivery findings are recorded as resolved in GitHub issues #19 and #20.
+**Review snapshot:** the score and 50-criterion table below are for commit `d89763f`. Subsequent implementation added function-local arrays; current verification is 42 Python tests plus a native sample build/run, but that newer implementation has not yet been independently rescored.
 
 ## Scope
 
-Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit.
+Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit. The compiler now supports fixed-size global and function-local numeric arrays; local array storage is capped at 8,192 elements per function call.
 
-This is not a production engine. Assets, audio, physics, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
+This is not a production engine. Assets, audio, physics, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state and arrays, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
 
 ## Verification
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -v` | PASS — 39 tests (after fixed-size numeric array implementation) |
+| `python -m unittest discover -s tests -v` | PASS — 42 tests, including function-local array isolation and bounds |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -23,6 +23,7 @@ This is not a production engine. Assets, audio, physics, cross-platform support,
 | New `examples/loops.ANVL` sample | PASS — MSVC release build and execution output `15` |
 | Native runtime integration | PASS — fixed-step updates, delta, queued Space edge, and clean shutdown covered |
 | Projected sphere bounds regression | PASS — production projection helper sampled centered, off-axis, and near-camera sphere surfaces |
+| `examples/local_arrays.ANVL` | PASS — MSVC release build; output `27`; generated C unchanged on repeat build |
 | VS Code extension installation | PASS — VS Code 1.143.1 lists `anvil-engine.anvil-language-support@0.1.2` after installing the project VSIX |
 | VS Code package registration | PASS — 0.1.2 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
 | Visible VS Code language mode/sample colors | PASS — VS Code status bar shows Anvil for `examples/arrays.ANVL`; the open sample visibly highlights array declarations, indexing, function syntax, keywords, and numbers. |
@@ -32,7 +33,7 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 ## Independent 50-criterion review
 
-The fresh independent review of commit `d89763f` scored **91/100 (91%) — PASS**. The evaluator reran the 39-test Python suite, extension checks, and compiler syntax check; verified the array example and that generated C stays stable; and confirmed the installed extension is 0.1.2 with the Anvil language mode selected. All six tracked generated C files had identical hashes before and after the suite, and the working tree stayed clean. Issues #19 and #20 document and resolve the test-output side effect and historical score arithmetic discrepancy. Remaining deductions are compiler density (22: 1), compiler module boundaries (23: 1), Windows/C backend portability (27: 1), and incomplete requested engine scope (2, 3, 5, 9, 40, 50). No critical compiler/runtime failure was reproduced.
+The fresh independent review of commit `d89763f` scored **91/100 (91%) — PASS**. The evaluator reran the 39-test Python suite, extension checks, and compiler syntax check; verified the global array example and stable generated C; and confirmed the installed extension is 0.1.2 with Anvil mode selected. All six tracked generated C files had identical hashes before and after the suite, and the worktree stayed clean. After that reviewed commit, function-local arrays were added and verified in the current worktree with 42 passing tests plus a native sample that prints 27. The updated feature is recorded in issue #9; independent rescore of this newer work is pending. Issues #19 and #20 document the resolved test-output side effect and historical score arithmetic discrepancy. The previous review's remaining deductions were compiler density (22: 1), compiler module boundaries (23: 1), Windows/C backend portability (27: 1), and incomplete requested engine scope (2, 3, 5, 9, 40, 50). No critical compiler/runtime failure was reproduced in that review.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
