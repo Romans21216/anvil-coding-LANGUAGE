@@ -2,7 +2,7 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27 after independent review of exact synchronized candidate `4bc8bc3c5d01c59622d7af1237b6021d5903e13f`; the latest evaluation is 90/100, below the required 98/100 bar. The critic confirmed item #185 tracking but reproduced overflow in finite extreme segment clipping and found a stale test count in candidate JSON; issue #47 records both findings. Issue #46's item mapping fix is independently verified and closed. Compiler items #101–#104 are COMPLETE; issues #12, #45, and #46 are resolved. Remaining score deductions include broader engine scope, platform/backend limits, and editor verification.
+Updated 2026-10-27 after independent review of exact synchronized candidate `eec0608dd6f252090b50fda1027eba14c6af1292`; the latest evaluation is 92/100, below the required 98/100 bar. The critic confirmed the item #185 overflow correction and consistent test count; issues #47's findings are resolved. Issue #46's item mapping fix is also independently verified and closed. Compiler items #101–#104 are COMPLETE; issues #12, #45, #46, and #47 are resolved. Remaining score deductions include broader engine scope, platform/backend limits, and editor verification.
 
 ## Status counts
 
@@ -13,7 +13,7 @@ Updated 2026-10-27 after independent review of exact synchronized candidate `4bc
 - NEEDS VERIFICATION: 428
 - IN PROGRESS: 2
 
-The item #172 resize feature was independently reviewed on `f12c0ac` (92/100). The latest review of the item #185 candidate `4bc8bc3` is 90/100, still below the required 98/100 threshold; issue #47 tracks the new overflow and test-count findings.
+The item #172 resize feature was independently reviewed on `f12c0ac` (92/100). The item #185 correction and synchronized records were reviewed on `eec0608` (92/100), still below the required 98/100 threshold. Issue #47 is resolved.
 
 ## Audited current items
 
@@ -29,7 +29,7 @@ The item #172 resize feature was independently reviewed on `f12c0ac` (92/100). T
 | 103 | Separate semantic validation from C generation. | COMPLETE | `compiler/semantics.py` validates before `compiler/codegen.py` emits C. The independent critic confirmed generated output is byte-identical for 12 representative examples against `854d36c`. |
 | 104 | Separate C generation from build orchestration. | COMPLETE | `compiler/codegen.py`, `compiler/build.py`, and `compiler/cli.py` have separate responsibilities. The critic confirmed both CLI invocation forms and the 21-definition legacy facade. Issue #12 is resolved and closed. |
 | 172 | Add dynamic window resizing. | IN PROGRESS | `runtime/anvil_projection.h::anvil_compute_viewport` computes a centered aspect-preserving viewport; `runtime/anvil_runtime.c` paints the fixed 960×600 image into the current client area. `tests/test_runtime.py` covers wide, tall, same-aspect, and invalid client sizes. The game window is already created with `WS_OVERLAPPEDWINDOW`; internal framebuffer resolution remains fixed. Canonical backlog source is issue #23 comment 6451810775; item #144 remains unverified. The critic confirmed the tracking correction on `f12c0ac`; a live resize was not visually inspected. |
-| 185 | Add robust near-plane clipping. | IN PROGRESS | Commit `cfce407` adds camera-space clipping for triangles, grid segments, and sphere hits. Commit `15ac43a` fixes the overflow reproduced by review `4bc8bc3` using stable interpolation, finite-output checks, and pre-raster screen clipping. All 74 tests pass; fresh independent review is pending. No live window was visually inspected; far-plane and side-frustum clipping remain out of scope. |
+| 185 | Add robust near-plane clipping. | IN PROGRESS | Commit `cfce407` adds camera-space clipping for triangles, grid segments, and sphere hits. Commit `15ac43a` fixes the overflow reproduced by review `4bc8bc3` using stable interpolation, finite-output checks, and pre-raster screen clipping. Critic `eec0608` confirmed the regression fix and all 74 tests. No live window was visually inspected; far-plane and side-frustum clipping remain out of scope. |
 | 301 | Improve the existing bounded 2D circle physics prototype. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: bounded fixed-step circle/axis-aligned-box solver; docs/ENGINE.md. No CCD, rotation, broad phase, joints, 3D bodies, or complete stability coverage. Issue #8; commit `f7c91b0`. |
 | 302 | Make the current 128-body limit configurable where feasible. | COMPLETE | runtime/anvil_runtime.c: physics_capacity and active-capacity-bounded loops; tests/test_compiler.py: growth, exhaustion, invalid values, refused shrink, shrink after release. The configured active pool still has a fixed compiled maximum of 128 slots. Issue #8; commit `560cee1`. |
 | 303 | Add rectangle collision bodies. | COMPLETE | runtime/anvil_runtime.c: axis-aligned rectangle bodies and box contacts; examples/physics_boxes.ANVL. Rectangles are axis aligned and cannot rotate. Issue #8; commit `0d3b5ed`. |

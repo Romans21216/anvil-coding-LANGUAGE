@@ -1,12 +1,12 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **90/100 — FAIL** (exact commit `4bc8bc3c5d01c59622d7af1237b6021d5903e13f`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 19/20, testing 17/20, delivery 18/20.
+**Latest independent evaluation:** **92/100 — FAIL** (exact commit `eec0608dd6f252090b50fda1027eba14c6af1292`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 19/20, testing 19/20, delivery 18/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
-**Latest review evidence:** the critic evaluated exact pushed commit `4bc8bc3c5d01c59622d7af1237b6021d5903e13f` and scored 90/100 (16/20, 20/20, 19/20, 17/20, 18/20). It reran 74 Python tests, extension validation, compileall, QA arithmetic validation, and diff check. It confirmed the corrected status mapping: item #185 is IN PROGRESS, 22 audited rows total 450, and issue #23 comment `6451810775` is the source of truth. No live rendered window was visually inspected. It found two issues: extreme finite segment coordinates overflow to infinity during near-plane interpolation (criterion 34) and candidate JSON reports 73 tests instead of 74 (criterion 38). Both are recorded under issue [#47](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/47), labeled `Codex Bugs`. The previous 92/100 on `f12c0ac` remains historical. Issue #46 is closed; extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
-**Current finding:** the 98/100 threshold remains unmet by 8 points. Criterion 34 loses a point for non-finite clipping output from finite input; criterion 38 loses a point for the candidate test-count mismatch. The implementation and candidate metadata are being corrected under issue #47. Compiler criteria 22 and 23 remain 2/2; issue #12 is closed.
+**Latest review evidence:** the critic evaluated exact pushed commit `eec0608dd6f252090b50fda1027eba14c6af1292` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 74 Python tests, 4 native runtime tests, extension validation, compileall, QA arithmetic, JSON/count checks, and diff check. It confirmed 22 audited rows total 450 and item #185 is active. The prior ±1e308 clipping reproduction now returns finite output; segment/triangle interpolation and screen-line clipping are covered by native tests. Candidate metadata records all 74 tests. Both findings from issue #47 are resolved. No live rendered window was visually inspected. The prior 90/100 on `4bc8bc3` and 92/100 on `f12c0ac` remain historical. Issue #46 is closed; extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
+**Current finding:** the 98/100 threshold remains unmet by 6 points. Remaining partial criteria are 2, 3, 5, 9, 27, 40, 47, and 50, reflecting incomplete overall engine scope, platform/backend limits, and unverified editor highlighting. Issues #12, #46, and #47 are closed.
 
-**Current unreviewed correction:** commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line rasterizer integer conversion. The candidate test-count record is corrected to 74. The expanded native regression and full 74-test suite pass, as do extension validation, compileall, QA arithmetic, JSON parsing, and diff check. The 90/100 score above applies to the pre-fix `4bc8bc3` snapshot; independent review of this correction is pending.
+**Latest reviewed correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
 **Formatting follow-up review:** candidate `3f77eee` was independently reviewed on exact commit `5072597`; all 72 tests, Black check, compileall, QA arithmetic, diff check, and 12-example generated-C parity pass. The critic scored this snapshot 92/100, still below 98.
 
@@ -22,12 +22,12 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 74 tests; independently rerun on exact review candidate `4bc8bc3` |
-| Canonical item #172 resize suite | PASS — all 74 suite tests passed on exact review candidate `4bc8bc3` |
-| Canonical item #185 near-plane clipping regression | PASS — native MSVC harness covers segments, triangles, and sphere near caps on the unreviewed candidate |
+| `python -m unittest discover -s tests -q` | PASS — 74 tests; independently rerun on exact review candidate `eec0608` |
+| Canonical item #172 resize suite | PASS — all 74 suite tests passed on exact review candidate `eec0608` |
+| Canonical item #185 near-plane clipping regression | PASS — native MSVC tests cover extreme finite segments, triangles, and sphere near caps on exact review candidate `eec0608` |
 | `python -m unittest discover -s tests -p test_runtime.py -v` | PASS — 4 native runtime tests, including resize, clipping, and aspect-preserving viewport cases |
 | `python -m unittest discover -s tests -p test_qa_report.py -v` | PASS — zero-score rubric accepted; mismatched category subtotal rejected |
-| `python scripts/validate_qa_report.py` | PASS — latest rubric totals 90/100; category subtotals agree |
+| `python scripts/validate_qa_report.py` | PASS — latest synchronized rubric totals 92/100; category subtotals agree |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -58,7 +58,7 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 
 **91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 19/20; testing and verification 18/20; developer experience and delivery 18/20. The exact reviewed commit was `bc4db99368b3af2953e49adc4e4cbd8f5706bb4e`. The critic reran 73 Python tests, 3 native runtime tests, extension validation, compileall, the QA validator, and diff check. It verified the viewport geometry helper and inspected the WM_PAINT path, but did not visually launch a resized window. The audited ledgers contain 21 rows and total 450. Criterion 38 scores 1 because the prior ledger labeled dynamic window resizing as #144; canonical issue #23 comment 6451810775 defines it as #172. Issue #46 tracks the correction. Criterion 22 remains 2 after formatting; criterion 23 remains 2 for phase separation. Criterion 27 remains 1 for Windows/MSVC and C-only backend. Criterion 47 remains 1 because newer extension tokens are not visually verified. The 98-point threshold remains unmet; issues #12 and #45 are closed.
 
-## Latest 50-criterion scoring for review `4bc8bc3`
+## Latest 50-criterion scoring for review `eec0608`
 
 Historical context: the independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and `51deb5d` scored **90/100 — PASS**. The review of `c4f3ec6` scored **88/100 — FAIL** because four docs contained stale complexity claims. Commit `560cee1` corrected those documents; a fresh independent review confirmed the fix and scored `560cee1` **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The friction feature commit `f7c91b0` scored **87/100 — FAIL** (15/20, 20/20, 17/20, 18/20, 17/20) because of stale high-level feature and QA records plus missing friction edge-case tests. Follow-up commits `e1e3768` and `83891c6` synchronized the records and added those tests. Its independent review scored **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The division-diagnostic commit `12b4e55` also scored **90/100 — PASS** with the same category totals; it reran all 56 tests, extension/Python validation, an MSVC numeric sample build/run, diff check, and verified the 450-item inventory. The reviewer found no defect in the new diagnostic, and item #48 is complete. Remaining deductions concern overall engine scope, compiler structure/platform breadth, and unverified new extension highlighting. See issues #8 and #24.
 
@@ -97,12 +97,12 @@ Historical context: the independent review of commit `f96a212` scored **87/100 (
 | 31 | Automated tests provided | 2 | The independent critic reran all 73 Python tests on exact candidate `f12c0ac`; extension and compileall checks also passed. |
 | 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, circle/box collisions, pool capacity, and generated executable paths are covered. |
 | 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
-| 34 | Edge cases explicitly tested | 1 | Critic `4bc8bc3` reproduced finite extreme camera-space inputs `(-1e308,0,0.01)` to `(1e308,0,0.4)` yielding `x=inf` after clipping at `0.08`. Issue #47 records the finding and required regression. |
+| 34 | Edge cases explicitly tested | 2 | Critic `eec0608` reran native MSVC regressions for the prior `±1e308` segment case, extreme triangle intersections, and viewport line clipping; all produce finite bounded results. |
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 1 | Candidate `4bc8bc3` has 74 passing Python tests, but `docs/IMPLEMENTATION_STATUS.json` records 73. Issue #47 tracks the stale test-count field. |
-| 39 | Regression checks performed | 2 | Critic `4bc8bc3` reran 74 tests, extension validation, compileall, QA validator, and diff check; native runtime tests include viewport and near-plane geometry. |
+| 38 | Results recorded accurately | 2 | On exact review `eec0608`, the candidate JSON, Markdown ledger, and QA report agree on 74 passing tests; the ledger has 22 audited rows totaling 450. |
+| 39 | Regression checks performed | 2 | Critic `eec0608` reran 74 tests, extension validation, compileall, QA validator, and diff check; all 4 native runtime tests pass. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
@@ -117,9 +117,9 @@ Historical context: the independent review of commit `f96a212` scored **87/100 (
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **19/20** | |
-| | **Testing and verification** | **17/20** | |
+| | **Testing and verification** | **19/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **90/100** | Exact review `4bc8bc3`; FAIL under the 98-point requirement. |
+| | **Total** | **92/100** | Exact review `eec0608`; FAIL under the 98-point requirement. |
 
 ### Deduction details and follow-up
 

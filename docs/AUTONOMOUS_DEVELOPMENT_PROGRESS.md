@@ -251,3 +251,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Finding 2 — issue #47, stale candidate test count:** `docs/IMPLEMENTATION_STATUS.json` said 73 tests while the candidate passed 74 and the other QA records stated 74. This reduced criterion 38 to 1/2.
 - **Independent checks:** 74 Python tests, extension validation, compileall, QA arithmetic, and diff check passed. The ledger has 22 audited rows and `428 + 3 + 17 + 2 = 450`. No live visual behavior was inspected.
 - **Correction:** commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` adds stable interpolation and screen-line clipping with extreme-value regression cases. The candidate JSON test count is corrected to 74. All 74 Python tests, extension validation, compileall, QA arithmetic, JSON parsing, and diff check pass. The 90-point result remains attached to exact commit `4bc8bc3`; a fresh review of `15ac43a` is required.
+
+
+### Fresh critic result — corrected item #185 snapshot `eec0608`
+
+- **Exact reviewed commit:** `eec0608dd6f252090b50fda1027eba14c6af1292`.
+- **Score:** **92/100 — FAIL** against 98. Categories: requirements 16/20, functionality 20/20, architecture 19/20, testing 19/20, delivery 18/20. Criteria 34 and 38 returned to 2/2 after verifying finite extreme-coordinate clipping and the consistent 74-test count.
+- **Independent checks:** 74 Python tests, all 4 native runtime tests, npm extension validation, compileall, QA arithmetic, JSON/status counts, and diff check passed. Ledger: 22 audited rows; `428 + 3 + 17 + 2 = 450`.
+- **Issue #47:** the critic verified the earlier segment overflow case, extreme triangle clipping, and ±1e308 screen-line clipping. Both tracked findings are resolved; issue #47 is closed with evidence.
+- **Remaining evaluation gap:** no live window was launched to visually inspect resizing or near-plane clipping. Remaining partial rubric criteria are 2, 3, 5, 9, 27, 40, 47, and 50. The required 98-point bar remains unmet.
