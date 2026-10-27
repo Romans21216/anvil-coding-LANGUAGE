@@ -1,6 +1,6 @@
 # Complete Improvement and Fix Backlog
 
-This file preserves the complete 360-item improvement request supplied for Anvil. It is a project backlog, not a statement that every item is implemented. Current status and sequencing are summarized in [the wiki roadmap](Wiki/Roadmap.md).
+This file preserves the complete 360-item improvement request supplied for Anvil. It is a project backlog, not a statement that every item is implemented. Current status and sequencing are summarized in [the wiki roadmap](Wiki/Roadmap.md). Progress update: numeric function parameters, return values, local variables, recursion, and `while` loops have working compiler support; the requested `for` loop and other listed features remain backlog work.
 
 ANVIL LANGUAGE AND GAME ENGINE — COMPLETE IMPROVEMENT AND FIX LIST
 CRITICAL — CORE LANGUAGE FIXES
