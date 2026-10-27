@@ -9,14 +9,14 @@
 
 Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit. The compiler supports fixed-size global and function-local numeric arrays; each function call is capped at 8,192 local elements, with a 16 MiB active-allocation budget across calls.
 
-This is not a production engine. Physics currently supports at most 128 2D circles, fixed-step gravity/force integration, overlap queries, and a four-pass circle contact solver; it does not include continuous collision detection, polygon or 3D bodies, friction, or joints. Assets, audio, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree also remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state and arrays, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
+This is not a production engine. Current physics supports at most 128 2D circles and axis-aligned boxes, fixed-step gravity/force integration, mixed-shape overlap queries, and a four-pass contact solver; it does not include continuous collision detection, polygon or 3D bodies, friction, rotation, or joints. Assets, audio, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree also remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state and arrays, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
 
 ## Verification
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 48 tests |
-| `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend built-ins |
+| `python -m unittest discover -s tests -v` | PASS — 50 tests, including mixed circle-box and box-box solver integration, invalid dimensions, and arity validation |
+| `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray backend and box-physics built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
 | Nested `while` inside `if/else` and another `while` | PASS — independent build/run output `13` |
@@ -26,9 +26,11 @@ This is not a production engine. Physics currently supports at most 128 2D circl
 | `examples/local_arrays.ANVL` | PASS — MSVC release build; output `27`; generated C unchanged on repeat build |
 | Recursive maximum-size local arrays | PASS — controlled source-line diagnostic at the 16 MiB allocation budget, rather than process stack overflow |
 | `examples/physics.ANVL` native release build | PASS — generated executable with MSVC |
-| VS Code extension installation | PASS — `anvil-engine.anvil-language-support@0.1.4` installed over 0.1.3 |
-| VS Code package registration | PASS — 0.1.4 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
+| `examples/physics_boxes.ANVL` native release build | PASS — generated executable with MSVC; interactive window not launched |
+| VS Code extension installation | 0.1.4 remains installed; user declined installing 0.1.5 |
+| VS Code package registration | PASS — 0.1.5 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
 | Visible VS Code language mode/sample colors | PASS — 0.1.4 was opened on `examples/ray_backends.ANVL`; Anvil mode and visible highlighting for `ray_backend` and `ray_backend_available` were confirmed during installation verification. The independent evaluator confirmed installation and automated token tests, but did not take a fresh screenshot. |
+| `body_create_box` visible highlighting | NOT VERIFIED in installed editor — automated grammar test passes for 0.1.5; installation was declined, so 0.1.4 remains installed |
 | Ray backend API sample | PASS — MSVC release build and execution of `examples/ray_backends.ANVL`; output `1`. BVH works; DXR/Embree are reported unavailable. |
 | `git diff --check` | PASS — clean in independent review |
 | Live game window in latest review | NOT INSPECTED |

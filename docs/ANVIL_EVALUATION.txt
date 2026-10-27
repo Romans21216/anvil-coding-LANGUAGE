@@ -23,7 +23,7 @@ WHAT ANVIL IS GOOD AT
 
 WHAT ANVIL IS NOT GOOD AT YET
 -----------------------------
-1. It is not a complete engine: physics is limited to 128 2D circles with fixed-step force/gravity integration and basic pairwise contacts. There is no continuous collision detection, polygon or 3D bodies, friction, or joints. A mature asset pipeline, texture/sprite system, audio engine, animation framework, scene graph, complete editor, and broad GUI system are also absent.
+1. It is not a complete engine: physics supports 128 fixed-step 2D circle and axis-aligned box bodies with basic pairwise contacts. There is no continuous collision detection, polygon or 3D bodies, friction, or joints. A mature asset pipeline, texture/sprite system, audio engine, animation framework, scene graph, complete editor, and broad GUI system are also absent.
 2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. Resize handling, robust clipping, mesh import, texture mapping, and performance profiling remain future work.
 3. Only one ray-tracing path is implemented: CPU BVH is available. The runtime exposes `ray_backend(name)` and `ray_backend_available(name)`. The selector successfully chooses BVH; hardware-accelerated RTX/DXR and Embree are not implemented and cannot be selected successfully.
 4. The language remains narrow: fixed-size global and function-local numeric arrays are now implemented, but dynamic arrays, user-defined types, modules/imports, static types, and a general string model are not. Function parameters, return values, recursion, function-local numeric state, numeric `while`/`for` loops, and array bounds checks are implemented.
@@ -50,7 +50,7 @@ Native Windows executable generation: Implemented for documented MSVC toolchain
 Basic 2D/3D rendering and camera controls: Implemented with notable limits
 BVH CPU ray-traced spheres: Implemented, limited to 32 per batch
 Ray backend selection and availability built-ins: Implemented and verified; only BVH is available; DXR/Embree unavailable
-Fixed-step 2D circle physics: Implemented as a bounded prototype (128 bodies; no CCD, friction, joints, or 3D/polygon bodies)
+Fixed-step 2D circle/axis-aligned box physics: Implemented as a bounded prototype (128 bodies; no rotation, CCD, friction, joints, or 3D/polygon bodies)
 RTX/DXR and Embree: Not implemented
 LAN multiplayer: Minimal UDP prototype
 Internet multiplayer: Not implemented

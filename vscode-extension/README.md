@@ -8,7 +8,7 @@ This extension registers the Anvil language identifier (`anvil`) for `.ANVL` fil
 2. Press `F5` to launch an Extension Development Host.
 3. Open `examples/first_world.ANVL` in the development host to see Anvil token scopes.
 
-To install the included package, use **Extensions: Install from VSIX...** and select `anvil-language-support-0.1.4.vsix`. To rebuild it, run `npx --yes @vscode/vsce package --allow-missing-repository` from this folder.
+To install the included package, use **Extensions: Install from VSIX...** and select `anvil-language-support-0.1.5.vsix`. To rebuild it, run `npx --yes @vscode/vsce package --allow-missing-repository` from this folder.
 
 ## Highlighted constructs
 

@@ -72,6 +72,7 @@ async function main() {
   expect('set local(ok) = ray_backend("bvh")', 'ray_backend', 'support.function.anvil');
   expect('set local(available) = ray_backend_available("dxr")', 'ray_backend_available', 'support.function.anvil');
   expect('set var(ball) = body_create(0, 0, 1, 1)', 'body_create', 'support.function.anvil');
+  expect('set var(box) = body_create_box(0, 0, 2, 1, 0)', 'body_create_box', 'support.function.anvil');
   expect('set var(contacts) = physics_step()', 'physics_step', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');

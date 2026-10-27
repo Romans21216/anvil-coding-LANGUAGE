@@ -1,0 +1,37 @@
+# Fixed-step mixed-shape physics: a movable box and circle land on a static box.
+scene 2d
+clear rgba(12, 17, 29, 255)
+
+set var(floor) = body_create_box(0, -2, 12, 1, 0)
+set var(box) = body_create_box(-1, 2, 1, 1, 1)
+set var(ball) = body_create(1, 3, 0.5, 1)
+set var(ok) = body_restitution(var(box), 0.35)
+set var(ok) = body_restitution(var(ball), 0.5)
+set var(box_x) = body_x(var(box))
+set var(box_y) = body_y(var(box))
+set var(ball_x) = body_x(var(ball))
+set var(ball_y) = body_y(var(ball))
+set var(contact_count) = 0
+
+fn(update)
+  if held(LEFT)
+    set var(ok) = body_force(var(box), -8, 0)
+  end
+  if held(RIGHT)
+    set var(ok) = body_force(var(box), 8, 0)
+  end
+  set var(contact_count) = physics_step()
+  set var(box_x) = body_x(var(box))
+  set var(box_y) = body_y(var(box))
+  set var(ball_x) = body_x(var(ball))
+  set var(ball_y) = body_y(var(ball))
+end
+
+fn(draw)
+  display rect(480 + var(box_x) * 48 - 24, 300 - var(box_y) * 48 - 24, 48, 48) -rgb(88, 164, 255)
+  display circle(480 + var(ball_x) * 48, 300 - var(ball_y) * 48, 24) -rgb(172, 106, 255)
+  display rect(192, 372, 576, 48) -rgb(89, 101, 123)
+  display text("2D box and circle physics") -l(20, 20) -rgb(237, 243, 255)
+  display text("Hold left/right to push the box") -l(20, 48) -rgb(187, 202, 221)
+  display text("Contacts: " + var(contact_count)) -l(20, 76) -rgb(157, 199, 255)
+end

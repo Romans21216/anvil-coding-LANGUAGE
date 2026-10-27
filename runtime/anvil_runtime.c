@@ -20,6 +20,7 @@ enum {
   ANVIL_RAY_BACKEND_EMBREE
 };
 enum { ANVIL_PHYSICS_BODIES = 128, ANVIL_PHYSICS_SOLVER_ITERATIONS = 4 };
+enum { ANVIL_PHYSICS_CIRCLE, ANVIL_PHYSICS_BOX };
 #define ANVIL_PHYSICS_MAX_COORDINATE 1000000000.0
 #define ANVIL_PHYSICS_MAX_RADIUS 1000000.0
 #define ANVIL_PHYSICS_MAX_SPEED 1000000.0
@@ -40,9 +41,9 @@ typedef struct {
 } AnvilProjected;
 typedef struct {
   double x, y, vx, vy, force_x, force_y;
-  double radius, mass, restitution;
+  double radius, half_width, half_height, mass, restitution;
   uint32_t generation;
-  int active;
+  int active, shape;
 } AnvilPhysicsBody;
 
 static HWND anvil_window;
@@ -941,13 +942,10 @@ static AnvilPhysicsBody *anvil_physics_body(double handle, int *slot_out) {
   return body;
 }
 
-double anvil_body_create(double x, double y, double radius, double mass) {
-  if (!isfinite(x) || !isfinite(y) || !isfinite(radius) || !isfinite(mass) ||
-      fabs(x) > ANVIL_PHYSICS_MAX_COORDINATE ||
-      fabs(y) > ANVIL_PHYSICS_MAX_COORDINATE || radius < 1.0e-6 ||
-      radius > ANVIL_PHYSICS_MAX_RADIUS || mass < 0.0 || mass > 1.0e12 ||
-      (mass > 0.0 && mass < 1.0e-6))
-    return -1.0;
+static double anvil_physics_allocate_body(double x, double y, double radius,
+                                          double half_width,
+                                          double half_height, double mass,
+                                          int shape) {
   for (int slot = 0; slot < ANVIL_PHYSICS_BODIES; ++slot) {
     AnvilPhysicsBody *body = &anvil_physics_bodies[slot];
     if (body->active)
@@ -958,13 +956,40 @@ double anvil_body_create(double x, double y, double radius, double mass) {
     memset(body, 0, sizeof(*body));
     body->generation = generation;
     body->active = 1;
+    body->shape = shape;
     body->x = x;
     body->y = y;
     body->radius = radius;
+    body->half_width = half_width;
+    body->half_height = half_height;
     body->mass = mass;
     return (double)generation * ANVIL_PHYSICS_BODIES + slot;
   }
   return -1.0;
+}
+
+double anvil_body_create(double x, double y, double radius, double mass) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(radius) || !isfinite(mass) ||
+      fabs(x) > ANVIL_PHYSICS_MAX_COORDINATE ||
+      fabs(y) > ANVIL_PHYSICS_MAX_COORDINATE || radius < 1.0e-6 ||
+      radius > ANVIL_PHYSICS_MAX_RADIUS || mass < 0.0 || mass > 1.0e12 ||
+      (mass > 0.0 && mass < 1.0e-6))
+    return -1.0;
+  return anvil_physics_allocate_body(x, y, radius, 0.0, 0.0, mass,
+                                     ANVIL_PHYSICS_CIRCLE);
+}
+
+double anvil_body_create_box(double x, double y, double width, double height,
+                             double mass) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(width) || !isfinite(height) ||
+      !isfinite(mass) || fabs(x) > ANVIL_PHYSICS_MAX_COORDINATE ||
+      fabs(y) > ANVIL_PHYSICS_MAX_COORDINATE || width < 2.0e-6 ||
+      width > 2.0 * ANVIL_PHYSICS_MAX_RADIUS || height < 2.0e-6 ||
+      height > 2.0 * ANVIL_PHYSICS_MAX_RADIUS || mass < 0.0 || mass > 1.0e12 ||
+      (mass > 0.0 && mass < 1.0e-6))
+    return -1.0;
+  return anvil_physics_allocate_body(x, y, 0.0, width * 0.5, height * 0.5,
+                                     mass, ANVIL_PHYSICS_BOX);
 }
 
 double anvil_body_destroy(double handle) {
@@ -1034,15 +1059,98 @@ double anvil_body_restitution(double handle, double restitution) {
   return 1.0;
 }
 
+static int anvil_physics_contact(const AnvilPhysicsBody *a,
+                                 const AnvilPhysicsBody *b, double *normal_x,
+                                 double *normal_y, double *penetration) {
+  if (a->shape == ANVIL_PHYSICS_CIRCLE &&
+      b->shape == ANVIL_PHYSICS_CIRCLE) {
+    double dx = b->x - a->x, dy = b->y - a->y;
+    double radius = a->radius + b->radius;
+    double distance_sq = dx * dx + dy * dy;
+    if (distance_sq >= radius * radius)
+      return 0;
+    double distance = sqrt(distance_sq);
+    *normal_x = distance > 1.0e-12 ? dx / distance : 1.0;
+    *normal_y = distance > 1.0e-12 ? dy / distance : 0.0;
+    *penetration = radius - distance;
+    return 1;
+  }
+
+  if (a->shape == ANVIL_PHYSICS_BOX && b->shape == ANVIL_PHYSICS_BOX) {
+    double dx = b->x - a->x, dy = b->y - a->y;
+    double overlap_x = a->half_width + b->half_width - fabs(dx);
+    double overlap_y = a->half_height + b->half_height - fabs(dy);
+    if (overlap_x <= 0.0 || overlap_y <= 0.0)
+      return 0;
+    if (overlap_x < overlap_y) {
+      *normal_x = dx >= 0.0 ? 1.0 : -1.0;
+      *normal_y = 0.0;
+      *penetration = overlap_x;
+    } else {
+      *normal_x = 0.0;
+      *normal_y = dy >= 0.0 ? 1.0 : -1.0;
+      *penetration = overlap_y;
+    }
+    return 1;
+  }
+
+  const AnvilPhysicsBody *circle = a->shape == ANVIL_PHYSICS_CIRCLE ? a : b;
+  const AnvilPhysicsBody *box = a->shape == ANVIL_PHYSICS_BOX ? a : b;
+  double closest_x = fmax(box->x - box->half_width,
+                          fmin(circle->x, box->x + box->half_width));
+  double closest_y = fmax(box->y - box->half_height,
+                          fmin(circle->y, box->y + box->half_height));
+  double dx = closest_x - circle->x, dy = closest_y - circle->y;
+  double distance_sq = dx * dx + dy * dy;
+  if (distance_sq >= circle->radius * circle->radius)
+    return 0;
+  if (distance_sq > 1.0e-24) {
+    double distance = sqrt(distance_sq);
+    *normal_x = dx / distance;
+    *normal_y = dy / distance;
+    *penetration = circle->radius - distance;
+  } else {
+    double left = circle->x - (box->x - box->half_width);
+    double right = box->x + box->half_width - circle->x;
+    double bottom = circle->y - (box->y - box->half_height);
+    double top = box->y + box->half_height - circle->y;
+    double nearest = left;
+    *normal_x = 1.0;
+    *normal_y = 0.0;
+    if (right < nearest) {
+      nearest = right;
+      *normal_x = -1.0;
+      *normal_y = 0.0;
+    }
+    if (bottom < nearest) {
+      nearest = bottom;
+      *normal_x = 0.0;
+      *normal_y = 1.0;
+    }
+    if (top < nearest) {
+      nearest = top;
+      *normal_x = 0.0;
+      *normal_y = -1.0;
+    }
+    *penetration = circle->radius + nearest;
+  }
+  if (a->shape == ANVIL_PHYSICS_BOX) {
+    *normal_x = -*normal_x;
+    *normal_y = -*normal_y;
+  }
+  return 1;
+}
+
 double anvil_body_collision(double first, double second) {
   int first_slot, second_slot;
   AnvilPhysicsBody *a = anvil_physics_body(first, &first_slot);
   AnvilPhysicsBody *b = anvil_physics_body(second, &second_slot);
   if (!a || !b || first_slot == second_slot)
     return 0.0;
-  double radius = a->radius + b->radius;
-  double dx = b->x - a->x, dy = b->y - a->y;
-  return dx * dx + dy * dy < radius * radius ? 1.0 : 0.0;
+  double normal_x, normal_y, penetration;
+  return anvil_physics_contact(a, b, &normal_x, &normal_y, &penetration)
+             ? 1.0
+             : 0.0;
 }
 
 double anvil_physics_gravity(double x, double y) {
@@ -1067,9 +1175,8 @@ double anvil_physics_step(void) {
       AnvilPhysicsBody *b = &anvil_physics_bodies[j];
       if (!b->active)
         continue;
-      double dx = b->x - a->x, dy = b->y - a->y;
-      double radius = a->radius + b->radius;
-      if (dx * dx + dy * dy < radius * radius)
+      double normal_x, normal_y, penetration;
+      if (anvil_physics_contact(a, b, &normal_x, &normal_y, &penetration))
         ++contact_count;
     }
   }
@@ -1120,21 +1227,15 @@ double anvil_physics_step(void) {
         AnvilPhysicsBody *b = &anvil_physics_bodies[j];
         if (!b->active)
           continue;
-        double dx = b->x - a->x, dy = b->y - a->y;
-        double radius = a->radius + b->radius;
-        double distance_sq = dx * dx + dy * dy;
-        if (distance_sq >= radius * radius)
+        double nx, ny, penetration;
+        if (!anvil_physics_contact(a, b, &nx, &ny, &penetration))
           continue;
-        double distance = sqrt(distance_sq);
-        double nx = distance > 1.0e-12 ? dx / distance : 1.0;
-        double ny = distance > 1.0e-12 ? dy / distance : 0.0;
         double inverse_a = a->mass > 0.0 ? 1.0 / a->mass : 0.0;
         double inverse_b = b->mass > 0.0 ? 1.0 / b->mass : 0.0;
         double inverse_sum = inverse_a + inverse_b;
         if (inverse_sum <= 0.0)
           continue;
 
-        double penetration = radius - distance;
         double correction = fmax(penetration - 0.0001, 0.0) * 0.8 / inverse_sum;
         a->x -= nx * correction * inverse_a;
         a->y -= ny * correction * inverse_a;

@@ -178,6 +178,60 @@ class CompilerTests(unittest.TestCase):
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "1")
 
+    def test_2d_box_and_mixed_shape_physics_contacts(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics-boxes.ANVL"
+            out = pathlib.Path(temp) / "physics-boxes.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  set local(ok) = physics_gravity(0, 0)\n"
+                "  set local(floor) = body_create_box(0, -1, 4, 2, 0)\n"
+                "  set local(ball) = body_create(0, 0.4, 0.5, 1)\n"
+                "  set local(left_box) = body_create_box(10, 0, 2, 2, 0)\n"
+                "  set local(right_box) = body_create_box(11.75, 0, 2, 2, 1)\n"
+                "  set local(container) = body_create_box(20, 0, 2, 2, 0)\n"
+                "  set local(embedded) = body_create(20, 0, 0.25, 1)\n"
+                "  if body_collision(local(floor), local(ball)) != 1\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_collision(local(left_box), local(right_box)) != 1\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_collision(local(container), local(embedded)) != 1\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_create_box(0, 0, -1, 2, 1) >= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  if physics_step() < 3\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_y(local(ball)) < 0.45\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_x(local(right_box)) < 11.9\n"
+                "    output 0\n"
+                "  end\n"
+                "  if abs(body_x(local(embedded)) - 20) < 1.2\n"
+                "    output 0\n"
+                "  end\n"
+                "  output 1\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "1")
+
+    def test_box_physics_builtin_arity_is_validated(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics-box-arity.ANVL"
+            source.write_text("fn(main)\n  output body_create_box(0, 0, 2, 2)\nend\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("body_create_box() expects 5 argument(s), got 4", result.stderr)
+
     def test_physics_builtin_arity_is_validated_before_c_generation(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "physics-arity.ANVL"

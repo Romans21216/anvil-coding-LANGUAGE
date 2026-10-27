@@ -16,7 +16,7 @@ Implemented in the current prototype:
 - Basic 2D and 3D software-rendered scenes, camera movement, and field of view.
 - Built-in `ray_sphere` with CPU BVH, plus projected sphere bounds regression coverage.
 - Basic Windows UDP host/join exchanging one numeric value.
-- Fixed-step 2D circle physics for up to 128 bodies, with force, gravity, restitution, overlap queries, and collision response.
+- Fixed-step 2D circle and axis-aligned box physics for up to 128 bodies, with force, gravity, restitution, mixed-shape overlap queries, and collision response.
 - VS Code syntax extension and sample programs.
 
 ## Next foundational work
