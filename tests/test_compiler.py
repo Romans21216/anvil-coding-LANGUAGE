@@ -265,6 +265,39 @@ class CompilerTests(unittest.TestCase):
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "1")
 
+    def test_physics_friction_zero_and_geometric_mean(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics-friction-edges.ANVL"
+            out = pathlib.Path(temp) / "physics-friction-edges.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  set local(ok) = physics_gravity(0, -9.81)\n"
+                "  set local(floor_zero) = body_create_box(0, 0, 10, 2, 0)\n"
+                "  set local(ball_zero) = body_create(0, 1.5, 0.5, 1)\n"
+                "  set local(floor_mix) = body_create_box(100, 0, 10, 2, 0)\n"
+                "  set local(ball_mix) = body_create(100, 1.5, 0.5, 1)\n"
+                "  set local(ok) = body_friction(local(floor_zero), 1)\n"
+                "  set local(ok) = body_friction(local(ball_zero), 0)\n"
+                "  set local(ok) = body_friction(local(floor_mix), 1)\n"
+                "  set local(ok) = body_friction(local(ball_mix), 0.25)\n"
+                "  set local(ok) = body_set_velocity(local(ball_zero), 5, 0)\n"
+                "  set local(ok) = body_set_velocity(local(ball_mix), 0.12, 0)\n"
+                "  set local(ok) = physics_step()\n"
+                "  if abs(body_vx(local(ball_zero)) - 5) > 0.000001\n"
+                "    output 0\n"
+                "  end\n"
+                "  if abs(body_vx(local(ball_mix)) - 0.03825) > 0.001\n"
+                "    output 0\n"
+                "  end\n"
+                "  output 1\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "1")
+
     def test_physics_body_capacity_can_grow_and_safely_shrink(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "physics-capacity.ANVL"
