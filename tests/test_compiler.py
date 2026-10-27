@@ -270,6 +270,12 @@ class CompilerTests(unittest.TestCase):
                 "  if body_create(30, 0, 0.5, 1) < 0\n"
                 "    output 0\n"
                 "  end\n"
+                "  set local(ok) = physics_gravity(0, 0)\n"
+                "  set local(ok) = body_set_velocity(local(a), 6, 0)\n"
+                "  set local(ok) = physics_step()\n"
+                "  if body_x(local(a)) <= -19.95\n"
+                "    output 0\n"
+                "  end\n"
                 "  output 1\n"
                 "end\n"
                 "call fn(main)\n",

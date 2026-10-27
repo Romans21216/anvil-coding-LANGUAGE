@@ -1181,11 +1181,11 @@ double anvil_physics_step(void) {
     dt = 1.0 / (double)anvil_fixed_hz;
 
   int contact_count = 0;
-  for (int i = 0; i < ANVIL_PHYSICS_BODIES; ++i) {
+  for (int i = 0; i < anvil_physics_active_capacity; ++i) {
     AnvilPhysicsBody *a = &anvil_physics_bodies[i];
     if (!a->active)
       continue;
-    for (int j = i + 1; j < ANVIL_PHYSICS_BODIES; ++j) {
+    for (int j = i + 1; j < anvil_physics_active_capacity; ++j) {
       AnvilPhysicsBody *b = &anvil_physics_bodies[j];
       if (!b->active)
         continue;
@@ -1195,7 +1195,7 @@ double anvil_physics_step(void) {
     }
   }
 
-  for (int i = 0; i < ANVIL_PHYSICS_BODIES; ++i) {
+  for (int i = 0; i < anvil_physics_active_capacity; ++i) {
     AnvilPhysicsBody *body = &anvil_physics_bodies[i];
     if (!body->active)
       continue;
@@ -1233,11 +1233,11 @@ double anvil_physics_step(void) {
 
   for (int iteration = 0; iteration < ANVIL_PHYSICS_SOLVER_ITERATIONS;
        ++iteration) {
-    for (int i = 0; i < ANVIL_PHYSICS_BODIES; ++i) {
+    for (int i = 0; i < anvil_physics_active_capacity; ++i) {
       AnvilPhysicsBody *a = &anvil_physics_bodies[i];
       if (!a->active)
         continue;
-      for (int j = i + 1; j < ANVIL_PHYSICS_BODIES; ++j) {
+      for (int j = i + 1; j < anvil_physics_active_capacity; ++j) {
         AnvilPhysicsBody *b = &anvil_physics_bodies[j];
         if (!b->active)
           continue;
@@ -1273,7 +1273,7 @@ double anvil_physics_step(void) {
 
   /* Collision impulses and positional corrections can exceed the integration
    * limits above. Reapply the public bounds after the solver has finished. */
-  for (int i = 0; i < ANVIL_PHYSICS_BODIES; ++i) {
+  for (int i = 0; i < anvil_physics_active_capacity; ++i) {
     AnvilPhysicsBody *body = &anvil_physics_bodies[i];
     if (!body->active)
       continue;
