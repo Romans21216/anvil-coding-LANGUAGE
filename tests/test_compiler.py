@@ -318,6 +318,7 @@ class CompilerTests(unittest.TestCase):
             source = pathlib.Path(temp) / "local-arrays.ANVL"
             out = pathlib.Path(temp) / "local-arrays.exe"
             source.write_text(
+                "set var(return_value) = 7\n"
                 "fn(sum-offset, offset)\n"
                 "  array values(3)\n"
                 "  for local(index) = 0 to 2\n"
@@ -338,8 +339,17 @@ class CompilerTests(unittest.TestCase):
                 "    output array(frame, 0) + call fn(recursive-sum, var(count) - 1)\n"
                 "  end\n"
                 "end\n"
+                "fn(discard-array)\n"
+                "  array spare(8192)\n"
+                "  set array(spare, 0) = 1\n"
+                "end\n"
                 "fn(main)\n"
-                "  output call fn(zero-local-array) + call fn(sum-offset, 2) + call fn(sum-offset, 5) + call fn(recursive-sum, 3)\n"
+                "  set local(repeated) = 0\n"
+                "  for local(pass) = 1 to 300\n"
+                "    call fn(discard-array)\n"
+                "    add local(repeated) call fn(sum-offset, 0)\n"
+                "  end\n"
+                "  output call fn(zero-local-array) + call fn(sum-offset, 2) + call fn(sum-offset, 5) + call fn(recursive-sum, 3) + local(repeated) + var(return_value)\n"
                 "end\n"
                 "call fn(main)\n",
                 encoding="utf-8",
@@ -347,11 +357,38 @@ class CompilerTests(unittest.TestCase):
             generated = pathlib.Path(temp) / "local-arrays.generated.c"
             subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(generated), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
-            self.assertEqual(result.stdout.strip(), "33")
+            self.assertEqual(result.stdout.strip(), "940")
             generated_c = generated.read_text(encoding="utf-8")
-            self.assertIn("double anvil_sum_offset__values[3] = {0};", generated_c)
-            self.assertIn("double anvil_recursive_sum__frame[1] = {0};", generated_c)
-            self.assertIn("double anvil_zero_local_array__empty[2] = {0};", generated_c)
+            self.assertIn("double *anvil_sum_offset__values = anvil_local_array_alloc(3,", generated_c)
+            self.assertIn("double *anvil_recursive_sum__frame = anvil_local_array_alloc(1,", generated_c)
+            self.assertIn("double *anvil_zero_local_array__empty = anvil_local_array_alloc(2,", generated_c)
+            self.assertIn("calloc(count, sizeof(double))", generated_c)
+            self.assertIn("anvil_local_array_free(anvil_sum_offset__values, 3);", generated_c)
+
+    def test_recursive_local_array_budget_fails_with_source_diagnostic(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "local-array-budget.ANVL"
+            out = pathlib.Path(temp) / "local-array-budget.exe"
+            source.write_text(
+                "fn(recurse, count)\n"
+                "  array frame(8192)\n"
+                "  if var(count) > 0\n"
+                "    output 1 + call fn(recurse, var(count) - 1)\n"
+                "  else\n"
+                "    output 0\n"
+                "  end\n"
+                "end\n"
+                "fn(main)\n"
+                "  output call fn(recurse, 1000)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(pathlib.Path(temp) / "local-array-budget.generated.c"), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("active local arrays exceed the 16 MiB Anvil memory limit", result.stderr)
+            self.assertIn("local-array-budget.ANVL:2:", result.stderr)
 
     def test_function_local_array_bounds_are_checked_at_runtime(self):
         with tempfile.TemporaryDirectory() as temp:

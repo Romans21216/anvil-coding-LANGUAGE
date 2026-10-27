@@ -28,7 +28,7 @@ Comments begin with `#` outside a quoted string. Names are case-sensitive. Funct
 
 ## Fixed-size numeric arrays
 
-Declare a global numeric array at top level, or a function-local numeric array inside a function, using `array name(size)`. Both kinds are fixed-size and start with every element set to zero. A local array belongs to the current function call, so recursive calls and separate invocations get independent storage. Local arrays use stack storage and are capped at 8,192 total elements per function (64 KiB of numeric data per call); globals may contain up to 1,048,576 elements each. Read an element using `array(name, index)` in any numeric expression and write it inside a function with `set array(name, index) = expression`. A local array is visible only inside its declaring function and cannot share a name with that function's parameter or scalar local. Indexes are zero-based and must be finite whole numbers from zero through `size - 1`; an invalid runtime index prints the source path and line and exits with code 2. Resizing, strings, and structures are not supported yet.
+Declare a global numeric array at top level, or a function-local numeric array inside a function, using `array name(size)`. Both kinds are fixed-size and start with every element set to zero. A local array belongs to the current function call, so recursive calls and separate invocations get independent storage. Local arrays use checked heap allocation and are freed on every function return; each function call may declare up to 8,192 local elements, and all active local arrays in the process are limited to 16 MiB. Allocation failure or budget exhaustion prints the source path and line and exits with code 2. Globals may contain up to 1,048,576 elements each. Read an element using `array(name, index)` in any numeric expression and write it inside a function with `set array(name, index) = expression`. A local array is visible only inside its declaring function and cannot share a name with that function's parameter or scalar local. Indexes are zero-based and must be finite whole numbers from zero through `size - 1`; an invalid runtime index prints the source path and line and exits with code 2. Resizing, strings, and structures are not supported yet.
 
 ```anv
 array scores(4)
@@ -43,7 +43,7 @@ end
 call fn(main)
 ```
 
-Function-local arrays use the same syntax and are allocated in each function's stack frame:
+Function-local arrays use the same syntax and live for one function invocation:
 
 ```anv
 fn(sum-offset, offset)

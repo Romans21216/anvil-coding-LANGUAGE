@@ -10,7 +10,7 @@ Implemented in the current prototype:
 - Numeric function parameters, numeric return values, recursion, and function-local state.
 - `while condition ... end` loops, with compiler validation and native execution tests.
 - Inclusive numeric `for local(name) = start to end [step amount] ... end` loops with ascending/descending steps and nested-loop checks.
-- Fixed-size global and function-local numeric arrays declared with `array name(size)`, with zero initialization, per-call stack storage for local arrays, and runtime-checked zero-based reads/writes.
+- Fixed-size global and function-local numeric arrays declared with `array name(size)`, with zero initialization, per-call heap storage for local arrays, checked cleanup and a 16 MiB active-call budget, and runtime-checked zero-based reads/writes.
 - Basic 2D and 3D software-rendered scenes, camera movement, and field of view.
 - Built-in `ray_sphere` with CPU BVH, plus projected sphere bounds regression coverage.
 - Basic Windows UDP host/join exchanging one numeric value.

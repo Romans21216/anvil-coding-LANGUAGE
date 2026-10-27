@@ -29,6 +29,7 @@ class Node:
     params: list[str] = field(default_factory=list)
     locals: set[str] = field(default_factory=set)
     local_arrays: dict[str, int] = field(default_factory=dict)
+    local_array_lines: dict[str, int] = field(default_factory=dict)
 
 
 class CompileError(Exception):
@@ -64,6 +65,7 @@ RUNTIME_C_NAMES = {
     "anvil_pressed", "anvil_held", "anvil_rnd", "anvil_seed", "anvil_noise",
     "anvil_fbm", "anvil_net_host", "anvil_net_join", "anvil_net_send",
     "anvil_net_receive", "anvil_net_close", "anvil_array_get", "anvil_array_set",
+    "anvil_local_array_alloc", "anvil_local_array_free",
 }
 
 
@@ -119,6 +121,7 @@ def split_keyword(text: str, keyword: str) -> tuple[str, str] | None:
 
 MAX_ARRAY_SIZE = 1_048_576
 MAX_LOCAL_ARRAY_ELEMENTS = 8_192
+MAX_ACTIVE_LOCAL_ARRAY_BYTES = 16 * 1024 * 1024
 
 
 def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node], set[str], dict[str, int]]:
@@ -159,6 +162,7 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
                 if sum(current_function.local_arrays.values()) + size > MAX_LOCAL_ARRAY_ELEMENTS:
                     raise CompileError(f"{path}:{line_no}: local arrays in a function may contain at most {MAX_LOCAL_ARRAY_ELEMENTS} elements total")
                 current_function.local_arrays[name] = size
+                current_function.local_array_lines[name] = line_no
             continue
         fn = re.fullmatch(r"fn\(([A-Za-z_][\w-]*)(?:\s*,\s*(.*))?\)", line)
         if fn:
@@ -659,7 +663,16 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
         elif n.kind in ("local_add", "local_sub"):
             op = "+=" if n.kind == "local_add" else "-="
             out.append(f"{indent}{c_name(scope.name + '__' + n.name)} {op} {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
-        elif n.kind == "output": out.append(f"{indent}return {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
+        elif n.kind == "output":
+            value = expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)
+            if scope is not None and scope.local_arrays:
+                out.append(f"{indent}{{")
+                out.append(f"{indent}    const double _anvil_return_value = {value};")
+                out.extend(local_array_cleanup(scope, indent + "    "))
+                out.append(f"{indent}    return _anvil_return_value;")
+                out.append(f"{indent}}}")
+            else:
+                out.append(f"{indent}return {value};")
         elif n.kind == "call":
             if n.name not in functions: raise CompileError(f"{path}:{n.line}: unknown function {n.name!r}")
             args = split_args(n.value)
@@ -731,13 +744,44 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
     return out
 
 
+def local_array_cleanup(scope: Node, indent: str) -> list[str]:
+    return [f"{indent}anvil_local_array_free({c_name(scope.name + '__' + name)}, {size});"
+            for name, size in sorted(scope.local_arrays.items())]
+
+
 def emit_c(path: pathlib.Path, functions: dict[str, Node], top: list[Node], variables: set[str],
            arrays: dict[str, int] | None = None, fixed_hz: int = 60,
            project_name: str = "Anvil Game") -> str:
     arrays = arrays or {}
-    lines = ["/* Generated from Anvil source. The .ANVL source remains the program. */", '#include "anvil_runtime.h"', "#include <math.h>", "#include <stdio.h>", ""]
+    lines = ["/* Generated from Anvil source. The .ANVL source remains the program. */", '#include "anvil_runtime.h"', "#include <math.h>", "#include <stdio.h>", "#include <stdlib.h>", ""]
     lines += [f"static double {c_name(name)};" for name in sorted(variables)]
     lines += [f"static double {c_name(name)}[{size}];" for name, size in sorted(arrays.items())]
+    if any(fn.local_arrays for fn in functions.values()):
+        lines.extend([
+            f"#define ANVIL_LOCAL_ARRAY_BUDGET_BYTES {MAX_ACTIVE_LOCAL_ARRAY_BYTES}u",
+            "static size_t anvil_active_local_array_bytes;",
+            "static double *anvil_local_array_alloc(size_t count, const char *path, int line) {",
+            "    const size_t bytes = count * sizeof(double);",
+            "    if (bytes > ANVIL_LOCAL_ARRAY_BUDGET_BYTES - anvil_active_local_array_bytes) {",
+            "        fprintf(stderr, \"%s:%d: active local arrays exceed the %u MiB Anvil memory limit\\n\", path, line, ANVIL_LOCAL_ARRAY_BUDGET_BYTES / (1024u * 1024u));",
+            "        exit(2);",
+            "    }",
+            "    double *values = (double *)calloc(count, sizeof(double));",
+            "    if (!values) {",
+            "        fprintf(stderr, \"%s:%d: unable to allocate local array (%zu bytes)\\n\", path, line, bytes);",
+            "        exit(2);",
+            "    }",
+            "    anvil_active_local_array_bytes += bytes;",
+            "    return values;",
+            "}",
+            "static void anvil_local_array_free(double *values, size_t count) {",
+            "    if (values) {",
+            "        free(values);",
+            "        anvil_active_local_array_bytes -= count * sizeof(double);",
+            "    }",
+            "}",
+            "",
+        ])
     for name, fn in functions.items():
         if name in ("draw", "update") and fn.params:
             raise CompileError(f"{path}:{fn.line}: engine callback '{name}' cannot have parameters")
@@ -748,10 +792,13 @@ def emit_c(path: pathlib.Path, functions: dict[str, Node], top: list[Node], vari
         params = ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params) or "void"
         lines.append(f"static double {c_name(name)}({params}) {{")
         lines.extend(f"    double {c_name(name + '__' + local)} = 0.0;" for local in sorted(fn.locals))
-        lines.extend(f"    double {c_name(name + '__' + local)}[{size}] = {{0}};" for local, size in sorted(fn.local_arrays.items()))
+        lines.extend(f"    double *{c_name(name + '__' + local)} = anvil_local_array_alloc({size}, {json.dumps(str(path))}, {fn.local_array_lines[local]});"
+                     for local, size in sorted(fn.local_arrays.items()))
         body = emit_nodes(path, fn.body, functions, "    ", fn, arrays)
-        lines.extend(body or ["    return 0.0;"])
-        if not any(n.kind == "output" for n in fn.body): lines.append("    return 0.0;")
+        lines.extend(body)
+        if not any(n.kind == "output" for n in fn.body):
+            lines.extend(local_array_cleanup(fn, "    "))
+            lines.append("    return 0.0;")
         lines.extend(["}", ""])
     # Setup commands and initial values run before callbacks.
     setup = [n for n in top if n.kind in ("set", "scene", "camera", "camera_fov", "camera_control", "clear", "seed", "net_host", "net_join")]
