@@ -2,8 +2,9 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **89/100 — FAIL** (commit `71b818b20c3ae012ba33cec846f8a208220b7991`; threshold: 90/100).
-**Review snapshot:** the independent reviewer evaluated exact commit `71b818b20c3ae012ba33cec846f8a208220b7991`, reran all 57 Python tests, VS Code extension validation, and Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), and passed `git diff --check`. It confirmed short-circuit behavior and that the complete 450-item list appears in issue #23's body and comment while repository docs contain only an audited subset. The earlier stale test-count finding on `83cf626` was corrected and issue #28 is closed. This review found a separate inconsistency: the evaluation still called completed item #46 pending review; it is tracked in issue #29. No code defect was found. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
+**Latest completed independent full review:** **90/100** (commit `2a745bb9b455baffe9248f24d39970ea31146b23`). The reviewer marked it PASS under the then-current 90-point threshold. The user's new required passing score is **98/100**, so this result is below the current threshold.
+**Current passing threshold:** 98/100, set by the user on 2026-10-27. Historical reviews keep their original scores and results; a historical 90/100 PASS does not meet the new threshold.
+**Review snapshot:** the independent reviewer evaluated exact commit `2a745bb9b455baffe9248f24d39970ea31146b23`, reran all 57 Python tests, VS Code extension validation, and Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), and passed `git diff --check`. It confirmed short-circuit behavior, accurate review history, and that the full 450-item list is in issue #23's body and comment while repository docs contain only an audited subset. It confirmed the item #46 status mismatch from `71b818b` is corrected; issue #29 is resolved and closed. No code defect was found. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
 
 ## Scope
 
@@ -84,7 +85,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 1 | On reviewed commit `71b818b`, the plain-text evaluation said completed item #46 was pending review while the ledger and progress log said complete. The follow-up now states #46 is complete; this is tracked in issue #29 pending re-review. The earlier stale test-count issue from `83cf626` is corrected and #28 is closed. |
+| 38 | Results recorded accurately | 2 | Review of `2a745bb` confirmed the evaluation says item #46 is complete and accurately preserves the 89-point historical finding on `71b818b`. Issue #29 is closed. |
 | 39 | Regression checks performed | 2 | Independent review reran all 57 tests and extension validation; native integration covers mixed-shape solver, pool capacity, friction, and short-circuit behavior. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
@@ -100,9 +101,9 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **18/20** | |
+| | **Testing and verification** | **19/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **89/100 — FAIL** | |
+| | **Total** | **90/100** | Reviewer PASS under the prior 90-point threshold; below the new 98-point requirement. |
 
 ### Deduction details and follow-up
 
@@ -112,7 +113,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 - **Criterion 9 — important use cases supported (1/2).** **Problem/evidence:** mixed 2D circle/box contacts work, but no rotation, CCD, polygon or 3D body, asset/audio use, or secure multiplayer path exists. **Impact:** suitable use cases are limited to small demos and learning. **Recommended fix:** broaden physics and engine systems in staged releases. **Status:** open; issue #8 is updated with current physics scope.
 - **Criteria 22 and 23 — readability and module responsibility (each 1/2).** **Problem/evidence:** `compiler/anvil.py` remains densely formatted and combines parsing, semantic validation, C generation, and build orchestration. **Impact:** feature additions increase maintenance and regression risk. **Recommended fix:** split the compiler into lexer/parser, semantic analysis, C backend, and build-driver modules, then format and test each boundary. **Status:** open; issue #12.
 - **Criterion 27 — extensible architecture (1/2).** **Problem/evidence:** runtime and native toolchain are Windows/MSVC and C-only. **Impact:** additional host platforms and compiler backends require substantial rework. **Recommended fix:** define platform/runtime interfaces and add non-Windows and alternate code-generation targets. **Status:** open; issue #11.
-- **Criterion 38 — results recorded accurately (1/2).** **Problem/evidence:** on `71b818b`, `docs/ANVIL_EVALUATION.txt` said item #46 remained pending review even though the ledger recorded it complete and the reviewer had confirmed the feature on `83cf626`. **Impact:** the evaluation contradicted the verified status. **Fix:** correct the evaluation to say #46 is complete and retain both exact review snapshots. **Status:** open in issue [#29](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/29); the prior count issue #28 is closed.
+- **Historical criterion 38 finding — resolved.** On `71b818b`, `docs/ANVIL_EVALUATION.txt` said item #46 remained pending review even though the ledger recorded it complete and the reviewer had confirmed the feature on `83cf626`. The follow-up corrected the wording; review of `2a745bb` confirmed consistency and issue #29 is closed. The prior count issue #28 is also closed.
 - **Criterion 40 — verified against original goal (1/2).** **Problem/evidence:** tests cover the current prototype, not the full engine request. **Impact:** the suite cannot establish completion of missing systems. **Recommended fix:** map acceptance tests to every requested feature and backlog milestone as those systems are delivered. **Status:** open; matrix and issue #23 track remaining scope.
 - **Criterion 47 — editor integration (1/2).** **Problem/evidence:** Extension 0.1.7 includes `body_friction` and automated token validation passes, but the user kept 0.1.4 installed; highlighting for newer built-ins has no visible editor verification. **Impact:** newly added highlighting is not confirmed in the user's editor. **Status:** pending user preference; exact evidence is tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24).
 - **Historical criteria 8, 38, and 44 finding — resolved.** On `f7c91b0`, the main completion/evaluation docs had not incorporated friction or the current review/test/package snapshot. Commits `e1e3768` and `83891c6` corrected these records, and independent review confirmed the documentation against implementation and verification; issue #27 is closed. The 87/100 score remains valid for that exact older snapshot. The independent reviewer also confirmed zero-friction and mixed-coefficient regression tests in `83891c6`; issue #26 is closed.
