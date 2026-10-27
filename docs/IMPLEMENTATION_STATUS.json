@@ -138,9 +138,9 @@
         "Reject malformed, duplicate, late, and unsupported version declarations with path-and-line diagnostics.",
         "Document the current version and compatibility policy and obtain independent review."
       ],
-      "verification_result": "IN PROGRESS: targeted parser tests and the full 63-test suite pass; extension validation, Python compilation, JSON/diff checks pass. Independent review is pending.",
+      "verification_result": "IN PROGRESS: candidate d5191d4ba2c7744b1b6207086abf0d8e05320afc is pushed. The full 63-test suite, extension grammar scope validation for the header, Python compilation, JSON checks, and git diff check pass. Independent review is pending.",
       "github_issue": "#23",
-      "commit": null
+      "commit": "d5191d4ba2c7744b1b6207086abf0d8e05320afc"
     },
     {
       "number": 301,
