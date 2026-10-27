@@ -130,6 +130,7 @@ def split_keyword(text: str, keyword: str) -> tuple[str, str] | None:
 MAX_ARRAY_SIZE = 1_048_576
 MAX_LOCAL_ARRAY_ELEMENTS = 8_192
 MAX_ACTIVE_LOCAL_ARRAY_BYTES = 16 * 1024 * 1024
+LANGUAGE_VERSION = 1
 
 
 def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node], set[str], dict[str, int]]:
@@ -140,10 +141,26 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
     variable_references: list[tuple[str, int, str | None]] = []
     local_references: list[tuple[str, int, str | None]] = []
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
+    version_declared = False
+    source_code_seen = False
     for line_no, raw in enumerate(source.splitlines(), 1):
         line = strip_comment(raw).strip()
         if not line:
             continue
+        if line == "language" or line.startswith("language "):
+            if source_code_seen:
+                raise CompileError(f"{path}:{line_no}: language version declaration must appear before all other source code")
+            if version_declared:
+                raise CompileError(f"{path}:{line_no}: language version may only be declared once")
+            declaration = re.fullmatch(r"language\s+version\s+(\d+)", line)
+            if not declaration:
+                raise CompileError(f"{path}:{line_no}: language version declaration must use 'language version N'")
+            version_declared = True
+            version = int(declaration.group(1))
+            if version != LANGUAGE_VERSION:
+                raise CompileError(f"{path}:{line_no}: unsupported Anvil language version {version}; compiler supports version {LANGUAGE_VERSION}")
+            continue
+        source_code_seen = True
         current_function = next((frame[2] for frame in reversed(stack)
                                  if frame[1] == "function"), None)
         for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", line):

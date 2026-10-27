@@ -12,6 +12,34 @@ COMPILER = ROOT / "compiler" / "anvil.py"
 
 
 class CompilerTests(unittest.TestCase):
+    def test_language_version_header_and_legacy_default(self):
+        with tempfile.TemporaryDirectory() as temp:
+            for name, source_text in {
+                "explicit-v1": "# Header comments are ignored\n\nlanguage version 1\nfn(main)\n  output 7\nend\ncall fn(main)\n",
+                "implicit-v1": "fn(main)\n  output 7\nend\ncall fn(main)\n",
+            }.items():
+                with self.subTest(name=name):
+                    source = pathlib.Path(temp) / f"{name}.ANVL"
+                    source.write_text(source_text, encoding="utf-8")
+                    result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / f"{name}.c")], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_language_version_errors_are_source_located(self):
+        cases = {
+            "unsupported": ("language version 2\nfn(main)\nend\n", "unsupported Anvil language version 2; compiler supports version 1", 1),
+            "malformed": ("language version next\nfn(main)\nend\n", "language version declaration must use 'language version N'", 1),
+            "duplicate": ("language version 1\nlanguage version 1\nfn(main)\nend\n", "language version may only be declared once", 2),
+            "late": ("fn(main)\nend\nlanguage version 1\n", "language version declaration must appear before all other source code", 3),
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            for name, (source_text, expected, line) in cases.items():
+                with self.subTest(name=name):
+                    source = pathlib.Path(temp) / f"{name}.ANVL"
+                    source.write_text(source_text, encoding="utf-8")
+                    result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / f"{name}.c")], capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(f"{source}:{line}: {expected}", result.stderr)
+
     def test_game_source_emits_native_renderer_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             c_file = pathlib.Path(temp) / "world.c"

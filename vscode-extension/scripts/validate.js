@@ -52,6 +52,9 @@ async function main() {
     check(scopes.includes(scope), `'${needle}' expected ${scope}; got ${scopes.join(' ')} in ${line}`);
   }
   expect('fn(update)', 'fn', 'keyword.declaration.function.anvil');
+  expect('language version 1', 'language', 'keyword.control.anvil');
+  expect('language version 1', 'version', 'keyword.control.anvil');
+  expect('language version 1', '1', 'constant.numeric.integer.anvil');
   expect('fn(update)', 'update', 'entity.name.function.anvil');
   expect('fn(add, left, right)', 'add', 'entity.name.function.anvil');
   expect('fn(add, left, right)', 'left', 'variable.parameter.anvil');

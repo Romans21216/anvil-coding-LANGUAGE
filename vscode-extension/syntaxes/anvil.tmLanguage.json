@@ -6,6 +6,7 @@
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#function-definition" },
+    { "include": "#language-version" },
     { "include": "#array-declaration" },
     { "include": "#function-call" },
     { "include": "#variables" },
@@ -18,6 +19,14 @@
     { "include": "#punctuation" }
   ],
   "repository": {
+    "language-version": {
+      "match": "\\b(language)(\\s+)(version)(\\s+)([0-9]+)\\b",
+      "captures": {
+        "1": { "name": "keyword.control.anvil" },
+        "3": { "name": "keyword.control.anvil" },
+        "5": { "name": "constant.numeric.integer.anvil" }
+      }
+    },
     "comments": {
       "patterns": [{ "name": "comment.line.number-sign.anvil", "match": "#.*$" }]
     },

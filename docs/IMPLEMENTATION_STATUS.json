@@ -1,19 +1,19 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
+  "reviewed_implementation_commit": "15439b54cd6e2b7a8165866d6054141f466f1b3e",
   "branch": "main",
   "summary": {
-    "NEEDS VERIFICATION": 436,
+    "NEEDS VERIFICATION": 435,
     "PARTIALLY IMPLEMENTED": 3,
     "COMPLETE": 11,
-    "IN PROGRESS": 0
+    "IN PROGRESS": 1
   },
-  "latest_verified_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
-  "latest_independently_reviewed_candidate_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
+  "latest_verified_commit": "15439b54cd6e2b7a8165866d6054141f466f1b3e",
+  "latest_independently_reviewed_candidate_commit": "15439b54cd6e2b7a8165866d6054141f466f1b3e",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
-  "latest_followup_status_change": "Corrects the stale commit/push wording in progress and autonomous-state records identified in issue #31; awaiting independent review.",
+  "last_pushed_reviewed_below_threshold_commit": "15439b54cd6e2b7a8165866d6054141f466f1b3e",
+  "latest_followup_status_change": "Independent review confirmed the progress/state wording fix; issue #31 is resolved and closed.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -64,7 +64,7 @@
         "git diff --check: passed",
         "docs/IMPLEMENTATION_STATUS.json and docs/CODEX_AUTONOMOUS_STATE.json: valid JSON"
       ],
-      "missing_or_limitations": "Item #47 behavior passed independent review on c5d7d40. Overall QA scored 89/100, below the required 98/100 bar, so broader evaluation work continues and another overall review is pending. This detects non-finite results but does not prevent every finite precision loss or integer-style wraparound because Anvil uses double values.",
+      "missing_or_limitations": "Item #47 behavior passed independent review on 15439b5. Overall QA scored 90/100, below the required 98/100 bar, so broader evaluation work continues and another overall review is pending. This detects non-finite results but does not prevent every finite precision loss or integer-style wraparound because Anvil uses double values.",
       "dependencies": [],
       "priority": "P0 correctness improvement",
       "assigned_agent": "Codex lead (sequential execution)",
@@ -74,7 +74,7 @@
         "Cover direct overflow, non-finite intermediates used in comparisons, and invalid math results.",
         "Document the behavior and get independent review."
       ],
-      "verification_result": "COMPLETE: the 61-test suite, extension validation, Python/JSON/diff checks, MSVC numeric demo, and independent review of c5d7d40 pass for item #47. The review scored 89/100 overall and found no code defect in this behavior. Issue #30 is resolved; stale workflow wording remains tracked under issue #31.",
+      "verification_result": "COMPLETE: the 61-test suite, extension validation, Python/JSON/diff checks, MSVC numeric demo, and independent review of 15439b5 pass for item #47. The review scored 90/100 overall and found no code defect. Issues #30 and #31 are resolved and closed; broader QA remains below 98/100.",
       "github_issue": "#23",
       "commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951"
     },
@@ -110,6 +110,37 @@
       "verification_result": "COMPLETE: native regression tests verify a source-located diagnostic and exit code 2 for division by zero, and ordinary nonzero floating-point division; the independent review of commit 12b4e55 scored 90/100 PASS and found no defect.",
       "github_issue": "#23",
       "commit": "12b4e55b142d0fd48cccddfc6d6f67eefed16710"
+    },
+    {
+      "number": 49,
+      "section": "1. CORE LANGUAGE AND SYNTAX",
+      "title": "Add language feature versioning.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "compiler/anvil.py: LANGUAGE_VERSION is 1; parse() accepts one optional leading 'language version 1' directive and rejects malformed, duplicate, late, or unsupported versions with source-located diagnostics."
+      ],
+      "tests": [
+        "tests/test_compiler.py::CompilerTests::test_language_version_header_and_legacy_default: passed for explicit version 1 and unversioned compatibility",
+        "tests/test_compiler.py::CompilerTests::test_language_version_errors_are_source_located: passed for unsupported, malformed, duplicate, and late declarations",
+        "python -m unittest discover -s tests -q: 63 passed",
+        "npm test --prefix vscode-extension: passed",
+        "python -m compileall -q compiler tests: passed",
+        "git diff --check: passed",
+        "Status JSON totals 450 backlog items with 15 audited entries"
+      ],
+      "missing_or_limitations": "Only language version 1 is currently implemented. The directive establishes compatibility boundaries for future syntax changes; it does not add alternate dialect behavior or project-manifest version selection.",
+      "dependencies": [],
+      "priority": "P1 compatibility improvement",
+      "assigned_agent": "Codex lead (sequential execution)",
+      "acceptance_criteria": [
+        "Allow an optional language version declaration before source code.",
+        "Preserve legacy unversioned files as the current version.",
+        "Reject malformed, duplicate, late, and unsupported version declarations with path-and-line diagnostics.",
+        "Document the current version and compatibility policy and obtain independent review."
+      ],
+      "verification_result": "IN PROGRESS: targeted parser tests and the full 63-test suite pass; extension validation, Python compilation, JSON/diff checks pass. Independent review is pending.",
+      "github_issue": "#23",
+      "commit": null
     },
     {
       "number": 301,

@@ -2,13 +2,13 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **89/100 — FAIL** (commit `c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2`) against the user's **98/100** threshold. It ran 61 Python tests, extension validation, Python compilation, an MSVC release build/run of `numeric_demo.ANVL` (output `17`), and `git diff --check`. It verified issue #23 still holds the full 450-item list. It confirmed the UDP guard and issue #30 fix. The latest issue #31 finding is stale commit/push wording in `AUTONOMOUS_DEVELOPMENT_PROGRESS.md` and `CODEX_AUTONOMOUS_STATE.json`; details are recorded in the issue comment. The current follow-up corrects those lines and awaits a fresh review. The previous 89/100 review of `bcbf221`, 85/100 review of `8ae53c4`, and 90/100 review of `2a745bb` remain historical and below 98.
+**Latest completed independent full review:** **90/100 — FAIL** (commit `15439b54cd6e2b7a8165866d6054141f466f1b3e`) against the user's **98/100** threshold. It ran 61 Python tests, extension validation, Python compilation, an MSVC release build/run of `numeric_demo.ANVL` (output `17`), JSON validation, and `git diff --check`. It verified issue #23 still holds the full 450-item list. It confirmed issues [#30](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/30) and [#31](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/31) are fixed and may close; both are now closed. The previous 89/100 review of `c5d7d40`, 89/100 review of `bcbf221`, 85/100 review of `8ae53c4`, and 90/100 review of `2a745bb` remain historical and below 98.
 **Current passing threshold:** 98/100, set by the user on 2026-10-27. Historical reviews keep their original scores and results; a historical 90/100 PASS does not meet the new threshold.
-**Review snapshot:** the latest reviewer evaluated exact commit `c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2`, reran all 61 Python tests, VS Code extension validation, Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), and passed `git diff --check`. It confirmed the full 450-item list remains in issue #23's body and comment, and repository files contain only the audited subset. It confirmed issue #30 is resolved and found the stale workflow lines under issue #31. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
+**Review snapshot:** the latest reviewer evaluated exact commit `15439b54cd6e2b7a8165866d6054141f466f1b3e`, reran all 61 Python tests, VS Code extension validation, Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), validated JSON, and passed `git diff --check`. It confirmed the full 450-item list remains in issue #23's body and comment, and repository files contain only the audited subset. It confirmed issues #30 and #31 are resolved and closed. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
 
 ## Scope
 
-Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit. The compiler supports fixed-size global and function-local numeric arrays; each function call is capped at 8,192 local elements, with a 16 MiB active-allocation budget across calls.
+Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, accepts optional `language version 1` declarations (and defaults legacy files to version 1), emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit. The compiler supports fixed-size global and function-local numeric arrays; each function call is capped at 8,192 local elements, with a 16 MiB active-allocation budget across calls.
 
 This is not a production engine. Current physics supports up to 128 2D circle and axis-aligned box bodies, with configurable active capacity, fixed-step gravity/force integration, mixed-shape contacts, a four-pass solver, restitution, and Coulomb friction. It does not include continuous collision detection, polygon or 3D bodies, rotation, or joints. Assets, audio, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree also remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state and arrays, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
 
@@ -16,7 +16,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — current candidate: 61 tests, including numeric overflow plus NaN/finite/missing-socket UDP behavior; the latest critic ran all 61 tests on `c5d7d40` |
+| `python -m unittest discover -s tests -q` | PASS — current candidate: 63 tests, including numeric overflow, UDP NaN/finite/missing-socket behavior, and language-version declarations; the latest critic ran all 61 tests on `15439b5` |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -42,9 +42,9 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Latest independent review — commit `c5d7d40`
+## Latest independent review — commit `15439b5`
 
-**89/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 18/20; developer experience and delivery 18/20. The reviewer verified 61 Python tests, VS Code extension validation, Python compilation, MSVC `numeric_demo` build/run (output `17`), `git diff --check`, and issue #23's 450 unique sequential entries. It confirmed the UDP finite-number fix, resolving issue #30. Its only current defect is criterion 38: the progress log says the #31 follow-up is pending commit/push, and the resumable state repeats that instruction, although HEAD is already pushed. Issue #31 remains open with the precise finding in its latest comment. The current follow-up corrects both statements and awaits review. The user requires 98/100; this review does not pass.
+**90/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 19/20; developer experience and delivery 18/20. The reviewer verified 61 Python tests, VS Code extension validation, Python compilation, MSVC `numeric_demo` build/run (output `17`), JSON parsing, `git diff --check`, and issue #23's 450 unique sequential entries. It confirmed the issue #30 numeric guard and all issue #31 metadata fixes; both issues are resolved and closed. There are no new code or documentation defects in the reviewed snapshot. The user requires 98/100; this review does not pass.
 
 ## Historical independent 50-criterion review — commit `2a745bb`
 
@@ -89,7 +89,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 1 | **Latest finding:** the progress/state files say the #31 update still needs commit/push although HEAD is pushed; issue #31. The wording is fixed in the current follow-up. |
+| 38 | Results recorded accurately | 2 | Reviewer confirmed the progress/state records accurately describe the pushed snapshot; issue #31 is resolved and closed. |
 | 39 | Regression checks performed | 2 | The independent review reran all 61 tests, extension validation, Python compilation, MSVC numeric demo, and diff check. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
@@ -105,9 +105,9 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **18/20** | |
+| | **Testing and verification** | **19/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **89/100** | Latest review FAIL under the 98-point requirement. |
+| | **Total** | **90/100** | Latest review FAIL under the 98-point requirement. |
 
 ### Deduction details and follow-up
 

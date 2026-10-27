@@ -2,6 +2,10 @@
 
 Anvil files are UTF-8 `.ANVL` text. `#` starts a comment outside quoted strings. Names are case-sensitive. `end` closes functions, `if` blocks, `while` loops, and `for` loops; indentation is optional.
 
+## Language versions
+
+Files may begin with `language version 1` to pin the syntax version. The declaration must appear before other source code and may appear only once. Blank lines and comments can precede it. Omitting the declaration keeps legacy files on version 1. The compiler rejects malformed or unsupported declarations with the source path and line, rather than silently interpreting a future syntax version as the current one.
+
 ## Functions, parameters, and returns
 
 ```anv
