@@ -449,6 +449,43 @@ class CompilerTests(unittest.TestCase):
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "3.5")
 
+    def test_non_finite_numeric_results_report_source_location(self):
+        cases = {
+            "overflow": "1e308 * 1e308",
+            "comparison-overflow": "1e308 * 1e308 > 0",
+            "invalid-math": "sqrt(-1)",
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            for name, expression in cases.items():
+                with self.subTest(name=name):
+                    source = pathlib.Path(temp) / f"{name}.ANVIL"
+                    out = pathlib.Path(temp) / f"{name}.exe"
+                    source.write_text(
+                        f"fn(main)\n  output {expression}\nend\ncall fn(main)\n",
+                        encoding="utf-8",
+                    )
+                    subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+                    result = subprocess.run([str(out)], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertIn(f"{source}:2: numeric overflow or non-finite result", result.stderr)
+
+    def test_accumulation_and_for_step_overflow_report_source_location(self):
+        cases = {
+            "local-add": "  set local(value) = 1e308\n  add local(value) 1e308\n  output local(value)\n",
+            "local-sub": "  set local(value) = -1e308\n  sub local(value) 1e308\n  output local(value)\n",
+            "for-step": "  set local(counter) = 0\n  for local(index) = 1e308 to 1e308 step 1e308\n    add local(counter) 1\n  end\n  output local(counter)\n",
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            for name, body in cases.items():
+                with self.subTest(name=name):
+                    source = pathlib.Path(temp) / f"{name}.ANVIL"
+                    out = pathlib.Path(temp) / f"{name}.exe"
+                    source.write_text(f"fn(main)\n{body}end\ncall fn(main)\n", encoding="utf-8")
+                    subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+                    result = subprocess.run([str(out)], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertIn("numeric overflow or non-finite result", result.stderr)
+
     def test_function_parameters_returns_and_local_scope(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "functions.ANVL"

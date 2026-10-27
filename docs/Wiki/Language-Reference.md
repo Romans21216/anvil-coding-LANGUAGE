@@ -29,7 +29,7 @@ Declare a global array at top level or a local array inside a function with `arr
 
 ## Expressions and control flow
 
-Operators are `+`, `-`, `*`, `/`, `%`, comparisons (`=`, `==`, `!=`, `<`, `<=`, `>`, `>=`), and logical `and`/`or`. Multiplication/division/remainder bind more tightly than addition/subtraction, then comparisons, `and`, and `or`. Logical operators short-circuit, so a skipped right operand (including a function call) is not evaluated. Parentheses group expressions. Division by zero produces a runtime source-path/line diagnostic and exits with code 2; ordinary nonzero division remains floating point.
+Operators are `+`, `-`, `*`, `/`, `%`, comparisons (`=`, `==`, `!=`, `<`, `<=`, `>`, `>=`), and logical `and`/`or`. Multiplication/division/remainder bind more tightly than addition/subtraction, then comparisons, `and`, and `or`. Logical operators short-circuit, so a skipped right operand (including a function call) is not evaluated. Parentheses group expressions. Division by zero produces a runtime source-path/line diagnostic and exits with code 2; ordinary nonzero division remains floating point. Numeric expressions that produce NaN or infinity (including overflow or invalid math inputs) also report the source location and exit with code 2, including when the value would otherwise only feed a comparison.
 
 `while condition` checks its numeric condition before each pass. The body repeats until the condition evaluates to zero. The body should update state used by the condition so the loop can terminate. Loops may be nested.
 

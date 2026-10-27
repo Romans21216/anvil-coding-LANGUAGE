@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import pathlib
 import re
@@ -59,7 +60,7 @@ def array_code(name: str, scope: Node | None) -> str:
 
 
 RUNTIME_C_NAMES = {
-    "anvil_run", "anvil_divide", "anvil_set_scene3d", "anvil_camera_perspective", "anvil_clear",
+    "anvil_run", "anvil_divide", "anvil_check_number", "anvil_set_scene3d", "anvil_camera_perspective", "anvil_clear",
     "anvil_rect", "anvil_circle", "anvil_line", "anvil_cube", "anvil_sphere",
     "anvil_plane", "anvil_text", "anvil_text_number", "anvil_time", "anvil_delta",
     "anvil_pressed", "anvil_held", "anvil_rnd", "anvil_seed", "anvil_noise",
@@ -468,6 +469,10 @@ class ExpressionParser:
             raise CompileError(f"{self.path}:{self.line}: expected a number, got a string")
         return code
 
+    def checked_number(self, code: str) -> str:
+        return (f"anvil_check_number(({code}), {json.dumps(str(self.path))}, "
+                f"{self.line})")
+
     def require_string(self, value: tuple[str, str]) -> str:
         code, kind = value
         if kind != "string":
@@ -479,6 +484,8 @@ class ExpressionParser:
             raise CompileError(f"{self.path}:{self.line}: expected an expression")
         kind, value = self.take()
         if kind == "number":
+            if not math.isfinite(float(value)):
+                raise CompileError(f"{self.path}:{self.line}: numeric literal must be finite")
             left = (value if any(char in value for char in ".eE") else value + ".0", "number")
         elif kind == "string":
             left = (value, "string")
@@ -547,7 +554,11 @@ class ExpressionParser:
                 expected = str(low) if low == high else f"{low}..{high}"
                 raise CompileError(f"{self.path}:{self.line}: {value}() expects {expected} argument(s), got {len(args)}")
             name = BUILTIN_C_NAMES.get(value, value)
-            left = (f"{name} ( {', '.join(args)} )" if args else f"{name} ( )", "number")
+            call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"
+            if value in {"time", "delta", "rnd", "noise", "fbm", "floor", "ceil",
+                         "sqrt", "sin", "cos", "abs", "min", "max"}:
+                call = self.checked_number(call)
+            left = (call, "number")
         elif kind == "word":
             raise CompileError(f"{self.path}:{self.line}: unknown name {value!r}")
         else:
@@ -561,15 +572,20 @@ class ExpressionParser:
             self.take()
             if not self.peek() or self.peek(")") or self.peek(","):
                 raise CompileError(f"{self.path}:{self.line}: operator {operator!r} needs a right operand")
-            left_code = self.require_number(left)
+            left_code = self.checked_number(self.require_number(left))
             right = self.require_number(self.parse(precedence + 1))
             if operator == "/":
                 left = (f"anvil_divide({left_code}, {right}, {json.dumps(str(self.path))}, {self.line})", "number")
             elif operator == "%":
-                left = (f"fmod({left_code}, {right})", "number")
+                left = (self.checked_number(f"fmod({left_code}, {self.checked_number(right)})"), "number")
+            elif operator in ("and", "or"):
+                c_operator = "&&" if operator == "and" else "||"
+                left = (f"({left_code} {c_operator} {self.checked_number(right)})", "number")
+            elif operator in ("=", "==", "!=", "<", "<=", ">", ">="):
+                c_operator = "==" if operator == "=" else operator
+                left = (f"({left_code} {c_operator} {self.checked_number(right)})", "number")
             else:
-                c_operator = {"=": "==", "and": "&&", "or": "||"}.get(operator, operator)
-                left = (f"({left_code} {c_operator} {right})", "number")
+                left = (self.checked_number(f"({left_code} {operator} {self.checked_number(right)})"), "number")
         return left
 
     def compile(self, expected: str = "number") -> str:
@@ -699,11 +715,15 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
                         f"{indent}    anvil_array_set({array_code(n.name, scope)}, {size}, {index_var}, {value_var}, {json.dumps(str(path))}, {n.line});",
                         f"{indent}}}"])
         elif n.kind in ("add", "sub"):
-            op = "+=" if n.kind == "add" else "-="
-            out.append(f"{indent}{variable_code(n.name, scope)} {op} {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
+            op = "+" if n.kind == "add" else "-"
+            target = variable_code(n.name, scope)
+            value = expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)
+            out.append(f"{indent}{target} = anvil_check_number(({target} {op} {value}), {json.dumps(str(path))}, {n.line});")
         elif n.kind in ("local_add", "local_sub"):
-            op = "+=" if n.kind == "local_add" else "-="
-            out.append(f"{indent}{c_name(scope.name + '__' + n.name)} {op} {expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)};")
+            op = "+" if n.kind == "local_add" else "-"
+            target = c_name(scope.name + '__' + n.name)
+            value = expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)
+            out.append(f"{indent}{target} = anvil_check_number(({target} {op} {value}), {json.dumps(str(path))}, {n.line});")
         elif n.kind == "output":
             value = expr(path, n.line, n.value, functions, scope=scope, arrays=arrays)
             if scope is not None and scope.local_arrays:
@@ -749,8 +769,9 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
             out.append(f"{inner}{loop_var} = {start_var};")
             out.append(f"{inner}if ({step_var} != 0.0) {{")
             condition = f"(({step_var} > 0.0 && {loop_var} <= {end_var}) || ({step_var} < 0.0 && {loop_var} >= {end_var}))"
-            out.append(f"{inner}    for (; {condition}; {loop_var} += {step_var}) {{")
+            out.append(f"{inner}    while ({condition}) {{")
             out.extend(emit_nodes(path, n.body, functions, inner + "        ", scope, arrays))
+            out.append(f"{inner}        {loop_var} = anvil_check_number(({loop_var} + {step_var}), {json.dumps(str(path))}, {n.line});")
             out.append(f"{inner}    }}")
             out.append(f"{inner}}}")
             out.append(f"{indent}}}")

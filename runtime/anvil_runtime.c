@@ -419,13 +419,23 @@ void anvil_text_number(double x, double y, const char *format, double value,
 
 double anvil_time(void) { return anvil_elapsed_seconds; }
 double anvil_delta(void) { return anvil_delta_seconds; }
+double anvil_check_number(double value, const char *path, int line) {
+  if (!isfinite(value)) {
+    fprintf(stderr, "%s:%d: numeric overflow or non-finite result\n",
+            path ? path : "<Anvil>", line);
+    exit(2);
+  }
+  return value;
+}
 double anvil_divide(double numerator, double denominator, const char *path,
                     int line) {
+  numerator = anvil_check_number(numerator, path, line);
+  denominator = anvil_check_number(denominator, path, line);
   if (denominator == 0.0) {
     fprintf(stderr, "%s:%d: division by zero\n", path ? path : "<Anvil>", line);
     exit(2);
   }
-  return numerator / denominator;
+  return anvil_check_number(numerator / denominator, path, line);
 }
 void anvil_set_fixed_hz(int hz) {
   if (hz >= 1 && hz <= 240)

@@ -26,7 +26,7 @@ Comments begin with `#` outside a quoted string. Names are case-sensitive. Funct
 
 `var(name)` reads a global numeric variable, except that a function parameter with the same name takes precedence inside that function. `set local(name) = expression` declares function-local numeric state, initialized to `0` at function entry; `local(name)` reads it, and `add local(name) amount` / `sub local(name) amount` update it. Local names are visible only in their declaring function. Existing `set var(name)` assignments continue to use global state unless `name` is a parameter of the current function. The compiler validates local/global references and function-call arity before generating C.
 
-Arithmetic uses `+`, `-`, `*`, `/`, and `%`; division by a value equal to zero (including negative zero) terminates the program with exit code 2 and reports the `.ANVL` source path and line. Nonzero division keeps normal floating-point behavior.
+Arithmetic uses `+`, `-`, `*`, `/`, and `%`; division by a value equal to zero (including negative zero) terminates the program with exit code 2 and reports the `.ANVL` source path and line. Nonzero division keeps normal floating-point behavior. Every numeric expression must produce a finite value: overflow to positive/negative infinity or an invalid result such as `sqrt(-1)` reports the source path and line and exits with code 2. The check happens before comparisons too, so an overflowing intermediate cannot silently become a true/false result.
 
 ## Fixed-size numeric arrays
 

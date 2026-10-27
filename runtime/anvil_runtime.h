@@ -50,6 +50,7 @@ enum {
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title);
 double anvil_divide(double numerator, double denominator, const char *path,
                     int line);
+double anvil_check_number(double value, const char *path, int line);
 void anvil_set_fixed_hz(int hz);
 void anvil_set_scene3d(int enabled);
 void anvil_camera_perspective(double x, double y, double z);

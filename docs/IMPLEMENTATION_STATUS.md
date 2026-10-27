@@ -2,7 +2,7 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27 from independently reviewed implementation commit `83cf626b0a5ab370d5a6da476ea47bbc2a9f728a`. Item #46 is complete; the overall review's stale QA test-count finding remains tracked in issue #28.
+Updated 2026-10-27 from independently reviewed commit `2a745bb9b455baffe9248f24d39970ea31146b23`. Item #46 is complete; the earlier stale QA count finding is fixed and issue #28 is closed. The current 90/100 score is below the new 98/100 passing threshold.
 
 ## Status counts
 
@@ -10,14 +10,15 @@ Updated 2026-10-27 from independently reviewed implementation commit `83cf626b0a
 - PARTIALLY IMPLEMENTED: 3
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
-- NEEDS VERIFICATION: 437
-- IN PROGRESS: 0
+- NEEDS VERIFICATION: 436
+- IN PROGRESS: 1
 
 ## Audited current items
 
 | # | Item | Status | Evidence and remaining work |
 |---:|---|---|---|
 | 46 | Add short-circuit Boolean evaluation. | COMPLETE | `compiler/anvil.py` maps `and`/`or` to C `&&`/`||`; the native side-effect test confirms false `and` / true `or` skip calls while true `and` / false `or` execute them. The independent reviewer confirmed behavior on `83cf626` (57 tests passed). The overall QA score was 89/100 due to unrelated stale count text in the QA report; see issue #28. |
+| 47 | Add explicit overflow behavior. | IN PROGRESS | `anvil_check_number` reports NaN/infinity with source path/line and exit code 2. Native cases cover arithmetic, comparison, invalid math, accumulation, and loop-step overflow. The full suite passes (59 tests); static checks pass; independent review pending. |
 | 48 | Add division-by-zero diagnostics. | COMPLETE | `compiler/anvil.py` lowers `/` through `anvil_divide`; `runtime/anvil_runtime.c` reports path/line and exits 2 on zero (including negative zero). Native tests cover zero diagnostic and regular division; the independent reviewer confirmed the behavior on commit `12b4e55` (90/100 PASS). Runtime detection only; no compile-time constant analysis. |
 | 301 | Improve the existing bounded 2D circle physics prototype. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: bounded fixed-step circle/axis-aligned-box solver; docs/ENGINE.md. No CCD, rotation, broad phase, joints, 3D bodies, or complete stability coverage. Issue #8; commit `f7c91b0`. |
 | 302 | Make the current 128-body limit configurable where feasible. | COMPLETE | runtime/anvil_runtime.c: physics_capacity and active-capacity-bounded loops; tests/test_compiler.py: growth, exhaustion, invalid values, refused shrink, shrink after release. The configured active pool still has a fixed compiled maximum of 128 slots. Issue #8; commit `560cee1`. |

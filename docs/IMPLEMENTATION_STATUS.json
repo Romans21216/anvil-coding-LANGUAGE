@@ -4,10 +4,10 @@
   "reviewed_implementation_commit": "83cf626b0a5ab370d5a6da476ea47bbc2a9f728a",
   "branch": "main",
   "summary": {
-    "NEEDS VERIFICATION": 437,
+    "NEEDS VERIFICATION": 436,
     "PARTIALLY IMPLEMENTED": 3,
     "COMPLETE": 10,
-    "IN PROGRESS": 0
+    "IN PROGRESS": 1
   },
   "latest_verified_commit": "83cf626b0a5ab370d5a6da476ea47bbc2a9f728a",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
@@ -39,6 +39,36 @@
       "verification_result": "COMPLETE: independent review of 83cf626 confirmed the short-circuit implementation and side-effect regression; the overall QA score's separate stale test-count documentation finding is tracked in issue #28.",
       "github_issue": "#23",
       "commit": "83cf626b0a5ab370d5a6da476ea47bbc2a9f728a"
+    },
+    {
+      "number": 47,
+      "section": "1. CORE LANGUAGE AND SYNTAX",
+      "title": "Add explicit overflow behavior.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "compiler/anvil.py: numeric expression generation wraps arithmetic results and operands in anvil_check_number; division checks finite operands/results.",
+        "runtime/anvil_runtime.c: anvil_check_number rejects non-finite doubles with source path/line and exit code 2."
+      ],
+      "tests": [
+        "tests/test_compiler.py::CompilerTests::test_non_finite_numeric_results_report_source_location: passed for arithmetic overflow, comparison intermediate, and sqrt(-1)",
+        "tests/test_compiler.py::CompilerTests::test_accumulation_and_for_step_overflow_report_source_location: passed for local add, local subtract, and for-loop step overflow",
+        "python -m unittest discover -s tests -q: 59 passed",
+        "python -m compileall -q compiler tests: passed",
+        "git diff --check: passed"
+      ],
+      "missing_or_limitations": "Awaiting full-suite verification and independent review. This policy covers non-finite numeric results in expressions; it does not prevent every finite precision loss or integer-style wraparound because Anvil uses double values.",
+      "dependencies": [],
+      "priority": "P0 correctness improvement",
+      "assigned_agent": "Codex lead (sequential execution)",
+      "acceptance_criteria": [
+        "Define overflow/non-finite runtime behavior.",
+        "Report the Anvil source path and line and exit deterministically.",
+        "Cover direct overflow, non-finite intermediates used in comparisons, and invalid math results.",
+        "Document the behavior and get independent review."
+      ],
+      "verification_result": "IN PROGRESS: targeted and full native regression suites pass (59 tests); static checks pass; independent review pending.",
+      "github_issue": "#23",
+      "commit": null
     },
     {
       "number": 48,

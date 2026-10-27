@@ -56,3 +56,14 @@ This log records verified implementation batches and is reconciled with Git befo
 - The user raised the required passing score to **98/100** after review of `2a745bb`.
 - That review's 90/100 was marked PASS under the then-current 90-point threshold, but it is below the new bar. Historical scores and their original pass/fail labels remain unchanged.
 - Future critic results must be compared with 98/100. Continue engineering against verified evaluator deductions and issue #23's source list.
+
+## Batch 5 — explicit numeric overflow behavior (in progress)
+
+- **Features:** Backlog item #47 now rejects numeric expressions that produce NaN or infinity. `anvil_check_number` reports the `.ANVL` source path and line and exits with code 2; arithmetic intermediates are checked before comparisons. Division by zero retains its distinct diagnostic.
+- **Backlog:** #47 is IN PROGRESS pending full-suite validation and independent review.
+- **Files:** `compiler/anvil.py`, runtime C API/implementation, compiler tests, language/compiler/wiki docs, and the compact audited status ledger.
+- **Tests:** Native regression coverage passes for direct multiplication overflow, overflow inside a comparison, invalid `sqrt(-1)`, local add/sub accumulation, and `for` step overflow. `python -m unittest discover -s tests -q` — 59 passed; `python -m compileall -q compiler tests` — passed; `git diff --check` — passed. Root `npm test` is not applicable because this repository has no root `package.json`.
+- **Review:** Pending. The latest 90/100 remains below the new 98/100 requirement; this slice will be evaluated against that threshold.
+- **Commit/push:** Pending.
+- **Limitations:** Anvil currently uses doubles; this detects non-finite outcomes but does not detect all finite precision loss or introduce integer overflow semantics.
+- **Next batch:** Request the independent critic, then update evaluation and the status ledger against the 98-point bar.
