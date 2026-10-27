@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
+  "reviewed_implementation_commit": "4bc8bc3c5d01c59622d7af1237b6021d5903e13f",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 428,
@@ -9,11 +9,11 @@
     "COMPLETE": 17,
     "IN PROGRESS": 2
   },
-  "latest_verified_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
-  "latest_independently_reviewed_candidate_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
+  "latest_verified_commit": "4bc8bc3c5d01c59622d7af1237b6021d5903e13f",
+  "latest_independently_reviewed_candidate_commit": "4bc8bc3c5d01c59622d7af1237b6021d5903e13f",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
-  "latest_followup_status_change": "Independent critic f12c0ac scored 92/100, FAIL vs98. Criterion 38 is restored after confirming resize work is canonical item #172; item #144 remains unverified. No live resized window was visually inspected.",
+  "last_pushed_reviewed_below_threshold_commit": "4bc8bc3c5d01c59622d7af1237b6021d5903e13f",
+  "latest_followup_status_change": "Independent critic 4bc8bc3 scored 90/100, FAIL vs98. Issue #47 records a finite-coordinate near-plane interpolation overflow and the candidate JSON mismatch between 73 and 74 tests.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -637,38 +637,39 @@
     }
   ],
   "latest_evaluation": {
-    "score": 92,
+    "score": 90,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
+    "commit": "4bc8bc3c5d01c59622d7af1237b6021d5903e13f",
     "categories": {
       "requirements": "16/20",
       "functionality_reliability": "20/20",
       "code_architecture": "19/20",
-      "testing_verification": "19/20",
+      "testing_verification": "17/20",
       "developer_experience_delivery": "18/20"
     },
     "findings": [
-      "Criterion 38 is restored to 2/2: the corrected status ledger maps dynamic window resizing to #172; #144 remains unverified per issue #23 comment 6451810775.",
-      "No live resized window was visually inspected; native viewport geometry helper tests pass.",
+      "Criterion 34: finite extreme endpoints (-1e308,0,0.01) to (1e308,0,0.4) produce x=INFINITY during near-plane clipping; issue #47 tracks the reproduction and fix.",
+      "Criterion 38: candidate JSON reports 73 tests although 74 pass; issue #47 tracks this stale count.",
+      "No live rendered window was visually inspected.",
       "Windows/MSVC and C-only backend limit platform/backend breadth.",
       "Newer VS Code grammar highlighting remains unverified by the user preference to retain 0.1.4.",
       "Broader engine scope remains incomplete."
     ]
   },
-  "current_candidate_commit": "cfce40701ac24f7fb64a0f194d7e32d5e25e2d52",
-  "status_counts_validated_on": "cfce40701ac24f7fb64a0f194d7e32d5e25e2d52",
+  "current_candidate_commit": "15ac43a8033557859db509ecca2fa8c88a13d7b7",
+  "status_counts_validated_on": "15ac43a8033557859db509ecca2fa8c88a13d7b7",
   "candidate_validation": {
-    "commit": "cfce40701ac24f7fb64a0f194d7e32d5e25e2d52",
+    "commit": "15ac43a8033557859db509ecca2fa8c88a13d7b7",
     "reviewed_score": null,
-    "previous_reviewed_score": 92,
+    "previous_reviewed_score": 90,
     "threshold": 98,
-    "result": "FAIL",
-    "python_unittest": "73 passed",
+    "result": "PENDING_REVIEW",
+    "python_unittest": "74 passed",
     "runtime_tests": "4 native runtime tests passed; viewport and near-plane geometry helpers exercised; live window not visually inspected",
     "status_ledger": "22 audited entries, 428 needing verification, 3 partial, 17 complete, 2 in progress = 450; #172 mapping confirmed and #185 active",
-    "finding": "Unreviewed candidate implements issue #23 item #185 near-plane clipping. The full 74-test suite, native viewport/clipping harnesses, extension validation, Python compilation, QA validator, and diff check pass. Previous candidate f12c0ac scored 92/100; that score does not apply to cfce407.",
-    "status": "implementation pushed; independent review pending; current pass threshold 98"
+    "finding": "Candidate 15ac43a uses overflow-stable interpolation, checks clipped outputs, and clips screen lines before integer conversion. Issue #47's stale candidate count is corrected to 74. All 74 tests and static checks pass; independent review pending.",
+    "status": "fix pushed; fresh independent review pending; current pass threshold 98"
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",

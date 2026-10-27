@@ -241,3 +241,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Implementation:** pushed commit `cfce40701ac24f7fb64a0f194d7e32d5e25e2d52`. Camera-space triangles are clipped into valid polygons; grid segments are clipped to retain the visible segment; rasterized spheres now intersect camera rays and draw a flat cap where clipped by the near plane. Triangle raster bounds are clamped before integer conversion to avoid huge projected coordinates overflowing screen bounds.
 - **Regression coverage:** native MSVC tests cover segments entirely behind and crossing the near plane, triangles with zero/one/two hidden vertices and boundary vertices, spheres crossing the near plane, spheres behind it, and missed rays. All **74 Python tests** pass; extension validation, compileall, QA rubric arithmetic, and diff check pass.
 - **Status:** item #185 is IN PROGRESS; the current audited ledger has 22 rows (428 needing verification, 3 partial, 17 complete, 2 in progress = 450). Far/side frustum clipping remains. This candidate has not yet received a fresh critic score; the latest reviewed result remains 92/100 — FAIL against 98.
+
+
+### Critic review — synchronized item #185 candidate `4bc8bc3`
+
+- **Exact reviewed commit:** `4bc8bc3c5d01c59622d7af1237b6021d5903e13f`.
+- **Fresh score:** **90/100 — FAIL** against the current **98/100** threshold. Categories: 16/20 requirements, 20/20 functionality, 19/20 architecture, 17/20 testing, 18/20 delivery.
+- **Finding 1 — issue #47, numerical clipping overflow:** an MSVC probe called `anvil_clip_segment_near` with finite endpoints `(-1e308, 0, 0.01)` and `(1e308, 0, 0.4)` at near depth `0.08`; it returned visible with `x=INFINITY`. The reviewer did not reproduce a full-window crash. This reduced criterion 34 to 1/2.
+- **Finding 2 — issue #47, stale candidate test count:** `docs/IMPLEMENTATION_STATUS.json` said 73 tests while the candidate passed 74 and the other QA records stated 74. This reduced criterion 38 to 1/2.
+- **Independent checks:** 74 Python tests, extension validation, compileall, QA arithmetic, and diff check passed. The ledger has 22 audited rows and `428 + 3 + 17 + 2 = 450`. No live visual behavior was inspected.
+- **Correction:** commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` adds stable interpolation and screen-line clipping with extreme-value regression cases. The candidate JSON test count is corrected to 74. All 74 Python tests, extension validation, compileall, QA arithmetic, JSON parsing, and diff check pass. The 90-point result remains attached to exact commit `4bc8bc3`; a fresh review of `15ac43a` is required.
