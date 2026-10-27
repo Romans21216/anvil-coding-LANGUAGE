@@ -3,11 +3,11 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 
 Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: latest completed independent full review of exact pushed commit 573cb447b6ebb6e8a9056518300384b0eaebc60e, with compiler/runtime tests, extension validation, and build workflows rerun by the reviewer. The local QA-test correction is not yet part of that reviewed commit.
+Basis: latest completed independent full review of exact pushed commit 597867f44a5140db27fdce2e4f2339859ef96af8, with compiler/runtime tests, extension validation, and build workflows rerun by the reviewer.
 
 LATEST INDEPENDENT REVIEW AND CURRENT CANDIDATE
 -----------------------------------------------
-The prior committed C-backed review is c10260483eab6b5adaadd261a66a92a9138b9ed8 at 92/100. The direct-native commit 573cb447b6ebb6e8a9056518300384b0eaebc60e received the latest independent score: 50/100 — FAIL against 98. The evaluator found two QA test failures on that snapshot; committed follow-up 150a042 fixes those tests and all 86 pass, but that follow-up has not been rescored. Issue #49 tracks native fractional-output truncation. The earlier 49/100 pre-fix native review and previous C-backed scores remain historical. Rust code generation is not a project target; direct x64 machine-code PE output is the selected direction. The legacy C backend is still the default and must be removed after native runtime parity is achieved.
+The latest independent review evaluated exact commit 597867f44a5140db27fdce2e4f2339859ef96af8 and scored 54/100 — FAIL against 98 (requirements 9/20, functionality 8/20, architecture 12/20, testing 14/20, delivery 11/20). The full 86-test suite passed and the QA fixture failures seen on 573cb44 are fixed in commit 150a042. The reviewer reproduced native fractional-output truncation (`output 17.875` prints `17`), tracked in issue #49. The previous direct-native review of 573cb44 scored 50/100; the earlier C-backed review of c102604 scored 92/100. Rust code generation is not a project target; direct x64 machine-code PE output is the selected direction. The legacy C backend is still the default and must be removed after native runtime parity is achieved.
 
 SUMMARY
 -------
@@ -65,7 +65,7 @@ Performance evidence: Not available
 
 INDEPENDENT REVIEW AND VERIFICATION
 -----------------------------------
-Latest independent review: exact pushed commit `c10260483eab6b5adaadd261a66a92a9138b9ed8`, **92/100 — FAIL** against the user's **98/100** passing threshold. Categories: requirements 16/20, functionality and reliability 20/20, code quality and architecture 19/20, testing and verification 19/20, developer experience and delivery 18/20. The critic reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON/count checks, and diff check. It confirmed the 26-row ledger totals 450 and items #391–394 are complete. Issue #48 is fixed and closed. No live mouse-enabled rendering was visually inspected. The prior 90/100 review of `4bc8bc3` and 92/100 reviews of `f12c0ac` and `c102604` remain tied to their exact snapshots. Extension 0.1.4 remains installed per preference.
+Prior C-backed independent review: exact pushed commit `c10260483eab6b5adaadd261a66a92a9138b9ed8`, **92/100 — FAIL** against the user's **98/100** passing threshold. Categories: requirements 16/20, functionality and reliability 20/20, code quality and architecture 19/20, testing and verification 19/20, developer experience and delivery 18/20. The critic reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON/count checks, and diff check. It confirmed the 26-row ledger totals 450 and items #391–394 are complete. Issue #48 is fixed and closed. No live mouse-enabled rendering was visually inspected. The prior 90/100 review of `4bc8bc3` and 92/100 reviews of `f12c0ac` and `c102604` remain tied to their exact snapshots. Extension 0.1.4 remains installed per preference.
 
 The current item #185 implementation was independently reviewed at 92/100; issue #47 is closed after verifying the overflow correction and accurate test count. Far-plane and side-frustum clipping, broad engine scope, platform/backend breadth, and visible editor verification remain unfinished.
 
@@ -99,14 +99,14 @@ Anvil's strengths are simplicity, inspectable C output, approachable examples, r
 
 LATEST INDEPENDENT REVIEW — DIRECT NATIVE COMMIT 573CB44
 ======================================================
-Exact reviewed commit: `573cb447b6ebb6e8a9056518300384b0eaebc60e`
+Exact reviewed commit: `597867f44a5140db27fdce2e4f2339859ef96af8`
 Evaluator: separate independent review agent; complete 50-criterion review.
-Score: **50/100 — FAIL** against the user's 98/100 threshold. Category subtotals: requirement fulfillment 9/20, functionality and reliability 8/20, code quality and architecture 12/20, testing and verification 10/20, developer experience and delivery 11/20.
+Score: **54/100 — FAIL** against the user's 98/100 threshold. Category subtotals: requirement fulfillment 9/20, functionality and reliability 8/20, code quality and architecture 12/20, testing and verification 14/20, developer experience and delivery 11/20.
 The evaluator ran 86 tests and found two failures in `tests.test_qa_report`; `npm test --prefix vscode-extension`, the standalone QA arithmetic script, and strict UTF-8 JSON parsing passed. It reproduced `output 17.875` printing `17`, filed as issue #49. The latest 50-point table and scoring details are in `docs/QA_REPORT.md`; this report retains the independent evaluation as plain text.
 
-The two QA failures were from tests that included historical score tables and hardcoded the old category subtotal. Issue #51 records the exact failures. The follow-up in commit 150a042 scopes rows to the current table and adjusts its subtotal dynamically; both QA tests and the entire 86-test suite pass. Issue #51 is closed as fixed. This follow-up has not been independently scored. The early pre-fix native snapshot scored 49/100; it is superseded by this 50/100 evaluation for commit 573cb44. The old C-backed 92/100 score remains tied to c102604 and does not apply to native compiler work.
+The two QA failures were from tests that included historical score tables and hardcoded the old category subtotal. Issue #51 records the exact failures. The follow-up in commit 150a042 scopes rows to the current table and adjusts its subtotal dynamically; both QA tests and the entire 86-test suite pass. Issue #51 is closed as fixed. The latest independent review of commit 597867f scored 54/100; this section records the prior 50/100 evaluation for commit 573cb44. The early pre-fix native snapshot scored 49/100. The old C-backed 92/100 score remains tied to c102604 and does not apply to native compiler work.
 
-50-CRITERION BREAKDOWN — EXACT REVIEWED COMMIT 573CB44
+50-CRITERION BREAKDOWN — EXACT REVIEWED COMMIT 597867F
 -----------------------------------------------------
 Each criterion is worth 2 points. The detailed short evidence below refers to the exact reviewed commit; current local test-fix status is stated separately above.
 
@@ -154,8 +154,8 @@ D. TESTING AND VERIFICATION — 10/20
 35. 1 — CLI EXE build/run works; engine integration is absent.
 36. 1 — Documented Python/npm commands are reproducible.
 37. 1 — PE build works, but reviewed full suite was red.
-38. 0 — Evaluation claimed 86 pass while reviewed execution had two QA test failures; the fix in commit 150a042 passes locally but is not yet independently reviewed.
-39. 1 — Full suite detected the QA fixture problem but did not pass on reviewed commit.
+38. 2 — Records identify the exact 573cb44 review and the committed QA fix; the follow-up still awaited a fresh independent score at this snapshot.
+39. 2 — Regression fix is covered by focused QA tests and the passing 86-test suite.
 40. 0 — Full user objective remains unfulfilled.
 
 E. DEVELOPER EXPERIENCE AND DELIVERY — 11/20
@@ -170,4 +170,4 @@ E. DEVELOPER EXPERIENCE AND DELIVERY — 11/20
 49. 2 — Limits and issue #49 are disclosed.
 50. 0 — This is not a practical full game-engine deliverable.
 
-Current status after review: commit 150a042 fixes both QA fixture tests; the focused QA tests pass, QA arithmetic and JSON checks pass, and `python -m unittest discover -s tests -q` passes all 86. This follow-up needs a fresh independent score. The intended no-C engine remains incomplete, so 50/100 is a failure and no success claim is appropriate.
+Independent verification on `597867f44a5140db27fdce2e4f2339859ef96af8`: 86 Python tests, extension npm tests, compileall, QA arithmetic, strict UTF-8 status JSON parsing, diff check, and MSVC numeric sample build/run all pass. The native fractional-output bug remains open in issue #49; the full no-C game-engine migration remains incomplete. The intended no-C engine remains incomplete, so 54/100 is a failure and no success claim is appropriate.

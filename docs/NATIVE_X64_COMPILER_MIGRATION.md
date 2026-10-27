@@ -39,4 +39,4 @@ The regular build still defaults to the existing C backend. The native backend d
 - Native regression tests cover code generation, PE metadata/fixups, execution, resource lifetime, and engine behavior.
 - Documentation and evaluation reports distinguish implemented native features from migration work still in progress.
 
-The last reviewed committed C-backed project snapshot scored 92/100, below the required 98/100. The direct-native commit `573cb447b6ebb6e8a9056518300384b0eaebc60e` was independently scored 50/100. QA test fixtures were repaired afterward and all 86 tests pass locally, but the follow-up is not yet independently scored; see `docs/ANVIL_EVALUATION.txt`.
+The direct-native candidate `597867f44a5140db27fdce2e4f2339859ef96af8` was independently scored 54/100, below the required 98/100. Its full 86-test suite passes. The native output helper still truncates fractional values; issue #49 tracks the exact reproduction. The native engine runtime is incomplete, and the C backend remains the default pending feature parity; Rust output is not a target. See `docs/ANVIL_EVALUATION.txt`.

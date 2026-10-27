@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "573cb447b6ebb6e8a9056518300384b0eaebc60e",
+  "reviewed_implementation_commit": "597867f44a5140db27fdce2e4f2339859ef96af8",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 424,
@@ -9,11 +9,11 @@
     "COMPLETE": 21,
     "IN PROGRESS": 2
   },
-  "latest_verified_commit": "573cb447b6ebb6e8a9056518300384b0eaebc60e",
-  "latest_independently_reviewed_candidate_commit": "573cb447b6ebb6e8a9056518300384b0eaebc60e",
+  "latest_verified_commit": "597867f44a5140db27fdce2e4f2339859ef96af8",
+  "latest_independently_reviewed_candidate_commit": "597867f44a5140db27fdce2e4f2339859ef96af8",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "573cb447b6ebb6e8a9056518300384b0eaebc60e",
-  "latest_followup_status_change": "Independent review of 573cb447 scored 50/100. It reproduced fractional output truncation (#49) and found two QA test fixture failures. The fixture fix passes all 86 tests locally but remains unreviewed.",
+  "last_pushed_reviewed_below_threshold_commit": "597867f44a5140db27fdce2e4f2339859ef96af8",
+  "latest_followup_status_change": "Independent review of exact commit 597867f scored 54/100. All 86 tests passed, confirming the QA fixture repair; native fractional output truncation remains issue #49.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -943,8 +943,8 @@
     "IN PROGRESS": 4
   },
   "resolved_critic_issue_48": "Fixed in the UTF-8 status synchronization after critic review d757c79: both files now parse as strict UTF-8 JSON and evaluation metadata records the exact reviewed candidate SHA. The fresh 91/100 evaluation remains attached to d757c79; a new review is required for the corrected snapshot.",
-  "latest_independent_candidate_score": 50,
-  "latest_independent_candidate_result": "FAIL against 98/100; reviewer found two QA rubric test failures on exact commit 573cb44",
-  "current_unscored_followup": "QA test fixtures were changed to isolate the active rubric and adjust the current subtotal dynamically; both focused tests and the full 86-test suite pass locally. Fractional native numeric output remains tracked as GitHub issue #49.",
-  "latest_independently_scored_candidate_commit": "573cb447b6ebb6e8a9056518300384b0eaebc60e"
+  "latest_independent_candidate_score": 54,
+  "latest_independent_candidate_result": "FAIL against 98/100; independent review of exact commit 597867f passed all 86 tests and reproduced native fractional output truncation (#49).",
+  "current_unscored_followup": "Documentation is being synchronized after the 597867f review; no runtime source changed. The reviewed native backend still truncates fractional output (#49).",
+  "latest_independently_scored_candidate_commit": "597867f44a5140db27fdce2e4f2339859ef96af8"
 }

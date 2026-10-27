@@ -1,14 +1,14 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **50/100 - FAIL** for exact commit `573cb447b6ebb6e8a9056518300384b0eaebc60e` against the user's **98/100** threshold. Categories: requirements 9/20, functionality/reliability 8/20, architecture 12/20, testing 10/20, delivery 11/20.
+**Latest independent evaluation:** **54/100 - FAIL** for exact commit `597867f44a5140db27fdce2e4f2339859ef96af8` against the user's **98/100** threshold. Categories: requirements 9/20, functionality/reliability 8/20, architecture 12/20, testing 14/20, delivery 11/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
 
-**Unscored native follow-up:** the latest review found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042` but has not been independently scored. Fractional output truncation remains issue #49.
+**Native QA follow-up (reviewed):** the latest review found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. Fractional output truncation remains issue #49.
 
 **Unreviewed implementation candidate:** source commit `9d9bf90e62e3e75ea94de7828d86800cbd382c99` adds bounded 24/32-bit BMP loading, generation-checked handles, image queries/release, and clipped/scaled alpha-blended 2D sprite drawing. The full suite passes (79 tests), the sprite sample builds with MSVC, extension 0.1.9 grammar validation, compileall, QA arithmetic, and diff checks pass. These checks are implementation evidence only. The later direct-native candidate received a 49/100 review on a pre-short-circuit-fix local snapshot; see the current native follow-up and full rubric below. Canonical issue #23 items #201 and #209 are under review, #202 awaits review, and #212 remains partial because rotation is not implemented.
 **Latest review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
-**Current finding:** exact commit `573cb44` scored 50/100, below the 98/100 threshold. The post-review QA fixture fix passes all 86 tests locally but has no independent score. The native runtime/engine is still far from complete, and issue #49 remains open.
+**Current finding:** exact commit `597867f44a5140db27fdce2e4f2339859ef96af8` scored 54/100, below the 98/100 threshold. The reviewer reran all 86 tests successfully and confirmed the QA fixture fix. Native fractional output remains incorrect and tracked by issue #49. The native runtime/game-engine migration remains incomplete.
 
 **Latest reviewed correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
@@ -62,9 +62,9 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 
 **91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 19/20; testing and verification 18/20; developer experience and delivery 18/20. The exact reviewed commit was `bc4db99368b3af2953e49adc4e4cbd8f5706bb4e`. The critic reran 73 Python tests, 3 native runtime tests, extension validation, compileall, the QA validator, and diff check. It verified the viewport geometry helper and inspected the WM_PAINT path, but did not visually launch a resized window. The audited ledgers contain 21 rows and total 450. Criterion 38 scores 1 because the prior ledger labeled dynamic window resizing as #144; canonical issue #23 comment 6451810775 defines it as #172. Issue #46 tracks the correction. Criterion 22 remains 2 after formatting; criterion 23 remains 2 for phase separation. Criterion 27 remains 1 for Windows/MSVC and C-only backend. Criterion 47 remains 1 because newer extension tokens are not visually verified. The 98-point threshold remains unmet; issues #12 and #45 are closed.
 
-## Latest 50-criterion scoring — direct native commit `573cb44`
+## Latest 50-criterion scoring — direct native commit `597867f`
 
-Independent reviewer evaluated exact pushed commit `573cb447b6ebb6e8a9056518300384b0eaebc60e`: **50/100 — FAIL** against the active **98/100** threshold. The reviewer ran 86 tests and found two QA-report fixture failures. Those fixtures were fixed in follow-up commit `150a042`; the full suite passes all 86 tests, but that follow-up has not been independently rescored. Full explanations are in `docs/ANVIL_EVALUATION.txt`.
+Independent reviewer evaluated exact pushed commit `597867f44a5140db27fdce2e4f2339859ef96af8`: **54/100 — FAIL** against the active **98/100** threshold. All 86 tests passed. Compared with the prior 50/100 review of `573cb44`, criteria 37, 38, and 39 each improved by one point after the fixture correction was committed and independently verified. Full explanations are in `docs/ANVIL_EVALUATION.txt`.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -104,9 +104,9 @@ Independent reviewer evaluated exact pushed commit `573cb447b6ebb6e8a90565183003
 | 34 | Edge cases explicitly tested | 2 | Native tests cover negative numbers, multiple args, booleans, and ascending/descending/zero-step loops. |
 | 35 | Integration behavior tested | 1 | CLI creates a runnable EXE; engine integration is absent. |
 | 36 | Documented test commands work | 1 | Unittest and npm commands are documented and reproducible. |
-| 37 | Builds and compilation pass | 1 | Native PE smoke build passes, but the full suite had two QA-test failures on this snapshot. |
-| 38 | Results recorded accurately | 0 | QA report claimed 86 passes although evaluator run had two failures; fixed in later local test changes. |
-| 39 | Regression checks performed | 1 | Full suite detected QA fixture problems, but exact reviewed snapshot was red. |
+| 37 | Builds and compilation pass | 2 | Critic reran the full 86-test suite; the MSVC numeric demo built and ran with output `17`. |
+| 38 | Results recorded accurately | 2 | Exact review SHA and the prior QA failures/fix are recorded; current checks and fractional-output finding match reproduced evidence. |
+| 39 | Regression checks performed | 2 | Focused QA regression tests and the full suite pass after the fixture repair. |
 | 40 | Verified against original goal | 0 | The broad compiler/runtime/engine request remains incomplete. |
 | 41 | Installation instructions accurate | 1 | Python/Windows command exists; no full native-engine install path. |
 | 42 | Setup reproducible | 1 | Limited native command is reproducible; full deployment/setup is not. |
@@ -121,9 +121,9 @@ Independent reviewer evaluated exact pushed commit `573cb447b6ebb6e8a90565183003
 | | **Requirement fulfillment** | **9/20** | |
 | | **Functionality and reliability** | **8/20** | |
 | | **Code quality and architecture** | **12/20** | |
-| | **Testing and verification** | **10/20** | |
+| | **Testing and verification** | **14/20** | |
 | | **Developer experience and delivery** | **11/20** | |
-| | **Total** | **50/100** | Exact commit `573cb44`; FAIL against 98. |
+| | **Total** | **54/100** | Exact commit `597867f`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
@@ -131,7 +131,7 @@ Independent reviewer evaluated exact pushed commit `573cb447b6ebb6e8a90565183003
 - **Criteria 11, 19:** native game core is absent; `output 17.875` prints `17` (reproduced and tracked as [issue #49](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/49)). Fix numeric formatting and add fraction tests.
 - **Criteria 14–18:** native error paths, zero division diagnostics, stack/ABI limits, recursion and stress cases need coverage.
 - **Criteria 22–30:** raw opcode emission, no typed IR, empty builtin dispatch and missing runtime interfaces impede correctness and growth. Add typed IR, instruction helpers, explicit ABI/layout validation, and engine runtime abstraction.
-- **Criteria 33, 37–39:** exact reviewed commit had 2 failures in `tests.test_qa_report`; fixtures included historical score tables and hardcoded 16/20. Fixed in commit `150a042` by scoping to current table and dynamically mutating subtotal; focused tests and all 86 full-suite tests pass. The fix is not independently reviewed yet. Tracking issue [#51](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/51) is closed after local verification.
+- **Criteria 33, 37–39:** exact reviewed commit had 2 failures in `tests.test_qa_report`; fixtures included historical score tables and hardcoded 16/20. Fixed in commit `150a042` by scoping to current table and dynamically mutating subtotal; focused tests and all 86 full-suite tests pass. Independent review of commit `597867f` confirmed this fix and the full-suite pass. Tracking issue [#51](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/51) is closed after local verification.
 - **Criteria 40, 50:** the full intended product remains incomplete; this numeric backend cannot create a 2D/3D game.
 - **Criteria 41–47:** no complete native setup/troubleshooting/project workflow; live VS Code highlighting not verified.
 
