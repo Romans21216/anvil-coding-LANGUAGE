@@ -62,6 +62,23 @@ call fn(main)
                 source = f"fn(main)\n  output {expression}\nend\ncall fn(main)\n"
                 self.assertEqual(self._run_source(source), expected)
 
+    def test_native_backend_rejects_out_of_range_output(self):
+        for expression in ("100000000000000000000", "-100000000000000000000"):
+            with self.subTest(expression=expression), tempfile.TemporaryDirectory() as temp:
+                path = pathlib.Path(temp) / "range.ANVL"
+                source = f"fn(main)\n  output {expression}\nend\ncall fn(main)\n"
+                path.write_text(source, encoding="utf-8")
+                functions, top, variables, arrays = parse(path, source)
+                executable = pathlib.Path(temp) / "range.exe"
+                executable.write_bytes(
+                    NativeCodegen(path, functions, top, variables, arrays).generate()
+                )
+                result = subprocess.run(
+                    [str(executable)], capture_output=True, text=True, timeout=5
+                )
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, "Anvil output out of range\n")
+
     def test_native_backend_compiles_loop_and_boolean_operators(self):
         source = """\
 fn(main)

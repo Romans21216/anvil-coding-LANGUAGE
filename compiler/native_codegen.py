@@ -484,10 +484,15 @@ class NativeCodegen:
         self.code.bytes(b"\x48\xc1\xe8\x3f\x41\x89\xc3")  # sign bit -> r11d
         self.code.bytes(b"\x66\x0f\x28\xc8")  # movapd xmm1,xmm0
         nonnegative = self.label("print_nonnegative")
+        range_error = self.label("print_range_error")
         self.code.bytes(b"\x45\x85\xdb")
         self.code.conditional_jump(0x84, nonnegative)
         self.code.bytes(b"\x66\x0f\x57\xc0\xf2\x0f\x5c\xc1")  # abs(x) via 0-x
         self.code.label(nonnegative)
+        self.code.bytes(b"\x48\xb8\x00\x00\x00\x00\x00\x00\xe0\x43")  # 2^63
+        self.code.bytes(b"\x66\x48\x0f\x6e\xd0\x66\x0f\x2e\xc2")  # compare abs(value)
+        self.code.conditional_jump(0x8A, range_error)  # jp: NaN
+        self.code.conditional_jump(0x83, range_error)  # jae: outside signed int64
         self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")  # cvttsd2si rax,xmm0
         self.code.bytes(b"\x48\x89\x44\x24\x28")  # save integer part
         self.code.bytes(b"\xf2\x48\x0f\x2a\xc8")  # cvtsi2sd xmm1,rax
@@ -566,6 +571,22 @@ class NativeCodegen:
         self.code.bytes(b"\x48\xc7\x44\x24\x20\x00\x00\x00\x00")
         self.code.rip_call_import("WriteFile")
         self.code.bytes(b"\x48\x83\xc4\x58\xc3")
+        self.code.label(range_error)
+        message = b"Anvil output out of range\n"
+        for offset in range(0, len(message), 8):
+            chunk = message[offset:offset + 8].ljust(8, b"\0")
+            self.code.bytes(b"\x48\xb8" + chunk)  # mov rax, immediate text
+            self.code.bytes(b"\x48\x89\x44\x24" + bytes((0x30 + offset,)))
+        self.code.bytes(b"\xb9\xf5\xff\xff\xff")  # STD_OUTPUT_HANDLE
+        self.code.rip_call_import("GetStdHandle")
+        self.code.bytes(b"\x48\x89\xc1\x48\x8d\x54\x24\x30")
+        self.code.bytes(b"\x41\xb8" + struct.pack("<I", len(message)))
+        self.code.bytes(b"\x4c\x8d\x4c\x24\x28")
+        self.code.bytes(b"\x48\xc7\x44\x24\x20\x00\x00\x00\x00")
+        self.code.rip_call_import("WriteFile")
+        self.code.bytes(b"\xb9\x02\x00\x00\x00")  # controlled runtime error
+        self.code.rip_call_import("ExitProcess")
+        self.code.bytes(b"\xcc")
 
     def generate(self) -> bytes:
         if self.arrays:

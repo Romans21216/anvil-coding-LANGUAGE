@@ -945,6 +945,6 @@
   "resolved_critic_issue_48": "Fixed in the UTF-8 status synchronization after critic review d757c79: both files now parse as strict UTF-8 JSON and evaluation metadata records the exact reviewed candidate SHA. The fresh 91/100 evaluation remains attached to d757c79; a new review is required for the corrected snapshot.",
   "latest_independent_candidate_score": 55,
   "latest_independent_candidate_result": "FAIL against 98/100; independent review of exact commit f330d4b passed all 87 tests, confirmed issue #49 fixed, and reproduced large finite output corruption tracked by issue #52.",
-  "current_unscored_followup": "Evaluation/status records are being synchronized after the f330d4b review. No runtime source changed in that documentation follow-up; issue #52 remains open.",
+  "current_unscored_followup": "The current working-tree candidate detects non-finite or out-of-range native output, prints a controlled range diagnostic, and exits with code 2. Positive and negative 1e20 regression tests pass; full-suite and independent review are pending.",
   "latest_independently_scored_candidate_commit": "f330d4b19225e46c2f32fcefda8e78d8719ef26f"
 }
