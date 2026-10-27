@@ -22,7 +22,7 @@ end
 call fn(main)
 ```
 
-Comments begin with `#` outside a quoted string. Names are case-sensitive. Function parameters and return values are numeric. `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside a numeric expression. Recursive calls are supported by the generated C functions. `while expression ... end` repeats its body while the numeric condition is nonzero.
+Comments begin with `#` outside a quoted string. Names are case-sensitive. Function parameters and return values are numeric. `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside a numeric expression. Recursive calls are supported by the generated C functions. `while expression ... end` repeats its body while the numeric condition is nonzero. `for local(name) = start to end [step amount] ... end` iterates over an inclusive numeric range.
 
 `var(name)` reads a global numeric variable, except that a function parameter with the same name takes precedence inside that function. `set local(name) = expression` declares function-local numeric state, initialized to `0` at function entry; `local(name)` reads it, and `add local(name) amount` / `sub local(name) amount` update it. Local names are visible only in their declaring function. Existing `set var(name)` assignments continue to use global state unless `name` is a parameter of the current function. The compiler validates local/global references and function-call arity before generating C.
 
@@ -44,6 +44,18 @@ fn(sum-to, limit)
 end
 
 call fn(sum-to, 5) # prints 15
+```
+
+`for local(index) = start to end [step amount]` evaluates its start, end, and step expressions once. The default step is `1`; negative steps count downward, and both endpoints are included when reached. A zero step runs zero iterations. The loop variable is a function-local numeric variable and retains its final value after the loop. A loop variable cannot be a function parameter, and nested `for` loops must use different local variable names.
+
+```anv
+fn(count-down)
+  set local(total) = 0
+  for local(index) = 5 to 1 step -2
+    add local(total) local(index)
+  end
+  output local(index) # returns -1 after the loop; total is 9
+end
 ```
 
 Built-ins currently include `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, and `max`. The implemented key names include letters, `SPACE`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, and `ESCAPE`.
@@ -81,5 +93,5 @@ fixed_hz = 60
 
 ## Not implemented yet
 
-Static types, arrays, structures, modules/imports, assets/sprites, audio, collision/physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables, and `while` loops are supported, but the language and engine remain much smaller than a general-purpose game engine today.
+Static types, arrays, structures, modules/imports, assets/sprites, audio, collision/physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables, `while` loops, and inclusive numeric `for` loops are supported, but the language and engine remain much smaller than a general-purpose game engine today.
 
