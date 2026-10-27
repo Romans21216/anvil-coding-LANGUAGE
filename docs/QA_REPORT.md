@@ -8,7 +8,7 @@
 
 **Formatting follow-up review:** candidate `3f77eee` was independently reviewed on exact commit `5072597`; all 72 tests, Black check, compileall, QA arithmetic, diff check, and 12-example generated-C parity pass. The critic scored this snapshot 92/100, still below 98.
 
-**Resize behavior candidate `2962455`: implementation corresponds to issue #23 item #172 (“Add dynamic window resizing”), not item #144 (“Add compiler version reporting”). The critic found the previous tracking mismatch and issue #46 records it. The runtime feature preserves the 960×600 framebuffer and aspect ratio. All 73 Python tests pass; no runtime defect was reproduced. The corrected ledger/evaluation sync is pending review.
+**Resize behavior candidate `2962455`: implementation corresponds to issue #23 item #172 (“Add dynamic window resizing”), not item #144 (“Add compiler version reporting”). The critic found the previous tracking mismatch and issue #46 records it. The runtime feature preserves the 960×600 framebuffer and aspect ratio. All 73 Python tests pass; no runtime defect was reproduced. The corrected ledger/evaluation sync is pushed in `0ac0bf9` and awaits independent review; prior score 91 remains associated with `bc4db99`.
 
 ## Scope
 

@@ -627,17 +627,18 @@
       "Broader engine scope remains incomplete."
     ]
   },
-  "current_candidate_commit": "pending corrected-record candidate commit",
+  "current_candidate_commit": "0ac0bf984a8ba8ecd73517879577a46258daddeb",
   "status_counts_validated_on": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
   "candidate_validation": {
-    "commit": "296245532a12255c79e4092c66f0cbacb3b085d3",
+    "commit": "0ac0bf984a8ba8ecd73517879577a46258daddeb",
     "reviewed_score": 91,
     "threshold": 98,
     "result": "FAIL",
     "python_unittest": "73 passed",
     "runtime_tests": "3 passed; viewport helper tested, actual window not visually launched",
     "status_ledger": "21 entries, 450 total; correction candidate maps resize feature to #172 and leaves #144 unverified",
-    "finding": "Canonical mapping correction is recorded in issue #46; fresh independent review pending."
+    "finding": "Canonical mapping correction is recorded in issue #46; fresh independent review pending.",
+    "status": "corrected tracking records pushed; fresh independent review pending"
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "current_active_item": 172,

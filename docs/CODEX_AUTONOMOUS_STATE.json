@@ -6,12 +6,12 @@
   "last_completed_backlog_item": 104,
   "current_active_item": 172,
   "current_active_item_status": "Backlog item #172 (dynamic window resizing) is in progress. 73 tests pass. Item #144 is compiler version reporting and remains unverified. Issue #46 tracks the mapping correction.",
-  "current_candidate_commit": "pending corrected-record candidate commit",
+  "current_candidate_commit": "0ac0bf984a8ba8ecd73517879577a46258daddeb",
   "latest_verified_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
   "last_pushed_reviewed_below_threshold_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
   "latest_independently_reviewed_candidate_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Exact review bc4db99 scored 91/100 \u2014 FAIL vs98. Item #172 resize implementation passes 73 tests; criterion 38 was reduced due the incorrect #144 mapping, now corrected in the working records and tracked by issue #46.",
+  "latest_push_result": "Correction commit 0ac0bf9 pushes resize work under canonical issue #23 item #172 and leaves #144 unverified. Latest independent score is 91/100 on bc4db99; re-review pending.",
   "latest_independent_review": {
     "commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
     "score": 91,
@@ -67,7 +67,7 @@
     "generated_c_parity": "12/12 examples byte-identical to baseline 854d36c after line wrapping",
     "runtime_viewport_test": "3 passed on exact reviewed commit; helper geometry exercised, no live window inspection"
   },
-  "pending_documentation_review": "Backlog mapping correction to #172 and the 91-point evaluation are synchronized; issue #46 awaits independent confirmation of the exact correction commit.",
+  "pending_documentation_review": "Exact correction snapshot 0ac0bf9 is pushed; obtain independent confirmation of the corrected backlog mapping and 91-point QA record. Issue #46 remains open pending that review.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -107,7 +107,7 @@
     45
   ],
   "candidate_validation": {
-    "status": "corrected backlog mapping pending independent review",
+    "status": "corrected backlog mapping pushed; fresh independent review pending",
     "item": 172,
     "prior_review_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
     "python_unittest": "73 passed",
@@ -116,7 +116,7 @@
     "compileall": "passed",
     "qa_report_validator": "passed; current QA rubric totals 91/100",
     "git_diff_check": "passed",
-    "commit": "296245532a12255c79e4092c66f0cbacb3b085d3"
+    "commit": "0ac0bf984a8ba8ecd73517879577a46258daddeb"
   },
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775"
 }
