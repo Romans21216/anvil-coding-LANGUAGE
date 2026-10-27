@@ -35,7 +35,8 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
         if line == "language" or line.startswith("language "):
             if source_code_seen:
                 raise CompileError(
-                    f"{path}:{line_no}: language version declaration must appear before all other source code"
+                    f"{path}:{line_no}: language version declaration must "
+                    "appear before all other source code"
                 )
             if version_declared:
                 raise CompileError(
@@ -44,7 +45,8 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             declaration = re.fullmatch(r"language\s+version\s+([0-9]+)", line)
             if not declaration:
                 raise CompileError(
-                    f"{path}:{line_no}: language version declaration must use 'language version N'"
+                    f"{path}:{line_no}: language version declaration must "
+                    "use 'language version N'"
                 )
             version_declared = True
             version_text = declaration.group(1)
@@ -54,7 +56,8 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             if version != str(LANGUAGE_VERSION):
                 shown_version = version if len(version) <= 32 else "value too large"
                 raise CompileError(
-                    f"{path}:{line_no}: unsupported Anvil language version {shown_version}; compiler supports version {LANGUAGE_VERSION}"
+                    f"{path}:{line_no}: unsupported Anvil language version "
+                    f"{shown_version}; compiler supports version {LANGUAGE_VERSION}"
                 )
             continue
         source_code_seen = True
@@ -89,12 +92,14 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 and normalized_size > max_array_text
             ):
                 raise CompileError(
-                    f"{path}:{line_no}: array size must be between 1 and {MAX_ARRAY_SIZE}"
+                    f"{path}:{line_no}: array size must be between "
+                    f"1 and {MAX_ARRAY_SIZE}"
                 )
             size = int(normalized_size)
             if size < 1:
                 raise CompileError(
-                    f"{path}:{line_no}: array size must be between 1 and {MAX_ARRAY_SIZE}"
+                    f"{path}:{line_no}: array size must be between "
+                    f"1 and {MAX_ARRAY_SIZE}"
                 )
             if current_function is None:
                 if len(stack) != 1:
@@ -107,14 +112,16 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             else:
                 if name in current_function.local_arrays:
                     raise CompileError(
-                        f"{path}:{line_no}: duplicate local array '{name}' in function '{current_function.name}'"
+                        f"{path}:{line_no}: duplicate local array '{name}' "
+                        f"in function '{current_function.name}'"
                     )
                 if (
                     sum(current_function.local_arrays.values()) + size
                     > MAX_LOCAL_ARRAY_ELEMENTS
                 ):
                     raise CompileError(
-                        f"{path}:{line_no}: local arrays in a function may contain at most {MAX_LOCAL_ARRAY_ELEMENTS} elements total"
+                        f"{path}:{line_no}: local arrays in a function may "
+                        f"contain at most {MAX_LOCAL_ARRAY_ELEMENTS} elements total"
                     )
                 current_function.local_arrays[name] = size
                 current_function.local_array_lines[name] = line_no
@@ -175,14 +182,16 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             loop_name, range_text = for_loop.groups()
             if loop_name in current_function.params:
                 raise CompileError(
-                    f"{path}:{line_no}: for-loop variable cannot be a function parameter"
+                    f"{path}:{line_no}: for-loop variable cannot be a "
+                    "function parameter"
                 )
             if any(
                 kind == "for" and block is not None and block.name == loop_name
                 for _, kind, block in stack
             ):
                 raise CompileError(
-                    f"{path}:{line_no}: nested for loops must use different local variables"
+                    f"{path}:{line_no}: nested for loops must use "
+                    "different local variables"
                 )
             range_parts = split_keyword(range_text, "to")
             if not range_parts:
@@ -214,11 +223,13 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
         if match:
             if current_function is None:
                 raise CompileError(
-                    f"{path}:{line_no}: local variables must be declared inside a function"
+                    f"{path}:{line_no}: local variables must be "
+                    "declared inside a function"
                 )
             if match.group(1) in current_function.params:
                 raise CompileError(
-                    f"{path}:{line_no}: local variable {match.group(1)!r} conflicts with a function parameter"
+                    f"{path}:{line_no}: local variable {match.group(1)!r} "
+                    "conflicts with a function parameter"
                 )
             current_function.locals.add(match.group(1))
             node = Node("local_set", line_no, match.group(2), match.group(1))
@@ -248,11 +259,13 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             if match:
                 if current_function is None:
                     raise CompileError(
-                        f"{path}:{line_no}: local variables can only be changed inside a function"
+                        f"{path}:{line_no}: local variables can only be "
+                        "changed inside a function"
                     )
                 if match.group(2) in current_function.params:
                     raise CompileError(
-                        f"{path}:{line_no}: local variable {match.group(2)!r} conflicts with a function parameter"
+                        f"{path}:{line_no}: local variable {match.group(2)!r} "
+                        "conflicts with a function parameter"
                     )
                 current_function.locals.add(match.group(2))
                 node = Node(

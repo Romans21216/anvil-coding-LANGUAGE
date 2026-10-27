@@ -17,7 +17,9 @@ from compiler.parser import parse
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Compile Anvil source or project to C, then link a native executable."
+        description=(
+            "Compile Anvil source or project to C, then link a native executable."
+        )
     )
     ap.add_argument(
         "source",
@@ -29,7 +31,10 @@ def main() -> int:
     ap.add_argument("--output", "-o", type=pathlib.Path, help="output executable")
     ap.add_argument(
         "--cc",
-        help="explicit C compiler compatible with the Windows runtime (MSVC is verified)",
+        help=(
+            "explicit C compiler compatible with the Windows runtime "
+            "(MSVC is verified)"
+        ),
     )
     ap.add_argument("--release", action="store_true", help="enable native optimization")
     args = ap.parse_args()
@@ -43,7 +48,8 @@ def main() -> int:
             unknown_keys = set(manifest) - {"name", "entry", "engine"}
             if unknown_keys:
                 raise CompileError(
-                    f"{args.source}: unsupported project setting(s): {', '.join(sorted(unknown_keys))}"
+                    f"{args.source}: unsupported project setting(s): "
+                    f"{', '.join(sorted(unknown_keys))}"
                 )
             name = manifest.get("name", project_name)
             if (
@@ -53,7 +59,8 @@ def main() -> int:
                 or any(ord(ch) < 32 for ch in name)
             ):
                 raise CompileError(
-                    f"{args.source}: project name must be a non-empty string without control characters"
+                    f"{args.source}: project name must be a non-empty "
+                    "string without control characters"
                 )
             project_name = name.strip()
             engine = manifest.get("engine", {})
@@ -62,7 +69,8 @@ def main() -> int:
             unknown_engine_keys = set(engine) - {"fixed_hz"}
             if unknown_engine_keys:
                 raise CompileError(
-                    f"{args.source}: unsupported engine setting(s): {', '.join(sorted(unknown_engine_keys))}"
+                    f"{args.source}: unsupported engine setting(s): "
+                    f"{', '.join(sorted(unknown_engine_keys))}"
                 )
             fixed_hz = engine.get("fixed_hz", 60)
             if (
@@ -102,7 +110,9 @@ def main() -> int:
         compiler = find_compiler(args.cc)
         if not compiler:
             print(
-                f"No C compiler found. Install Visual Studio 2022 Build Tools with the C++ workload. Generated source: {c_path}",
+                "No C compiler found. Install Visual Studio 2022 Build Tools "
+                "with the C++ workload. Generated source: "
+                f"{c_path}",
                 file=sys.stderr,
             )
             return 2

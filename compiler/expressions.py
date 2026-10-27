@@ -17,7 +17,9 @@ from compiler.common import (
 )
 
 TOKEN = re.compile(
-    r"""\s*(?:([0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)|("(?:\\.|[^"\\])*")|(var\([A-Za-z_][\w-]*\))|(local\([A-Za-z_][\w-]*\))|(<=|>=|!=|==|[(),+\-*/%=<>])|([A-Za-z_][\w-]*))"""
+    r"""\s*(?:([0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)|("(?:\\.|[^"\\])*")|"""
+    r"""(var\([A-Za-z_][\w-]*\))|(local\([A-Za-z_][\w-]*\))|"""
+    r"""(<=|>=|!=|==|[(),+\-*/%=<>])|([A-Za-z_][\w-]*))"""
 )
 
 BUILTINS = {
@@ -265,7 +267,8 @@ class ExpressionParser:
                 self.path, self.line, parts[1], self.functions, self.scope, self.arrays
             ).compile()
             left = (
-                f"anvil_array_get({array_code(name, self.scope)}, {size}, {index_expr}, "
+                f"anvil_array_get({array_code(name, self.scope)}, {size}, "
+                f"{index_expr}, "
                 f"{json.dumps(str(self.path))}, {self.line})",
                 "number",
             )
@@ -282,7 +285,8 @@ class ExpressionParser:
             ):
                 expected = len(self.functions[name].params)
                 raise CompileError(
-                    f"{self.path}:{self.line}: function {name!r} expects {expected} argument(s), got {len(raw_args)}"
+                    f"{self.path}:{self.line}: function {name!r} expects "
+                    f"{expected} argument(s), got {len(raw_args)}"
                 )
             args = [
                 ExpressionParser(
@@ -334,7 +338,8 @@ class ExpressionParser:
             if not low <= len(args) <= high:
                 expected = str(low) if low == high else f"{low}..{high}"
                 raise CompileError(
-                    f"{self.path}:{self.line}: {value}() expects {expected} argument(s), got {len(args)}"
+                    f"{self.path}:{self.line}: {value}() expects {expected} "
+                    f"argument(s), got {len(args)}"
                 )
             name = BUILTIN_C_NAMES.get(value, value)
             call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"
@@ -356,13 +361,15 @@ class ExpressionParser:
             self.take()
             if not self.peek() or self.peek(")") or self.peek(","):
                 raise CompileError(
-                    f"{self.path}:{self.line}: operator {operator!r} needs a right operand"
+                    f"{self.path}:{self.line}: operator {operator!r} needs "
+                    "a right operand"
                 )
             left_code = self.checked_number(self.require_number(left))
             right = self.require_number(self.parse(precedence + 1))
             if operator == "/":
                 left = (
-                    f"anvil_divide({left_code}, {right}, {json.dumps(str(self.path))}, {self.line})",
+                    f"anvil_divide({left_code}, {right}, "
+                    f"{json.dumps(str(self.path))}, {self.line})",
                     "number",
                 )
             elif operator == "%":
@@ -397,7 +404,8 @@ class ExpressionParser:
         result = self.parse()
         if self.peek():
             raise CompileError(
-                f"{self.path}:{self.line}: unexpected token {self.tokens[self.index][1]!r} in expression"
+                f"{self.path}:{self.line}: unexpected token "
+                f"{self.tokens[self.index][1]!r} in expression"
             )
         code, actual = result
         if actual != expected:
