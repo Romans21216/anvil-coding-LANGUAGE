@@ -17,7 +17,7 @@ end
 call fn(main)
 ```
 
-`fn(name)` defines a zero-argument function. `fn(name, first, second)` defines numeric parameters. `output expression` returns a number; a function without `output` returns zero. `call fn(name, arguments...)` works as a statement or numeric expression. Recursive calls work in the generated C.
+`fn(name)` defines a zero-argument function. `fn(name, first, second)` defines numeric parameters. `output expression` returns a number; a function without `output` returns zero. `call fn(name, arguments...)` works as a statement or numeric expression. Recursive calls work in the generated C. `while condition ... end` repeats while its numeric condition is nonzero.
 
 `var(name)` refers to global numeric state unless a parameter with that name shadows it inside the current function. `set local(name) = expression` declares function-local numeric state, initialized to zero on each call. Read it with `local(name)` and update it with `add local(name) amount` or `sub local(name) amount`. Locals are visible only in the function where declared.
 
@@ -37,7 +37,7 @@ fn(clamp-low, value, lower)
 end
 ```
 
-The current language has `if`/`else`/`end`, but does not yet have loops, arrays, user-defined structures, static types, modules, or general-purpose strings.
+The current language has `if`/`else`/`end` and `while`/`end` loops, but does not yet have arrays, user-defined structures, static types, modules, or general-purpose strings.
 
 ## Built-ins
 
