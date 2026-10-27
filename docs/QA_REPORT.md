@@ -101,5 +101,5 @@ The latest completed independent review scored **89/100 (89%)**, below the 90-po
 
 ## Bug tracking
 
-Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), [#2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), and [#3](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/3) were filed by the independent reviewer with the `Codex Bugs` label and closed after their documentation defects were corrected. The stale evaluation score was filed as [issue #4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4), also with the `Codex Bugs` label; it is being fixed in this revision.
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), [#2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), and [#3](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/3) were filed by the independent reviewer with the `Codex Bugs` label and closed after their documentation defects were corrected. The stale evaluation score was filed as [issue #4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4), also with the `Codex Bugs` label; both evaluation documents now record 89/100, and the issue is closed pending the fresh review result.
 
