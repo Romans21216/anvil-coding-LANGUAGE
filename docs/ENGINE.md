@@ -23,7 +23,7 @@ Current drawing primitives are `rect`, `circle`, `line`, `text`, `cube`, `sphere
 
 `camera fov(degrees)` sets the horizontal field of view (clamped to 20–120 degrees). `camera control(move_speed, turn_speed)` enables keyboard movement during fixed updates: W/S move forward/backward, A/D strafe, Q/E move vertically, and the arrow keys turn and look up/down. Movement uses the fixed update step, so it is independent of frame rate. The sample world demonstrates these controls and ray-traced spheres.
 
-The renderer uses hand-written C software rasterization for conventional primitives and CPU BVH ray tracing for `ray_sphere`. It is useful for a small starter game and for learning; it lacks GPU acceleration/DXR, mesh import, texture mapping, robust near-plane clipping, dynamic internal resolution, and production-grade rasterization. Text uses the Windows GDI font path.
+The renderer uses hand-written C software rasterization for conventional primitives and CPU BVH ray tracing for `ray_sphere`. It clips 3D triangle faces, grid segments, and rasterized sphere surfaces against the camera near plane, including a flat cap where a sphere crosses that plane. The native regression harness covers segments and triangles plus sphere ray intersections; the full game window was not visually inspected in the latest critic run. It remains a small starter renderer: GPU acceleration/DXR, mesh import, texture mapping, far/side frustum clipping, dynamic internal resolution, and production-grade rasterization are still absent. Text uses the Windows GDI font path.
 
 ## Math, time, and input
 

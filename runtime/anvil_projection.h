@@ -18,6 +18,118 @@ typedef struct {
   int height;
 } AnvilViewport;
 
+typedef struct {
+  double x;
+  double y;
+  double depth;
+} AnvilCameraVertex;
+
+/* Clip one camera-space segment against the forward near plane. */
+static inline int anvil_clip_segment_near(AnvilCameraVertex *a,
+                                          AnvilCameraVertex *b,
+                                          double near_depth) {
+  if (!a || !b || !isfinite(near_depth) || near_depth <= 0.0 ||
+      !isfinite(a->x) || !isfinite(a->y) || !isfinite(a->depth) ||
+      !isfinite(b->x) || !isfinite(b->y) || !isfinite(b->depth))
+    return 0;
+
+  int a_inside = a->depth >= near_depth;
+  int b_inside = b->depth >= near_depth;
+  if (!a_inside && !b_inside)
+    return 0;
+  if (a_inside && b_inside)
+    return 1;
+
+  AnvilCameraVertex *outside = a_inside ? b : a;
+  const AnvilCameraVertex *inside = a_inside ? a : b;
+  double denominator = inside->depth - outside->depth;
+  if (denominator == 0.0)
+    return 0;
+  double t = (near_depth - outside->depth) / denominator;
+  outside->x += t * (inside->x - outside->x);
+  outside->y += t * (inside->y - outside->y);
+  outside->depth = near_depth;
+  return 1;
+}
+
+/* Clip a camera-space triangle; output contains up to four polygon vertices. */
+static inline int anvil_clip_triangle_near(const AnvilCameraVertex input[3],
+                                           double near_depth,
+                                           AnvilCameraVertex output[4]) {
+  if (!input || !output || !isfinite(near_depth) || near_depth <= 0.0)
+    return 0;
+
+  int count = 0;
+  AnvilCameraVertex previous = input[2];
+  if (!isfinite(previous.x) || !isfinite(previous.y) ||
+      !isfinite(previous.depth))
+    return 0;
+  int previous_inside = previous.depth >= near_depth;
+  for (int i = 0; i < 3; ++i) {
+    AnvilCameraVertex current = input[i];
+    if (!isfinite(current.x) || !isfinite(current.y) ||
+        !isfinite(current.depth))
+      return 0;
+    int current_inside = current.depth >= near_depth;
+    if (current_inside != previous_inside) {
+      double denominator = current.depth - previous.depth;
+      if (denominator == 0.0)
+        return 0;
+      double t = (near_depth - previous.depth) / denominator;
+      output[count++] = (AnvilCameraVertex){
+          previous.x + t * (current.x - previous.x),
+          previous.y + t * (current.y - previous.y), near_depth};
+    }
+    if (current_inside)
+      output[count++] = current;
+    previous = current;
+    previous_inside = current_inside;
+  }
+  return count;
+}
+
+/* Intersect a camera ray with a sphere, clipping its surface at the near plane. */
+static inline int anvil_intersect_sphere_near(
+    AnvilCameraVertex center, double radius, double ray_x, double ray_y,
+    double near_depth, double *hit_depth, double *normal_x, double *normal_y,
+    double *normal_z, int *near_cap) {
+  if (!hit_depth || !normal_x || !normal_y || !normal_z || !near_cap ||
+      !isfinite(center.x) || !isfinite(center.y) || !isfinite(center.depth) ||
+      !isfinite(radius) || radius <= 0.0 || !isfinite(ray_x) ||
+      !isfinite(ray_y) || !isfinite(near_depth) || near_depth <= 0.0)
+    return 0;
+
+  const double a = ray_x * ray_x + ray_y * ray_y + 1.0;
+  const double b = -2.0 * (ray_x * center.x + ray_y * center.y + center.depth);
+  const double c = center.x * center.x + center.y * center.y +
+                   center.depth * center.depth - radius * radius;
+  const double discriminant = b * b - 4.0 * a * c;
+  if (!isfinite(discriminant) || discriminant < 0.0)
+    return 0;
+
+  const double root = sqrt(discriminant);
+  const double near_hit = (-b - root) / (2.0 * a);
+  const double far_hit = (-b + root) / (2.0 * a);
+  if (far_hit < near_depth)
+    return 0;
+
+  if (near_hit < near_depth) {
+    *hit_depth = near_depth;
+    *normal_x = 0.0;
+    *normal_y = 0.0;
+    *normal_z = -1.0;
+    *near_cap = 1;
+    return 1;
+  }
+
+  *hit_depth = near_hit;
+  *normal_x = (ray_x * near_hit - center.x) / radius;
+  *normal_y = (ray_y * near_hit - center.y) / radius;
+  *normal_z = (near_hit - center.depth) / radius;
+  *near_cap = 0;
+  return isfinite(*normal_x) && isfinite(*normal_y) && isfinite(*normal_z);
+}
+
 /* Fit the fixed-aspect framebuffer into a resizable client area. */
 static inline int anvil_compute_viewport(int client_width, int client_height,
                                          int image_width, int image_height,
@@ -83,15 +195,19 @@ static inline int anvil_project_sphere_bounds(
       focal_length * fmax(vertical_a, vertical_b);
   const double screen_bottom = height * 0.54 -
       focal_length * fmin(vertical_a, vertical_b);
+  if (!isfinite(screen_left) || !isfinite(screen_right) ||
+      !isfinite(screen_top) || !isfinite(screen_bottom) || screen_right < 0.0 ||
+      screen_bottom < 0.0 || screen_left >= width || screen_top >= height)
+    return 0;
 
-  bounds->min_x = (int)floor(screen_left) - 1;
-  bounds->max_x = (int)ceil(screen_right) + 1;
-  bounds->min_y = (int)floor(screen_top) - 1;
-  bounds->max_y = (int)ceil(screen_bottom) + 1;
-  if (bounds->min_x < 0) bounds->min_x = 0;
-  if (bounds->min_y < 0) bounds->min_y = 0;
-  if (bounds->max_x >= width) bounds->max_x = width - 1;
-  if (bounds->max_y >= height) bounds->max_y = height - 1;
+  bounds->min_x = screen_left <= 1.0 ? 0 : (int)floor(screen_left) - 1;
+  bounds->max_x = screen_right >= width - 2.0
+                      ? width - 1
+                      : (int)ceil(screen_right) + 1;
+  bounds->min_y = screen_top <= 1.0 ? 0 : (int)floor(screen_top) - 1;
+  bounds->max_y = screen_bottom >= height - 2.0
+                      ? height - 1
+                      : (int)ceil(screen_bottom) + 1;
   return 1;
 }
 

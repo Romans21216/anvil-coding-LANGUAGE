@@ -8,6 +8,115 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
+    def test_near_plane_clips_segments_and_triangles(self):
+        from compiler.anvil import build_c, find_compiler
+
+        compiler = find_compiler(None)
+        if not compiler:
+            self.skipTest("MSVC is required to run the native clipping regression test")
+
+        harness = r'''#include "anvil_projection.h"
+#include <stdio.h>
+
+static int near_vertex(AnvilCameraVertex v) {
+  return fabs(v.depth - 0.08) < 1e-12;
+}
+
+int main(void) {
+  AnvilCameraVertex a = {0.0, 0.0, 0.01};
+  AnvilCameraVertex b = {2.0, 4.0, 0.4};
+  if (!anvil_clip_segment_near(&a, &b, 0.08) || !near_vertex(a) ||
+      fabs(a.x - 0.358974358974359) > 1e-12 ||
+      fabs(a.y - 0.717948717948718) > 1e-12 || b.depth != 0.4) {
+    puts("crossing segment was not clipped at the near plane");
+    return 1;
+  }
+
+  AnvilCameraVertex hidden_a = {0.0, 0.0, 0.01};
+  AnvilCameraVertex hidden_b = {1.0, 1.0, 0.07};
+  if (anvil_clip_segment_near(&hidden_a, &hidden_b, 0.08)) {
+    puts("segment fully behind the near plane was retained");
+    return 2;
+  }
+
+  AnvilCameraVertex input[3] = {{-1.0, 0.0, 0.01}, {1.0, 0.0, 0.4},
+                                {0.0, 1.0, 0.5}};
+  AnvilCameraVertex output[4];
+  int count = anvil_clip_triangle_near(input, 0.08, output);
+  if (count != 4 || !near_vertex(output[0]) ||
+      !near_vertex(output[1]) || output[2].depth != 0.4 ||
+      output[3].depth != 0.5) {
+    puts("one-hidden-vertex triangle did not become a clipped quad");
+    return 3;
+  }
+
+  input[0].depth = 0.01;
+  input[1].depth = 0.02;
+  input[2].depth = 0.5;
+  count = anvil_clip_triangle_near(input, 0.08, output);
+  if (count != 3 || !near_vertex(output[0]) ||
+      !near_vertex(output[1]) || output[2].depth != 0.5) {
+    puts("two-hidden-vertex triangle did not become a clipped triangle");
+    return 4;
+  }
+
+  input[0].depth = 0.01;
+  input[1].depth = 0.02;
+  input[2].depth = 0.07;
+  if (anvil_clip_triangle_near(input, 0.08, output) != 0) {
+    puts("triangle fully behind the near plane was retained");
+    return 5;
+  }
+  input[0].depth = 0.08;
+  input[1].depth = 0.4;
+  input[2].depth = 0.5;
+  if (anvil_clip_triangle_near(input, 0.08, output) != 3) {
+    puts("triangle on the clipping boundary was lost");
+    return 6;
+  }
+
+  double hit_depth, nx, ny, nz;
+  int near_cap;
+  if (!anvil_intersect_sphere_near((AnvilCameraVertex){0.0, 0.0, 0.1},
+                                   0.1, 0.0, 0.0, 0.08, &hit_depth, &nx,
+                                   &ny, &nz, &near_cap) ||
+      !near_cap || fabs(hit_depth - 0.08) > 1e-12 || nz != -1.0) {
+    puts("sphere crossing the near plane did not produce a clipped cap");
+    return 7;
+  }
+  if (!anvil_intersect_sphere_near((AnvilCameraVertex){0.0, 0.0, -0.1},
+                                   0.2, 0.0, 0.0, 0.08, &hit_depth, &nx,
+                                   &ny, &nz, &near_cap) ||
+      !near_cap) {
+    puts("sphere in front of the camera was lost at the near plane");
+    return 8;
+  }
+  if (anvil_intersect_sphere_near((AnvilCameraVertex){0.0, 0.0, -0.3},
+                                  0.2, 0.0, 0.0, 0.08, &hit_depth, &nx,
+                                  &ny, &nz, &near_cap) ||
+      anvil_intersect_sphere_near((AnvilCameraVertex){0.0, 0.0, 0.5}, 0.1,
+                                  1.0, 0.0, 0.08, &hit_depth, &nx, &ny, &nz,
+                                  &near_cap)) {
+    puts("sphere fully clipped or outside the ray was retained");
+    return 9;
+  }
+  puts("near-plane segment and triangle clipping cases passed");
+  return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            c_file = temp_path / "near_plane_clip.c"
+            executable = temp_path / "near_plane_clip.exe"
+            c_file.write_text(harness, encoding="utf-8")
+            build_c(compiler[1], c_file, executable, release=True)
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=8
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("clipping cases passed", result.stdout)
+
     def test_resize_viewport_preserves_framebuffer_aspect_ratio(self):
         from compiler.anvil import build_c, find_compiler
 

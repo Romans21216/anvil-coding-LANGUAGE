@@ -14,6 +14,7 @@
 
 enum { ANVIL_WIDTH = 960, ANVIL_HEIGHT = 600, ANVIL_KEYS = 256 };
 enum { ANVIL_TRACE_SPHERES = 32 };
+static const double ANVIL_NEAR_DEPTH = 0.08;
 enum {
   ANVIL_RAY_BACKEND_BVH,
   ANVIL_RAY_BACKEND_DXR,
@@ -174,6 +175,24 @@ static AnvilVec3 anvil_rotate(AnvilVec3 p, double rx, double ry, double rz) {
   return p;
 }
 
+static AnvilCameraVertex anvil_to_camera(AnvilVec3 p) {
+  AnvilVec3 right, up, forward;
+  anvil_camera_basis(&right, &up, &forward);
+  AnvilVec3 relative = {p.x - anvil_camera_x, p.y - anvil_camera_y,
+                        p.z - anvil_camera_z};
+  return (AnvilCameraVertex){anvil_dot(relative, right), anvil_dot(relative, up),
+                             anvil_dot(relative, forward)};
+}
+
+static int anvil_project_camera(AnvilCameraVertex p, AnvilProjected *out) {
+  if (p.depth < ANVIL_NEAR_DEPTH || !isfinite(p.depth))
+    return 0;
+  out->x = ANVIL_WIDTH * 0.5 + p.x * anvil_camera_focal / p.depth;
+  out->y = ANVIL_HEIGHT * 0.54 - p.y * anvil_camera_focal / p.depth;
+  out->depth = p.depth;
+  return 1;
+}
+
 static int anvil_project(AnvilVec3 p, AnvilProjected *out) {
   if (!anvil_scene_is_3d) {
     const double pixels_per_unit = 64.0;
@@ -182,36 +201,27 @@ static int anvil_project(AnvilVec3 p, AnvilProjected *out) {
     out->depth = 1000.0 - p.z;
     return 1;
   }
-  AnvilVec3 right, up, forward;
-  anvil_camera_basis(&right, &up, &forward);
-  AnvilVec3 relative = {p.x - anvil_camera_x, p.y - anvil_camera_y,
-                        p.z - anvil_camera_z};
-  double depth = anvil_dot(relative, forward);
-  if (depth < 0.08)
-    return 0;
-  out->x = ANVIL_WIDTH * 0.5 + anvil_dot(relative, right) * anvil_camera_focal / depth;
-  out->y = ANVIL_HEIGHT * 0.54 - anvil_dot(relative, up) * anvil_camera_focal / depth;
-  out->depth = depth;
-  return 1;
+  return anvil_project_camera(anvil_to_camera(p), out);
 }
 
 static void anvil_triangle(AnvilProjected a, AnvilProjected b, AnvilProjected c,
                            uint32_t color, int alpha) {
   double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-  if (fabs(area) < 1e-8)
+  if (!isfinite(area) || fabs(area) < 1e-8 || !isfinite(a.x) ||
+      !isfinite(a.y) || !isfinite(b.x) || !isfinite(b.y) ||
+      !isfinite(c.x) || !isfinite(c.y))
     return;
-  int minx = (int)floor(fmin(a.x, fmin(b.x, c.x))),
-      maxx = (int)ceil(fmax(a.x, fmax(b.x, c.x)));
-  int miny = (int)floor(fmin(a.y, fmin(b.y, c.y))),
-      maxy = (int)ceil(fmax(a.y, fmax(b.y, c.y)));
-  if (minx < 0)
-    minx = 0;
-  if (miny < 0)
-    miny = 0;
-  if (maxx >= ANVIL_WIDTH)
-    maxx = ANVIL_WIDTH - 1;
-  if (maxy >= ANVIL_HEIGHT)
-    maxy = ANVIL_HEIGHT - 1;
+  double left = fmin(a.x, fmin(b.x, c.x));
+  double right = fmax(a.x, fmax(b.x, c.x));
+  double top = fmin(a.y, fmin(b.y, c.y));
+  double bottom = fmax(a.y, fmax(b.y, c.y));
+  if (right < 0.0 || bottom < 0.0 || left >= ANVIL_WIDTH ||
+      top >= ANVIL_HEIGHT)
+    return;
+  int minx = left <= 0.0 ? 0 : (int)floor(left);
+  int maxx = right >= ANVIL_WIDTH - 1 ? ANVIL_WIDTH - 1 : (int)ceil(right);
+  int miny = top <= 0.0 ? 0 : (int)floor(top);
+  int maxy = bottom >= ANVIL_HEIGHT - 1 ? ANVIL_HEIGHT - 1 : (int)ceil(bottom);
   for (int y = miny; y <= maxy; ++y)
     for (int x = minx; x <= maxx; ++x) {
       double px = x + 0.5, py = y + 0.5;
@@ -322,13 +332,10 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
                 double rz, int r, int g, int b, int a) {
   double h = size * .5;
   AnvilVec3 v[8];
-  AnvilProjected p[8];
   for (int i = 0; i < 8; ++i) {
     AnvilVec3 q = {(i & 1) ? h : -h, (i & 2) ? h : -h, (i & 4) ? h : -h};
     q = anvil_rotate(q, rx, ry, rz);
     v[i] = (AnvilVec3){x + q.x, y + q.y, z + q.z};
-    if (!anvil_project(v[i], &p[i]))
-      return;
   }
   static const int faces[6][4] = {{0, 4, 6, 2}, {1, 3, 7, 5}, {0, 1, 5, 4},
                                   {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}};
@@ -339,39 +346,97 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
         anvil_normalize(anvil_cross(anvil_sub(v[faces[f][1]], v[faces[f][0]]),
                                     anvil_sub(v[faces[f][2]], v[faces[f][0]])));
     double brightness = .28 + .72 * fmax(0.0, anvil_dot(n, light));
-    AnvilProjected t0[3] = {p[faces[f][0]], p[faces[f][1]], p[faces[f][2]]},
-                   t1[3] = {p[faces[f][0]], p[faces[f][2]], p[faces[f][3]]};
-    anvil_triangle_lit(t0, base, brightness, a);
-    anvil_triangle_lit(t1, base, brightness, a);
+    const int triangles[2][3] = {{faces[f][0], faces[f][1], faces[f][2]},
+                                 {faces[f][0], faces[f][2], faces[f][3]}};
+    for (int t = 0; t < 2; ++t) {
+      AnvilProjected projected[4];
+      int count;
+      if (anvil_scene_is_3d) {
+        AnvilCameraVertex camera[3] = {
+            anvil_to_camera(v[triangles[t][0]]),
+            anvil_to_camera(v[triangles[t][1]]),
+            anvil_to_camera(v[triangles[t][2]])};
+        AnvilCameraVertex clipped[4];
+        count = anvil_clip_triangle_near(camera, ANVIL_NEAR_DEPTH, clipped);
+        for (int i = 0; i < count; ++i)
+          if (!anvil_project_camera(clipped[i], &projected[i])) {
+            count = 0;
+            break;
+          }
+      } else {
+        count = 3;
+        for (int i = 0; i < count; ++i)
+          if (!anvil_project(v[triangles[t][i]], &projected[i])) {
+            count = 0;
+            break;
+          }
+      }
+      for (int i = 1; i + 1 < count; ++i) {
+        AnvilProjected clipped_triangle[3] = {projected[0], projected[i],
+                                               projected[i + 1]};
+        anvil_triangle_lit(clipped_triangle, base, brightness, a);
+      }
+    }
   }
 }
 
 void anvil_sphere(double x, double y, double z, double radius, int r, int g,
                   int b, int a) {
-  AnvilProjected center;
-  if (!anvil_project((AnvilVec3){x, y, z}, &center))
+  if (radius <= 0.0 || !isfinite(radius))
     return;
-  double sr = radius * 520.0 / center.depth;
-  int rr = (int)ceil(sr), cx = (int)lrint(center.x), cy = (int)lrint(center.y);
-  uint32_t base = anvil_color(r, g, b);
-  AnvilVec3 light = anvil_normalize((AnvilVec3){-.4, .7, .6});
-  for (int py = cy - rr; py <= cy + rr; ++py)
-    for (int px = cx - rr; px <= cx + rr; ++px) {
-      double nx = (px - center.x) / sr, ny = (center.y - py) / sr,
-             q = nx * nx + ny * ny;
-      if (q > 1)
+  if (!anvil_scene_is_3d) {
+    AnvilProjected center;
+    if (!anvil_project((AnvilVec3){x, y, z}, &center))
+      return;
+    const double screen_radius = radius * 64.0;
+    int rr = (int)ceil(screen_radius);
+    int cx = (int)lrint(center.x), cy = (int)lrint(center.y);
+    uint32_t color = anvil_color(r, g, b);
+    double radius_squared = screen_radius * screen_radius;
+    for (int py = cy - rr; py <= cy + rr; ++py)
+      for (int px = cx - rr; px <= cx + rr; ++px) {
+        double dx = px - center.x, dy = py - center.y;
+        if (dx * dx + dy * dy <= radius_squared)
+          anvil_pixel(px, py, color, a);
+      }
+    return;
+  }
+
+  AnvilCameraVertex camera_center = anvil_to_camera((AnvilVec3){x, y, z});
+  AnvilPixelBounds bounds;
+  if (!anvil_project_sphere_bounds(
+          camera_center.x, camera_center.y, camera_center.depth, radius,
+          anvil_camera_focal, ANVIL_WIDTH, ANVIL_HEIGHT, &bounds))
+    return;
+
+  AnvilVec3 right, up, forward;
+  anvil_camera_basis(&right, &up, &forward);
+  AnvilVec3 world_light = anvil_normalize((AnvilVec3){-.4, .7, .6});
+  AnvilCameraVertex light = {anvil_dot(world_light, right),
+                             anvil_dot(world_light, up),
+                             anvil_dot(world_light, forward)};
+  const double ambient = 0.2;
+  for (int py = bounds.min_y; py <= bounds.max_y; ++py)
+    for (int px = bounds.min_x; px <= bounds.max_x; ++px) {
+      double ray_x = (px + 0.5 - ANVIL_WIDTH * 0.5) / anvil_camera_focal;
+      double ray_y = (ANVIL_HEIGHT * 0.54 - (py + 0.5)) / anvil_camera_focal;
+      double depth, nx, ny, nz;
+      int near_cap;
+      if (!anvil_intersect_sphere_near(
+              camera_center, radius, ray_x, ray_y, ANVIL_NEAR_DEPTH, &depth,
+              &nx, &ny, &nz, &near_cap))
         continue;
-      double nz = sqrt(1 - q);
-      double shade =
-          .2 + .8 * fmax(0.0, nx * light.x + ny * light.y + nz * light.z);
-      uint32_t c =
-          anvil_color((int)(r * shade), (int)(g * shade), (int)(b * shade));
-      double depth = center.depth - radius * nz;
-      size_t i = (size_t)py * ANVIL_WIDTH + (size_t)px;
-      if (px >= 0 && py >= 0 && px < ANVIL_WIDTH && py < ANVIL_HEIGHT &&
-          depth < anvil_depth_buffer[i]) {
-        anvil_depth_buffer[i] = depth;
-        anvil_pixel(px, py, c, a);
+      double shade = ambient +
+                     (1.0 - ambient) *
+                         fmax(0.0, nx * light.x + ny * light.y + nz * light.depth);
+      if (near_cap)
+        shade = ambient + (1.0 - ambient) * fmax(0.0, -light.depth);
+      uint32_t color = anvil_color((int)(r * shade), (int)(g * shade),
+                                   (int)(b * shade));
+      size_t index = (size_t)py * ANVIL_WIDTH + (size_t)px;
+      if (depth < anvil_depth_buffer[index]) {
+        anvil_depth_buffer[index] = depth;
+        anvil_pixel(px, py, color, a);
       }
     }
 }
@@ -386,9 +451,27 @@ void anvil_plane(double x, double y, double z, double width, double depth,
               a1 = {x + width * .5, y, z - depth * .5 + depth * t},
               a2 = {x - width * .5 + width * t, y, z - depth * .5},
               a3 = {x - width * .5 + width * t, y, z + depth * .5};
-    if (anvil_project(a0, &p0) && anvil_project(a1, &p1))
+    int line0_visible;
+    if (anvil_scene_is_3d) {
+      AnvilCameraVertex c0 = anvil_to_camera(a0), c1 = anvil_to_camera(a1);
+      line0_visible = anvil_clip_segment_near(&c0, &c1, ANVIL_NEAR_DEPTH) &&
+                      anvil_project_camera(c0, &p0) &&
+                      anvil_project_camera(c1, &p1);
+    } else {
+      line0_visible = anvil_project(a0, &p0) && anvil_project(a1, &p1);
+    }
+    if (line0_visible)
       anvil_line(p0.x, p0.y, p1.x, p1.y, r, g, b, a, 1);
-    if (anvil_project(a2, &p2) && anvil_project(a3, &p3))
+    int line1_visible;
+    if (anvil_scene_is_3d) {
+      AnvilCameraVertex c2 = anvil_to_camera(a2), c3 = anvil_to_camera(a3);
+      line1_visible = anvil_clip_segment_near(&c2, &c3, ANVIL_NEAR_DEPTH) &&
+                      anvil_project_camera(c2, &p2) &&
+                      anvil_project_camera(c3, &p3);
+    } else {
+      line1_visible = anvil_project(a2, &p2) && anvil_project(a3, &p3);
+    }
+    if (line1_visible)
       anvil_line(p2.x, p2.y, p3.x, p3.y, r, g, b, a, 1);
   }
   (void)base;
