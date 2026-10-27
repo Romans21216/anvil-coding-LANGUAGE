@@ -2,56 +2,104 @@
 
 **Review date:** 2026-10-27  
 **Source format:** `.ANVL`  
-**Latest completed independent evaluation:** **86/100 — FAIL** (requested threshold: 90/100; review preceded the new `while` feature)
+**Latest completed independent full review:** **89/100 — FAIL** (threshold: 90/100)  
+**Review snapshot:** before the score-record correction in this revision; a fresh rubric review is pending.
 
 ## Scope
 
-Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime has a fixed-size software 2D/3D renderer, keyboard camera controls, fixed-step updates, seeded random/noise functions, a minimal numeric UDP API, and built-in `ray_sphere(x,y,z,radius)`. Ray spheres use CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries; the documented per-batch limit is 32. This is not a production engine. Assets, audio, physics, cross-platform support, a Rust backend, RTX/DXR, and Embree remain unimplemented.
+Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit.
 
-The `.ANVL` suffix was chosen by the user. Functions support numeric parameters, numeric return values, recursion, and function-local numeric state. `while` loops are implemented; `for` loops, arrays, user-defined structures, and modules/imports are not implemented.
+This is not a production engine. Assets, audio, physics, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state, and `while` loops. `for` loops, arrays, structures, and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
 
 ## Verification
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 32 tests (including `while` execution and missing-condition diagnostics) |
-| `npm test --prefix vscode-extension` | PASS — extension manifest/config and TextMate token scopes |
-| Build `game.ANVLproj` with MSVC | PASS — reviewer built `build/audit_360_game.exe` |
-| Build and run `examples/functions.ANVL` | PASS — reviewer built executable; it printed `13` |
-| Native runtime integration | PASS — fixed-step updates, delta, queued Space key edge, and clean shutdown covered |
-| Projected sphere bounds regression | PASS — compiled production projection helper sampled sphere surfaces at centered, off-axis, and near-camera positions |
-| VS Code package | PASS — VSIX package exists and extension grammar checks pass |
-| VS Code extension installation | PASS — installed VSIX with VS Code 1.143.1; `code --list-extensions --show-versions` reports `anvil-engine.anvil-language-support@0.1.0` |
-| VS Code language mode and visible sample highlighting | NOT VISUALLY VERIFIED in this review |
-| Live game window visual inspection | NOT PERFORMED in the latest independent review |
+| `python -m unittest discover -s tests -q` | PASS — 32 tests |
+| `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes |
+| MSVC release build of `game.ANVLproj` | PASS |
+| MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
+| Nested `while` inside `if/else` and another `while` | PASS — independent build/run output `13` |
+| Native runtime integration | PASS — fixed-step updates, delta, queued Space edge, and clean shutdown covered |
+| Projected sphere bounds regression | PASS — production projection helper sampled centered, off-axis, and near-camera sphere surfaces |
+| VS Code extension installation | PASS — VS Code 1.143.1 lists `anvil-engine.anvil-language-support@0.1.0` in the isolated extension directory |
+| VS Code package registration | PASS — language ID `anvil`, `.ANVL`/`.anvl`, grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
+| Visible VS Code language mode/sample colors | NOT VERIFIED visually |
+| Live game window in latest review | NOT INSPECTED |
 
-Earlier display and editor evidence in prior reports is historical, not part of the latest independent review. Current test/build results demonstrate a working prototype path, not production readiness or measured performance.
+These checks verify the prototype workflows and selected regression cases. They do not establish production readiness, cross-platform behavior, or performance.
 
 ## Independent 50-criterion review
 
-The latest completed full independent reviewer scored the project **86/100**, below the 90-point acceptance threshold, before the `while` feature was added. A focused follow-up review passed loop parsing, nesting, and code generation; it did not rescore the full 50-criterion rubric. The rubric below is retained as the previous full review.
+The latest completed independent review scored **89/100 (89%)**, below the 90-point threshold. The scoring below preserves that review snapshot. The evaluator found the open editor's visual language mode unverified and the project's full engine scope incomplete. It also found that this report still listed 86 as the latest score; that reporting defect is corrected in the current revision, and a fresh rubric review is pending.
 
-| Criteria | Scores |
-|---|---|
-| 1–10: Requirement fulfillment | 2, 1, 1, 2, 1, 2, 2, 1, 1, 2 (**15/20**) |
-| 11–20: Functionality and reliability | 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 (**20/20**) |
-| 21–30: Code quality and architecture | 2, 1, 1, 2, 2, 2, 1, 2, 2, 2 (**17/20**) |
-| 31–40: Testing and verification | 2, 2, 2, 2, 2, 2, 2, 0, 2, 1 (**17/20**) |
-| 41–50: Developer experience and delivery | 2, 2, 2, 2, 2, 1, 1, 2, 2, 1 (**17/20**) |
-| **Total** | **86/100 — FAIL** |
+| # | Criterion | Score | Evidence, deduction, and status |
+|---:|---|:---:|---|
+| 1 | Explicit requirements identified | 2 | Compiler, runtime, language, extension, and documentation requirements are identified. |
+| 2 | Implicit requirements addressed | 1 | The broad game-engine backlog is only partly implemented; planned systems remain. |
+| 3 | Functionality matches intended goal | 1 | Working Windows prototype, but not the requested full engine. |
+| 4 | Required deliverables present | 2 | Repository includes compiler, runtime, docs, examples, tests, and VS Code extension. |
+| 5 | No essential feature missing | 1 | GPU renderer, assets, audio, physics, and broader multiplayer remain unfinished. |
+| 6 | Stated constraints respected | 2 | `.ANVL` is consistently used as requested. |
+| 7 | Ambiguity resolved logically | 2 | Current C/MSVC prototype scope and limitations are documented. |
+| 8 | Behavior matches documentation | 2 | Latest review found language/compiler/engine guides aligned after fixes. |
+| 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
+| 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
+| 11 | Core functionality works | 2 | Compiler, native runtime, camera, rendering, and CPU BVH ray spheres build. |
+| 12 | Secondary functionality works | 2 | Timing, input, math/noise, networking primitive, and loops are covered. |
+| 13 | Primary workflows functional | 2 | Direct source and manifest build/run workflows pass. |
+| 14 | Inputs validated | 2 | Syntax, arity, references, manifest fields, paths, rates, and ports are checked. |
+| 15 | Errors handled gracefully | 2 | Invalid source and project inputs produce controlled diagnostics. |
+| 16 | Edge cases covered | 2 | Tests cover invalid syntax, scope/arity, loop condition, timing, and projection bounds. |
+| 17 | Invalid inputs controlled | 2 | Malformed inputs are rejected before generating/building C. |
+| 18 | Stable across repeated operations | 2 | Compiler/runtime tests and repeatable random/noise checks pass. |
+| 19 | No known critical defects | 2 | No critical code defect reproduced; prior docs defects were corrected. |
+| 20 | Components integrate | 2 | Compiler, generated C, runtime, manifest, extension, and networking sample integrate. |
+| 21 | Logical project structure | 2 | Compiler, runtime, examples, tests, docs, and extension are organized. |
+| 22 | Readable and consistently formatted | 1 | Compiler remains densely formatted; reformatting is still recommended. |
+| 23 | Clear module responsibilities | 1 | Parsing, validation, C generation, and build orchestration remain concentrated in `compiler/anvil.py`. |
+| 24 | Consistent descriptive naming | 2 | Anvil identity and `.ANVL` naming are consistent. |
+| 25 | Duplication minimized | 2 | Reviewer found no material duplicate/unused code issue. |
+| 26 | Dependencies appropriate | 2 | Core compiler uses Python standard library and the documented native toolchain. |
+| 27 | Supports future extensions | 1 | Current runtime/backend is Windows/MSVC and C-only. |
+| 28 | No unfinished placeholders | 2 | Unsupported capabilities are described as future work. |
+| 29 | Configuration understandable | 2 | TOML project settings are explicit and validated. |
+| 30 | Conventions followed | 2 | Current Python, C, TOML, and extension conventions are adequate. |
+| 31 | Automated tests provided | 2 | 32 Python tests and VS Code grammar validation are present. |
+| 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, and generated executable paths are covered. |
+| 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
+| 34 | Edge cases explicitly tested | 2 | Loop diagnostics and runtime timing/projection cases are tested. |
+| 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
+| 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
+| 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest and function samples. |
+| 38 | Results recorded accurately | 1 | This review snapshot exposed stale 86/100 score text; corrected here, full review pending. |
+| 39 | Regression checks performed | 2 | 32 tests pass after loop and documentation fixes. |
+| 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
+| 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
+| 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
+| 43 | Usage understandable | 2 | Guides and examples explain the supported syntax and build path. |
+| 44 | Design decisions documented | 2 | Runtime, compiler backend, renderer, ray tracing, and networking limits are described. |
+| 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
+| 46 | Opens in intended environment | 1 | VS Code install is confirmed, but visible workspace mode was not inspected. |
+| 47 | Editor integration works | 2 | VSIX, extension registration, grammar tests, and isolated installation pass. |
+| 48 | Deliverables organized | 2 | Repository separates source, runtime, tests, docs, examples, and extension. |
+| 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
+| 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
+| | **Requirement fulfillment** | **16/20** | |
+| | **Functionality and reliability** | **20/20** | |
+| | **Code quality and architecture** | **17/20** | |
+| | **Testing and verification** | **18/20** | |
+| | **Developer experience and delivery** | **18/20** | |
+| | **Total** | **89/100 — FAIL** | |
 
-Main deductions: the full engine backlog is substantially incomplete; compiler responsibilities and formatting are concentrated in one file; visible editor language mode was not verified; and evaluation documents had become stale and contradictory. Criterion 38 scored zero because the prior QA report had inaccurate test counts and a superseded score. Both confirmed documentation issues have since been corrected and closed. The Python suite now passes 32 tests, and this report records the added loop feature. VS Code installation was confirmed after the prior full review.
+### Priorities from the review
+
+1. Continue the game-engine backlog: GPU rendering, assets, audio, physics, richer data structures, robust networking, benchmarks, and portability.
+2. Split and format the compiler into clear parser, validation, C generation, and build modules.
+3. Verify the extension's visible language mode and sample highlighting in an editor session.
+4. Keep evaluation scores and verification results synchronized with every fresh review.
 
 ## Bug tracking
 
-The reviewer filed [issue #1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), **Codex Bugs: evaluation documents contradict current compiler and test results**, and [issue #2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), **Codex Bugs: compiler guide says while loops are unsupported**. Both carried the `Codex Bugs` label and were closed after the reports were corrected. Missing roadmap features are not classified as bugs.
-
-## Next priorities
-
-1. Continue implementing the user's improvement backlog in small, tested increments.
-2. Split parser, validation, C generation, and build orchestration into modules.
-3. Visually verify the installed extension's language mode and sample highlighting in an editor session.
-4. Expand renderer features and add pixel-level visual regression checks.
-5. Improve networking reliability and portability before treating it as multiplayer infrastructure.
-6. Add benchmarks before claiming high or “hyper-efficient” performance.
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), [#2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), and [#3](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/3) were filed by the independent reviewer with the `Codex Bugs` label and closed after their documentation defects were corrected. The stale evaluation score was filed as [issue #4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4), also with the `Codex Bugs` label; it is being fixed in this revision.
 
