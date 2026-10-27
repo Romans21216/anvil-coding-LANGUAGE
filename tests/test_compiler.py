@@ -49,6 +49,28 @@ class CompilerTests(unittest.TestCase):
             self.assertIn(f"{source}:1: unsupported Anvil language version value too large; compiler supports version 1", result.stderr)
             self.assertNotIn("Traceback", result.stderr)
 
+    def test_unicode_decimal_digit_is_rejected_as_invalid_anvil_syntax(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "unicode-digit.ANVL"
+            generated = pathlib.Path(temp) / "unicode-digit.c"
+            source.write_text("fn(main)\n  output ١\nend\ncall fn(main)\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(f"{source}:2: invalid expression near", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertFalse(generated.exists(), "invalid Unicode numeric syntax must fail before C generation")
+
+    def test_oversized_array_length_is_rejected_without_integer_conversion_error(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "oversized-array.ANVL"
+            generated = pathlib.Path(temp) / "oversized-array.c"
+            source.write_text("array huge(" + ("9" * 5000) + ")\nfn(main)\nend\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(f"{source}:1: array size must be between 1 and 1048576", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertFalse(generated.exists(), "invalid array size must fail before C generation")
+
     def test_game_source_emits_native_renderer_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             c_file = pathlib.Path(temp) / "world.c"

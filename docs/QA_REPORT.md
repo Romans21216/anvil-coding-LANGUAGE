@@ -2,9 +2,10 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest independent evaluation:** **89/100 — FAIL** (documentation follow-up commit `702d8792d4270a75c0db67b2300fc03da3409240`) against the user's **98/100** threshold. The critic confirmed that the 50 criterion scores sum to 89, the categories sum to 89, and Markdown/JSON status counts match (12 complete, 3 partial, 435 needing verification, 0 in progress). It verified JSON, `git diff --check`, and the 450-item source-of-truth constraint; issues #35 and #36 are fixed. The commit is documentation-only, so the critic did not rerun runtime tests; the preceding full code review on `ed08f43` passed 64 Python tests, extension validation, Python compilation, and an MSVC numeric demo (output `17`). The score remains below 98.
+**Latest independent evaluation:** **84/100 — FAIL** (exact commit `3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef`) against the user's **98/100** threshold. Category scores: requirements 15/20, functionality/reliability 16/20, architecture 17/20, testing 19/20, delivery 17/20. The critic verified the 64-test suite, extension validation, Python compilation, MSVC conformance example output `6`, JSON/Markdown counts (12 complete, 3 partial, 434 needing verification, 1 in progress), and the 450-item issue #23 invariant. It found five conformance defects in the new language specification/compiler boundary plus trailing whitespace. Findings are tracked as `Codex Bugs` issues #37–#42. Score arithmetic is 15+16+17+19+17=84; the threshold remains 98.
 **Current passing threshold:** 98/100, set by the user on 2026-10-27. Historical reviews keep their original scores and results; a historical 90/100 PASS does not meet the new threshold.
-**Review snapshot:** the latest reviewer evaluated exact documentation snapshot `702d8792d4270a75c0db67b2300fc03da3409240`, confirmed issue #35's score reconciliation, issue #36's Markdown/JSON synchronization, and issue #23's 450-item source-of-truth rule. JSON and diff checks pass, and the worktree is clean. This docs-only review did not rerun runtime tests; compiler candidate `ed08f43` previously passed 64 Python tests, extension validation, Python compilation, and an MSVC numeric demo build/run (output `17`). Extension 0.1.4 remains installed; the user has not approved a newer install, so newer visible highlighting remains unverified.
+**Review snapshot:** the latest reviewer evaluated exact commit `3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef`. The 50 criterion scores and category totals agree at 84; the critic reran 64 Python tests, extension validation, Python compilation, the MSVC conformance example (output `6`), and checked issue #23's 450-item invariant. Issues #37–#42 record the findings. The reviewer reported that `git diff --check HEAD^ HEAD` fails on trailing spaces at `docs/LANGUAGE_SPEC.md:3–4`. Extension 0.1.4 remains installed per user preference; newer visible highlighting remains unverified.
+**Unreviewed fix candidate:** The working tree now addresses #37–#42. Its checks pass: 66 Python tests; extension validation; Python compilation; MSVC release builds of the numeric demo (run output `17`) and starter world; documented conformance example (run output `6`); manual rejection checks for unpositioned text and spaced camera expressions; 5,000-digit array-size diagnostic; and `git diff --check`. These are candidate results only. The latest official score remains 84/100 until a critic evaluates the exact fix commit.
 
 ## Scope
 
@@ -35,16 +36,17 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 | Visible VS Code language mode/sample colors | PASS — 0.1.4 was opened on `examples/ray_backends.ANVL`; Anvil mode and visible highlighting for `ray_backend` and `ray_backend_available` were confirmed during installation verification. The independent evaluator confirmed installation and automated token tests, but did not take a fresh screenshot. |
 | New physics built-ins visible highlighting | NOT VERIFIED in installed editor — automated grammar test passes for 0.1.7; 0.1.4 remains installed |
 | Ray backend API sample | PASS — MSVC release build and execution of `examples/ray_backends.ANVL`; output `1`. BVH works; DXR/Embree are reported unavailable. |
-| `git diff --check` | PASS — clean in independent review |
+| `git diff --check HEAD^ HEAD` on reviewed commit `3cd390c` | FAIL — critic reproduced trailing spaces at `docs/LANGUAGE_SPEC.md:3–4`; issue #42. The unreviewed fix candidate passes `git diff --check`. |
+| Spec conformance example | PASS — critic built with MSVC and ran the native executable; output `6` |
 | Live game window in latest review | NOT INSPECTED |
 
 These checks verify the prototype workflows and selected regression cases. They do not establish production readiness, cross-platform behavior, or performance.
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Latest independent review — documentation snapshot `702d879`
+## Latest independent review — language-specification snapshot `3cd390c`
 
-**89/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 18/20; developer experience and delivery 18/20. The critic verified that the individual criterion scores and category totals both sum to 89, Markdown/JSON ledger counts match, JSON parses, `git diff --check` passes, and issue #23 still contains 450 unique sequential entries. It made no new finding; issues #35/#36 are verified fixed and closed. This was a documentation-only review, so runtime checks were not repeated; the underlying code review on `ed08f43` passed 64 tests, extension validation, Python compilation, and an MSVC numeric demo build/run (output `17`). The 98-point threshold remains unmet.
+**84/100 — FAIL** against the required 98/100. Category totals: requirements 15/20; functionality and reliability 16/20; code quality and architecture 17/20; testing and verification 19/20; developer experience and delivery 17/20. The critic verified the criterion/category arithmetic, matching implementation ledgers, valid JSON, 450 unique sequential issue #23 entries with no full-list repository duplicate, 64 passing tests, extension validation, Python compilation, and an MSVC build/run of the new conformance example (output `6`). Findings: Unicode numeric tokens are accepted but emit invalid C; display text grammar omits required `-l(x,y)`; the display integer suffix ordering is wrong; camera perspective's expression grammar exceeds parser capability; accepted `set var(name) = null` syntax is undocumented; and the new specification has trailing whitespace. These are tracked in issues #37–#42, all labeled `Codex Bugs`. The current score remains below the 98-point threshold.
 
 ## Historical independent 50-criterion review — commit `2a745bb`
 
@@ -59,21 +61,21 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 5 | No essential feature missing | 1 | GPU renderer, assets, audio, 3D/advanced physics, and broader multiplayer remain unfinished. |
 | 6 | Stated constraints respected | 2 | `.ANVL` is consistently used as requested. |
 | 7 | Ambiguity resolved logically | 2 | Current C/MSVC prototype scope and limitations are documented. |
-| 8 | Behavior matches documentation | 2 | Latest critic directly verified the 5,000-digit version header produces the documented path-and-line diagnostic without traceback; issue #32 is closed. |
+| 8 | Behavior matches documentation | 1 | **Finding:** New normative language spec diverges from parser behavior: Unicode number handling, display text location/suffix syntax, camera-perspective token parsing, and accepted `null` cleanup statement. Critic reproduced these on `3cd390c`; issues #37–#41. |
 | 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
 | 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
 | 11 | Core functionality works | 2 | The reviewer confirmed `receive()` rejects a non-finite UDP value with the promised source-located diagnostic; issue #30 is resolved. |
 | 12 | Secondary functionality works | 2 | Timing, input, math/noise, networking primitive, and native-tested `while`/`for` loops are covered. |
 | 13 | Primary workflows functional | 2 | Direct source and manifest build/run workflows pass. |
-| 14 | Inputs validated | 2 | The latest critic verified a 5,000-digit version value is rejected without traceback; issue #32 is closed. |
-| 15 | Errors handled gracefully | 2 | The latest critic verified source-located handling for the oversized version case; issue #32 is closed. |
-| 16 | Edge cases covered | 2 | Tests cover overflow and non-finite UDP packets, finite network input, and unavailable sockets, along with recursion, array, and physics edge cases. |
-| 17 | Invalid inputs controlled | 2 | The oversized version input returns a controlled source-located diagnostic; issue #32 is closed. |
+| 14 | Inputs validated | 1 | **Finding:** `compiler/anvil.py` accepts Arabic-Indic digit `١` through its Unicode digit regex, emits it into C, then MSVC fails instead of rejecting the invalid Anvil number. Issue #37. |
+| 15 | Errors handled gracefully | 1 | **Finding:** The Unicode digit case reaches a generic compiler subprocess failure instead of a source-located Anvil diagnostic. Issue #37. |
+| 16 | Edge cases covered | 1 | **Finding:** No regression covers Unicode decimal digits accepted by `\d` although the spec promises ASCII-only digits; issue #37. |
+| 17 | Invalid inputs controlled | 1 | **Finding:** Arabic-Indic numeric input is not rejected at the Anvil source boundary; generated-C failure occurs later. Issue #37. |
 | 18 | Stable across repeated operations | 2 | Compiler/runtime tests and repeatable random/noise checks pass. |
 | 19 | No known critical defects | 2 | The recursive-array stack-exhaustion finding is fixed; the physics reviewer found no critical issue in the reviewed physics paths. |
 | 20 | Components integrate | 2 | Compiler, generated C, runtime, manifest, extension, and networking sample integrate. |
 | 21 | Logical project structure | 2 | Compiler, runtime, examples, tests, docs, and extension are organized. |
-| 22 | Readable and consistently formatted | 1 | Compiler remains densely formatted; reformatting is still recommended. |
+| 22 | Readable and consistently formatted | 1 | Compiler remains densely formatted. The critic also found `git diff --check HEAD^ HEAD` fails on trailing spaces in the new spec; issue #42. |
 | 23 | Clear module responsibilities | 1 | Parsing, validation, C generation, and build orchestration remain concentrated in `compiler/anvil.py`. |
 | 24 | Consistent descriptive naming | 2 | Anvil identity and `.ANVL` naming are consistent. |
 | 25 | Duplication minimized | 2 | Reviewer found no material duplicate/unused code issue. |
@@ -89,27 +91,30 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 1 | Review `c648ccb` found the criterion-score sum and Markdown status ledger inconsistent; corrected in `727d349` and independently verified. Issues #35/#36 are closed. |
+| 38 | Results recorded accurately | 2 | Critic `3cd390c` verified current review arithmetic, synchronized ledgers, test evidence, and backlog total. Issues #35/#36 remain resolved. |
 | 39 | Regression checks performed | 2 | The independent review of `ed08f43` reran 64 tests, extension validation, Python compilation, MSVC numeric demo, and diff check. The previous wording incorrectly reported 61 for `2dd1d8e`, which ran 63. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
 | 43 | Usage understandable | 2 | Guides and examples explain the supported syntax and build path. |
-| 44 | Design decisions documented | 2 | High-level evaluation and completion docs now describe per-body friction range 0–1, default 0.5, geometric-mean mixing, and normal-impulse clamping. The reviewer confirmed consistency; issue #27 is resolved. |
+| 44 | Design decisions documented | 1 | **Finding:** New normative language specification contains several mismatches with compiler-accepted behavior, including display and camera syntax; issues #38–#41. |
 | 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
 | 46 | Opens in intended environment | 2 | The evaluator confirmed extension 0.1.4 installed; visible Anvil mode had previously been verified for the ray-backend sample. |
 | 47 | Editor integration works | 1 | **Problem:** newer grammar tokens are not verified in the installed editor. **Evidence:** automated grammar validation passes, but the user kept 0.1.4 installed. **Impact:** visible syntax coloring for newer built-ins remains unverified. **Status:** pending user preference; tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24). |
 | 48 | Deliverables organized | 2 | Source, runtime, examples, tests, docs, extension grammar, and packaged VSIX are in their expected folders; the reviewer confirmed a clean worktree before and after verification. |
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
-| | **Requirement fulfillment** | **16/20** | |
-| | **Functionality and reliability** | **20/20** | |
+| | **Requirement fulfillment** | **15/20** | |
+| | **Functionality and reliability** | **16/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **18/20** | |
-| | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **89/100** | Latest review FAIL under the 98-point requirement. |
+| | **Testing and verification** | **19/20** | |
+| | **Developer experience and delivery** | **17/20** | |
+| | **Total** | **84/100** | Latest review FAIL under the 98-point requirement. |
 
 ### Deduction details and follow-up
+
+- **Latest critic findings on `3cd390c` (84/100 — FAIL; required pass score 98).** All findings below are labeled `Codex Bugs`; exact reproductions and acceptance criteria are in [#37](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/37)–[#42](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/42). #37: lexer accepts Arabic-Indic `١` through Unicode `\d`, emits it into generated C, then MSVC fails with a generic subprocess error. #38: normative `display text("Hello")` grammar omits required `-l(x,y)`. #39: display grammar places the ignored legacy integer suffix after style flags, unlike compiler/examples. #40: camera grammar claims arbitrary expressions but parser splits into exactly three whitespace tokens. #41: spec omits accepted no-op `set var(name) = null`, used in `examples/numeric_demo.ANVL`. #42: trailing spaces on spec lines 3–4 make `git diff --check HEAD^ HEAD` fail. The independent critic reran 64 tests, extension validation, Python compilation, and MSVC conformance example (output `6`); these checks did not cover the Unicode-token failure.
+- **Criteria 8, 14–17, 22, and 44 deductions from the latest review.** Evidence and fixes are tracked in #37–#42 above. The current specification and compiler behavior must be aligned before item #50 can be marked complete.
 
 - **Issues #32, #33, and #34 — resolved:** the critic of `ed08f43` verified the 5,000-digit diagnostic, the progress wording fix, and the correction distinguishing the 64-test `ed08f43` run from the 63-test `2dd1d8e` run.
 - **Issues #35 and #36 — resolved:** review `727d349` verified that rubric rows sum to 89 and the Markdown implementation ledger matches JSON. The evaluator's 89/100 score remains below the user's 98-point bar for broader engine-scope, architecture, and editor-verification reasons.
@@ -134,5 +139,5 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 
 ## Bug tracking
 
-Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed evaluator findings are recorded in [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) (VS Code 0.1.3 install/highlighting), [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (historical QA synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (tracked generated C), [#19](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/19) (test output side effects), [#20](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/20) (evaluation arithmetic), [#21](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/21) (recursive local-array stack exhaustion), and [#22](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/22) (QA synchronization after physics); resolved issues are closed. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 extended physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15).
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed evaluator findings are recorded in [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) (VS Code 0.1.3 install/highlighting), [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (historical QA synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (tracked generated C), [#19](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/19) (test output side effects), [#20](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/20) (evaluation arithmetic), [#21](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/21) (recursive local-array stack exhaustion), and [#22](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/22) (QA synchronization after physics). Latest item #50 findings are [#37](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/37)–[#42](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/42), each labeled `Codex Bugs`. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 extended physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15).
 

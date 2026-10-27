@@ -152,7 +152,7 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
                 raise CompileError(f"{path}:{line_no}: language version declaration must appear before all other source code")
             if version_declared:
                 raise CompileError(f"{path}:{line_no}: language version may only be declared once")
-            declaration = re.fullmatch(r"language\s+version\s+(\d+)", line)
+            declaration = re.fullmatch(r"language\s+version\s+([0-9]+)", line)
             if not declaration:
                 raise CompileError(f"{path}:{line_no}: language version declaration must use 'language version N'")
             version_declared = True
@@ -173,11 +173,17 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
         for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", line):
             local_references.append((reference.group(1), line_no,
                                      current_function.name if current_function else None))
-        array_decl = re.fullmatch(r"array\s+([A-Za-z_][\w-]*)\s*\(\s*(\d+)\s*\)", line)
+        array_decl = re.fullmatch(r"array\s+([A-Za-z_][\w-]*)\s*\(\s*([0-9]+)\s*\)", line)
         if array_decl:
             name, raw_size = array_decl.groups()
-            size = int(raw_size)
-            if not 1 <= size <= MAX_ARRAY_SIZE:
+            normalized_size = raw_size.lstrip("0") or "0"
+            max_array_text = str(MAX_ARRAY_SIZE)
+            if (len(normalized_size) > len(max_array_text)
+                    or (len(normalized_size) == len(max_array_text)
+                        and normalized_size > max_array_text)):
+                raise CompileError(f"{path}:{line_no}: array size must be between 1 and {MAX_ARRAY_SIZE}")
+            size = int(normalized_size)
+            if size < 1:
                 raise CompileError(f"{path}:{line_no}: array size must be between 1 and {MAX_ARRAY_SIZE}")
             if current_function is None:
                 if len(stack) != 1:
@@ -329,10 +335,10 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
                 node = Node("clear", line_no, value=line[len("clear rgba"):])
             elif line.startswith("display "):
                 node = Node("display", line_no, value=line[len("display "):])
-            elif (m := re.fullmatch(r"net\s+host\((\d+)\)", line)):
+            elif (m := re.fullmatch(r"net\s+host\(([0-9]+)\)", line)):
                 validate_port(path, line_no, m.group(1))
                 node = Node("net_host", line_no, value=m.group(1))
-            elif (m := re.fullmatch(r'net\s+join\(("(?:\\.|[^"\\])*")\s*,\s*(\d+)\)', line)):
+            elif (m := re.fullmatch(r'net\s+join\(("(?:\\.|[^"\\])*")\s*,\s*([0-9]+)\)', line)):
                 validate_port(path, line_no, m.group(2))
                 node = Node("net_join", line_no, value=m.group(1) + "," + m.group(2))
             elif line.startswith("net send(") and line.endswith(")"):
@@ -381,7 +387,7 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
     return functions, top, variables, arrays
 
 
-TOKEN = re.compile(r'''\s*(?:(\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)|("(?:\\.|[^"\\])*")|(var\([A-Za-z_][\w-]*\))|(local\([A-Za-z_][\w-]*\))|(<=|>=|!=|==|[(),+\-*/%=<>])|([A-Za-z_][\w-]*))''')
+TOKEN = re.compile(r'''\s*(?:([0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)|("(?:\\.|[^"\\])*")|(var\([A-Za-z_][\w-]*\))|(local\([A-Za-z_][\w-]*\))|(<=|>=|!=|==|[(),+\-*/%=<>])|([A-Za-z_][\w-]*))''')
 
 
 BUILTINS = {
@@ -679,7 +685,7 @@ def emit_display(path: pathlib.Path, node: Node, ind: str,
         loc = [expr(path, node.line, v, functions, scope=scope, arrays=arrays) for v in split_args(lm.group(1))]
         if len(loc) != 2: raise CompileError(f"{path}:{node.line}: -l expects x,y")
         raw = raw.replace(lm.group(0), "")
-    call = re.fullmatch(r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+\d+)?", raw.strip())
+    call = re.fullmatch(r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?", raw.strip())
     if not call:
         raise CompileError(f"{path}:{node.line}: malformed display command")
     shape, arg_text = call.groups()

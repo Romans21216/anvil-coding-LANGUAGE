@@ -5,27 +5,34 @@
   "last_completed_batch": 8,
   "last_completed_backlog_item": 49,
   "current_active_item": 50,
-  "current_active_item_status": "Backlog item #50 is in progress. docs/LANGUAGE_SPEC.md defines the current v1 language, the conformance example was accepted by the compiler's --emit-c path, and independent source review is pending. Latest critic score remains 89/100, below the required 98/100.",
-  "current_candidate_commit": "pending item #50 documentation commit",
-  "latest_verified_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
-  "last_pushed_reviewed_below_threshold_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
-  "latest_independently_reviewed_candidate_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
+  "current_active_item_status": "Backlog item #50 is in progress. Critic 3cd390c scored 84/100 and findings #37–#42 are tracked as Codex Bugs. Candidate fixes align the spec/compiler, with 66 tests, extension validation, Python compilation, MSVC examples, and diff check passing; fixes await independent review.",
+  "current_candidate_commit": "fix candidate pending",
+  "latest_verified_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
+  "last_pushed_reviewed_below_threshold_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
+  "latest_independently_reviewed_candidate_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Exact documentation snapshot 702d879 scored 89/100 against 98/100. Critic confirmed #34–#36 follow-ups are resolved, rubric scores sum to 89, Markdown and JSON counts agree, and issue #23 remains the sole full-list location.",
+  "latest_push_result": "Exact language specification commit 3cd390c scored 84/100 — FAIL against 98/100. The critic verified arithmetic and ledgers, built and ran the conformance example (output 6), and found issues #37–#42; all are labeled Codex Bugs and require fixes.",
   "latest_independent_review": {
-    "commit": "702d8792d4270a75c0db67b2300fc03da3409240",
-    "score": 89,
+    "commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
+    "score": 84,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
     "current_required_threshold": 98,
     "current_threshold_status": "BELOW_THRESHOLD",
-    "findings": [],
+    "findings": [
+      {"issue": 37, "summary": "Unicode decimal digit ١ passes lexer and is emitted into C; MSVC fails generically instead of a source-located Anvil diagnostic."},
+      {"issue": 38, "summary": "Normative display text grammar omits the required -l(x,y) location."},
+      {"issue": 39, "summary": "Display grammar places the legacy integer suffix after style flags, unlike the compiler and sample."},
+      {"issue": 40, "summary": "Camera perspective grammar permits arbitrary expressions that the whitespace-token parser rejects."},
+      {"issue": 41, "summary": "Spec omits accepted no-op set var(name) = null syntax used by examples/numeric_demo.ANVL."},
+      {"issue": 42, "summary": "New language specification has trailing whitespace; git diff --check HEAD^ HEAD fails."}
+    ],
     "categories": {
-      "requirements": "16/20",
-      "functionality_reliability": "20/20",
+      "requirements": "15/20",
+      "functionality_reliability": "16/20",
       "code_architecture": "17/20",
-      "testing_verification": "18/20",
-      "developer_experience_delivery": "18/20"
+      "testing_verification": "19/20",
+      "developer_experience_delivery": "17/20"
     }
   },
   "previous_independent_review": {
@@ -41,16 +48,17 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "64 passed on code commit ed08f43, including explicit/implicit language version, malformed/duplicate/late/unsupported headers, and a 5,000-digit version regression; documentation-only review 727d349 did not rerun runtime tests",
+    "python_unittest": "64 passed in critic review of 3cd390c; includes explicit/implicit language version, malformed/duplicate/late/unsupported headers, and a 5,000-digit version regression",
     "vscode_extension_validation": "passed",
     "python_compile": "passed (python -m compileall -q compiler tests)",
     "msvc_numeric_demo": "built and ran successfully; output 17",
-    "git_diff_check": "passed",
-    "implementation_status_inventory": "Full 450-item list only in issue #23 body/comment; compact audited subset has 16 entries including in-progress item #50",
+    "msvc_language_spec_example": "built with --release and ran successfully; output 6",
+    "git_diff_check": "FAIL on exact commit 3cd390c: trailing whitespace on docs/LANGUAGE_SPEC.md lines 3-4; issue #42",
+    "implementation_status_inventory": "Full 450-item list only in issue #23 body/comment; compact audited subset has 16 entries including in-progress item #50; latest reviewer verified counts 12 complete, 3 partial, 1 in progress, 434 needs verification",
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "The latest completed review 702d879 scored 89/100 and confirmed score arithmetic, Markdown/JSON status synchronization, and 450-item source-of-truth consistency. Issues #32–#36 are fixed and closed. The item #50 formal language specification is pending independent conformance review; 98/100 is the pass threshold.",
+  "pending_documentation_review": "The latest exact review 3cd390c scored 84/100 against the 98/100 pass threshold. Candidate fixes for #37–#42 have passed listed local checks; all six issues remain open until a fresh independent critic verifies the exact fix commit.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -62,7 +70,7 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
     "next_recommended_tasks": [
-    "Review and complete issue #23 item #50 (formal language specification), then pursue architecture and engine-scope deductions. Latest overall score is 89/100, below 98/100.",
+    "Obtain fresh independent review of the candidate fixes for issues #37–#42 and complete item #50; then pursue architecture and engine-scope deductions. Latest critic score is 84/100, below 98/100.",
     "Continue selecting work directly from issue #23; keep the full item list only in that issue."
   ],
   "master_backlog": {

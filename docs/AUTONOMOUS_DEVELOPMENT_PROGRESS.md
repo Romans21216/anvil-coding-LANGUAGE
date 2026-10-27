@@ -101,5 +101,20 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Deliverable:** `docs/LANGUAGE_SPEC.md` documents UTF-8 line syntax, language versioning, declarations, scope, arrays, control flow, expression precedence/evaluation, built-ins, rendering statements, runtime limits/errors, compilation, and a complete example. README, guide, and wiki now link to it.
 - **Scope:** The document states current Windows/MSVC and CPU renderer/BVH limitations; it does not present roadmap capabilities as implemented.
 - **Review:** The compiler accepted the documented conformance example and emitted C. Independent conformance check against `compiler/anvil.py` and `runtime/anvil_runtime.c` is pending. Do not mark #50 complete or change the latest QA score until reviewed.
-- **QA:** Latest critic remains 89/100 — FAIL against 98. The new document has not yet received a fresh critic review.
+- **QA:** Latest critic at this point was 89/100 — FAIL against 98. The new document had not yet received a fresh critic review.
 - **Next:** Validate and correct the specification, obtain an independent review of the exact candidate commit, then update the evaluation and ledger with that result.
+
+### Independent review follow-up — commit `3cd390c`
+
+- **Score:** 84/100 — FAIL against the required 98/100. Category scores: requirements 15/20, functionality/reliability 16/20, architecture 17/20, testing 19/20, developer experience/delivery 17/20.
+- **Checks:** Critic reran 64 Python tests, VS Code extension validation, Python compilation, status JSON/Markdown counts, and an MSVC release build/run of the conformance sample (output `6`). It verified issue #23's 450 sequential backlog entries.
+- **Findings:** Unicode decimal digits reach invalid generated C; display text grammar omits required coordinates; display suffix ordering conflicts with implementation; camera grammar promises unsupported expressions; the accepted `null` cleanup statement is omitted; trailing whitespace makes the commit diff check fail. Tracked precisely in `Codex Bugs` issues #37–#42.
+- **Evaluation:** Updated `QA_REPORT.md`, `ANVIL_EVALUATION.txt`, both state ledgers, and this progress log immediately after the critic run. The score remains below 98. Fix all six findings and rerun the critic.
+
+### Finding corrections — candidate for fresh review
+
+- **#37:** Numeric/version/array/port/display-integer token patterns now use ASCII `[0-9]`. Added a regression proving Arabic-Indic `١` returns a line diagnostic and emits no C. Also bounded huge array-size text before integer conversion and added a 5,000-digit array-size regression.
+- **#38–#41:** Updated the normative EBNF and semantic rules for mandatory text location, legacy display integer placement, whitespace-free camera coordinates, and accepted no-op `set var(name) = null`. Also included the text-number compatibility form.
+- **#42:** Removed the spec's trailing spaces; `git diff --check` now passes.
+- **Validation:** 66 Python tests pass; `npm test --prefix vscode-extension` and `python -m compileall -q compiler tests` pass. MSVC release builds pass for `examples/numeric_demo.ANVL` (run output `17`) and `examples/first_world.ANVL`. Manual negatives confirm unpositioned text and spaced camera expressions are rejected with source diagnostics; `git diff --check` passes.
+- **Review state:** Findings #37–#42 remain open until an independent critic reviews the exact fix commit. Latest critic is still 84/100; do not record a higher score until a new review runs.

@@ -1,7 +1,7 @@
 # Anvil Language Specification — Version 1
 
-**Status:** normative description of the `.ANVL` language accepted by the current compiler.  
-**Language version:** `1` (an omitted version declaration means version 1).  
+**Status:** normative description of the `.ANVL` language accepted by the current compiler.
+**Language version:** `1` (an omitted version declaration means version 1).
 **Reference implementation:** `compiler/anvil.py`; runtime behavior is implemented in `runtime/anvil_runtime.c`.
 
 This document specifies the language that exists today. It does not describe planned syntax. Anvil is a small, line-oriented, dynamically numeric language compiled ahead of time to ordinary C and linked with the Anvil runtime.
@@ -38,15 +38,17 @@ file             = { blank_line | comment_line }, [ version_line ], { blank_line
 version_line     = "language", whitespace, "version", whitespace, INTEGER, line_end ;
 top_item         = function_definition | global_array | top_level_statement ;
 function_definition = "fn(", IDENT, [ ",", parameter_list ], ")", line_end,
-                      { function_statement }, "end", line_end ;
+                      { blank_line | comment_line | function_statement }, "end", line_end ;
 parameter_list   = IDENT, { ",", IDENT } ;
 global_array     = "array", whitespace, IDENT, "(", INTEGER, ")", line_end ;
 function_statement = statement | local_array ;
+block_item       = blank_line | comment_line | function_statement ;
 local_array      = "array", whitespace, IDENT, "(", INTEGER, ")", line_end ;
-top_level_statement = global_assignment | engine_statement | "seed(", expression, ")"
+top_level_statement = global_assignment | cleanup_statement | engine_statement | "seed(", expression, ")"
                     | "net host(", INTEGER, ")" | "net join(", STRING, ",", INTEGER, ")"
                     | function_call_statement ;
 global_assignment = "set var(", IDENT, ") =", expression ;
+cleanup_statement = "set var(", IDENT, ") = null" ;
 line_end         = physical_newline | end_of_file ;
 ```
 
@@ -61,7 +63,7 @@ Scalar globals are introduced by `set var(name) = expression`. Globals begin at 
 Every statement below occupies a single source line, except that a block statement owns the following lines up to its matching `end`.
 
 ```ebnf
-statement        = assignment | accumulation | array_write | function_call_statement | net_send_statement
+statement        = assignment | cleanup_statement | accumulation | array_write | function_call_statement | net_send_statement
                  | return_statement | if_statement | while_statement
                  | for_statement | engine_statement | display_statement ;
 assignment       = "set var(", IDENT, ") =", expression
@@ -71,12 +73,14 @@ accumulation     = ("add" | "sub"), whitespace, "var(", IDENT, ")", whitespace, 
 array_write      = "set array(", IDENT, ",", expression, ") =", expression ;
 function_call_statement = "call fn(", IDENT, [ ",", argument_list ], ")" ;
 net_send_statement = "net send(", expression, ")" ;
-display_statement = "display", whitespace, display_call, { whitespace, display_style }, [ whitespace, INTEGER ] ;
+display_statement = "display", whitespace, display_call, display_tail ;
+display_tail     = { whitespace, display_style }, [ whitespace, INTEGER ], { whitespace, display_style } ;
 display_call     = "rect(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "circle(", expression, ",", expression, ",", expression, ")"
                  | "line(", expression, ",", expression, ",", expression, ",", expression,
                    [ ",", expression ], ")"
-                 | "text(", STRING, ")" | "cube(", expression, ",", expression, ",", expression, ",", expression, ")"
+                 | "text(", STRING, [ whitespace, "+", whitespace, "var(", IDENT, ")" ], ")"
+                 | "cube(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "sphere(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "ray_sphere(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "plane(", expression, ",", expression, ",", expression, ",", expression, ",", expression, ")" ;
@@ -86,13 +90,17 @@ display_style    = "-rgb(", expression, ",", expression, ",", expression, ")"
                  | "-rotate(", expression, ",", expression, ",", expression, ")" ;
 return_statement = "output", whitespace, expression ;
 if_statement    = "if", whitespace, expression, line_end,
-                  { statement }, [ "else", line_end, { statement } ], "end" ;
-while_statement = "while", whitespace, expression, line_end, { statement }, "end" ;
+                  { block_item }, [ "else", line_end, { block_item } ], "end" ;
+while_statement = "while", whitespace, expression, line_end, { block_item }, "end" ;
 for_statement   = "for local(", IDENT, ") =", expression, "to", expression,
-                  [ "step", expression ], line_end, { statement }, "end" ;
+                  [ "step", expression ], line_end, { block_item }, "end" ;
 ```
 
-The statements that may appear at file top level are limited to global `set var`, global array declarations, engine/project setup statements, `seed(expression)`, and `call fn(...)`. `add`, `sub`, `output`, local declarations, array writes, `if`, `while`, and `for` belong inside a function. Although the parser can form a top-level branch node, top-level control-flow blocks are rejected by C emission; they are not part of the accepted language.
+Semantic constraint for the grammar above: when `display_call` is `text(STRING)`, `display_tail` must contain at least one `-l(x,y)` location style; without it the compiler rejects the command.
+
+The statements that may appear at file top level are limited to global `set var`, global array declarations, engine/project setup statements, `seed(expression)`, and `call fn(...)`. `add`, `sub`, `output`, local declarations, array writes, display commands, `if`, `while`, and `for` belong inside a function. Although the parser can form a top-level branch node, top-level control-flow blocks are rejected by C emission; they are not part of the accepted language.
+
+The compatibility form `set var(name) = null` is accepted as a no-op (it neither clears nor changes the numeric variable). It remains in older examples as cleanup syntax; Anvil has no nullable scalar values.
 
 ### 3.1 Function locals and returns
 
@@ -173,7 +181,7 @@ All built-ins return a numeric result unless otherwise stated. Calls use parenth
 
 | Group | Function signatures | Meaning and limits |
 |---|---|---|
-| Clock/input | `time()`; `delta()`; `pressed(key)`; `held(key)` | Runtime time, fixed-step delta, and keyboard edge/held state. Keys include `A`–`Z`, `SPACE`, arrows, `ENTER`, and `ESCAPE`. |
+| Clock/input | `time()`; `delta()`; `pressed(key)`; `held(key)` | Runtime time, fixed-step delta, and keyboard edge/held state. Keys include the symbolic tokens `A`–`Z`, `SPACE`, arrows, `ENTER`, and `ESCAPE`; key inputs are numeric values and may also be supplied as numeric virtual-key codes. |
 | Random/noise | `seed(value)` statement; `rnd(low, high)`; `noise(x,y,z)`; `fbm(x,y,z,octaves,lacunarity,gain)` | Seeded pseudo-random values and 3D gradient/fractal noise. |
 | Math | `floor(x)`; `ceil(x)`; `sqrt(x)`; `sin(x)`; `cos(x)`; `abs(x)`; `min(a,b)`; `max(a,b)` | Double-precision math helpers. Invalid/non-finite results are rejected. |
 | Ray backend | `ray_backend(name)`; `ray_backend_available(name)` | String-literal names. `"bvh"` is selectable; only the CPU BVH backend is implemented. Availability queries for `"dxr"` and `"embree"` return false. Failed selection leaves the active backend unchanged. |
@@ -186,16 +194,17 @@ Project/window setup statements are normally written at top level:
 
 ```ebnf
 engine_statement = "scene", whitespace, ("2d" | "3d")
-                 | "camera perspective", whitespace, expression, whitespace, expression, whitespace, expression
+                 | "camera perspective", whitespace, camera_coordinate, whitespace, camera_coordinate, whitespace, camera_coordinate
                  | "camera fov(", expression, ")"
                  | "camera control(", expression, ",", expression, ")"
                  | "clear rgba(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "seed(", expression, ")"
                  | "net host(", INTEGER, ")"
                  | "net join(", STRING, ",", INTEGER, ")" ;
+camera_coordinate = ? one whitespace-free expression token sequence accepted by the expression parser ? ;
 ```
 
-`display` is a function-body statement. Supported primitives and argument counts are `rect(x,y,width,height)`, `circle(x,y,radius)`, `line(x1,y1,x2,y2[,thickness])`, `text(string)`, `cube(x,y,z,size)`, `sphere(x,y,z,radius)`, `ray_sphere(x,y,z,radius)`, and `plane(x,y,z,width,depth)`. A display command may add `-rgb(r,g,b)` or `-rgba(r,g,b,a)`; the default is opaque white. `-l(x,y)` positions text. `-rotate(x,y,z)` supplies cube rotation. The accepted optional integer immediately after a drawing call is retained as legacy syntax and has no documented semantic effect.
+`display` is a function-body statement. Supported primitives and argument counts are `rect(x,y,width,height)`, `circle(x,y,radius)`, `line(x1,y1,x2,y2[,thickness])`, `text(string)`, `cube(x,y,z,size)`, `sphere(x,y,z,radius)`, `ray_sphere(x,y,z,radius)`, and `plane(x,y,z,width,depth)`. A display command may add `-rgb(r,g,b)` or `-rgba(r,g,b,a)`; the default is opaque white. `display text(...)` requires `-l(x,y)` to provide its position. `-rotate(x,y,z)` supplies cube rotation. One optional integer suffix is accepted after the draw call, before or after style modifiers; it is retained as legacy syntax and has no documented semantic effect.
 
 `ray_sphere` submits a sphere to the per-frame CPU BVH ray tracer. The current batch supports at most 32 ray-traced spheres. Hardware RTX/DXR and Embree are unavailable. Conventional 2D/3D primitives use the current fixed-size software renderer.
 
