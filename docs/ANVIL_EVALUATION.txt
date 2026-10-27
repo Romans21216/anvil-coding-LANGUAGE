@@ -7,7 +7,7 @@ Basis: latest completed independent full review of exact pushed commit 573cb447b
 
 LATEST INDEPENDENT REVIEW AND CURRENT CANDIDATE
 -----------------------------------------------
-The prior committed C-backed review is c10260483eab6b5adaadd261a66a92a9138b9ed8 at 92/100. The direct-native commit 573cb447b6ebb6e8a9056518300384b0eaebc60e received the latest independent score: 50/100 — FAIL against 98. The evaluator found two QA test failures on that snapshot; a local follow-up fixes those tests and all 86 pass, but that follow-up has not been rescored. Issue #49 tracks native fractional-output truncation. The earlier 49/100 pre-fix native review and previous C-backed scores remain historical. Rust code generation is not a project target; direct x64 machine-code PE output is the selected direction. The legacy C backend is still the default and must be removed after native runtime parity is achieved.
+The prior committed C-backed review is c10260483eab6b5adaadd261a66a92a9138b9ed8 at 92/100. The direct-native commit 573cb447b6ebb6e8a9056518300384b0eaebc60e received the latest independent score: 50/100 — FAIL against 98. The evaluator found two QA test failures on that snapshot; committed follow-up 150a042 fixes those tests and all 86 pass, but that follow-up has not been rescored. Issue #49 tracks native fractional-output truncation. The earlier 49/100 pre-fix native review and previous C-backed scores remain historical. Rust code generation is not a project target; direct x64 machine-code PE output is the selected direction. The legacy C backend is still the default and must be removed after native runtime parity is achieved.
 
 SUMMARY
 -------
@@ -104,7 +104,7 @@ Evaluator: separate independent review agent; complete 50-criterion review.
 Score: **50/100 — FAIL** against the user's 98/100 threshold. Category subtotals: requirement fulfillment 9/20, functionality and reliability 8/20, code quality and architecture 12/20, testing and verification 10/20, developer experience and delivery 11/20.
 The evaluator ran 86 tests and found two failures in `tests.test_qa_report`; `npm test --prefix vscode-extension`, the standalone QA arithmetic script, and strict UTF-8 JSON parsing passed. It reproduced `output 17.875` printing `17`, filed as issue #49. The latest 50-point table and scoring details are in `docs/QA_REPORT.md`; this report retains the independent evaluation as plain text.
 
-The two QA failures were from tests that included historical score tables and hardcoded the old category subtotal. Issue #51 records the exact failures. The local follow-up scopes rows to the current table and adjusts its subtotal dynamically; both QA tests and the entire 86-test suite now pass. Issue #51 is closed as fixed. Those test changes are not yet committed or independently scored. The early pre-fix native snapshot scored 49/100; it is superseded by this 50/100 evaluation for commit 573cb44. The old C-backed 92/100 score remains tied to c102604 and does not apply to native compiler work.
+The two QA failures were from tests that included historical score tables and hardcoded the old category subtotal. Issue #51 records the exact failures. The follow-up in commit 150a042 scopes rows to the current table and adjusts its subtotal dynamically; both QA tests and the entire 86-test suite pass. Issue #51 is closed as fixed. This follow-up has not been independently scored. The early pre-fix native snapshot scored 49/100; it is superseded by this 50/100 evaluation for commit 573cb44. The old C-backed 92/100 score remains tied to c102604 and does not apply to native compiler work.
 
 50-CRITERION BREAKDOWN — EXACT REVIEWED COMMIT 573CB44
 -----------------------------------------------------
@@ -154,7 +154,7 @@ D. TESTING AND VERIFICATION — 10/20
 35. 1 — CLI EXE build/run works; engine integration is absent.
 36. 1 — Documented Python/npm commands are reproducible.
 37. 1 — PE build works, but reviewed full suite was red.
-38. 0 — Evaluation claimed 86 pass while reviewed execution had two QA test failures; local fixes now pass but are unreviewed.
+38. 0 — Evaluation claimed 86 pass while reviewed execution had two QA test failures; the fix in commit 150a042 passes locally but is not yet independently reviewed.
 39. 1 — Full suite detected the QA fixture problem but did not pass on reviewed commit.
 40. 0 — Full user objective remains unfulfilled.
 
@@ -170,4 +170,4 @@ E. DEVELOPER EXPERIENCE AND DELIVERY — 11/20
 49. 2 — Limits and issue #49 are disclosed.
 50. 0 — This is not a practical full game-engine deliverable.
 
-Current status after review: the two QA fixture tests were fixed locally, `python -m unittest tests.test_qa_report -v` passes, QA arithmetic and JSON checks pass, and `python -m unittest discover -s tests -v` passes all 86. This local follow-up needs a fresh independent score. The intended no-C engine remains incomplete, so 50/100 is a failure and no success claim is appropriate.
+Current status after review: commit 150a042 fixes both QA fixture tests; the focused QA tests pass, QA arithmetic and JSON checks pass, and `python -m unittest discover -s tests -q` passes all 86. This follow-up needs a fresh independent score. The intended no-C engine remains incomplete, so 50/100 is a failure and no success claim is appropriate.
