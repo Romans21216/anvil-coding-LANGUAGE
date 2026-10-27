@@ -2,8 +2,8 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **90/100 — PASS** (commit `51deb5d`; threshold: 90/100).
-**Review snapshot:** the independent reviewer evaluated exact commit `51deb5dbc182681991251e50b841283869fe53d8`, reran all 52 Python tests, VS Code extension validation, and Python compilation, confirmed extension 0.1.4 remains installed, built `examples/physics_boxes.ANVL` with MSVC, and passed `git diff --check`. Extension 0.1.6 is packaged but not installed per user preference; criterion 47 reflects missing visible verification for new physics built-ins. The reviewer found that the active capacity limits allocation but runtime contact/integration loops still scan all 128 slots. The prior reviews remain historical records below.
+**Latest completed independent full review:** **88/100 — FAIL** (commit `c4f3ec6`; threshold: 90/100).
+**Review snapshot:** the independent reviewer evaluated exact commit `c4f3ec6198e18dcdd20d0080a7ea7e741a69b8c9`, reran all 52 Python tests, VS Code extension validation, and Python compilation, confirmed extension 0.1.4 remains installed, built `examples/physics_boxes.ANVL` with MSVC, and passed `git diff --check`. Extension 0.1.6 is packaged but not installed per user preference. The review confirmed physics loops honor active capacity, but found four docs inaccurately claimed they always scan 128 slots; this reduced criteria 8 and 44. The previous review remains in the history below.
 
 ## Scope
 
@@ -37,11 +37,11 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 These checks verify the prototype workflows and selected regression cases. They do not establish production readiness, cross-platform behavior, or performance.
 
-The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation honors the active setting, while the runtime's integration/contact loops still traverse the fixed 128-slot array. This bounds allocation but does not reduce pair-scan work at smaller configured capacities.
+The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
 ## Independent 50-criterion review
 
-The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and then `51deb5d` scored **90/100 — PASS**; the latest category scores are (16/20, 20/20, 17/20, 19/20, 18/20). The latest review reran 52 tests and extension validation, confirmed extension 0.1.4 installed and 0.1.6 packaged, and built the physics sample. Its remaining deductions concern overall engine scope, compiler structure/platform breadth, and missing visible highlighting of new built-ins. It also noted that physics loops scan the full 128-slot array despite a smaller active capacity. The full latest rubric is below; issue #8 tracks remaining physics scope and issue #24 tracks editor verification.
+The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and `51deb5d` scored **90/100 — PASS**. The latest review of `c4f3ec6` scored **88/100 — FAIL** with categories 15/20, 20/20, 17/20, 19/20, and 17/20. It reran 52 tests and all build/extension checks successfully. The 2-point deduction came from stale complexity statements in `docs/QA_REPORT.md`, `docs/COMPLETION_MATRIX.md`, `docs/ANVIL_EVALUATION.txt`, and `docs/ENGINE.md`; the runtime itself already iterated to active capacity. Those descriptions are corrected in this follow-up documentation commit, pending independent verification. Other deductions concern overall engine scope, compiler structure/platform breadth, and unverified new extension highlighting. See issues #8, #24, and #25.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -52,7 +52,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 5 | No essential feature missing | 1 | GPU renderer, assets, audio, 3D/advanced physics, and broader multiplayer remain unfinished. |
 | 6 | Stated constraints respected | 2 | `.ANVL` is consistently used as requested. |
 | 7 | Ambiguity resolved logically | 2 | Current C/MSVC prototype scope and limitations are documented. |
-| 8 | Behavior matches documentation | 2 | Latest review found language/compiler/engine guides aligned after fixes. |
+| 8 | Behavior matches documentation | 1 | **Problem:** four documents claimed physics pair checks still scan the full 128 slots at reduced capacity. **Evidence:** the reviewed runtime loops use `anvil_physics_active_capacity`; statements in QA, completion matrix, evaluation, and engine docs were stale. **Impact:** documented work complexity did not match actual behavior. **Fix/status:** those descriptions are corrected in this follow-up; fix awaits independent re-review. |
 | 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
 | 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
 | 11 | Core functionality works | 2 | Compiler, native runtime, camera, rendering, CPU BVH ray spheres, and limited 2D circle/axis-aligned-box physics build. |
@@ -82,25 +82,25 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 2 | QA records identify reviewed commit `51deb5d`, the 52-test result, extension 0.1.4 installed, 0.1.6 packaged, and the exact sample build; they record the fixed-table scan limitation. |
+| 38 | Results recorded accurately | 2 | QA records identify reviewed commit `c4f3ec6`, 52 tests, extension 0.1.4 installed, 0.1.6 packaged, and the stale-documentation finding. |
 | 39 | Regression checks performed | 2 | Independent review reran all 52 tests and extension validation; native integration covers mixed-shape solver and pool-capacity boundaries. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
 | 43 | Usage understandable | 2 | Guides and examples explain the supported syntax and build path. |
-| 44 | Design decisions documented | 2 | Runtime, compiler backend, renderer, ray tracing, and networking limits are described. |
+| 44 | Design decisions documented | 1 | **Problem:** physics complexity documentation was stale and reported a 128-slot scan even for smaller active capacities. **Evidence:** `docs/ENGINE.md` said O(n²) over 128 slots, with similar statements in the evaluation, QA, and completion matrix. **Impact:** users would misread the cost of selecting a smaller capacity. **Fix/status:** wording now describes loops over active capacity; fresh independent verification pending. |
 | 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
 | 46 | Opens in intended environment | 2 | The evaluator confirmed extension 0.1.4 installed; visible Anvil mode had previously been verified for the ray-backend sample. |
 | 47 | Editor integration works | 1 | **Problem:** new physics builtin highlighting has not been checked in an installed editor. **Evidence:** 0.1.6 grammar/package token checks pass, but the user kept 0.1.4 installed; it predates `body_create_box` and `physics_capacity`. **Impact:** visible syntax coloring for these built-ins is unverified in the user's editor. **Recommended fix/status:** install 0.1.6 and open `physics_boxes.ANVL` if the user later approves; currently pending by user choice. |
 | 48 | Deliverables organized | 2 | Source, runtime, examples, tests, docs, extension grammar, and packaged VSIX are in their expected folders; the reviewer confirmed a clean worktree before and after verification. |
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
-| | **Requirement fulfillment** | **16/20** | |
+| | **Requirement fulfillment** | **15/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
 | | **Testing and verification** | **19/20** | |
-| | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **90/100 — PASS** | |
+| | **Developer experience and delivery** | **17/20** | |
+| | **Total** | **88/100 — FAIL** | |
 
 ### Deduction details and follow-up
 
@@ -112,6 +112,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 - **Criterion 27 — extensible architecture (1/2).** **Problem/evidence:** runtime and native toolchain are Windows/MSVC and C-only. **Impact:** additional host platforms and compiler backends require substantial rework. **Recommended fix:** define platform/runtime interfaces and add non-Windows and alternate code-generation targets. **Status:** open; issue #11.
 - **Criterion 40 — verified against original goal (1/2).** **Problem/evidence:** 50 tests verify current compiler/runtime/physics behavior, but do not cover the full engine request. **Impact:** the test suite cannot establish completion of missing systems. **Recommended fix:** map acceptance tests to every requested feature and backlog milestone as those systems are delivered. **Status:** open; matrix and issue #23 track remaining scope.
 - **Criterion 47 — editor integration (1/2).** **Problem/evidence:** Extension 0.1.6 includes `body_create_box` and `physics_capacity`, and automated token validation passes, but the user kept 0.1.4 installed; the new built-ins have no visible editor verification. **Impact:** newly added highlighting is not confirmed in the user's editor. **Recommended fix:** if later approved, install 0.1.6 and inspect `examples/physics_boxes.ANVL`. **Status:** pending user preference; exact evidence is tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24).
+- **Criteria 8 and 44 — documentation accuracy (each 1/2).** The runtime loop-bound implementation had changed, but four documents still reported full 128-slot traversal. The docs have been corrected in the follow-up commit; the score remains 88 for the exact reviewed snapshot until a fresh independent review validates the correction. The finding is tracked in issue [#25](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/25).
 - **Criterion 50 — practical for intended scope (1/2).** **Problem/evidence:** the engine lacks production graphics, assets, audio, mature physics, robust networking, portability, and performance evidence. **Impact:** it is not ready for production games. **Recommended fix:** continue implementation, benchmark real workloads, and define release criteria. **Status:** open; issue #15 and backlog #23.
 
 ### Priorities from the review
