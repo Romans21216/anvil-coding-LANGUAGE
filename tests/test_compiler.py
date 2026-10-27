@@ -124,6 +124,38 @@ class CompilerTests(unittest.TestCase):
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "120")
 
+    def test_while_loop_runs_and_updates_locals(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "while.ANVL"
+            out = pathlib.Path(temp) / "while.exe"
+            source.write_text(
+                "fn(sum_to, limit)\n"
+                "  set local(index) = 1\n"
+                "  set local(total) = 0\n"
+                "  while local(index) <= var(limit)\n"
+                "    add local(total) local(index)\n"
+                "    add local(index) 1\n"
+                "  end\n"
+                "  output local(total)\n"
+                "end\n"
+                "fn(main)\n"
+                "  output call fn(sum_to, 5)\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "15")
+
+    def test_while_loop_requires_condition(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "bad.ANVL"
+            source.write_text("fn(main)\n  while\n  end\nend\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("while needs a condition", result.stderr)
+
     def test_network_api_emits_native_udp_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             c_file = pathlib.Path(temp) / "network.c"
