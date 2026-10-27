@@ -9,11 +9,11 @@
     "COMPLETE": 12,
     "IN PROGRESS": 1
   },
-  "latest_verified_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
-  "latest_independently_reviewed_candidate_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
+  "latest_verified_commit": "0abba63faca13530b3c615b54e7a895922a0bf9b",
+  "latest_independently_reviewed_candidate_commit": "0abba63faca13530b3c615b54e7a895922a0bf9b",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
-  "latest_followup_status_change": "Independent review of 3cd390c scored 84/100 against the 98-point threshold, verified the 64-test/extension/Python/MSVC example results and ledger totals, and found issues #37–#42, all tracked as Codex Bugs.",
+  "last_pushed_reviewed_below_threshold_commit": "0abba63faca13530b3c615b54e7a895922a0bf9b",
+  "latest_followup_status_change": "Independent review of 0abba63 scored 88/100 against the 98-point threshold, confirmed issues #37–#42 fixed and closed, verified 66 tests/extension/Python/MSVC results and ledger totals, and found duplicate display modifier mismatch #43.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -153,11 +153,10 @@
         "README.md, docs/LANGUAGE.md, docs/Wiki/Home.md, and docs/Wiki/Language-Reference.md link to the formal specification."
       ],
       "tests": [
-        "Independent critic built and ran the conformance example with MSVC; output 6",
-        "Candidate regression tests reject Arabic-Indic digit ١ and a 5,000-digit array size with path-and-line diagnostics and confirm no C emission",
-        "Candidate validation: 66 Python tests passed; npm test --prefix vscode-extension passed; python -m compileall -q compiler tests passed",
-        "Candidate MSVC release builds: examples/numeric_demo.ANVL (run output 17) and examples/first_world.ANVL",
-        "Manual candidate checks: unpositioned display text and spaced camera coordinate expressions are rejected as documented; git diff --check passes"
+        "Independent critic verified 66 Python tests, npm extension validation, Python compileall, and git diff --check on 0abba63",
+        "MSVC release builds/runs verified for numeric demo (output 17) and spec conformance sample (output 6); starter world release build passed",
+        "Independent critic verified issues #37–#42 are fixed: ASCII-only Unicode-digit rejection, oversized array guard, text location requirement, suffix grammar, camera coordinate grammar, null cleanup grammar, and whitespace",
+        "Latest independent critic found duplicate location modifier grammar mismatch, now tracked as open issue #43"
       ],
       "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
       "dependencies": [],
@@ -170,7 +169,7 @@
         "Link the specification from the README and language reference/wiki.",
         "Independently review the specification for consistency with implementation."
       ],
-      "verification_result": "IN PROGRESS: critic 3cd390c found issues #37–#42. Candidate fixes and listed checks are complete, but the fixes remain pending independent review; do not mark COMPLETE yet.",
+      "verification_result": "IN PROGRESS: critic 0abba63 confirmed issues #37–#42 fixed and closed, but found duplicate display-modifier mismatch #43. Correct it and obtain another independent review before completion.",
       "github_issue": "#23",
       "commit": "b8213aa6878b2f0c02f8f4655fbd443f7291a4ec"
     },

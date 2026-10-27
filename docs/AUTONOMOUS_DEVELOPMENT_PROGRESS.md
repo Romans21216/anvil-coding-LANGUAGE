@@ -118,3 +118,18 @@ This log records verified implementation batches and is reconciled with Git befo
 - **#42:** Removed the spec's trailing spaces; `git diff --check` now passes.
 - **Validation:** 66 Python tests pass; `npm test --prefix vscode-extension` and `python -m compileall -q compiler tests` pass. MSVC release builds pass for `examples/numeric_demo.ANVL` (run output `17`) and `examples/first_world.ANVL`. Manual negatives confirm unpositioned text and spaced camera expressions are rejected with source diagnostics; `git diff --check` passes.
 - **Review state:** Findings #37–#42 remain open until an independent critic reviews the exact fix commit. Latest critic is still 84/100; do not record a higher score until a new review runs.
+
+### Independent review follow-up — commit `0abba63`
+
+- **Score:** 88/100 — FAIL against the required 98/100. Category scores: requirements 15/20, functionality/reliability 20/20, architecture 17/20, testing 19/20, delivery 17/20.
+- **Checks:** Critic confirmed 66 tests, extension validation, Python compilation, MSVC numeric/conformance builds (outputs `17` and `6`), starter-world release build, clean diff, matching status records, and 450 unique issue #23 entries.
+- **Resolved:** Critic confirmed fixes #37–#42; added resolution comments and closed all six issues.
+- **New finding:** Duplicate `-l(x,y)` modifiers are permitted by `display_tail` in the spec but rejected by `emit_display`. Tracked in [issue #43](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/43), labeled `Codex Bugs`.
+- **Evaluation:** Updated QA report, full text evaluation, JSON/Markdown status ledgers, and this log immediately after the critic. Latest score remains below 98; fix #43 and re-review.
+
+### Issue #43 correction candidate
+
+- **Change:** The normative spec now states that a display command may contain at most one `-l(x,y)` and one `-rotate(x,y,z)`. Repeated RGB modifiers are documented as accepted with the first color taking effect, matching the current parser.
+- **Regression:** Added a compiler test asserting a repeated text-location modifier fails with a source-line diagnostic before C generation.
+- **Validation:** `python -m unittest discover -s tests -q` — 67 passed; extension validation, Python compileall, and `git diff --check` pass.
+- **Review state:** Issue #43 remains open. Latest official score is still 88/100 until a new critic reviews the exact correction commit.

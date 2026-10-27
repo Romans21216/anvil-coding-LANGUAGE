@@ -5,37 +5,38 @@
   "last_completed_batch": 8,
   "last_completed_backlog_item": 49,
   "current_active_item": 50,
-  "current_active_item_status": "Backlog item #50 is in progress. Critic 3cd390c scored 84/100 and findings #37–#42 are tracked as Codex Bugs. Candidate fixes align the spec/compiler, with 66 tests, extension validation, Python compilation, MSVC examples, and diff check passing; fixes await independent review.",
-  "current_candidate_commit": "b8213aa6878b2f0c02f8f4655fbd443f7291a4ec",
-  "latest_verified_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
-  "last_pushed_reviewed_below_threshold_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
-  "latest_independently_reviewed_candidate_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
+  "current_active_item_status": "Backlog item #50 is in progress. Critic 0abba63 scored 88/100 (below 98), confirmed issues #37–#42 fixed/closed, and found duplicate display-modifier grammar mismatch #43, now open as Codex Bugs.",
+  "current_candidate_commit": "0abba63faca13530b3c615b54e7a895922a0bf9b",
+  "latest_verified_commit": "0abba63faca13530b3c615b54e7a895922a0bf9b",
+  "last_pushed_reviewed_below_threshold_commit": "0abba63faca13530b3c615b54e7a895922a0bf9b",
+  "latest_independently_reviewed_candidate_commit": "0abba63faca13530b3c615b54e7a895922a0bf9b",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Exact language specification commit 3cd390c scored 84/100 — FAIL against 98/100. The critic verified arithmetic and ledgers, built and ran the conformance example (output 6), and found issues #37–#42; all are labeled Codex Bugs and require fixes.",
+  "latest_push_result": "Exact review commit 0abba63 scored 88/100 — FAIL against 98/100. The critic verified 66 tests, extension/Python checks, MSVC builds, arithmetic/ledgers, issue #23, and fixes #37–#42. It found duplicate display modifier mismatch #43.",
   "latest_independent_review": {
-    "commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
-    "score": 84,
+    "commit": "0abba63faca13530b3c615b54e7a895922a0bf9b",
+    "score": 88,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
     "current_required_threshold": 98,
     "current_threshold_status": "BELOW_THRESHOLD",
     "findings": [
-      {"issue": 37, "summary": "Unicode decimal digit ١ passes lexer and is emitted into C; MSVC fails generically instead of a source-located Anvil diagnostic."},
-      {"issue": 38, "summary": "Normative display text grammar omits the required -l(x,y) location."},
-      {"issue": 39, "summary": "Display grammar places the legacy integer suffix after style flags, unlike the compiler and sample."},
-      {"issue": 40, "summary": "Camera perspective grammar permits arbitrary expressions that the whitespace-token parser rejects."},
-      {"issue": 41, "summary": "Spec omits accepted no-op set var(name) = null syntax used by examples/numeric_demo.ANVL."},
-      {"issue": 42, "summary": "New language specification has trailing whitespace; git diff --check HEAD^ HEAD fails."}
+      {"issue": 43, "summary": "display_tail repeats display_style without limiting -l/-rotate; duplicate -l modifiers compile-fail although the grammar appears to allow them."}
     ],
     "categories": {
       "requirements": "15/20",
-      "functionality_reliability": "16/20",
+      "functionality_reliability": "20/20",
       "code_architecture": "17/20",
       "testing_verification": "19/20",
       "developer_experience_delivery": "17/20"
     }
   },
   "previous_independent_review": {
+    "commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
+    "score": 84,
+    "threshold_at_time": 98,
+    "result_at_time": "FAIL; language specification/compiler findings #37–#42 tracked and later fixed"
+  },
+  "earlier_independent_review": {
     "commit": "8ae53c4daaed0d2160262aa24a2a0d5178235a96",
     "score": 85,
     "threshold_at_time": 98,
@@ -53,12 +54,12 @@
     "python_compile": "passed (python -m compileall -q compiler tests)",
     "msvc_numeric_demo": "built and ran successfully; output 17",
     "msvc_language_spec_example": "built with --release and ran successfully; output 6",
-    "git_diff_check": "FAIL on exact commit 3cd390c: trailing whitespace on docs/LANGUAGE_SPEC.md lines 3-4; issue #42",
+    "git_diff_check": "passed on exact reviewed commit 0abba63",
     "implementation_status_inventory": "Full 450-item list only in issue #23 body/comment; compact audited subset has 16 entries including in-progress item #50; latest reviewer verified counts 12 complete, 3 partial, 1 in progress, 434 needs verification",
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "The latest exact review 3cd390c scored 84/100 against the 98/100 pass threshold. Candidate fixes for #37–#42 have passed listed local checks; all six issues remain open until a fresh independent critic verifies the exact fix commit.",
+  "pending_documentation_review": "The latest exact review 0abba63 scored 88/100 against 98/100 and confirmed #37–#42 fixed and closed. Issue #43 is the sole new spec mismatch and remains open pending correction/review.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -70,7 +71,7 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
     "next_recommended_tasks": [
-    "Obtain fresh independent review of the candidate fixes for issues #37–#42 and complete item #50; then pursue architecture and engine-scope deductions. Latest critic score is 84/100, below 98/100.",
+    "Fix issue #43's duplicate display modifier grammar, obtain a fresh critic review, and continue item #50; then pursue architecture and engine-scope deductions. Latest score is 88/100, below 98/100.",
     "Continue selecting work directly from issue #23; keep the full item list only in that issue."
   ],
   "master_backlog": {

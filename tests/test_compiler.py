@@ -71,6 +71,17 @@ class CompilerTests(unittest.TestCase):
             self.assertNotIn("Traceback", result.stderr)
             self.assertFalse(generated.exists(), "invalid array size must fail before C generation")
 
+    def test_duplicate_display_location_modifier_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "duplicate-location.ANVL"
+            generated = pathlib.Path(temp) / "duplicate-location.c"
+            source.write_text('fn(draw)\n  display text("Hi") -l(1,2) -l(3,4)\nend\n', encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(f"{source}:2:", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+            self.assertFalse(generated.exists(), "invalid duplicate location modifier must fail before C generation")
+
     def test_game_source_emits_native_renderer_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             c_file = pathlib.Path(temp) / "world.c"
