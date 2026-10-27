@@ -154,6 +154,7 @@
       ],
       "tests": [
         "Independent critic verified 66 Python tests, npm extension validation, Python compileall, and git diff --check on 0abba63",
+        "Candidate commit e17eeac adds a regression for duplicate display locations; full Python suite now passes 67 tests",
         "MSVC release builds/runs verified for numeric demo (output 17) and spec conformance sample (output 6); starter world release build passed",
         "Independent critic verified issues #37–#42 are fixed: ASCII-only Unicode-digit rejection, oversized array guard, text location requirement, suffix grammar, camera coordinate grammar, null cleanup grammar, and whitespace",
         "Latest independent critic found duplicate location modifier grammar mismatch, now tracked as open issue #43"
@@ -169,9 +170,9 @@
         "Link the specification from the README and language reference/wiki.",
         "Independently review the specification for consistency with implementation."
       ],
-      "verification_result": "IN PROGRESS: critic 0abba63 confirmed issues #37–#42 fixed and closed, but found duplicate display-modifier mismatch #43. Correct it and obtain another independent review before completion.",
+      "verification_result": "IN PROGRESS: critic 0abba63 confirmed issues #37–#42 fixed and closed, but found duplicate display-modifier mismatch #43. Candidate e17eeac documents the one-location/one-rotation constraint and adds a duplicate-location regression; 67 tests pass. Fresh independent review is pending.",
       "github_issue": "#23",
-      "commit": "b8213aa6878b2f0c02f8f4655fbd443f7291a4ec"
+      "commit": "e17eeac505cf12d70363bf658f598cb6d485a45b"
     },
     {
       "number": 301,
