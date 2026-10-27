@@ -1,11 +1,10 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Source format:** `.ANVL`
-**Latest independent evaluation:** **88/100 — FAIL** (exact commit `0abba63faca13530b3c615b54e7a895922a0bf9b`) against the user's **98/100** threshold. Category scores: requirements 15/20, functionality/reliability 20/20, architecture 17/20, testing 19/20, delivery 17/20. The critic confirmed fixes #37–#42, verified 66 tests, extension validation, Python compilation, MSVC sample builds/runs, JSON/Markdown counts, and issue #23's 450-item invariant. It found one remaining grammar mismatch: repeated `-l(x,y)` modifiers appear valid in the EBNF but the compiler rejects them. Tracked as `Codex Bugs` issue #43. Score arithmetic is 15+20+17+19+17=88; threshold remains 98.
-**Current passing threshold:** 98/100, set by the user on 2026-10-27. Historical reviews keep their original scores and results; a historical 90/100 PASS does not meet the new threshold.
-**Latest review snapshot:** the critic evaluated exact commit `0abba63faca13530b3c615b54e7a895922a0bf9b` and scored it 88. It reran 66 Python tests, extension validation, Python compilation, MSVC builds/runs for the numeric demo and spec example, built the starter world, confirmed invalid Unicode digits/huge array sizes and unpositioned text/spaced camera syntax are rejected, and verified issue #23's 450-item invariant. It found only the duplicate display modifier mismatch (#43). It confirmed issue #37–#42 behaviors are fixed; those six issues have since been commented and closed. Extension 0.1.4 remains installed per user preference; newer visible highlighting remains unverified.
-**Unreviewed correction candidate:** `docs/LANGUAGE_SPEC.md` now states duplicate `-l`/`-rotate` modifiers are invalid, and a regression verifies the compiler rejects duplicate text locations. The candidate passes 67 Python tests, extension validation, Python compilation, and `git diff --check`. The latest official score remains 88/100 until a critic evaluates the exact corrected commit.
+**Latest independent evaluation:** **89/100 — FAIL** (exact commit `65c15bf002c1bad268aec2bd68e7b184fd110c33`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 17/20, testing 18/20, delivery 18/20.
+**Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
+**Latest review evidence:** the critic ran 67 Python tests, extension validation, Python compilation, and `git diff --check`; all passed. It confirmed the issue #43 language-spec correction and issue #23's 450 unique sequential entries. This exact review did not rerun MSVC builds; prior MSVC evidence remains historical. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
+**Latest finding:** the reviewed snapshot's QA narrative claimed an earlier score of 88 while the displayed criterion/category rows totaled 84. Tracked as open `Codex Bugs` issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44). This evaluation synchronization is not yet independently reviewed.
 
 ## Scope
 
@@ -44,9 +43,9 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Latest independent review — language-specification snapshot `0abba63`
+## Latest independent review — language-specification snapshot `65c15bf`
 
-**88/100 — FAIL** against the required 98/100. Category totals: requirements 15/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 19/20; developer experience and delivery 17/20. The critic confirmed 66 tests, extension/Python validation, MSVC release builds and executable output `17`/`6`, valid JSON and matching ledger counts, and issue #23's 450 unique sequential entries with no repository duplicate. It confirmed fixes #37–#42 and found one new mismatch: the grammar allows duplicate `-l(x,y)`/display modifiers while compiler parsing rejects a repeated location style. Exact reproduction and acceptance criteria are in issue #43, labeled `Codex Bugs`. The 98-point threshold remains unmet.
+**89/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 18/20; developer experience and delivery 18/20. The critic evaluated exact commit `65c15bf002c1bad268aec2bd68e7b184fd110c33`, ran 67 Python tests, extension validation, Python compilation, and `git diff --check`; all passed. The reviewer confirmed issue #43's duplicate display-modifier correction and the 450-entry sequential issue #23 backlog. It found that this report's narrative said 88 while its displayed criterion/category totals added to 84. The arithmetic mismatch is tracked in [issue #44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44), labeled `Codex Bugs`. The user-set 98-point threshold remains unmet. The reviewer did not rerun MSVC builds on this exact snapshot.
 
 ## Historical independent 50-criterion review — commit `2a745bb`
 
@@ -61,7 +60,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 5 | No essential feature missing | 1 | GPU renderer, assets, audio, 3D/advanced physics, and broader multiplayer remain unfinished. |
 | 6 | Stated constraints respected | 2 | `.ANVL` is consistently used as requested. |
 | 7 | Ambiguity resolved logically | 2 | Current C/MSVC prototype scope and limitations are documented. |
-| 8 | Behavior matches documentation | 1 | **Finding:** The latest spec grammar permits repeated display modifiers although the compiler rejects duplicate `-l(x,y)`. Critic reproduced on `0abba63`; issue #43. Earlier #37–#42 findings were verified fixed. |
+| 8 | Behavior matches documentation | 2 | Critic `65c15bf` confirmed the spec prohibits repeated `-l` and `-rotate` modifiers, matching compiler behavior; issue #43 is resolved. |
 | 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
 | 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
 | 11 | Core functionality works | 2 | The reviewer confirmed `receive()` rejects a non-finite UDP value with the promised source-located diagnostic; issue #30 is resolved. |
@@ -91,30 +90,32 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 2 | Critic `3cd390c` verified current review arithmetic, synchronized ledgers, test evidence, and backlog total. Issues #35/#36 remain resolved. |
+| 38 | Results recorded accurately | 1 | **Finding:** This report narrative says the previous review scored 88, but its criterion subtotal rows add to 84. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) tracks correction; current review score is 89. |
 | 39 | Regression checks performed | 2 | The independent review of `ed08f43` reran 64 tests, extension validation, Python compilation, MSVC numeric demo, and diff check. The previous wording incorrectly reported 61 for `2dd1d8e`, which ran 63. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
 | 43 | Usage understandable | 2 | Guides and examples explain the supported syntax and build path. |
-| 44 | Design decisions documented | 1 | **Finding:** The spec still permits repeated display modifiers rejected by compiler (`-l` at `docs/LANGUAGE_SPEC.md`); issue #43. Other item #50 mismatches #37–#42 were verified fixed. |
+| 44 | Design decisions documented | 2 | The language specification documents the one-location/one-rotation modifier rule; critic `65c15bf` confirmed it matches compiler behavior. Issue #43 is resolved. |
 | 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
 | 46 | Opens in intended environment | 2 | The evaluator confirmed extension 0.1.4 installed; visible Anvil mode had previously been verified for the ray-backend sample. |
 | 47 | Editor integration works | 1 | **Problem:** newer grammar tokens are not verified in the installed editor. **Evidence:** automated grammar validation passes, but the user kept 0.1.4 installed. **Impact:** visible syntax coloring for newer built-ins remains unverified. **Status:** pending user preference; tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24). |
 | 48 | Deliverables organized | 2 | Source, runtime, examples, tests, docs, extension grammar, and packaged VSIX are in their expected folders; the reviewer confirmed a clean worktree before and after verification. |
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
-| | **Requirement fulfillment** | **15/20** | |
-| | **Functionality and reliability** | **16/20** | |
+| | **Requirement fulfillment** | **16/20** | |
+| | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **19/20** | |
-| | **Developer experience and delivery** | **17/20** | |
-| | **Total** | **84/100** | Latest review FAIL under the 98-point requirement. |
+| | **Testing and verification** | **18/20** | |
+| | **Developer experience and delivery** | **18/20** | |
+| | **Total** | **89/100** | Exact review `65c15bf`; FAIL under the 98-point requirement. |
 
 ### Deduction details and follow-up
 
-- **Latest critic finding on `0abba63` (88/100 — FAIL; required pass score 98).** Issue [#43](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/43), labeled `Codex Bugs`, records exact reproduction: `display text("Hi") -l(1,2) -l(3,4)` is admitted by the repeated-style grammar but rejected by `emit_display` because a second location modifier remains in the command. Restrict the spec to at most one location and one rotation modifier. The critic confirmed prior findings #37–#42 were fixed; those issues have resolution comments and are closed.
-- **Latest deductions on criteria 8 and 44.** Remaining normative mismatch is duplicate display modifiers (#43). Broader requirement and practical-scope deductions remain because the engine is still a prototype. The latest review corrected input/error/edge-case rows 14–17 to 2 after verifying the new guards and regressions.
+- **Latest critic finding on `65c15bf` (89/100 — FAIL; required pass score 98).** Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44), labeled `Codex Bugs`, records that the latest QA narrative claimed an 88-point review while the displayed score rows totaled 84. The current review independently scored 89 with categories 16/20, 20/20, 17/20, 18/20, and 18/20. Synchronize the rubric and ledgers, then request another review.
+
+- **Previous critic finding on `0abba63` (88/100 — FAIL; required pass score 98; resolved).** Issue [#43](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/43), labeled `Codex Bugs`, records exact reproduction: `display text("Hi") -l(1,2) -l(3,4)` is admitted by the repeated-style grammar but rejected by `emit_display` because a second location modifier remains in the command. Restrict the spec to at most one location and one rotation modifier. The critic confirmed prior findings #37–#42 were fixed; those issues have resolution comments and are closed.
+- **Previous deductions on criteria 8 and 44 — resolved.** The `65c15bf` critic confirmed the duplicate-modifier grammar now matches the compiler. Broader requirement and practical-scope deductions remain because the engine is still a prototype. The latest review corrected input/error/edge-case rows 14–17 to 2 after verifying the new guards and regressions.
 
 - **Issues #32, #33, and #34 — resolved:** the critic of `ed08f43` verified the 5,000-digit diagnostic, the progress wording fix, and the correction distinguishing the 64-test `ed08f43` run from the 63-test `2dd1d8e` run.
 - **Issues #35 and #36 — resolved:** review `727d349` verified that rubric rows sum to 89 and the Markdown implementation ledger matches JSON. The evaluator's 89/100 score remains below the user's 98-point bar for broader engine-scope, architecture, and editor-verification reasons.

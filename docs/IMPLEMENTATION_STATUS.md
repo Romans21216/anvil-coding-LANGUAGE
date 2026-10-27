@@ -2,16 +2,16 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27 after independent review of exact commit `0abba63faca13530b3c615b54e7a895922a0bf9b`; the latest evaluation is 88/100, below the required 98/100 bar. The critic confirmed issues #37–#42 are fixed and closed, reran 66 tests and extension/Python checks, built MSVC samples, and verified ledger totals. It found duplicate display modifiers remain overstated in the spec; issue #43 is open and labeled `Codex Bugs`. Item #50 remains in progress until this last mismatch is fixed and independently re-reviewed.
+Updated 2026-10-27 after independent review of exact commit `65c15bf002c1bad268aec2bd68e7b184fd110c33`; the latest evaluation is 89/100, below the required 98/100 bar. The critic confirmed issue #43 fixed/closed and ran 67 tests plus extension/Python/diff checks. It found QA report arithmetic drift, tracked in open issue #44 labeled `Codex Bugs`. Item #50 is COMPLETE: the critic confirmed the specification matches implemented language behavior. The latest review did not rerun MSVC builds.
 
 ## Status counts
 
-- COMPLETE: 12
+- COMPLETE: 13
 - PARTIALLY IMPLEMENTED: 3
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
 - NEEDS VERIFICATION: 434
-- IN PROGRESS: 1
+- IN PROGRESS: 0
 
 ## Audited current items
 
@@ -21,7 +21,7 @@ Updated 2026-10-27 after independent review of exact commit `0abba63faca13530b3c
 | 47 | Add explicit overflow behavior. | COMPLETE | `anvil_check_number` guards arithmetic and all numeric built-in results, including `receive()`. Native cases cover arithmetic, comparison, invalid math, accumulation, loop-step overflow, end-to-end NaN/finite UDP datagrams, and no-socket receive behavior. The full suite passes (61 tests); extension and static checks pass; independent review of `15439b5` confirmed the behavior. Issues #30 and #31 are resolved and closed. Overall QA remains below 98/100. |
 | 48 | Add division-by-zero diagnostics. | COMPLETE | `compiler/anvil.py` lowers `/` through `anvil_divide`; `runtime/anvil_runtime.c` reports path/line and exits 2 on zero (including negative zero). Native tests cover zero diagnostic and regular division; the independent reviewer confirmed the behavior on commit `12b4e55` (90/100 PASS). Runtime detection only; no compile-time constant analysis. |
 | 49 | Add language feature versioning. | COMPLETE | Optional leading `language version 1` declaration; unversioned files keep version 1 behavior. Independent review `ed08f43` verified all 64 tests and the 5,000-digit source-located diagnostic. Issues #32/#33 are fixed and closed. Only version 1 is implemented. |
-| 50 | Publish a complete formal language specification. | IN PROGRESS | `docs/LANGUAGE_SPEC.md` records the v1 contract and links from README/guide/wiki; its example builds and prints `6`. Critic `0abba63` scored 88/100 and confirmed fixes #37–#42, now closed. Candidate `e17eeac` documents at most one location/rotation modifier and adds a duplicate-location regression. 67 tests and extension/Python/diff checks pass; independent review is pending. |
+| 50 | Publish a complete formal language specification. | COMPLETE | `docs/LANGUAGE_SPEC.md` records the v1 contract and links from README/guide/wiki; its example builds and prints `6`. Critic `65c15bf` confirmed the duplicate-modifier rule matches compiler behavior and issues #37–#43 are resolved. The 67-test suite and extension/Python/diff checks pass. Latest overall score 89/100 remains below 98 because of broader scope and a separate QA arithmetic finding (#44). |
 | 301 | Improve the existing bounded 2D circle physics prototype. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: bounded fixed-step circle/axis-aligned-box solver; docs/ENGINE.md. No CCD, rotation, broad phase, joints, 3D bodies, or complete stability coverage. Issue #8; commit `f7c91b0`. |
 | 302 | Make the current 128-body limit configurable where feasible. | COMPLETE | runtime/anvil_runtime.c: physics_capacity and active-capacity-bounded loops; tests/test_compiler.py: growth, exhaustion, invalid values, refused shrink, shrink after release. The configured active pool still has a fixed compiled maximum of 128 slots. Issue #8; commit `560cee1`. |
 | 303 | Add rectangle collision bodies. | COMPLETE | runtime/anvil_runtime.c: axis-aligned rectangle bodies and box contacts; examples/physics_boxes.ANVL. Rectangles are axis aligned and cannot rotate. Issue #8; commit `0d3b5ed`. |
