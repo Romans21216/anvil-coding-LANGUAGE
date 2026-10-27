@@ -2,6 +2,7 @@
 #define ANVIL_PROJECTION_H
 
 #include <math.h>
+#include <stdint.h>
 
 typedef struct {
   int min_x;
@@ -9,6 +10,41 @@ typedef struct {
   int min_y;
   int max_y;
 } AnvilPixelBounds;
+
+typedef struct {
+  int x;
+  int y;
+  int width;
+  int height;
+} AnvilViewport;
+
+/* Fit the fixed-aspect framebuffer into a resizable client area. */
+static inline int anvil_compute_viewport(int client_width, int client_height,
+                                         int image_width, int image_height,
+                                         AnvilViewport *viewport) {
+  if (!viewport || client_width <= 0 || client_height <= 0 || image_width <= 0 ||
+      image_height <= 0)
+    return 0;
+
+  int width;
+  int height;
+  if ((int64_t)client_width * image_height <=
+      (int64_t)client_height * image_width) {
+    width = client_width;
+    height = (int)((int64_t)client_width * image_height / image_width);
+  } else {
+    height = client_height;
+    width = (int)((int64_t)client_height * image_width / image_height);
+  }
+  if (width < 1 || height < 1)
+    return 0;
+
+  viewport->x = (client_width - width) / 2;
+  viewport->y = (client_height - height) / 2;
+  viewport->width = width;
+  viewport->height = height;
+  return 1;
+}
 
 /* Return an integer screen-space rectangle enclosing a projected sphere. */
 static inline int anvil_project_sphere_bounds(

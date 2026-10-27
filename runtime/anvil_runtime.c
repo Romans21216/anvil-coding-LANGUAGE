@@ -1365,6 +1365,9 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     return 0;
   case WM_ERASEBKGND:
     return 1;
+  case WM_SIZE:
+    InvalidateRect(window, NULL, FALSE);
+    break;
   case WM_KEYDOWN:
     if (wparam < ANVIL_KEYS) {
       if (!anvil_keys[wparam])
@@ -1379,10 +1382,20 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
   case WM_PAINT: {
     PAINTSTRUCT ps;
     HDC dc = BeginPaint(window, &ps);
-    if (anvil_pixels)
-      StretchDIBits(dc, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT, 0, 0, ANVIL_WIDTH,
-                    ANVIL_HEIGHT, anvil_pixels, &anvil_bitmap_info,
-                    DIB_RGB_COLORS, SRCCOPY);
+    RECT client;
+    if (GetClientRect(window, &client)) {
+      FillRect(dc, &client, (HBRUSH)GetStockObject(BLACK_BRUSH));
+      AnvilViewport viewport;
+      if (anvil_pixels &&
+          anvil_compute_viewport(client.right - client.left,
+                                 client.bottom - client.top, ANVIL_WIDTH,
+                                 ANVIL_HEIGHT, &viewport)) {
+        StretchDIBits(dc, viewport.x, viewport.y, viewport.width,
+                      viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
+                      anvil_pixels, &anvil_bitmap_info, DIB_RGB_COLORS,
+                      SRCCOPY);
+      }
+    }
     EndPaint(window, &ps);
     return 0;
   }

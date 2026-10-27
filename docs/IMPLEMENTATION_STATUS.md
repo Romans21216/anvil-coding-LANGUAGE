@@ -10,8 +10,8 @@ Updated 2026-10-27 after independent review of exact commit `5072597f0fe8ed21a97
 - PARTIALLY IMPLEMENTED: 3
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
-- NEEDS VERIFICATION: 430
-- IN PROGRESS: 0
+- NEEDS VERIFICATION: 429
+- IN PROGRESS: 1
 
 Compiler architecture and formatting were independently reviewed on `5072597`; score 92/100 remains below the required 98/100 threshold.
 
@@ -27,7 +27,8 @@ Compiler architecture and formatting were independently reviewed on `5072597`; s
 | 101 | Separate lexical analysis from parsing. | COMPLETE | Independent critic `96b71fe` confirmed lexer/parser module separation, preserved CLI/facade behavior, 72 passing tests, and byte-identical generated C for 12 examples. Formatting follow-up is tracked separately in issue #12. |
 | 102 | Separate parsing from semantic validation. | COMPLETE | `parse_syntax` produces a `ParsedProgram`; `validate_program` resolves references and C symbol collisions. Phase-boundary tests and the independent critic verified the split on exact review `96b71fe`. |
 | 103 | Separate semantic validation from C generation. | COMPLETE | `compiler/semantics.py` validates before `compiler/codegen.py` emits C. The independent critic confirmed generated output is byte-identical for 12 representative examples against `854d36c`. |
-| 104 | Separate C generation from build orchestration. | COMPLETE | `compiler/codegen.py`, `compiler/build.py`, and `compiler/cli.py` have separate responsibilities. The critic confirmed both CLI invocation forms and the 21-definition legacy facade. Issue #12 stays open for formatting only. |
+| 104 | Separate C generation from build orchestration. | COMPLETE | `compiler/codegen.py`, `compiler/build.py`, and `compiler/cli.py` have separate responsibilities. The critic confirmed both CLI invocation forms and the 21-definition legacy facade. Issue #12 is resolved and closed. |
+| 144 | Add dynamic window resizing. | IN PROGRESS | `runtime/anvil_projection.h::anvil_compute_viewport` computes a centered aspect-preserving viewport; `runtime/anvil_runtime.c` paints the fixed 960×600 image into the current client area. `tests/test_runtime.py` covers wide, tall, same-aspect, and invalid client sizes. The game window is already created with `WS_OVERLAPPEDWINDOW`; internal framebuffer resolution remains fixed. Independent review pending. |
 | 301 | Improve the existing bounded 2D circle physics prototype. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: bounded fixed-step circle/axis-aligned-box solver; docs/ENGINE.md. No CCD, rotation, broad phase, joints, 3D bodies, or complete stability coverage. Issue #8; commit `f7c91b0`. |
 | 302 | Make the current 128-body limit configurable where feasible. | COMPLETE | runtime/anvil_runtime.c: physics_capacity and active-capacity-bounded loops; tests/test_compiler.py: growth, exhaustion, invalid values, refused shrink, shrink after release. The configured active pool still has a fixed compiled maximum of 128 slots. Issue #8; commit `560cee1`. |
 | 303 | Add rectangle collision bodies. | COMPLETE | runtime/anvil_runtime.c: axis-aligned rectangle bodies and box contacts; examples/physics_boxes.ANVL. Rectangles are axis aligned and cannot rotate. Issue #8; commit `0d3b5ed`. |

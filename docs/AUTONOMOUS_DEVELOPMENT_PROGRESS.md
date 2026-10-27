@@ -209,3 +209,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Inventory:** 20 audited rows; 430 needing verification, 3 partial, 17 complete, 0 in progress (450 total).
 - **Resolution:** Issue #12 acceptance is met; compiler modules, formatting, phase tests, docs, and compatibility have independent evidence. Issue #12 is closed. The critic also found `current_active_item: 22` ambiguous beside completed backlog item 104 and zero in-progress backlog rows. This was filed as [issue #45](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/45), labeled `Codex Bugs`; the sync clears the active backlog item and records rubric criterion 22 in `last_reviewed_rubric_criterion`. Issue #45 is resolved and closed.
 - **Remaining score deductions:** engine scope, Windows/MSVC and C-only limits, and unverified new-token highlighting because extension 0.1.4 remains installed per user preference.
+
+
+## Batch 11 — resizable game window (item #144)
+
+- **Scope:** The native window is already resizable, but the old paint path always drew the 960×600 frame from the top-left, leaving clipping or unused space. The runtime now computes a centered 16:10 viewport, fills letterbox bars, and scales presentation without changing the internal resolution.
+- **Regression coverage:** A native C harness checks the original 960×600 size, a wide 1200×600 client (120-pixel side bars), a tall 600×800 client (212-pixel top bar), a 1280×720 client, and invalid dimensions. All 73 Python tests pass; the runtime test module passes all 3 tests.
+- **Documentation:** Engine and completion-matrix docs state the distinction between resizable presentation and fixed internal framebuffer.
+- **Status:** Item #144 is IN PROGRESS pending independent review; all 73 tests pass locally. Latest independent score remains 92/100 on `5072597`, below the 98-point threshold.

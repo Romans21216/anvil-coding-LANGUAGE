@@ -8,6 +8,52 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
+    def test_resize_viewport_preserves_framebuffer_aspect_ratio(self):
+        from compiler.anvil import build_c, find_compiler
+
+        compiler = find_compiler(None)
+        if not compiler:
+            self.skipTest("MSVC is required to run the native viewport regression test")
+
+        harness = r'''#include "anvil_projection.h"
+#include <stdio.h>
+
+static int viewport_is(int cw, int ch, int x, int y, int w, int h) {
+  AnvilViewport viewport;
+  if (!anvil_compute_viewport(cw, ch, 960, 600, &viewport)) return 0;
+  return viewport.x == x && viewport.y == y &&
+         viewport.width == w && viewport.height == h;
+}
+
+int main(void) {
+  AnvilViewport invalid;
+  if (!viewport_is(960, 600, 0, 0, 960, 600) ||
+      !viewport_is(1200, 600, 120, 0, 960, 600) ||
+      !viewport_is(600, 800, 0, 212, 600, 375) ||
+      !viewport_is(1280, 720, 64, 0, 1152, 720) ||
+      anvil_compute_viewport(0, 600, 960, 600, &invalid) ||
+      anvil_compute_viewport(600, 0, 960, 600, &invalid) ||
+      anvil_compute_viewport(600, 800, 0, 600, &invalid)) {
+    puts("resizable viewport bounds or aspect ratio are incorrect");
+    return 1;
+  }
+  puts("resizable viewport preserves aspect ratio and centers letterboxing");
+  return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            c_file = temp_path / "viewport_resize.c"
+            executable = temp_path / "viewport_resize.exe"
+            c_file.write_text(harness, encoding="utf-8")
+            build_c(compiler[1], c_file, executable, release=True)
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=8
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("preserves aspect ratio", result.stdout)
+
     def test_projected_sphere_bounds_contain_off_axis_silhouettes(self):
         from compiler.anvil import build_c, find_compiler
 

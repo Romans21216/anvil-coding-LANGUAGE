@@ -8,6 +8,8 @@
 
 **Formatting follow-up review:** candidate `3f77eee` was independently reviewed on exact commit `5072597`; all 72 tests, Black check, compileall, QA arithmetic, diff check, and 12-example generated-C parity pass. The critic scored this snapshot 92/100, still below 98.
 
+**Current unreviewed engine candidate:** backlog item #144 adds resizable-window presentation with aspect-preserving letterboxing while retaining the 960×600 internal framebuffer. All 73 Python tests pass, including native viewport tests for original, wide, tall, letterboxed, and invalid dimensions. No new overall score is claimed until independent review.
+
 ## Scope
 
 Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, accepts optional `language version 1` declarations (and defaults legacy files to version 1), emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit. The compiler supports fixed-size global and function-local numeric arrays; each function call is capped at 8,192 local elements, with a 16 MiB active-allocation budget across calls.
@@ -18,7 +20,9 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 72 tests; independently rerun on exact reviewed commit `96b71fe` |
+| `python -m unittest discover -s tests -q` | PASS — 72 tests; independently rerun on exact reviewed commit `5072597` |
+| Current item #144 candidate full suite | PASS — 73 tests locally; includes native viewport resize regression; candidate remains unreviewed |
+| `python -m unittest discover -s tests -p test_runtime.py -v` | PASS — 3 native runtime integration tests, including aspect-preserving viewport cases |
 | `python -m unittest discover -s tests -p test_qa_report.py -v` | PASS — zero-score rubric accepted; mismatched category subtotal rejected |
 | `python scripts/validate_qa_report.py` | PASS — 50 criteria total 92/100; category subtotals agree |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |

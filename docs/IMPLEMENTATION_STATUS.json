@@ -4,16 +4,16 @@
   "reviewed_implementation_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
   "branch": "main",
   "summary": {
-    "NEEDS VERIFICATION": 430,
+    "NEEDS VERIFICATION": 429,
     "PARTIALLY IMPLEMENTED": 3,
     "COMPLETE": 17,
-    "IN PROGRESS": 0
+    "IN PROGRESS": 1
   },
   "latest_verified_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
   "latest_independently_reviewed_candidate_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
-  "latest_followup_status_change": "Independent review 5072597 confirmed compiler phase separation and formatting; items #101\u2013#104 are COMPLETE and issue #12 acceptance is met. Latest evaluation is 92/100, FAIL against 98.",
+  "latest_followup_status_change": "Backlog item #144 dynamic window resizing is in progress: fixed framebuffer is scaled into a centered aspect-preserving viewport; native regression test and docs are added. Latest independent score remains 92/100 on 5072597.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -300,6 +300,37 @@
       "verification_result": "Independently verified on exact review commit 5072597f0fe8ed21a97774fa2582f7174ed242cd: 72 tests pass; compiler phase boundaries, facade/CLI compatibility, and generated-C parity verified. Issue #12 remains open for formatting follow-up, not these completed phase-separation items.",
       "github_issue": "#23",
       "commit": "43894d3"
+    },
+    {
+      "number": 144,
+      "section": "B. CPU AND GPU RENDERING",
+      "title": "Add dynamic window resizing.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "runtime/anvil_projection.h: anvil_compute_viewport computes a centered, aspect-preserving destination rectangle",
+        "runtime/anvil_runtime.c: WM_PAINT fills letterbox bars and scales the fixed frame into the current client rectangle",
+        "docs/ENGINE.md: fixed 960\u00d7600 rendering and resizable-window presentation behavior documented"
+      ],
+      "tests": [
+        "tests/test_runtime.py: native viewport tests pass for original, wide, tall, centered letterbox, and invalid dimensions",
+        "python -m unittest discover -s tests -q: 73 passed locally on unreviewed candidate",
+        "python -m unittest discover -s tests -p test_runtime.py -v: 3 native runtime tests passed"
+      ],
+      "missing_or_limitations": "Only the presentation window resizes. The software framebuffer and internal rendering remain fixed at 960\u00d7600; there is no dynamic-resolution renderer. Independent review pending.",
+      "dependencies": [
+        "Windows GDI presentation path"
+      ],
+      "priority": "P1 rendering usability",
+      "assigned_agent": "Codex lead",
+      "acceptance_criteria": [
+        "Window resize events repaint the frame without clipping or stretching the scene.",
+        "Rendered image preserves 16:10 aspect ratio and is centered with letterbox bars.",
+        "Zero or invalid client sizes do not cause invalid viewport dimensions.",
+        "Native regression tests and docs cover the behavior; obtain independent review."
+      ],
+      "verification_result": "IN PROGRESS: full 73-test suite and all 3 native runtime tests pass locally; independent review pending.",
+      "github_issue": "#23 item 144",
+      "commit": "pending candidate commit"
     },
     {
       "number": 301,
@@ -595,19 +626,19 @@
       "Broader game-engine scope remains incomplete."
     ]
   },
-  "current_candidate_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
+  "current_candidate_commit": "pending",
   "status_counts_validated_on": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
   "candidate_validation": {
-    "commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
-    "status": "independently reviewed",
-    "score": 92,
-    "threshold": 98,
-    "result": "FAIL",
-    "python_unittest": "72 passed",
-    "black": "Black 26.10.1 check passed; five cited compiler modules max 88 columns",
-    "cli_compatibility": "both help paths pass; all 21 legacy exports retained",
-    "generated_c_parity": "12 examples byte-identical to 854d36c",
-    "inventory": "20 audited entries; 450 total"
+    "status": "unreviewed item #144 candidate; local validation passed",
+    "scope": "Resizable-window presentation with 16:10 letterboxing; internal framebuffer remains 960x600",
+    "python_unittest": "73 passed",
+    "runtime_tests": "3 passed, including viewport resize",
+    "extension_validation": "passed",
+    "compileall": "passed",
+    "qa_report_validator": "passed; current reviewed score remains 92/100",
+    "status_ledger": "21 audited entries; counts 17 complete, 3 partial, 1 in progress, 429 needing verification; total 450",
+    "diff_check": "passed"
   },
-  "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization."
+  "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
+  "current_active_item": 144
 }

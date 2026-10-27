@@ -1,6 +1,6 @@
 # Anvil Engine Runtime
 
-The initial runtime targets Windows and keeps the engine surface intentionally small. `fn(update)` runs at a fixed simulation rate (60 Hz by default), then the runtime clears its fixed-size 960×600 frame, calls `fn(draw)`, and presents the software-rendered pixels in a native window. `.ANVLproj` can set `engine.fixed_hz` from 1 to 240. `delta()` reports the fixed update step; `time()` reports elapsed wall time.
+The initial runtime targets Windows and keeps the engine surface intentionally small. `fn(update)` runs at a fixed simulation rate (60 Hz by default), then the runtime clears its fixed-size 960×600 frame, calls `fn(draw)`, and presents the software-rendered pixels in a native window. The game window can be resized; presentation preserves the 16:10 frame aspect ratio and centers letterboxing when needed, while internal rendering remains 960×600. `.ANVLproj` can set `engine.fixed_hz` from 1 to 240. `delta()` reports the fixed update step; `time()` reports elapsed wall time.
 
 ## Available commands
 
@@ -23,7 +23,7 @@ Current drawing primitives are `rect`, `circle`, `line`, `text`, `cube`, `sphere
 
 `camera fov(degrees)` sets the horizontal field of view (clamped to 20–120 degrees). `camera control(move_speed, turn_speed)` enables keyboard movement during fixed updates: W/S move forward/backward, A/D strafe, Q/E move vertically, and the arrow keys turn and look up/down. Movement uses the fixed update step, so it is independent of frame rate. The sample world demonstrates these controls and ray-traced spheres.
 
-The renderer uses hand-written C software rasterization for conventional primitives and CPU BVH ray tracing for `ray_sphere`. It is useful for a small starter game and for learning; it lacks GPU acceleration/DXR, mesh import, texture mapping, robust near-plane clipping, resize handling, and production-grade rasterization. Text uses the Windows GDI font path.
+The renderer uses hand-written C software rasterization for conventional primitives and CPU BVH ray tracing for `ray_sphere`. It is useful for a small starter game and for learning; it lacks GPU acceleration/DXR, mesh import, texture mapping, robust near-plane clipping, dynamic internal resolution, and production-grade rasterization. Text uses the Windows GDI font path.
 
 ## Math, time, and input
 
