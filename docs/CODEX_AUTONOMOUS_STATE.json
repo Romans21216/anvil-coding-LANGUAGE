@@ -5,20 +5,20 @@
   "last_completed_batch": 5,
   "last_completed_backlog_item": 47,
   "current_active_item": 47,
-  "current_active_item_status": "Backlog item #47 is complete and independently reviewed. The latest overall score is 89/100, below 98; the exact issue #31 limitations-string correction is implemented locally and awaits fresh review.",
-  "latest_verified_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
-  "last_pushed_reviewed_below_threshold_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
-  "latest_independently_reviewed_candidate_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
+  "current_active_item_status": "Backlog item #47 is complete and independently reviewed. The latest overall score is 89/100, below 98; stale progress/state commit-push wording from issue #31 is corrected in this follow-up and awaits fresh review.",
+  "latest_verified_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
+  "last_pushed_reviewed_below_threshold_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
+  "latest_independently_reviewed_candidate_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "The latest reviewed snapshot is bcbf221; the issue #31 wording correction is in the current branch follow-up and awaits independent confirmation. The overall review remains below the 98/100 threshold.",
+  "latest_push_result": "The latest reviewed snapshot c5d7d40 scored 89/100; stale commit/push wording in the progress and autonomous-state records is corrected in this follow-up and awaits independent confirmation. The overall review remains below the 98/100 threshold.",
   "latest_independent_review": {
-    "commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
+    "commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
     "score": 89,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
     "current_required_threshold": 98,
     "current_threshold_status": "BELOW_THRESHOLD",
-    "findings": ["#31 docs/IMPLEMENTATION_STATUS.json item #47 missing_or_limitations incorrectly says full-suite verification is pending"],
+    "findings": ["#31 progress log and autonomous state say the pushed fix is pending commit/push"],
     "categories": {
       "requirements": "16/20",
       "functionality_reliability": "20/20",
@@ -49,7 +49,7 @@
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "The issue #31 missing_or_limitations wording is corrected in the current worktree; commit/push the sync and obtain fresh review. Overall bar remains 98/100.",
+  "pending_documentation_review": "The stale workflow wording in the progress and state files is corrected in the current follow-up; obtain a fresh review. Overall bar remains 98/100.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -61,7 +61,7 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
     "next_recommended_tasks": [
-    "Commit/push the issue #31 wording fix, obtain fresh review, then continue toward the 98/100 overall QA threshold.",
+    "Obtain a fresh review of the corrected issue #31 workflow wording, then continue toward the 98/100 overall QA threshold.",
     "Continue selecting work directly from issue #23; keep the full item list only in that issue."
   ],
   "master_backlog": {

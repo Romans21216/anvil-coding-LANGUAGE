@@ -2,9 +2,9 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **89/100 — FAIL** (commit `bcbf22101e4dc2e29e696880111bdc10a4702e50`) against the user's **98/100** threshold. It ran 61 Python tests, extension validation, Python compilation, an MSVC release build/run of `numeric_demo.ANVL` (output `17`), and `git diff --check`. It verified issue #23 still holds the full 450-item list. The reviewer confirmed the UDP NaN guard and finite/missing-socket behavior, resolving issue [#30](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/30). It found one remaining issue #31 metadata contradiction: item #47's `missing_or_limitations` field says full-suite verification is pending although the suite and independent review passed. Issue [#31](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/31) remains open; the exact finding is recorded in its comment. The wording is corrected in the current worktree and awaits a fresh review. The previous 85/100 review of `8ae53c4` and 90/100 review of `2a745bb` remain historical and below 98.
+**Latest completed independent full review:** **89/100 — FAIL** (commit `c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2`) against the user's **98/100** threshold. It ran 61 Python tests, extension validation, Python compilation, an MSVC release build/run of `numeric_demo.ANVL` (output `17`), and `git diff --check`. It verified issue #23 still holds the full 450-item list. It confirmed the UDP guard and issue #30 fix. The latest issue #31 finding is stale commit/push wording in `AUTONOMOUS_DEVELOPMENT_PROGRESS.md` and `CODEX_AUTONOMOUS_STATE.json`; details are recorded in the issue comment. The current follow-up corrects those lines and awaits a fresh review. The previous 89/100 review of `bcbf221`, 85/100 review of `8ae53c4`, and 90/100 review of `2a745bb` remain historical and below 98.
 **Current passing threshold:** 98/100, set by the user on 2026-10-27. Historical reviews keep their original scores and results; a historical 90/100 PASS does not meet the new threshold.
-**Review snapshot:** the latest reviewer evaluated exact commit `bcbf22101e4dc2e29e696880111bdc10a4702e50`, reran all 61 Python tests, VS Code extension validation, Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), and passed `git diff --check`. It confirmed the full 450-item list remains in issue #23's body and comment, and repository files contain only the audited subset. It confirmed issue #30's UDP behavior is fixed and identified the remaining status string under issue #31. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
+**Review snapshot:** the latest reviewer evaluated exact commit `c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2`, reran all 61 Python tests, VS Code extension validation, Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), and passed `git diff --check`. It confirmed the full 450-item list remains in issue #23's body and comment, and repository files contain only the audited subset. It confirmed issue #30 is resolved and found the stale workflow lines under issue #31. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
 
 ## Scope
 
@@ -16,7 +16,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — current candidate: 61 tests, including numeric overflow plus NaN/finite/missing-socket UDP behavior; the latest critic ran all 61 tests on `bcbf221` |
+| `python -m unittest discover -s tests -q` | PASS — current candidate: 61 tests, including numeric overflow plus NaN/finite/missing-socket UDP behavior; the latest critic ran all 61 tests on `c5d7d40` |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -42,9 +42,9 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Latest independent review — commit `bcbf221`
+## Latest independent review — commit `c5d7d40`
 
-**89/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 18/20; developer experience and delivery 18/20. The reviewer verified 61 Python tests, VS Code extension validation, Python compilation, MSVC `numeric_demo` build/run (output `17`), `git diff --check`, and issue #23's 450 unique sequential entries. It confirmed the UDP finite-number fix, resolving issue #30. Its only current defect is criterion 38: `docs/IMPLEMENTATION_STATUS.json` item #47 `missing_or_limitations` says “Awaiting full-suite verification” while the same row records tests and review complete. Issue #31 remains open with the precise finding in its latest comment. The user requires 98/100; this review does not pass.
+**89/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 18/20; developer experience and delivery 18/20. The reviewer verified 61 Python tests, VS Code extension validation, Python compilation, MSVC `numeric_demo` build/run (output `17`), `git diff --check`, and issue #23's 450 unique sequential entries. It confirmed the UDP finite-number fix, resolving issue #30. Its only current defect is criterion 38: the progress log says the #31 follow-up is pending commit/push, and the resumable state repeats that instruction, although HEAD is already pushed. Issue #31 remains open with the precise finding in its latest comment. The current follow-up corrects both statements and awaits review. The user requires 98/100; this review does not pass.
 
 ## Historical independent 50-criterion review — commit `2a745bb`
 
@@ -89,7 +89,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 1 | **Latest finding:** item #47 `missing_or_limitations` in `IMPLEMENTATION_STATUS.json` still says full-suite verification is pending despite completed tests/review; issue #31. |
+| 38 | Results recorded accurately | 1 | **Latest finding:** the progress/state files say the #31 update still needs commit/push although HEAD is pushed; issue #31. The wording is fixed in the current follow-up. |
 | 39 | Regression checks performed | 2 | The independent review reran all 61 tests, extension validation, Python compilation, MSVC numeric demo, and diff check. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |

@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
+  "reviewed_implementation_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 436,
@@ -9,11 +9,11 @@
     "COMPLETE": 11,
     "IN PROGRESS": 0
   },
-  "latest_verified_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
-  "latest_independently_reviewed_candidate_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
+  "latest_verified_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
+  "latest_independently_reviewed_candidate_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "bcbf22101e4dc2e29e696880111bdc10a4702e50",
-  "latest_followup_status_change": "Corrects the item #47 missing_or_limitations wording identified in issue #31; awaiting independent review.",
+  "last_pushed_reviewed_below_threshold_commit": "c5d7d405a1c7a8f28f2ee1e8446a0c6d7f9b1ba2",
+  "latest_followup_status_change": "Corrects the stale commit/push wording in progress and autonomous-state records identified in issue #31; awaiting independent review.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -64,7 +64,7 @@
         "git diff --check: passed",
         "docs/IMPLEMENTATION_STATUS.json and docs/CODEX_AUTONOMOUS_STATE.json: valid JSON"
       ],
-      "missing_or_limitations": "Item #47 behavior passed independent review on bcbf221. Overall QA scored 89/100, below the required 98/100 bar, so broader evaluation work continues and another overall review is pending. This detects non-finite results but does not prevent every finite precision loss or integer-style wraparound because Anvil uses double values.",
+      "missing_or_limitations": "Item #47 behavior passed independent review on c5d7d40. Overall QA scored 89/100, below the required 98/100 bar, so broader evaluation work continues and another overall review is pending. This detects non-finite results but does not prevent every finite precision loss or integer-style wraparound because Anvil uses double values.",
       "dependencies": [],
       "priority": "P0 correctness improvement",
       "assigned_agent": "Codex lead (sequential execution)",
@@ -74,7 +74,7 @@
         "Cover direct overflow, non-finite intermediates used in comparisons, and invalid math results.",
         "Document the behavior and get independent review."
       ],
-      "verification_result": "COMPLETE: the 61-test suite, extension validation, Python/JSON/diff checks, MSVC numeric demo, and independent review of bcbf221 pass for item #47. The review scored 89/100 overall and found no code defect in this behavior. Issue #30 is resolved; unrelated status-field wording remains tracked under issue #31.",
+      "verification_result": "COMPLETE: the 61-test suite, extension validation, Python/JSON/diff checks, MSVC numeric demo, and independent review of c5d7d40 pass for item #47. The review scored 89/100 overall and found no code defect in this behavior. Issue #30 is resolved; stale workflow wording remains tracked under issue #31.",
       "github_issue": "#23",
       "commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951"
     },
