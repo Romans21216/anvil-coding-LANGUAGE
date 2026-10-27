@@ -56,6 +56,11 @@ void anvil_set_scene3d(int enabled);
 void anvil_camera_perspective(double x, double y, double z);
 void anvil_camera_fov(double degrees);
 void anvil_camera_control(double speed, double turn_degrees_per_second);
+double anvil_mouse_x(void);
+double anvil_mouse_y(void);
+double anvil_mouse_pressed(const char *button);
+double anvil_mouse_held(const char *button);
+double anvil_mouse_wheel(void);
 void anvil_trace_sphere(double x, double y, double z, double radius, int r,
                         int g, int b, int a);
 void anvil_trace_finish(void);

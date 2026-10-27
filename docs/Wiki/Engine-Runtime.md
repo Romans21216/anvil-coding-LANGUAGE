@@ -20,3 +20,5 @@ BVH CPU ray tracing is the only implemented ray-tracing backend. DXR and Embree 
 
 `ray_backend("bvh")` selects the ray-tracing backend at runtime, and `ray_backend_available("dxr")` checks whether a named backend is available. Both return numeric `1` or `0`. A failed selection keeps the current backend and prints a diagnostic. This build implements only `bvh`; DXR and Embree currently return unavailable.
 
+Mouse input is available as `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held(...)`, and `mouse_wheel()`. Pointer coordinates map through the centered aspect-preserving viewport to the virtual 960×600 framebuffer; a pointer in letterbox space returns `-1`. Button edges and wheel detents are consumed at fixed-update boundaries. `examples/mouse_input.ANVL` shows a click counter and cursor marker.
+

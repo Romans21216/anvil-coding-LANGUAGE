@@ -8,6 +8,7 @@
 - A small native software renderer for 2D rectangles, circles, lines and text, plus shaded 3D cubes, spheres, and grid planes with a perspective camera and depth buffer.
 - Keyboard camera movement/look, adjustable field of view, and a built-in BVH-accelerated CPU ray-traced sphere with shadows and specular lighting.
 - Keyboard edge/held state, configurable fixed-step updates, deterministic RNG and noise helpers.
+- Resize-aware mouse position, per-update button edges, held buttons, and signed wheel input in virtual framebuffer coordinates.
 - A first LAN multiplayer primitive: opt-in UDP host/join and exchanging one numeric value.
 - A configurable fixed-step 2D circle and axis-aligned box-body system (up to 128 slots) with forces, gravity, restitution, mixed-shape collision response, and Coulomb friction.
 - A VS Code language extension and a browser-based preview workbench.
@@ -60,6 +61,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Fixed-size arrays sample](examples/arrays.ANVL)
 - [2D circle physics sample](examples/physics.ANVL)
 - [2D boxes and mixed-shape physics sample](examples/physics_boxes.ANVL)
+- [Mouse input sample](examples/mouse_input.ANVL)
 - [VS Code extension](vscode-extension/README.md)
 - [Full improvement backlog](docs/IMPROVEMENT_BACKLOG.md)
 - [Wiki pages](docs/Wiki/Home.md)

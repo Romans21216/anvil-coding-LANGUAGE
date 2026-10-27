@@ -1,0 +1,25 @@
+# Mouse input is mapped into the fixed 960x600 virtual frame.
+scene 2d
+clear rgba(12, 17, 29, 255)
+
+set var(cursor_x) = -1
+set var(cursor_y) = -1
+set var(clicks) = 0
+set var(wheel) = 0
+
+fn(update)
+  set var(cursor_x) = mouse_x()
+  set var(cursor_y) = mouse_y()
+  if mouse_pressed("left")
+    add var(clicks) 1
+  end
+  add var(wheel) mouse_wheel()
+end
+
+fn(draw)
+  display text("Click count: " + var(clicks)) -l(24, 32) -rgb(235, 242, 255)
+  display text("Wheel detents: " + var(wheel)) -l(24, 60) -rgb(156, 195, 255)
+  if var(cursor_x) >= 0 and var(cursor_y) >= 0
+    display circle(var(cursor_x), var(cursor_y), 10) -rgba(96, 212, 164, 200)
+  end
+end

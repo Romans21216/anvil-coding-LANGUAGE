@@ -4,9 +4,9 @@
   "branch": "main",
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
-  "current_active_item": 185,
-  "current_active_item_status": "Backlog item #185 (robust near-plane clipping) remains in progress in code commit 15ac43a. Critic eec0608 independently verified the extreme-coordinate overflow correction and accurate 74-test record. No live window was inspected; far-plane and side-frustum clipping remain unimplemented.",
-  "current_candidate_commit": "15ac43a8033557859db509ecca2fa8c88a13d7b7",
+  "current_active_item": 391,
+  "current_active_item_status": "Backlog items #391–394 (mouse position, buttons, and wheel input) implemented in the current uncommitted candidate; 77 Python tests, extension validation, compileall, sample build, and diff checks pass. Exact commit and independent review are pending. Required evaluation threshold: 98/100.",
+  "current_candidate_commit": "ddf8c6f8b923c6b7f8ee3bca154d0ffd5e5f7309",
   "latest_verified_commit": "eec0608dd6f252090b50fda1027eba14c6af1292",
   "last_pushed_reviewed_below_threshold_commit": "eec0608dd6f252090b50fda1027eba14c6af1292",
   "latest_independently_reviewed_candidate_commit": "eec0608dd6f252090b50fda1027eba14c6af1292",
@@ -54,19 +54,13 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "74 passed; independently rerun on exact reviewed candidate eec0608",
-    "vscode_extension_validation": "passed; independently rerun on exact reviewed candidate eec0608",
-    "python_compile": "passed; independently rerun on exact reviewed candidate eec0608",
-    "msvc_numeric_demo": "built and ran successfully; output 17",
-    "msvc_language_spec_example": "built with --release and ran successfully; output 6",
-    "git_diff_check": "passed for exact reviewed candidate eec0608",
-    "implementation_status_inventory": "22 audited entries; 428 needing verification, 3 partial, 17 complete, 2 in progress = 450. #172 mapping confirmed; #185 active.",
-    "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
-    "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)",
-    "qa_report_validator": "passed on eec0608's pre-sync report snapshot; latest rubric arithmetic now syncs to 92/100",
-    "black": "passed independently: Black 26.10.1 --check compiler tests/test_compiler_modules.py; all five cited modules max 88 columns",
-    "generated_c_parity": "12/12 examples byte-identical to baseline 854d36c after line wrapping",
-    "runtime_viewport_test": "4 native tests passed on exact reviewed commit; extreme clipping cases exercised, no live window inspection"
+    "python_unittest": "77 passed on mouse-input candidate",
+    "vscode_extension_validation": "passed; extension 0.1.8 grammar validation (not installed)",
+    "python_compile": "compileall passed",
+    "mouse_example": "examples/mouse_input.ANVL built with MSVC release compiler",
+    "git_diff_check": "passed",
+    "runtime_mouse_integration": "passed resize-aware viewport, letterbox exclusion, left/right/middle pressed/held/release, wheel detent/reset checks",
+    "independent_review": "pending exact candidate commit; required passing score 98/100"
   },
   "pending_documentation_review": null,
   "blocked_items": [
@@ -80,8 +74,8 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
   "next_recommended_tasks": [
-    "Resolve verified issue #46, then continue authentic game-engine work from issue #23 toward 98/100.",
-    "Keep current passing threshold at 98; sync all evaluation documents immediately after every critic run."
+    "Complete mouse-input visual/runtime inspection where feasible, push exact candidate, and obtain independent critic score against the 98/100 threshold.",
+    "If the review is below 98/100, address evidence-backed findings and rerun the full evaluation."
   ],
   "master_backlog": {
     "issue": 23,
@@ -98,8 +92,8 @@
   "implementation_status_counts": {
     "COMPLETE": 17,
     "PARTIALLY IMPLEMENTED": 3,
-    "IN PROGRESS": 2,
-    "NEEDS VERIFICATION": 428,
+    "IN PROGRESS": 6,
+    "NEEDS VERIFICATION": 424,
     "TOTAL": 450
   },
   "resolved_critic_issues": [
@@ -110,19 +104,16 @@
     47
   ],
   "candidate_validation": {
-    "status": "issue #47 fixes independently verified; score 92/100 remains below 98",
-    "item": 185,
-    "prior_review_commit": "4bc8bc3c5d01c59622d7af1237b6021d5903e13f",
-    "reviewed_score": 92,
+    "status": "mouse-input candidate pending independent review",
+    "item": "391–394",
+    "reviewed_score": null,
     "threshold": 98,
-    "result": "FAIL",
-    "python_unittest": "74 passed on 15ac43a",
-    "runtime_tests": "4 native runtime tests passed",
+    "result": "PENDING",
+    "python_unittest": "77 passed",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "passed; QA report arithmetic synchronized to 92/100, below 98",
     "git_diff_check": "passed",
-    "commit": "eec0608dd6f252090b50fda1027eba14c6af1292"
+    "commit": "ddf8c6f8b923c6b7f8ee3bca154d0ffd5e5f7309"
   },
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775"
 }

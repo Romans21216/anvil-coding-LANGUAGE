@@ -29,6 +29,7 @@ The renderer uses hand-written C software rasterization for conventional primiti
 
 - `delta()` and `time()` return seconds.
 - `pressed(SPACE)` is a key-down edge preserved until the next fixed update; `held(SPACE)` stays true while a key is down. Letter keys and arrow keys are supported.
+- `mouse_x()` and `mouse_y()` return the pointer in the 960×600 virtual framebuffer; both return `-1` while in letterbox bars or outside the window. `mouse_pressed("left")`, `mouse_pressed("right")`, and `mouse_pressed("middle")` report one fixed-update edge; `mouse_held(...)` reports the down state until release or focus loss. `mouse_wheel()` returns signed wheel detents for the current fixed update. Pointer mapping follows the same centered aspect-preserving resize viewport as the presented game frame.
 - `rnd(low, high)` returns an inclusive integer. `seed(value)` makes the xorshift generator repeatable.
 - `noise(x,y,z)` is deterministic gradient noise; `fbm(x,y,z,octaves,lacunarity,gain)` combines octaves.
 - Math calls include `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, and `max`.
@@ -45,5 +46,5 @@ Bindings written with `set var(name)` are global numeric state unless shadowed b
 
 ## Planned extensions
 
-Sprites and asset handles, audio, 3D physics, polygon collision, a GPU-backed DXR renderer, persistence, mouse/controller input, platform backends, and profiling tools remain future work. The compiler rejects statements that have not been implemented instead of silently treating them as active features.
+Sprites and asset handles, audio, 3D physics, polygon collision, a GPU-backed DXR renderer, persistence, controller input, platform backends, and profiling tools remain future work. The compiler rejects statements that have not been implemented instead of silently treating them as active features.
 

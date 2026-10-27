@@ -12,7 +12,12 @@
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
-enum { ANVIL_WIDTH = 960, ANVIL_HEIGHT = 600, ANVIL_KEYS = 256 };
+enum {
+  ANVIL_WIDTH = 960,
+  ANVIL_HEIGHT = 600,
+  ANVIL_KEYS = 256,
+  ANVIL_MOUSE_BUTTONS = 3
+};
 enum { ANVIL_TRACE_SPHERES = 32 };
 static const double ANVIL_NEAR_DEPTH = 0.08;
 enum {
@@ -57,6 +62,13 @@ static double *anvil_depth_buffer;
 static int anvil_running;
 static int anvil_keys[ANVIL_KEYS];
 static int anvil_pressed_keys[ANVIL_KEYS];
+static int anvil_mouse_buttons[ANVIL_MOUSE_BUTTONS];
+static int anvil_mouse_pressed_buttons[ANVIL_MOUSE_BUTTONS];
+static int anvil_mouse_client_x = -1;
+static int anvil_mouse_client_y = -1;
+static int anvil_mouse_has_position;
+static double anvil_mouse_wheel_delta;
+static int anvil_mouse_invalid_button_warned;
 static int anvil_clear_color[4] = {12, 17, 29, 255};
 static int anvil_scene_is_3d = 1;
 static double anvil_camera_x = 0.0, anvil_camera_y = 3.0, anvil_camera_z = 8.0;
@@ -538,6 +550,50 @@ double anvil_pressed(int key) {
 double anvil_held(int key) {
   return key >= 0 && key < ANVIL_KEYS ? anvil_keys[key] != 0 : 0.0;
 }
+static int anvil_mouse_button_index(const char *button) {
+  if (button && _stricmp(button, "left") == 0)
+    return 0;
+  if (button && _stricmp(button, "right") == 0)
+    return 1;
+  if (button && _stricmp(button, "middle") == 0)
+    return 2;
+  if (!anvil_mouse_invalid_button_warned) {
+    fprintf(stderr,
+            "Anvil: unknown mouse button '%s'; choose 'left', 'right', or 'middle'.\n",
+            button ? button : "<null>");
+    anvil_mouse_invalid_button_warned = 1;
+  }
+  return -1;
+}
+double anvil_mouse_pressed(const char *button) {
+  int index = anvil_mouse_button_index(button);
+  return index >= 0 ? anvil_mouse_pressed_buttons[index] != 0 : 0.0;
+}
+double anvil_mouse_held(const char *button) {
+  int index = anvil_mouse_button_index(button);
+  return index >= 0 ? anvil_mouse_buttons[index] != 0 : 0.0;
+}
+static double anvil_mouse_coordinate(int horizontal) {
+  if (!anvil_window || !anvil_mouse_has_position)
+    return -1.0;
+  RECT client;
+  AnvilViewport viewport;
+  if (!GetClientRect(anvil_window, &client) ||
+      !anvil_compute_viewport(client.right - client.left,
+                             client.bottom - client.top, ANVIL_WIDTH,
+                             ANVIL_HEIGHT, &viewport))
+    return -1.0;
+  int x = anvil_mouse_client_x, y = anvil_mouse_client_y;
+  if (x < viewport.x || y < viewport.y || x >= viewport.x + viewport.width ||
+      y >= viewport.y + viewport.height)
+    return -1.0;
+  if (horizontal)
+    return (double)(x - viewport.x) * ANVIL_WIDTH / viewport.width;
+  return (double)(y - viewport.y) * ANVIL_HEIGHT / viewport.height;
+}
+double anvil_mouse_x(void) { return anvil_mouse_coordinate(1); }
+double anvil_mouse_y(void) { return anvil_mouse_coordinate(0); }
+double anvil_mouse_wheel(void) { return anvil_mouse_wheel_delta; }
 static void anvil_camera_update(void) {
   if (anvil_camera_move_speed <= 0.0 && anvil_camera_turn_speed <= 0.0)
     return;
@@ -1459,6 +1515,56 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
   case WM_SIZE:
     InvalidateRect(window, NULL, FALSE);
     break;
+  case WM_MOUSEMOVE: {
+    anvil_mouse_client_x = (short)LOWORD(lparam);
+    anvil_mouse_client_y = (short)HIWORD(lparam);
+    anvil_mouse_has_position = 1;
+    TRACKMOUSEEVENT tracking = {sizeof(tracking), TME_LEAVE, window, 0};
+    TrackMouseEvent(&tracking);
+    return 0;
+  }
+  case WM_MOUSELEAVE:
+    anvil_mouse_has_position = 0;
+    return 0;
+  case WM_LBUTTONDOWN:
+  case WM_RBUTTONDOWN:
+  case WM_MBUTTONDOWN: {
+    int index = message == WM_LBUTTONDOWN ? 0
+                : message == WM_RBUTTONDOWN ? 1
+                                            : 2;
+    if (!anvil_mouse_buttons[index])
+      anvil_mouse_pressed_buttons[index] = 1;
+    anvil_mouse_buttons[index] = 1;
+    SetCapture(window);
+    return 0;
+  }
+  case WM_LBUTTONUP:
+  case WM_RBUTTONUP:
+  case WM_MBUTTONUP: {
+    int index = message == WM_LBUTTONUP ? 0
+                : message == WM_RBUTTONUP ? 1
+                                          : 2;
+    anvil_mouse_buttons[index] = 0;
+    if (!anvil_mouse_buttons[0] && !anvil_mouse_buttons[1] &&
+        !anvil_mouse_buttons[2] && GetCapture() == window)
+      ReleaseCapture();
+    return 0;
+  }
+  case WM_MOUSEWHEEL:
+    anvil_mouse_wheel_delta +=
+        (double)(short)HIWORD(wparam) / (double)WHEEL_DELTA;
+    return 0;
+  case WM_CAPTURECHANGED:
+    if ((HWND)lparam != window)
+      memset(anvil_mouse_buttons, 0, sizeof(anvil_mouse_buttons));
+    return 0;
+  case WM_KILLFOCUS:
+    memset(anvil_keys, 0, sizeof(anvil_keys));
+    memset(anvil_mouse_buttons, 0, sizeof(anvil_mouse_buttons));
+    anvil_mouse_has_position = 0;
+    if (GetCapture() == window)
+      ReleaseCapture();
+    return 0;
   case WM_KEYDOWN:
     if (wparam < ANVIL_KEYS) {
       if (!anvil_keys[wparam])
@@ -1591,13 +1697,22 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
       update_count++;
       if (update_count == 1)
         memset(anvil_pressed_keys, 0, sizeof(anvil_pressed_keys));
+      if (update_count == 1) {
+        memset(anvil_mouse_pressed_buttons, 0,
+               sizeof(anvil_mouse_pressed_buttons));
+        anvil_mouse_wheel_delta = 0.0;
+      }
     }
     anvil_clear_frame();
     if (draw)
       draw();
     anvil_trace_finish();
-    if (!update)
+    if (!update) {
       memset(anvil_pressed_keys, 0, sizeof(anvil_pressed_keys));
+      memset(anvil_mouse_pressed_buttons, 0,
+             sizeof(anvil_mouse_pressed_buttons));
+      anvil_mouse_wheel_delta = 0.0;
+    }
     InvalidateRect(anvil_window, NULL, FALSE);
     UpdateWindow(anvil_window);
     double sleep_seconds = step_seconds - accumulator;

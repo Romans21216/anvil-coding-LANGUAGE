@@ -77,7 +77,7 @@ The current language has `if`/`else`/`end`, `while`/`end`, numeric `for`/`end` l
 
 ## Built-ins
 
-- Time/input: `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`.
+- Time/input: `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held(...)`, and `mouse_wheel()`. Mouse coordinates use the virtual 960×600 framebuffer and return `-1` outside the game viewport, including letterbox bars. Button-down edges and wheel detents are available through the next fixed update; held state ends on release or focus loss.
 - Random/noise: `seed(value)`, `rnd(low, high)`, `noise(x, y, z)`, `fbm(x, y, z, octaves, lacunarity, gain)`.
 - Math: `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, `max`.
 - Drawing: `rect`, `circle`, `line`, `text`, `cube`, `sphere`, `ray_sphere`, `plane`.

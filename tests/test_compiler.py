@@ -164,6 +164,69 @@ class CompilerTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("expected a string, got a number", result.stderr)
 
+    def test_mouse_builtins_emit_runtime_calls_and_validate_button_names_as_strings(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "mouse.ANVL"
+            generated = pathlib.Path(temp) / "mouse.c"
+            source.write_text(
+                'fn(update)\n'
+                '  set var(x) = mouse_x()\n'
+                '  set var(y) = mouse_y()\n'
+                '  if mouse_pressed("left") and mouse_held("right")\n'
+                '    add var(y) mouse_wheel()\n'
+                '  end\n'
+                'end\n',
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            emitted = generated.read_text(encoding="utf-8")
+            for call in (
+                "anvil_mouse_x ( )",
+                "anvil_mouse_y ( )",
+                'anvil_mouse_pressed ( "left" )',
+                'anvil_mouse_held ( "right" )',
+                "anvil_mouse_wheel ( )",
+            ):
+                with self.subTest(call=call):
+                    self.assertIn(call, emitted)
+
+            source.write_text(
+                'fn(main)\n  output mouse_pressed(1)\nend\n', encoding="utf-8"
+            )
+            invalid = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertIn("expected a string, got a number", invalid.stderr)
+
+    def test_mouse_input_example_generates_native_mouse_calls(self):
+        with tempfile.TemporaryDirectory() as temp:
+            generated = pathlib.Path(temp) / "mouse_input.c"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(COMPILER),
+                    str(ROOT / "examples" / "mouse_input.ANVL"),
+                    "--emit-c",
+                    str(generated),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            emitted = generated.read_text(encoding="utf-8")
+            self.assertIn('anvil_mouse_pressed ( "left" )', emitted)
+            self.assertIn("anvil_mouse_x ( )", emitted)
+            self.assertIn("anvil_mouse_y ( )", emitted)
+            self.assertIn("anvil_mouse_wheel ( )", emitted)
+
     def test_starter_game_links_native_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / "world.exe"

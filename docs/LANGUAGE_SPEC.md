@@ -145,7 +145,8 @@ compare_operator = "=" | "==" | "!=" | "<" | "<=" | ">" | ">=" ;
 builtin_call     = builtin_name, "(", [ argument_list ], ")" ;
 builtin_name     = "time" | "delta" | "rnd" | "noise" | "fbm" | "floor" | "ceil"
                  | "sqrt" | "sin" | "cos" | "abs" | "min" | "max" | "pressed"
-                 | "held" | "receive" | "body_create" | "body_create_box" | "body_destroy"
+                 | "held" | "mouse_x" | "mouse_y" | "mouse_pressed" | "mouse_held"
+                 | "mouse_wheel" | "receive" | "body_create" | "body_create_box" | "body_destroy"
                  | "body_active" | "body_x" | "body_y" | "body_vx" | "body_vy"
                  | "body_set_velocity" | "body_force" | "body_restitution" | "body_friction"
                  | "body_collision" | "physics_capacity" | "physics_gravity" | "physics_step"
@@ -172,7 +173,7 @@ Parentheses group expressions. `=` and `==` both mean numeric equality. Comparis
 
 The compiler also accepts the legacy compatibility form `compute(expression)` when it wraps an entire expression. It is not a callable built-in; nested or partial `compute(...)` forms are not supported.
 
-An expression must have the expected value kind. Most operators, variables, arrays, and function results are numeric. String literals are accepted only in string-taking built-ins and drawing text. The ray-backend functions require a string literal. `net join` accepts a literal address. Drawing text accepts a string literal; the current dynamic form is a string literal followed by `+ var(name)`, formatted as a whole number. This limited form does not create a general string value.
+An expression must have the expected value kind. Most operators, variables, arrays, and function results are numeric. String literals are accepted only in string-taking built-ins and drawing text. The ray-backend functions require a string literal; mouse button functions require one of the string literals `"left"`, `"right"`, or `"middle"` at runtime. `net join` accepts a literal address. Drawing text accepts a string literal; the current dynamic form is a string literal followed by `+ var(name)`, formatted as a whole number. This limited form does not create a general string value.
 
 Division by zero, including negative zero, is a runtime error with source path and line and exit code 2. Every numeric operation and numeric built-in result must be finite; NaN or infinity (including overflow and invalid math results) produces a source-located runtime error. Numeric values use the C backend's `double` representation; there are no integer, decimal, or user-defined numeric types in version 1.
 
@@ -182,7 +183,7 @@ All built-ins return a numeric result unless otherwise stated. Calls use parenth
 
 | Group | Function signatures | Meaning and limits |
 |---|---|---|
-| Clock/input | `time()`; `delta()`; `pressed(key)`; `held(key)` | Runtime time, fixed-step delta, and keyboard edge/held state. Keys include the symbolic tokens `A`–`Z`, `SPACE`, arrows, `ENTER`, and `ESCAPE`; key inputs are numeric values and may also be supplied as numeric virtual-key codes. |
+| Clock/input | `time()`; `delta()`; `pressed(key)`; `held(key)`; `mouse_x()`; `mouse_y()`; `mouse_pressed(button)`; `mouse_held(button)`; `mouse_wheel()` | Runtime time, fixed-step delta, keyboard state, mouse position/button state, and wheel delta. Keys include the symbolic tokens `A`–`Z`, `SPACE`, arrows, `ENTER`, and `ESCAPE`; key inputs are numeric values and may also be supplied as numeric virtual-key codes. Mouse buttons are string literals `"left"`, `"right"`, or `"middle"`. Position is in fixed 960×600 virtual framebuffer pixels, with `-1` returned in letterbox bars or outside the window. Pressed state and wheel delta last through the next fixed update; held state ends on release or window focus loss. |
 | Random/noise | `seed(value)` statement; `rnd(low, high)`; `noise(x,y,z)`; `fbm(x,y,z,octaves,lacunarity,gain)` | Seeded pseudo-random values and 3D gradient/fractal noise. |
 | Math | `floor(x)`; `ceil(x)`; `sqrt(x)`; `sin(x)`; `cos(x)`; `abs(x)`; `min(a,b)`; `max(a,b)` | Double-precision math helpers. Invalid/non-finite results are rejected. |
 | Ray backend | `ray_backend(name)`; `ray_backend_available(name)` | String-literal names. `"bvh"` is selectable; only the CPU BVH backend is implemented. Availability queries for `"dxr"` and `"embree"` return false. Failed selection leaves the active backend unchanged. |

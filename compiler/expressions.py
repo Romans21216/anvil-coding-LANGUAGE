@@ -38,6 +38,11 @@ BUILTINS = {
     "max": (2, 2),
     "pressed": (1, 1),
     "held": (1, 1),
+    "mouse_x": (0, 0),
+    "mouse_y": (0, 0),
+    "mouse_pressed": (1, 1),
+    "mouse_held": (1, 1),
+    "mouse_wheel": (0, 0),
     "receive": (0, 0),
     "body_create": (4, 4),
     "body_create_box": (5, 5),
@@ -67,6 +72,11 @@ BUILTIN_C_NAMES = {
     "fbm": "anvil_fbm",
     "pressed": "anvil_pressed",
     "held": "anvil_held",
+    "mouse_x": "anvil_mouse_x",
+    "mouse_y": "anvil_mouse_y",
+    "mouse_pressed": "anvil_mouse_pressed",
+    "mouse_held": "anvil_mouse_held",
+    "mouse_wheel": "anvil_mouse_wheel",
     "receive": "anvil_net_receive",
     "abs": "fabs",
     "min": "fmin",
@@ -91,7 +101,12 @@ BUILTIN_C_NAMES = {
     "ray_backend_available": "anvil_ray_backend_available",
 }
 
-BUILTIN_STRING_ARGUMENTS = {"ray_backend", "ray_backend_available"}
+BUILTIN_STRING_ARGUMENTS = {
+    "ray_backend",
+    "ray_backend_available",
+    "mouse_pressed",
+    "mouse_held",
+}
 
 
 class ExpressionParser:

@@ -10,12 +10,14 @@ const grammarPath = path.join(root, 'syntaxes', 'anvil.tmLanguage.json');
 const samplePath = path.resolve(root, '..', 'examples', 'first_world.ANVL');
 const arraysSamplePath = path.resolve(root, '..', 'examples', 'arrays.ANVL');
 const physicsSamplePath = path.resolve(root, '..', 'examples', 'physics.ANVL');
+const mouseSamplePath = path.resolve(root, '..', 'examples', 'mouse_input.ANVL');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 JSON.parse(fs.readFileSync(grammarPath, 'utf8'));
 const sample = fs.readFileSync(samplePath, 'utf8');
 const arraysSample = fs.readFileSync(arraysSamplePath, 'utf8');
 const physicsSample = fs.readFileSync(physicsSamplePath, 'utf8');
+const mouseSample = fs.readFileSync(mouseSamplePath, 'utf8');
 const check = (condition, message) => { if (!condition) throw new Error(message); };
 
 check(manifest.contributes.languages.some(x => x.id === 'anvil' && x.extensions.includes('.ANVL')), 'Anvil language or extension is not registered');
@@ -79,6 +81,11 @@ async function main() {
   expect('set var(ok) = body_friction(var(box), 0.8)', 'body_friction', 'support.function.anvil');
   expect('set var(capacity) = physics_capacity(64)', 'physics_capacity', 'support.function.anvil');
   expect('set var(contacts) = physics_step()', 'physics_step', 'support.function.anvil');
+  expect('set var(x) = mouse_x()', 'mouse_x', 'support.function.anvil');
+  expect('set var(y) = mouse_y()', 'mouse_y', 'support.function.anvil');
+  expect('set var(clicked) = mouse_pressed("left")', 'mouse_pressed', 'support.function.anvil');
+  expect('set var(held) = mouse_held("right")', 'mouse_held', 'support.function.anvil');
+  expect('set var(wheel) = mouse_wheel()', 'mouse_wheel', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
   expect('set var(size) = 3 + 4', '+', 'keyword.operator.anvil');
@@ -95,6 +102,9 @@ async function main() {
   }
   for (const required of ['body_create(', 'body_force(', 'physics_step()']) {
     check(physicsSample.includes(required), `physics sample does not demonstrate ${required}`);
+  }
+  for (const required of ['mouse_x()', 'mouse_y()', 'mouse_pressed("left")', 'mouse_wheel()']) {
+    check(mouseSample.includes(required), `mouse sample does not demonstrate ${required}`);
   }
   console.log('PASS: VS Code manifest/config are valid; TextMate grammar loads and token scopes match Anvil samples.');
   registry.dispose();

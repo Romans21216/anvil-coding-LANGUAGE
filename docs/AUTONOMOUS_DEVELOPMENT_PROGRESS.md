@@ -260,3 +260,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Independent checks:** 74 Python tests, all 4 native runtime tests, npm extension validation, compileall, QA arithmetic, JSON/status counts, and diff check passed. Ledger: 22 audited rows; `428 + 3 + 17 + 2 = 450`.
 - **Issue #47:** the critic verified the earlier segment overflow case, extreme triangle clipping, and ±1e308 screen-line clipping. Both tracked findings are resolved; issue #47 is closed with evidence.
 - **Remaining evaluation gap:** no live window was launched to visually inspect resizing or near-plane clipping. Remaining partial rubric criteria are 2, 3, 5, 9, 27, 40, 47, and 50. The required 98-point bar remains unmet.
+
+### Mouse-input batch — canonical backlog items #391–394
+
+- Added `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`, and `mouse_wheel()` built-ins across the C runtime, compiler, and VS Code grammar.
+- Pointer coordinates map through the live centered aspect-preserving viewport to 960×600 virtual pixels; points in letterbox bars return `-1`. Button-down edges and wheel detents are available through one fixed update, and held-button state clears on release or focus loss.
+- Added `examples/mouse_input.ANVL`, language/spec/engine/wiki documentation, extension token checks, and native integration coverage for resized coordinates, letterbox rejection, click edges, button release, and wheel reset.
+- The candidate is not yet independently reviewed; the last verified score remains 92/100 — FAIL against 98. Items #391–394 are recorded as IN PROGRESS until full verification and independent review.

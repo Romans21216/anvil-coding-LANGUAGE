@@ -8,6 +8,151 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class RuntimeIntegrationTests(unittest.TestCase):
+    def test_mouse_events_map_to_virtual_frame_and_preserve_update_edges(self):
+        from compiler.anvil import build_c, find_compiler
+
+        compiler = find_compiler(None)
+        if not compiler:
+            self.skipTest("MSVC is required to run the Windows mouse-input probe")
+
+        harness = r'''#include "anvil_runtime.h"
+#include <stdio.h>
+
+static int update_count;
+static int pressed_on_first_update[3];
+static int held_on_first_update[3];
+static int pressed_on_second_update[3];
+static int held_on_second_update[3];
+static int held_on_third_update[3];
+static double x_on_first_update;
+static double y_on_first_update;
+static double x_on_second_update;
+static double y_on_second_update;
+static double wheel_on_first_update;
+static double wheel_on_second_update;
+static int events_posted;
+static int valid_position_posted;
+static int release_posted;
+static const char *button_names[3] = {"left", "right", "middle"};
+
+static double update(void) {
+  update_count++;
+  if (update_count == 1) {
+    for (int i = 0; i < 3; ++i) {
+      pressed_on_first_update[i] = (int)anvil_mouse_pressed(button_names[i]);
+      held_on_first_update[i] = (int)anvil_mouse_held(button_names[i]);
+    }
+    x_on_first_update = anvil_mouse_x();
+    y_on_first_update = anvil_mouse_y();
+    wheel_on_first_update = anvil_mouse_wheel();
+  } else if (update_count == 2) {
+    for (int i = 0; i < 3; ++i) {
+      pressed_on_second_update[i] = (int)anvil_mouse_pressed(button_names[i]);
+      held_on_second_update[i] = (int)anvil_mouse_held(button_names[i]);
+    }
+    x_on_second_update = anvil_mouse_x();
+    y_on_second_update = anvil_mouse_y();
+    wheel_on_second_update = anvil_mouse_wheel();
+  } else if (update_count == 3) {
+    for (int i = 0; i < 3; ++i)
+      held_on_third_update[i] = (int)anvil_mouse_held(button_names[i]);
+    PostQuitMessage(0);
+  }
+  return 0.0;
+}
+
+static double draw(void) {
+  if (!events_posted) {
+    HWND window = FindWindowA("AnvilNativeGameWindow", "Anvil Mouse Probe");
+    if (window) {
+      events_posted = 1;
+      RECT outer = {0, 0, 1200, 600};
+      AdjustWindowRect(&outer, WS_OVERLAPPEDWINDOW, FALSE);
+      SetWindowPos(window, NULL, 0, 0, outer.right - outer.left,
+                   outer.bottom - outer.top, SWP_NOZORDER | SWP_NOACTIVATE);
+      POINT cursor = {10, 300};
+      ClientToScreen(window, &cursor);
+      SetCursorPos(cursor.x, cursor.y);
+      SendMessageA(window, WM_MOUSEMOVE, 0, MAKELPARAM(10, 300));
+      SendMessageA(window, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(10, 300));
+      SendMessageA(window, WM_RBUTTONDOWN, MK_RBUTTON, MAKELPARAM(10, 300));
+      SendMessageA(window, WM_MBUTTONDOWN, MK_MBUTTON, MAKELPARAM(10, 300));
+      SendMessageA(window, WM_MOUSEWHEEL,
+                   MAKEWPARAM(0, (unsigned short)WHEEL_DELTA),
+                   MAKELPARAM(10, 300));
+    }
+  } else if (update_count == 1 && !valid_position_posted) {
+    HWND window = FindWindowA("AnvilNativeGameWindow", "Anvil Mouse Probe");
+    if (window) {
+      valid_position_posted = 1;
+      POINT cursor = {600, 300};
+      ClientToScreen(window, &cursor);
+      SetCursorPos(cursor.x, cursor.y);
+      SendMessageA(window, WM_MOUSEMOVE, 0, MAKELPARAM(600, 300));
+    }
+  } else if (update_count == 2 && !release_posted) {
+    HWND window = FindWindowA("AnvilNativeGameWindow", "Anvil Mouse Probe");
+    if (window) {
+      release_posted = 1;
+      SendMessageA(window, WM_LBUTTONUP, 0, MAKELPARAM(600, 300));
+      SendMessageA(window, WM_RBUTTONUP, 0, MAKELPARAM(600, 300));
+      SendMessageA(window, WM_MBUTTONUP, 0, MAKELPARAM(600, 300));
+    }
+  }
+  return 0.0;
+}
+
+int main(void) {
+  anvil_set_fixed_hz(30);
+  anvil_run(update, draw, "Anvil Mouse Probe");
+  printf("updates=%d first=%d%d%d/%d%d%d second=%d%d%d/%d%d%d "
+         "third=%d%d%d "
+         "bar=%.1f,%.1f pos=%.1f,%.1f wheel=%.1f/%.1f\n",
+         update_count, pressed_on_first_update[0], pressed_on_first_update[1],
+         pressed_on_first_update[2], held_on_first_update[0],
+         held_on_first_update[1], held_on_first_update[2],
+         pressed_on_second_update[0], pressed_on_second_update[1],
+         pressed_on_second_update[2], held_on_second_update[0],
+         held_on_second_update[1], held_on_second_update[2],
+         held_on_third_update[0], held_on_third_update[1],
+         held_on_third_update[2],
+         x_on_first_update, y_on_first_update, x_on_second_update,
+         y_on_second_update, wheel_on_first_update, wheel_on_second_update);
+  return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            c_file = temp_path / "mouse_probe.c"
+            executable = temp_path / "mouse_probe.exe"
+            c_file.write_text(harness, encoding="utf-8")
+            build_c(compiler[1], c_file, executable, release=True)
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=8
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        match = re.search(
+            r"updates=(\d+) first=(\d{3})/(\d{3}) second=(\d{3})/(\d{3}) "
+            r"third=(\d{3}) bar=([-0-9.]+),([-0-9.]+) "
+            r"pos=([-0-9.]+),([-0-9.]+) wheel=([-0-9.]+)/([-0-9.]+)",
+            result.stdout,
+        )
+        self.assertIsNotNone(match, result.stdout)
+        (updates, first_pressed, first_held, second_pressed, second_held,
+         third_held, bar_x, bar_y, x, y, wheel, next_wheel) = match.groups()
+        self.assertGreaterEqual(int(updates), 3)
+        self.assertEqual(first_pressed, "111")
+        self.assertEqual(first_held, "111")
+        self.assertEqual(second_pressed, "000")
+        self.assertEqual(second_held, "111")
+        self.assertEqual(third_held, "000")
+        self.assertEqual((float(bar_x), float(bar_y)), (-1.0, -1.0))
+        self.assertAlmostEqual(float(x), 480.0, delta=1.0)
+        self.assertAlmostEqual(float(y), 300.0, delta=1.0)
+        self.assertAlmostEqual(float(wheel), 1.0, places=2)
+        self.assertAlmostEqual(float(next_wheel), 0.0, places=2)
+
     def test_near_plane_clips_segments_and_triangles(self):
         from compiler.anvil import build_c, find_compiler
 
