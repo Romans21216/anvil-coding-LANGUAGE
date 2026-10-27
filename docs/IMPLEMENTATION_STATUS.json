@@ -4,10 +4,10 @@
   "reviewed_implementation_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
   "branch": "main",
   "summary": {
-    "NEEDS VERIFICATION": 429,
+    "NEEDS VERIFICATION": 428,
     "PARTIALLY IMPLEMENTED": 3,
     "COMPLETE": 17,
-    "IN PROGRESS": 1
+    "IN PROGRESS": 2
   },
   "latest_verified_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
   "latest_independently_reviewed_candidate_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
@@ -333,6 +333,35 @@
       "commit": "2962455"
     },
     {
+      "number": 185,
+      "section": "B. CPU AND GPU RENDERING",
+      "title": "Add robust near-plane clipping.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "runtime/anvil_projection.h: clips camera-space line segments and triangles against the near plane and intersects camera rays with clipped spheres",
+        "runtime/anvil_runtime.c: applies clipping to cube faces, grid lines, and rasterized sphere surfaces"
+      ],
+      "tests": [
+        "tests/test_runtime.py: native regression cases cover crossing/hidden segments; triangles with zero, one, or two hidden vertices; sphere near-cap and fully clipped cases",
+        "python -m unittest discover -s tests -q: 74 passed on candidate cfce407"
+      ],
+      "missing_or_limitations": "Implementation is not yet independently reviewed or visually inspected. Far-plane and side-frustum clipping remain unimplemented.",
+      "dependencies": [
+        "Camera-space projection and fixed-size software renderer"
+      ],
+      "priority": "P1 rendering correctness",
+      "assigned_agent": "Codex lead",
+      "acceptance_criteria": [
+        "Camera-crossing triangle faces are clipped into valid near-plane polygons instead of dropping the whole primitive.",
+        "Grid segments crossing the camera plane retain their visible segment.",
+        "Sphere surfaces crossing the near plane are clipped consistently, including the near-plane cap.",
+        "Hidden geometry is rejected and projection does not produce unbounded framebuffer indexing."
+      ],
+      "verification_result": "Candidate implementation and native helper regression test are in progress; independent review pending.",
+      "github_issue": "#23 item 185",
+      "commit": "cfce407"
+    },
+    {
       "number": 301,
       "section": "7. PHYSICS AND COLLISION SYSTEM",
       "title": "Improve the existing bounded 2D circle physics prototype.",
@@ -627,21 +656,22 @@
       "Broader engine scope remains incomplete."
     ]
   },
-  "current_candidate_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
-  "status_counts_validated_on": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
+  "current_candidate_commit": "cfce40701ac24f7fb64a0f194d7e32d5e25e2d52",
+  "status_counts_validated_on": "cfce40701ac24f7fb64a0f194d7e32d5e25e2d52",
   "candidate_validation": {
-    "commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
-    "reviewed_score": 92,
+    "commit": "cfce40701ac24f7fb64a0f194d7e32d5e25e2d52",
+    "reviewed_score": null,
+    "previous_reviewed_score": 92,
     "threshold": 98,
     "result": "FAIL",
     "python_unittest": "73 passed",
-    "runtime_tests": "3 passed; viewport helper tested, actual window not visually launched",
-    "status_ledger": "21 entries, 450 total; correction candidate maps resize feature to #172 and leaves #144 unverified",
-    "finding": "Critic confirmed the corrected #172 mapping, 450-item total, and 21 audited rows. Issue #46 is resolved. No live resized window was visually inspected.",
-    "status": "corrected tracking records independently confirmed; 92/100 below 98"
+    "runtime_tests": "4 native runtime tests passed; viewport and near-plane geometry helpers exercised; live window not visually inspected",
+    "status_ledger": "22 audited entries, 428 needing verification, 3 partial, 17 complete, 2 in progress = 450; #172 mapping confirmed and #185 active",
+    "finding": "Unreviewed candidate implements issue #23 item #185 near-plane clipping. The full 74-test suite, native viewport/clipping harnesses, extension validation, Python compilation, QA validator, and diff check pass. Previous candidate f12c0ac scored 92/100; that score does not apply to cfce407.",
+    "status": "implementation pushed; independent review pending; current pass threshold 98"
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
-  "current_active_item": 172,
+  "current_active_item": 185,
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775"
 }

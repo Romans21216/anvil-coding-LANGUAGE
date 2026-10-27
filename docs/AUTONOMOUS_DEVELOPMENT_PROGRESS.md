@@ -234,3 +234,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Change from the prior review:** Criterion 38 rises from 1/2 to 2/2 after the critic confirmed item #172 is dynamic window resizing and #144 remains unverified compiler version reporting. The 91/100 `bc4db99` score remains historical.
 - **Independent checks:** 73 Python tests, VS Code extension validation, compileall, QA arithmetic, and `git diff --check` passed. The 21 audited rows sum to the 450-item backlog. The critic did not visually inspect a resized game window.
 - **Issue tracking:** Issue #46's canonical-number correction has now been independently verified, documented with evidence, and closed. The 98-point goal remains unmet by 6 points. The fresh result was added to issue #23 without duplicating its 450-item list.
+
+
+## Batch 12 — robust near-plane clipping (canonical item #185)
+
+- **Implementation:** pushed commit `cfce40701ac24f7fb64a0f194d7e32d5e25e2d52`. Camera-space triangles are clipped into valid polygons; grid segments are clipped to retain the visible segment; rasterized spheres now intersect camera rays and draw a flat cap where clipped by the near plane. Triangle raster bounds are clamped before integer conversion to avoid huge projected coordinates overflowing screen bounds.
+- **Regression coverage:** native MSVC tests cover segments entirely behind and crossing the near plane, triangles with zero/one/two hidden vertices and boundary vertices, spheres crossing the near plane, spheres behind it, and missed rays. All **74 Python tests** pass; extension validation, compileall, QA rubric arithmetic, and diff check pass.
+- **Status:** item #185 is IN PROGRESS; the current audited ledger has 22 rows (428 needing verification, 3 partial, 17 complete, 2 in progress = 450). Far/side frustum clipping remains. This candidate has not yet received a fresh critic score; the latest reviewed result remains 92/100 — FAIL against 98.

@@ -4,14 +4,14 @@
   "branch": "main",
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
-  "current_active_item": 172,
-  "current_active_item_status": "Backlog item #172 (dynamic window resizing) remains in progress. The independent review confirmed the canonical mapping; all 73 tests pass. Item #144 is compiler version reporting and remains unverified. No live resized window was visually inspected.",
-  "current_candidate_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
+  "current_active_item": 185,
+  "current_active_item_status": "Backlog item #185 (robust near-plane clipping) is in progress in cfce407. Runtime clips cube triangles, grid segments, and rasterized spheres; all 74 tests pass. Far-plane and side-frustum clipping remain unimplemented. Independent review is pending. Item #172 tracking was independently confirmed; #144 remains unverified.",
+  "current_candidate_commit": "cfce40701ac24f7fb64a0f194d7e32d5e25e2d52",
   "latest_verified_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
   "last_pushed_reviewed_below_threshold_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
   "latest_independently_reviewed_candidate_commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Candidate f12c0ac was independently reviewed at 92/100, below the required 98/100. Criterion 38 is restored after confirming resize work is canonical item #172; #144 remains unverified.",
+  "latest_push_result": "Candidate cfce407 implements issue #23 item #185 and is pushed, with independent review pending. The latest reviewed candidate f12c0ac scored 92/100, below 98; criterion 38 is restored and #144 remains unverified.",
   "latest_independent_review": {
     "commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de",
     "score": 92,
@@ -97,8 +97,8 @@
   "implementation_status_counts": {
     "COMPLETE": 17,
     "PARTIALLY IMPLEMENTED": 3,
-    "IN PROGRESS": 1,
-    "NEEDS VERIFICATION": 429,
+    "IN PROGRESS": 2,
+    "NEEDS VERIFICATION": 428,
     "TOTAL": 450
   },
   "resolved_critic_issues": [
@@ -108,16 +108,16 @@
     46
   ],
   "candidate_validation": {
-    "status": "corrected backlog mapping pushed; fresh independent review pending",
-    "item": 172,
+    "status": "near-plane clipping item #185 candidate pushed; independent review pending",
+    "item": 185,
     "prior_review_commit": "bc4db99368b3af2953e49adc4e4cbd8f5706bb4e",
-    "python_unittest": "73 passed",
-    "runtime_tests": "3 passed",
+    "python_unittest": "74 passed on cfce407",
+    "runtime_tests": "4 native runtime tests passed",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "passed; latest QA rubric totals 92/100",
+    "qa_report_validator": "passed; latest reviewed rubric totals 92/100 on f12c0ac; cfce407 candidate awaits independent score",
     "git_diff_check": "passed",
-    "commit": "f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de"
+    "commit": "cfce40701ac24f7fb64a0f194d7e32d5e25e2d52"
   },
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775"
 }
