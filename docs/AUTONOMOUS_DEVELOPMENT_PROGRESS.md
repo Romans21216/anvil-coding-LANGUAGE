@@ -68,20 +68,28 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Limitations:** Anvil currently uses doubles; this detects non-finite outcomes but does not detect all finite precision loss or introduce integer overflow semantics.
 - **Next batch:** Continue directly from issue #23 item #49 (language feature versioning), then rerun the evaluation against 98/100.
 
-## Batch 6 — language feature versioning (in progress)
+## Batch 6 — language feature versioning (implementation, superseded by review follow-up)
 
 - **Features:** Backlog item #49 adds an optional leading `language version 1` declaration. Existing unversioned files keep version 1 behavior. Malformed, repeated, late, and unsupported declarations report the source path and line.
-- **Backlog:** #49 is IN PROGRESS pending independent review; only language version 1 is implemented.
+- **Backlog:** #49 is COMPLETE after independent review of `ed08f43`; only language version 1 is implemented.
 - **Files:** `compiler/anvil.py`, compiler regression tests, language/compiler/wiki docs, and the compact implementation ledger.
-- **Tests:** `python -m unittest discover -s tests -q` — 63 passed; `npm test --prefix vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; JSON summary totals 450 items with 15 audited entries; `git diff --check` — passed.
-- **Review:** The last overall review is `15439b54cd6e2b7a8165866d6054141f466f1b3e`, 90/100 below the new 98-point bar. Item #49's independent review is pending.
+- **Tests:** `python -m unittest discover -s tests -q` — 64 passed; `npm test --prefix vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; JSON summary totals 450 items with 15 audited entries; `git diff --check` — passed.
+- **Review:** Exact commit `ed08f43ca0d9beb5440f18fade48faf556694b1f` scored 89/100 below the 98-point bar and independently verified item #49. Issues #32 and #33 were fixed and closed; QA count issue #34 is being corrected in Batch 8.
 - **Commit/push:** Item #49 implementation is pushed in `d5191d4ba2c7744b1b6207086abf0d8e05320afc`; its full validation passed. The state-record correction is in pushed commit `2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2`. Review of that exact snapshot scored 85/100 and found an oversized-version diagnostic failure and this stale sentence, now tracked in issues [#32](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/32) and [#33](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/33).
-- **Next batch:** Fix and verify issues #32/#33, then obtain a fresh exact-commit review against 98/100.
+- **Next batch:** Correct test-count evidence in QA_REPORT.md and obtain a fresh review.
 
-## Batch 7 — version diagnostics and QA-state corrections (in progress)
+## Batch 7 — version diagnostics and QA-state corrections (complete)
 
 - **Findings:** Independent review of `2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2` scored **85/100 — FAIL** and reported two issues, both labeled `Codex Bugs`: [#32](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/32) (5,000-digit version declarations raised uncaught `ValueError`) and [#33](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/33) (stale “being committed” progress wording).
 - **Fixes:** Version parsing now compares decimal text without unbounded integer conversion; long unsupported versions receive a bounded source-located diagnostic. Added a 5,000-digit regression test. Corrected the progress sentence to distinguish pushed commit state from pending review.
 - **Tests:** `python -m unittest discover -s tests -q` — 64 passed; `npm test --prefix vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; both status JSON files parse and the backlog summary totals 450; `git diff --check` — passed.
-- **Commit/push:** Fixes and QA synchronization are committed and pushed in `f7372a6805d3324f91eb362d9f3e64f501c4090b`; all 64 tests and documentation checks pass. Exact-commit independent review is pending; #32 and #33 remain open until it confirms the fixes.
-- **Review:** Latest completed review is `2dd1d8e`, **85/100**, below 98. Request a new critic review after commit/push; #32 and #33 remain open until the exact committed fixes are confirmed.
+- **Commit/push:** Fixes and QA synchronization were committed and pushed in `f7372a6805d3324f91eb362d9f3e64f501c4090b`.
+- **Review:** Exact commit `ed08f43ca0d9beb5440f18fade48faf556694b1f` scored **89/100 — FAIL** against 98. The critic reran 64 tests, verified the oversized-version diagnostic, confirmed the progress wording fix, and closed issues #32 and #33. It also found a mismatch between historical test counts in QA rubric rows 31 and 39; tracked in [#34](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/34).
+- **Next batch:** Sync QA counts for issue #34, obtain fresh review, then continue issue #23 item #50.
+
+## Batch 8 — synchronize QA review counts (in progress)
+
+- **Finding:** Review `ed08f43` reported that `QA_REPORT.md` rubric rows 31 and 39 misstate test totals for review `2dd1d8e` (reported as 59 and 61 instead of 63). Current review `ed08f43` itself ran 64 tests.
+- **Fix:** Updated both rows to identify their exact review commits and counts; the summary distinguishes `2dd1d8e` (63 tests) from `ed08f43` (64 tests).
+- **Tracking:** [Issue #34](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/34) is labeled `Codex Bugs`; change is pending commit/push and independent verification.
+- **Review:** Latest score is 89/100 on `ed08f43`, below the user's 98/100 threshold.

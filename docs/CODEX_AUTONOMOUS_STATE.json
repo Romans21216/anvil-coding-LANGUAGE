@@ -2,27 +2,27 @@
   "project": "Anvil language and game engine",
   "repository": "Romans21216/anvil-coding-LANGUAGE",
   "branch": "main",
-  "last_completed_batch": 5,
-  "last_completed_backlog_item": 47,
-  "current_active_item": 49,
-  "current_active_item_status": "Independent review of exact commit 2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2 scored 85/100 (below 98) and reported issues #32 and #33. Both fixes are committed and pushed in f7372a6805d3324f91eb362d9f3e64f501c4090b. All 64 tests, extension validation, Python compilation, JSON checks, and diff checks pass; exact-commit re-review is pending.",
-  "current_candidate_commit": "f7372a6805d3324f91eb362d9f3e64f501c4090b",
-  "latest_verified_commit": "2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2",
-  "last_pushed_reviewed_below_threshold_commit": "2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2",
-  "latest_independently_reviewed_candidate_commit": "2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2",
+  "last_completed_batch": 7,
+  "last_completed_backlog_item": 49,
+  "current_active_item": 50,
+  "current_active_item_status": "Backlog item #49 language feature versioning is complete and independently verified. Latest review of ed08f43 scored 89/100, below 98; issues #32/#33 are fixed and closed. Correcting QA report count mismatch #34 before starting backlog item #50.",
+  "current_candidate_commit": "ed08f43ca0d9beb5440f18fade48faf556694b1f",
+  "latest_verified_commit": "ed08f43ca0d9beb5440f18fade48faf556694b1f",
+  "last_pushed_reviewed_below_threshold_commit": "ed08f43ca0d9beb5440f18fade48faf556694b1f",
+  "latest_independently_reviewed_candidate_commit": "ed08f43ca0d9beb5440f18fade48faf556694b1f",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Fixes for findings #32/#33 are pushed in f7372a6; all 64 tests and supporting checks pass. Exact-commit review is pending. Latest completed review is 2dd1d8e, 85/100 below 98/100.",
+  "latest_push_result": "Exact pushed snapshot ed08f43 scored 89/100 against 98/100. Critic verified fixes #32/#33 and found mismatched historical test counts in QA_REPORT.md rows 31 and 39 (#34); those counts are corrected in the current follow-up, awaiting review.",
   "latest_independent_review": {
-    "commit": "2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2",
-    "score": 85,
+    "commit": "ed08f43ca0d9beb5440f18fade48faf556694b1f",
+    "score": 89,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
     "current_required_threshold": 98,
     "current_threshold_status": "BELOW_THRESHOLD",
-    "findings": ["#32: 5,000-digit language version declaration causes uncaught ValueError instead of a source-located diagnostic; fixed in worktree, verification pending.", "#33: Batch 6 progress line said pushed status correction was still being committed; corrected in worktree."],
+    "findings": ["#34: QA_REPORT.md criteria 31 and 39 misattribute different test counts to review 2dd1d8e; corrected in the current follow-up, review pending."],
     "categories": {
-      "requirements": "15/20",
-      "functionality_reliability": "17/20",
+      "requirements": "16/20",
+      "functionality_reliability": "20/20",
       "code_architecture": "17/20",
       "testing_verification": "18/20",
       "developer_experience_delivery": "18/20"
@@ -41,7 +41,7 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "64 passed on pushed candidate f7372a6, including explicit/implicit language version, malformed/duplicate/late/unsupported headers, and a 5,000-digit version regression",
+    "python_unittest": "64 passed on independently reviewed commit ed08f43, including explicit/implicit language version, malformed/duplicate/late/unsupported headers, and a 5,000-digit version regression",
     "vscode_extension_validation": "passed",
     "python_compile": "passed (python -m compileall -q compiler tests)",
     "msvc_numeric_demo": "built and ran successfully; output 17",
@@ -50,7 +50,7 @@
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "Evaluation and QA report record exact review 2dd1d8e, 85/100, and findings #32/#33. Both fixes are pushed in f7372a6 and pass the 64-test suite, extension validation, Python compilation, JSON checks, and git diff check; exact-commit review remains pending. Required bar is 98/100.",
+  "pending_documentation_review": "Evaluation and QA report record exact review ed08f43, 89/100, with issues #32/#33 confirmed fixed and closed. Issue #34 records a mismatch in historical test counts; rows 31/39 now distinguish the 64-test ed08f43 review from the 63-test 2dd1d8e review. Fresh review of this synchronization is pending. Required bar is 98/100.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -62,7 +62,7 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
     "next_recommended_tasks": [
-    "Obtain independent review of pushed candidate f7372a6 and close issues #32/#33 if confirmed; latest overall score is 85/100, below 98/100.",
+    "Get independent confirmation of QA count synchronization issue #34, then continue issue #23 item #50; latest overall score is 89/100, below 98/100.",
     "Continue selecting work directly from issue #23; keep the full item list only in that issue."
   ],
   "master_backlog": {
