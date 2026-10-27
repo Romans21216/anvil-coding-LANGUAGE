@@ -76,6 +76,7 @@ The current language has `if`/`else`/`end`, `while`/`end`, numeric `for`/`end` l
 - Math: `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, `max`.
 - Drawing: `rect`, `circle`, `line`, `text`, `cube`, `sphere`, `ray_sphere`, `plane`.
 - Networking prototype: `net host(port)`, `net join("IPv4", port)`, `net send(number)`, `receive()`.
+- Physics: `body_create`, `body_destroy`, `body_active`, body position/velocity queries, `body_set_velocity`, `body_force`, `body_restitution`, `body_collision`, `physics_gravity`, and `physics_step` for fixed-step 2D circles.
 
 See `docs/LANGUAGE.md` for the complete current syntax and `docs/ENGINE.md` for graphics details.
 

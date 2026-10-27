@@ -2,20 +2,20 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **91/100 — PASS** (commit `8f82f1c`; threshold: 90/100)
-**Review snapshot:** the table below records the independent review of `8f82f1c`. The earlier `f96a212` review scored 87/100 after reproducing native stack exhaustion with large recursive local arrays. The fix uses checked, zero-initialized heap allocation, frees local arrays on generated returns, and caps active allocations at 16 MiB. The independent reviewer rescored the fix at 91/100.
+**Latest completed independent full review:** **88/100 — FAIL** (working tree based on `b00f35a`; threshold: 90/100). This score was corrected by the evaluator after its first category-sum arithmetic error; the corrected total is 88.
+**Review snapshot:** the 88-point review covered the physics implementation and 46-test suite before this report and VS Code 0.1.3 were synchronized. It deducted criterion 38 for stale QA records and criteria 46–47 because 0.1.3 had not yet been installed and visibly checked. The prior 91/100 review of `8f82f1c` remains historical evidence for that revision only.
 
 ## Scope
 
 Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime provides fixed-size software 2D/3D drawing, keyboard camera controls, fixed-step updates, seeded random/noise functions, minimal numeric UDP, and the built-in `ray_sphere(x,y,z,radius)`. The ray sphere uses CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries, with a documented 32-sphere per-batch limit. The compiler supports fixed-size global and function-local numeric arrays; each function call is capped at 8,192 local elements, with a 16 MiB active-allocation budget across calls.
 
-This is not a production engine. Assets, audio, physics, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state and arrays, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
+This is not a production engine. Physics currently supports at most 128 2D circles, fixed-step gravity/force integration, overlap queries, and a four-pass circle contact solver; it does not include continuous collision detection, polygon or 3D bodies, friction, or joints. Assets, audio, cross-platform support, a Rust backend, GPU rendering, RTX/DXR, and Embree also remain unimplemented. Functions support numeric parameters, return values, recursion, function-local numeric state and arrays, `while` loops, inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing. Structures and modules/imports remain unsupported. The `.ANVL` extension is the user's selected suffix.
 
 ## Verification
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -v` | PASS — 43 tests, including function-local arrays, recursive allocation-budget failure, cleanup, and bounds |
+| `python -m unittest discover -s tests -v` | PASS — 46 tests, including physics integration, contact timing, post-solver velocity/coordinate bounds, and repeatability |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -25,16 +25,17 @@ This is not a production engine. Assets, audio, physics, cross-platform support,
 | Projected sphere bounds regression | PASS — production projection helper sampled centered, off-axis, and near-camera sphere surfaces |
 | `examples/local_arrays.ANVL` | PASS — MSVC release build; output `27`; generated C unchanged on repeat build |
 | Recursive maximum-size local arrays | PASS — controlled source-line diagnostic at the 16 MiB allocation budget, rather than process stack overflow |
-| VS Code extension installation | PASS — VS Code 1.143.1 lists `anvil-engine.anvil-language-support@0.1.2` after installing the project VSIX |
-| VS Code package registration | PASS — 0.1.2 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
-| Visible VS Code language mode/sample colors | PASS — VS Code status bar shows Anvil for `examples/arrays.ANVL`; the open sample visibly highlights array declarations, indexing, function syntax, keywords, and numbers. |
+| `examples/physics.ANVL` native release build | PASS — generated executable with MSVC |
+| VS Code extension installation | PASS — `anvil-engine.anvil-language-support@0.1.3` installed over 0.1.2 |
+| VS Code package registration | PASS — 0.1.3 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
+| Visible VS Code language mode/sample colors | PASS — `examples/physics.ANVL` opened in Anvil language mode with visible token coloring for physics built-ins, declarations, control flow, strings, and numeric literals. |
 | Live game window in latest review | NOT INSPECTED |
 
 These checks verify the prototype workflows and selected regression cases. They do not establish production readiness, cross-platform behavior, or performance.
 
 ## Independent 50-criterion review
 
-The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit, reran the 43-test suite, extension checks, Python compilation, and samples, and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. The remaining deductions concern compiler density (22: 1), module boundaries (23: 1), Windows/C backend portability (27: 1), and incomplete engine scope (2, 3, 5, 9, 40, 50). Issues #19–#21 are resolved.
+The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit, reran the then-current suite, and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later review of the physics working tree (based on `b00f35a`) verified 46 tests and scored **88/100 — FAIL** after correcting its own category arithmetic: criteria 1–10 = 16, 11–20 = 20, 21–30 = 17, 31–40 = 18, and 41–50 = 17. Its deductions included stale QA records and no visible 0.1.3 check at review time. Since then, the QA records were refreshed, 0.1.3 was installed, and the physics sample was visibly checked in VS Code; these later changes require another independent score. Issues #19–#21 are resolved.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -42,21 +43,21 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 2 | Implicit requirements addressed | 1 | The broad game-engine backlog is only partly implemented; planned systems remain. |
 | 3 | Functionality matches intended goal | 1 | Working Windows prototype, but not the requested full engine. |
 | 4 | Required deliverables present | 2 | Repository includes compiler, runtime, docs, examples, tests, and VS Code extension. |
-| 5 | No essential feature missing | 1 | GPU renderer, assets, audio, physics, and broader multiplayer remain unfinished. |
+| 5 | No essential feature missing | 1 | GPU renderer, assets, audio, 3D/advanced physics, and broader multiplayer remain unfinished. |
 | 6 | Stated constraints respected | 2 | `.ANVL` is consistently used as requested. |
 | 7 | Ambiguity resolved logically | 2 | Current C/MSVC prototype scope and limitations are documented. |
 | 8 | Behavior matches documentation | 2 | Latest review found language/compiler/engine guides aligned after fixes. |
 | 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
 | 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
-| 11 | Core functionality works | 2 | Compiler, native runtime, camera, rendering, and CPU BVH ray spheres build. |
+| 11 | Core functionality works | 2 | Compiler, native runtime, camera, rendering, CPU BVH ray spheres, and limited 2D circle physics build. |
 | 12 | Secondary functionality works | 2 | Timing, input, math/noise, networking primitive, and native-tested `while`/`for` loops are covered. |
 | 13 | Primary workflows functional | 2 | Direct source and manifest build/run workflows pass. |
 | 14 | Inputs validated | 2 | Syntax, arity, references, manifest fields, paths, rates, and ports are checked. |
 | 15 | Errors handled gracefully | 2 | The 16 MiB active-array budget fails with exit code 2 and a source-located diagnostic instead of exhausting the OS stack. |
-| 16 | Edge cases covered | 2 | Independent review confirmed coverage for recursion isolation, allocation limits, explicit/implicit return cleanup, and array bounds. |
+| 16 | Edge cases covered | 2 | Tests cover recursion isolation, allocation limits, array bounds, stale physics handles, capacity, collision timing, numeric clamps, and repeated physics output. |
 | 17 | Invalid inputs controlled | 2 | Malformed inputs are rejected before generating/building C. |
 | 18 | Stable across repeated operations | 2 | Compiler/runtime tests and repeatable random/noise checks pass. |
-| 19 | No known critical defects | 2 | The evaluator's recursive-array stack-exhaustion finding was fixed and independently verified on `8f82f1c`; no known critical defect remains in the reviewed scope. |
+| 19 | No known critical defects | 2 | The recursive-array stack-exhaustion finding is fixed; the physics reviewer found no critical issue in the reviewed physics paths. |
 | 20 | Components integrate | 2 | Compiler, generated C, runtime, manifest, extension, and networking sample integrate. |
 | 21 | Logical project structure | 2 | Compiler, runtime, examples, tests, docs, and extension are organized. |
 | 22 | Readable and consistently formatted | 1 | Compiler remains densely formatted; reformatting is still recommended. |
@@ -68,32 +69,32 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 28 | No unfinished placeholders | 2 | Unsupported capabilities are described as future work. |
 | 29 | Configuration understandable | 2 | TOML project settings are explicit and validated. |
 | 30 | Conventions followed | 2 | Current Python, C, TOML, and extension conventions are adequate. |
-| 31 | Automated tests provided | 2 | The independently reviewed `8f82f1c` suite contains 43 Python tests, including local-array recursion, budget, cleanup, and bounds regressions. |
+| 31 | Automated tests provided | 2 | Current suite contains 46 Python tests, including physics native integration and physics edge regressions. |
 | 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, and generated executable paths are covered. |
 | 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
-| 34 | Edge cases explicitly tested | 2 | The 43-test suite covers recursive allocation exhaustion and repeated cleanup; the evaluator also reproduced the bounded source diagnostic. |
+| 34 | Edge cases explicitly tested | 2 | The current suite covers recursive allocation exhaustion/cleanup plus physics contact timing, extreme velocity/coordinate bounds, and repeatability. |
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
-| 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest and function samples. |
-| 38 | Results recorded accurately | 2 | Review score, commit, test count, category totals, and independent verification evidence match the `8f82f1c` review. |
-| 39 | Regression checks performed | 2 | Independent review reran all 43 tests and the local-array regression after the heap-budget fix. |
+| 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
+| 38 | Results recorded accurately | 1 | At the 88-point review snapshot, QA records were stale (physics said unimplemented, test count 43, score 91, and package 0.1.2); the records have since been corrected and need fresh review. |
+| 39 | Regression checks performed | 2 | Independent physics review reran all 46 tests and extension validation; targeted tests also cover solver clamps and contact timing. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
 | 43 | Usage understandable | 2 | Guides and examples explain the supported syntax and build path. |
 | 44 | Design decisions documented | 2 | Runtime, compiler backend, renderer, ray tracing, and networking limits are described. |
 | 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
-| 46 | Opens in intended environment | 2 | VS Code reports extension 0.1.2 installed, has `examples/arrays.ANVL` open, and its accessibility tree reports Anvil language mode; earlier screenshot recorded visible highlighting. |
-| 47 | Editor integration works | 2 | Extension 0.1.2 is installed; grammar tests pass and issue #13 records the visual highlighting check. |
+| 46 | Opens in intended environment | 1 | At the 88-point review time 0.1.3 was not yet installed; it has since been installed and `examples/physics.ANVL` opened in Anvil mode. |
+| 47 | Editor integration works | 1 | At review time only 0.1.3 package validation was automated; the package is now installed and physics syntax highlighting is visibly verified. |
 | 48 | Deliverables organized | 2 | The array generated C file is tracked; all six tracked generated C hashes remained unchanged through the full test suite, and the worktree stayed clean. |
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **19/20** | |
-| | **Developer experience and delivery** | **19/20** | |
-| | **Total** | **91/100 — PASS** | |
+| | **Testing and verification** | **18/20** | |
+| | **Developer experience and delivery** | **17/20** | |
+| | **Total at reviewed snapshot** | **88/100 — FAIL** | |
 
 ### Priorities from the review
 
@@ -103,5 +104,5 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 
 ## Bug tracking
 
-Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed findings from the array review are recorded in [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (QA record synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (tracked generated C), [#19](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/19) (test output side effects), [#20](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/20) (evaluation arithmetic), and [#21](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/21) (recursive local-array stack exhaustion); those fixes are closed. Issue [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) records verified installation and highlighting for extension 0.1.2. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15).
+Issues [#1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1)–[#4](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/4) track earlier corrected report defects and are closed. The detailed evaluator findings are recorded in [#16](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/16) (historical QA synchronization), [#17](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/17) (finding classification), [#18](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/18) (tracked generated C), [#19](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/19) (test output side effects), [#20](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/20) (evaluation arithmetic), [#21](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/21) (recursive local-array stack exhaustion), and [#22](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/22) (QA synchronization after physics); resolved issues are closed. Issue [#13](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/13) records the 0.1.2 install/highlighting evidence; this report records the later 0.1.3 verification. Broader implementation gaps remain open in [#5 GPU and ray-tracing backends](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/5), [#6 asset pipeline](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/6), [#7 audio](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/7), [#8 extended physics](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/8), [#9 remaining array forms/structures/modules](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/9), [#10 multiplayer](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/10), [#11 portability and Rust backend](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/11), [#12 compiler readability and modularity](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12), [#14 performance benchmarks](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/14), and [#15 completion matrix/full-scope tracking](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/15).
 

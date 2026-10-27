@@ -87,6 +87,19 @@ int anvil_net_join(const char *address, int port);
 void anvil_net_send(double value);
 double anvil_net_receive(void);
 void anvil_net_close(void);
+double anvil_body_create(double x, double y, double radius, double mass);
+double anvil_body_destroy(double handle);
+double anvil_body_active(double handle);
+double anvil_body_x(double handle);
+double anvil_body_y(double handle);
+double anvil_body_vx(double handle);
+double anvil_body_vy(double handle);
+double anvil_body_set_velocity(double handle, double vx, double vy);
+double anvil_body_force(double handle, double fx, double fy);
+double anvil_body_restitution(double handle, double restitution);
+double anvil_body_collision(double first, double second);
+double anvil_physics_gravity(double x, double y);
+double anvil_physics_step(void);
 double anvil_array_get(const double *values, int size, double index,
                        const char *source, int line);
 void anvil_array_set(double *values, int size, double index, double value,

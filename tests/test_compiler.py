@@ -57,6 +57,128 @@ class CompilerTests(unittest.TestCase):
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "network_client.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertGreater(out.stat().st_size, 100_000)
 
+    def test_2d_circle_physics_step_collision_and_stale_handles(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics.ANVL"
+            out = pathlib.Path(temp) / "physics.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  set local(first) = body_create(0, 0, 0.5, 1)\n"
+                "  set local(second) = body_create(0.95, 0, 0.5, 1)\n"
+                "  set local(fixed) = body_create(100, 0, 1, 0)\n"
+                "  if body_active(local(first)) != 1\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_collision(local(first), local(second)) != 1\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(ok) = body_restitution(local(first), 1)\n"
+                "  set local(ok) = body_restitution(local(second), 1)\n"
+                "  set local(ok) = body_set_velocity(local(first), 1, 0)\n"
+                "  if body_set_velocity(local(fixed), 5, 5) != 0 or body_force(local(fixed), 1, 1) != 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(ok) = physics_gravity(0, 0)\n"
+                "  set local(contacts) = physics_step()\n"
+                "  if local(contacts) < 1\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_vx(local(first)) > 0.05 or body_vx(local(second)) < 0.9\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_x(local(fixed)) != 100 or body_y(local(fixed)) != 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(ok) = body_force(local(first), 0, -10)\n"
+                "  set local(ok) = physics_step()\n"
+                "  if body_vy(local(first)) >= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(old) = local(first)\n"
+                "  set local(ok) = body_destroy(local(old))\n"
+                "  set local(replacement) = body_create(4, 0, 0.5, 1)\n"
+                "  if body_active(local(old)) != 0 or body_active(local(replacement)) != 1\n"
+                "    output 0\n"
+                "  end\n"
+                "  if local(old) = local(replacement)\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_create(0, 0, 0, 1) >= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(index) = 0\n"
+                "  set local(result) = 0\n"
+                "  for local(index) = 1 to 125\n"
+                "    set local(result) = body_create(local(index) * 3, 0, 0.25, 1)\n"
+                "  end\n"
+                "  if local(result) < 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_create(0, 0, 1, 1) >= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  output 1\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
+            self.assertEqual(result.stdout.strip(), "1")
+
+    def test_physics_builtin_arity_is_validated_before_c_generation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics-arity.ANVL"
+            source.write_text("fn(main)\n  output body_create(0, 0, 1)\nend\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("physics-arity.ANVL:2:", result.stderr)
+            self.assertIn("body_create() expects 4 argument(s), got 3", result.stderr)
+
+    def test_physics_contact_timing_bounds_and_repeatability(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "physics-bounds.ANVL"
+            out = pathlib.Path(temp) / "physics-bounds.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  set local(ok) = physics_gravity(0, 0)\n"
+                "  set local(a) = body_create(0, 0, 1, 1)\n"
+                "  set local(b) = body_create(2.01, 0, 1, 1)\n"
+                "  set local(ok) = body_restitution(local(a), 1)\n"
+                "  set local(ok) = body_restitution(local(b), 1)\n"
+                "  set local(ok) = body_set_velocity(local(a), 1, 0)\n"
+                "  set local(ok) = body_set_velocity(local(b), -1, 0)\n"
+                "  if physics_step() != 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_vx(local(a)) >= 0 or body_vx(local(b)) <= 0\n"
+                "    output 0\n"
+                "  end\n"
+                "  set local(heavy) = body_create(-500000, 0, 1000000, 1000000000)\n"
+                "  set local(light) = body_create(500000, 0, 1000000, 0.000001)\n"
+                "  set local(ok) = body_restitution(local(heavy), 1)\n"
+                "  set local(ok) = body_restitution(local(light), 1)\n"
+                "  set local(ok) = body_set_velocity(local(heavy), 1000000, 0)\n"
+                "  set local(ok) = body_set_velocity(local(light), -1000000, 0)\n"
+                "  set local(edge_a) = body_create(999999999, 0, 1000000, 1)\n"
+                "  set local(edge_b) = body_create(999999999, 0, 1000000, 1)\n"
+                "  set local(ok) = physics_step()\n"
+                "  if body_vx(local(light)) > 1000000 or body_vx(local(light)) < -1000000\n"
+                "    output 0\n"
+                "  end\n"
+                "  if body_x(local(edge_b)) > 1000000000\n"
+                "    output 0\n"
+                "  end\n"
+                "  output body_vx(local(light)) + body_x(local(edge_b))\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            first = subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip()
+            second = subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip()
+            self.assertEqual(first, second)
+
     def test_numeric_program_builds_and_runs(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / "numeric.exe"

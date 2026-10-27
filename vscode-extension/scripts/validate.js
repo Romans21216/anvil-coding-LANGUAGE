@@ -9,11 +9,13 @@ const configPath = path.join(root, 'language-configuration.json');
 const grammarPath = path.join(root, 'syntaxes', 'anvil.tmLanguage.json');
 const samplePath = path.resolve(root, '..', 'examples', 'first_world.ANVL');
 const arraysSamplePath = path.resolve(root, '..', 'examples', 'arrays.ANVL');
+const physicsSamplePath = path.resolve(root, '..', 'examples', 'physics.ANVL');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 JSON.parse(fs.readFileSync(grammarPath, 'utf8'));
 const sample = fs.readFileSync(samplePath, 'utf8');
 const arraysSample = fs.readFileSync(arraysSamplePath, 'utf8');
+const physicsSample = fs.readFileSync(physicsSamplePath, 'utf8');
 const check = (condition, message) => { if (!condition) throw new Error(message); };
 
 check(manifest.contributes.languages.some(x => x.id === 'anvil' && x.extensions.includes('.ANVL')), 'Anvil language or extension is not registered');
@@ -67,6 +69,8 @@ async function main() {
   expect('display cube(0, 0, 0, 1.8)', 'display', 'support.function.engine.anvil');
   expect('display cube(0, 0, 0, 1.8)', 'cube', 'support.function.anvil');
   expect('display ray_sphere(0, 0, 0, 1)', 'ray_sphere', 'support.function.anvil');
+  expect('set var(ball) = body_create(0, 0, 1, 1)', 'body_create', 'support.function.anvil');
+  expect('set var(contacts) = physics_step()', 'physics_step', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
   expect('set var(size) = 3 + 4', '+', 'keyword.operator.anvil');
@@ -80,6 +84,9 @@ async function main() {
   }
   for (const required of ['array scores(4)', 'array(scores, local(index))']) {
     check(arraysSample.includes(required), `array sample does not demonstrate ${required}`);
+  }
+  for (const required of ['body_create(', 'body_force(', 'physics_step()']) {
+    check(physicsSample.includes(required), `physics sample does not demonstrate ${required}`);
   }
   console.log('PASS: VS Code manifest/config are valid; TextMate grammar loads and token scopes match Anvil samples.');
   registry.dispose();

@@ -66,6 +66,10 @@ RUNTIME_C_NAMES = {
     "anvil_fbm", "anvil_net_host", "anvil_net_join", "anvil_net_send",
     "anvil_net_receive", "anvil_net_close", "anvil_array_get", "anvil_array_set",
     "anvil_local_array_alloc", "anvil_local_array_free",
+    "anvil_body_create", "anvil_body_destroy", "anvil_body_active",
+    "anvil_body_x", "anvil_body_y", "anvil_body_vx", "anvil_body_vy",
+    "anvil_body_set_velocity", "anvil_body_force", "anvil_body_restitution",
+    "anvil_body_collision", "anvil_physics_gravity", "anvil_physics_step",
 }
 
 
@@ -361,12 +365,24 @@ BUILTINS = {
     "sqrt": (1, 1), "sin": (1, 1), "cos": (1, 1), "abs": (1, 1),
     "min": (2, 2), "max": (2, 2), "pressed": (1, 1), "held": (1, 1),
     "receive": (0, 0),
+    "body_create": (4, 4), "body_destroy": (1, 1), "body_active": (1, 1),
+    "body_x": (1, 1), "body_y": (1, 1), "body_vx": (1, 1), "body_vy": (1, 1),
+    "body_set_velocity": (3, 3), "body_force": (3, 3),
+    "body_restitution": (2, 2), "body_collision": (2, 2),
+    "physics_gravity": (2, 2), "physics_step": (0, 0),
 }
 BUILTIN_C_NAMES = {
     "time": "anvil_time", "delta": "anvil_delta", "rnd": "anvil_rnd",
     "noise": "anvil_noise", "fbm": "anvil_fbm",
     "pressed": "anvil_pressed", "held": "anvil_held",
     "receive": "anvil_net_receive", "abs": "fabs", "min": "fmin", "max": "fmax",
+    "body_create": "anvil_body_create", "body_destroy": "anvil_body_destroy",
+    "body_active": "anvil_body_active", "body_x": "anvil_body_x",
+    "body_y": "anvil_body_y", "body_vx": "anvil_body_vx",
+    "body_vy": "anvil_body_vy", "body_set_velocity": "anvil_body_set_velocity",
+    "body_force": "anvil_body_force", "body_restitution": "anvil_body_restitution",
+    "body_collision": "anvil_body_collision", "physics_gravity": "anvil_physics_gravity",
+    "physics_step": "anvil_physics_step",
 }
 
 

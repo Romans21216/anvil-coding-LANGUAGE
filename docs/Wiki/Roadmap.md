@@ -14,6 +14,7 @@ Implemented in the current prototype:
 - Basic 2D and 3D software-rendered scenes, camera movement, and field of view.
 - Built-in `ray_sphere` with CPU BVH, plus projected sphere bounds regression coverage.
 - Basic Windows UDP host/join exchanging one numeric value.
+- Fixed-step 2D circle physics for up to 128 bodies, with force, gravity, restitution, overlap queries, and collision response.
 - VS Code syntax extension and sample programs.
 
 ## Next foundational work
@@ -24,7 +25,7 @@ Implemented in the current prototype:
 4. Extract a platform abstraction and configurable render-surface/window layer; preserve the CPU renderer as a first-class backend.
 5. Add a true GPU raster backend only after defining parity and fallback contracts. Keep CPU BVH ray tracing independent; add DXR or Embree only as optional backends.
 6. Replace numeric UDP with versioned bounded messages and peer/session lifecycle before expanding online play.
-7. Build image/mesh/audio/physics features only with corresponding file handling, tests, and examples.
+7. Extend the initial circle physics with polygons, 3D bodies, friction, joints, and spatial acceleration only alongside tests and examples.
 8. Benchmark actual compiler, frame, memory, and ray-tracing performance before making speed claims.
 
 Every feature should have source tests, executable integration evidence where practical, updated references/examples, and a release note. Planned features must not be described as implemented.

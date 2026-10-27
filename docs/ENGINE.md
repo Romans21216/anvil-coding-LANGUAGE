@@ -33,9 +33,17 @@ The renderer uses hand-written C software rasterization for conventional primiti
 - `noise(x,y,z)` is deterministic gradient noise; `fbm(x,y,z,octaves,lacunarity,gain)` combines octaves.
 - Math calls include `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, and `max`.
 
+## Fixed-step 2D circle physics
+
+The runtime has a deterministic circle-body system with a fixed capacity of 128 bodies. A body is created with `body_create(x, y, radius, mass)`, which returns a numeric handle or `-1` when its arguments are invalid or the body table is full. A mass of `0` creates an immovable body; dynamic bodies require mass from `0.000001` through `1e12`. Radius must be from `0.000001` through `1e6`, and initial coordinates must be within ±1e9. Each body is a circle in world units. Handles include a generation value, so a destroyed body's stale handle does not silently refer to a later body that reuses its slot.
+
+Call `physics_step()` once per `fn(update)` to integrate gravity and queued forces using the engine's fixed `delta()`. The default gravity is `(0, -9.81)`; `physics_gravity(x, y)` changes it, with each component limited to ±1e6. `body_force(handle, x, y)` accumulates force (each input and the accumulated components are limited to ±1e12) until the next step, and `body_set_velocity(handle, vx, vy)` sets a dynamic body's velocity (each component limited to ±1e6). `body_restitution(handle, amount)` sets bounce from `0` (no bounce) to `1` (fully elastic). The step resolves circle-circle overlaps with a bounded four-pass impulse and positional-correction solver, then returns the number of overlapping pairs found at the start of the step. `body_collision(a, b)` queries current circle overlap; `body_x`, `body_y`, `body_vx`, and `body_vy` read position/velocity; `body_active` checks a handle; `body_destroy` releases it. Status functions return `1` on success and `0` on failure; invalid handles return `0` for `body_active`/collision and `-1` for numeric queries. Static bodies ignore force/velocity changes. Coordinates are bounded to ±1e9 world units, radii to 1e6, and speed to 1e6 units/second.
+
+This is 2D circle physics only: no polygon shapes, friction, joints, continuous collision detection, broad-phase acceleration, 3D physics, or spatial-units conversion. Pair checking is O(n²) over the 128 body slots. See `examples/physics.ANVL` for an executable input-and-rendering sample.
+
 Bindings written with `set var(name)` are global numeric state unless shadowed by a function parameter. Functions accept numeric parameters (`fn(name, value, ...)`), return numeric values with `output expression`, support recursion, and can declare function-local numeric state with `set local(name) = expression`. `while condition ... end` and inclusive numeric `for local(index) = start to end [step amount] ... end` loops are supported. Engine callbacks `fn(update)` and `fn(draw)` must remain zero-argument. The compiler rejects strings in numeric expressions before C generation. Keep update/draw work small: the current loop does not implement interpolation, job scheduling, or a scene graph.
 
 ## Planned extensions
 
-Sprites and asset handles, audio, collision, a GPU-backed DXR renderer, persistence, mouse/controller input, platform backends, and profiling tools remain future work. The compiler rejects statements that have not been implemented instead of silently treating them as active features.
+Sprites and asset handles, audio, 3D physics, polygon collision, a GPU-backed DXR renderer, persistence, mouse/controller input, platform backends, and profiling tools remain future work. The compiler rejects statements that have not been implemented instead of silently treating them as active features.
 

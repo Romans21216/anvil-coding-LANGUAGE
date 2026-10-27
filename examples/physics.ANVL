@@ -1,0 +1,34 @@
+# Deterministic fixed-step 2D circle physics.
+scene 2d
+clear rgba(12, 17, 29, 255)
+
+set var(player) = body_create(-1, 2, 0.5, 1)
+set var(target) = body_create(1, 0, 0.75, 2)
+set var(player_bounce) = body_restitution(var(player), 0.65)
+set var(target_bounce) = body_restitution(var(target), 0.65)
+set var(player_x) = body_x(var(player))
+set var(player_y) = body_y(var(player))
+set var(target_x) = body_x(var(target))
+set var(target_y) = body_y(var(target))
+
+fn(update)
+  if held(LEFT)
+    set var(force_result) = body_force(var(player), -8, 0)
+  end
+  if held(RIGHT)
+    set var(force_result) = body_force(var(player), 8, 0)
+  end
+  set var(contact_count) = physics_step()
+  set var(player_x) = body_x(var(player))
+  set var(player_y) = body_y(var(player))
+  set var(target_x) = body_x(var(target))
+  set var(target_y) = body_y(var(target))
+end
+
+fn(draw)
+  display circle(480 + var(player_x) * 64, 300 - var(player_y) * 64, 32) -rgb(88, 164, 255)
+  display circle(480 + var(target_x) * 64, 300 - var(target_y) * 64, 48) -rgb(172, 106, 255)
+  display text("2D circle physics") -l(20, 20) -rgb(237, 243, 255)
+  display text("Hold left/right to push the blue body") -l(20, 48) -rgb(187, 202, 221)
+  display text("Contacts: " + var(contact_count)) -l(20, 76) -rgb(157, 199, 255)
+end

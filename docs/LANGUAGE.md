@@ -91,6 +91,8 @@ end
 
 Built-ins currently include `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, and `max`. The implemented key names include letters, `SPACE`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, and `ESCAPE`.
 
+The fixed-step physics built-ins are `body_create(x,y,radius,mass)`, `body_destroy(handle)`, `body_active(handle)`, `body_x(handle)`, `body_y(handle)`, `body_vx(handle)`, `body_vy(handle)`, `body_set_velocity(handle,vx,vy)`, `body_force(handle,fx,fy)`, `body_restitution(handle,value)`, `body_collision(first,second)`, `physics_gravity(x,y)`, and `physics_step()`. Creation returns a numeric body handle or `-1` on invalid input/capacity exhaustion. Status calls return `1` or `0`; invalid body queries return `-1`. `physics_step()` uses the engine fixed delta and returns its initial overlap-pair count. The runtime stores at most 128 2D circles and resolves circle contacts; see [the physics section in the engine guide](ENGINE.md#fixed-step-2d-circle-physics) for limits and numeric bounds.
+
 ## Drawing and input
 
 `scene 2d` / `scene 3d`, `camera perspective x y z`, `camera fov(degrees)`, `camera control(move_speed,turn_speed)`, and `clear rgba(r,g,b,a)` configure the native window runtime. Camera movement uses WASD, Q/E for vertical movement, and the arrow keys for looking when camera controls are enabled. Draw commands belong inside `fn(draw)`:
@@ -124,5 +126,5 @@ fixed_hz = 60
 
 ## Not implemented yet
 
-Static types, dynamically sized arrays, structures, modules/imports, assets/sprites, audio, collision/physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables and arrays, `while`/inclusive numeric `for` loops, and fixed-size global numeric arrays are supported, but the language and engine remain much smaller than a general-purpose game engine today.
+Static types, dynamically sized arrays, structures, modules/imports, assets/sprites, audio, 3D/polygon physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables and arrays, `while`/inclusive numeric `for` loops, fixed-size global numeric arrays, and fixed-step 2D circle physics are supported, but the language and engine remain much smaller than a general-purpose game engine today.
 

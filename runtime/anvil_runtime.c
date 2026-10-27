@@ -14,6 +14,10 @@
 
 enum { ANVIL_WIDTH = 960, ANVIL_HEIGHT = 600, ANVIL_KEYS = 256 };
 enum { ANVIL_TRACE_SPHERES = 32 };
+enum { ANVIL_PHYSICS_BODIES = 128, ANVIL_PHYSICS_SOLVER_ITERATIONS = 4 };
+#define ANVIL_PHYSICS_MAX_COORDINATE 1000000000.0
+#define ANVIL_PHYSICS_MAX_RADIUS 1000000.0
+#define ANVIL_PHYSICS_MAX_SPEED 1000000.0
 typedef struct {
   double x, y, z;
 } AnvilVec3;
@@ -29,6 +33,12 @@ typedef struct {
 typedef struct {
   double x, y, depth;
 } AnvilProjected;
+typedef struct {
+  double x, y, vx, vy, force_x, force_y;
+  double radius, mass, restitution;
+  uint32_t generation;
+  int active;
+} AnvilPhysicsBody;
 
 static HWND anvil_window;
 static HDC anvil_memory_dc;
@@ -61,6 +71,9 @@ static SOCKADDR_IN anvil_net_peer;
 static int anvil_net_has_peer;
 static int anvil_winsock_started;
 static double anvil_net_value;
+static AnvilPhysicsBody anvil_physics_bodies[ANVIL_PHYSICS_BODIES];
+static double anvil_physics_gravity_x;
+static double anvil_physics_gravity_y = -9.81;
 
 static uint32_t anvil_color(int r, int g, int b) {
   if (r < 0)
@@ -854,6 +867,270 @@ void anvil_net_close(void) {
     anvil_winsock_started = 0;
   }
   anvil_net_has_peer = 0;
+}
+
+static AnvilPhysicsBody *anvil_physics_body(double handle, int *slot_out) {
+  const double max_handle = (double)UINT32_MAX * ANVIL_PHYSICS_BODIES +
+                            (ANVIL_PHYSICS_BODIES - 1);
+  if (!isfinite(handle) || handle < 0.0 || handle > max_handle ||
+      floor(handle) != handle)
+    return NULL;
+  uint64_t encoded = (uint64_t)handle;
+  int slot = (int)(encoded % ANVIL_PHYSICS_BODIES);
+  uint32_t generation = (uint32_t)(encoded / ANVIL_PHYSICS_BODIES);
+  AnvilPhysicsBody *body = &anvil_physics_bodies[slot];
+  if (!generation || !body->active || body->generation != generation)
+    return NULL;
+  if (slot_out)
+    *slot_out = slot;
+  return body;
+}
+
+double anvil_body_create(double x, double y, double radius, double mass) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(radius) || !isfinite(mass) ||
+      fabs(x) > ANVIL_PHYSICS_MAX_COORDINATE ||
+      fabs(y) > ANVIL_PHYSICS_MAX_COORDINATE || radius < 1.0e-6 ||
+      radius > ANVIL_PHYSICS_MAX_RADIUS || mass < 0.0 || mass > 1.0e12 ||
+      (mass > 0.0 && mass < 1.0e-6))
+    return -1.0;
+  for (int slot = 0; slot < ANVIL_PHYSICS_BODIES; ++slot) {
+    AnvilPhysicsBody *body = &anvil_physics_bodies[slot];
+    if (body->active)
+      continue;
+    uint32_t generation = body->generation + 1;
+    if (!generation)
+      generation = 1;
+    memset(body, 0, sizeof(*body));
+    body->generation = generation;
+    body->active = 1;
+    body->x = x;
+    body->y = y;
+    body->radius = radius;
+    body->mass = mass;
+    return (double)generation * ANVIL_PHYSICS_BODIES + slot;
+  }
+  return -1.0;
+}
+
+double anvil_body_destroy(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body)
+    return 0.0;
+  body->active = 0;
+  body->force_x = 0.0;
+  body->force_y = 0.0;
+  return 1.0;
+}
+
+double anvil_body_active(double handle) {
+  return anvil_physics_body(handle, NULL) ? 1.0 : 0.0;
+}
+
+double anvil_body_x(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  return body ? body->x : -1.0;
+}
+
+double anvil_body_y(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  return body ? body->y : -1.0;
+}
+
+double anvil_body_vx(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  return body ? body->vx : -1.0;
+}
+
+double anvil_body_vy(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  return body ? body->vy : -1.0;
+}
+
+double anvil_body_set_velocity(double handle, double vx, double vy) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body || body->mass <= 0.0 || !isfinite(vx) || !isfinite(vy) ||
+      fabs(vx) > ANVIL_PHYSICS_MAX_SPEED || fabs(vy) > ANVIL_PHYSICS_MAX_SPEED)
+    return 0.0;
+  body->vx = vx;
+  body->vy = vy;
+  return 1.0;
+}
+
+double anvil_body_force(double handle, double force_x, double force_y) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body || body->mass <= 0.0 || !isfinite(force_x) || !isfinite(force_y) ||
+      fabs(force_x) > 1.0e12 || fabs(force_y) > 1.0e12)
+    return 0.0;
+  double next_force_x = body->force_x + force_x;
+  double next_force_y = body->force_y + force_y;
+  if (!isfinite(next_force_x) || !isfinite(next_force_y) ||
+      fabs(next_force_x) > 1.0e12 || fabs(next_force_y) > 1.0e12)
+    return 0.0;
+  body->force_x = next_force_x;
+  body->force_y = next_force_y;
+  return 1.0;
+}
+
+double anvil_body_restitution(double handle, double restitution) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body || !isfinite(restitution) || restitution < 0.0 || restitution > 1.0)
+    return 0.0;
+  body->restitution = restitution;
+  return 1.0;
+}
+
+double anvil_body_collision(double first, double second) {
+  int first_slot, second_slot;
+  AnvilPhysicsBody *a = anvil_physics_body(first, &first_slot);
+  AnvilPhysicsBody *b = anvil_physics_body(second, &second_slot);
+  if (!a || !b || first_slot == second_slot)
+    return 0.0;
+  double radius = a->radius + b->radius;
+  double dx = b->x - a->x, dy = b->y - a->y;
+  return dx * dx + dy * dy < radius * radius ? 1.0 : 0.0;
+}
+
+double anvil_physics_gravity(double x, double y) {
+  if (!isfinite(x) || !isfinite(y) || fabs(x) > 1.0e6 || fabs(y) > 1.0e6)
+    return 0.0;
+  anvil_physics_gravity_x = x;
+  anvil_physics_gravity_y = y;
+  return 1.0;
+}
+
+double anvil_physics_step(void) {
+  double dt = anvil_delta_seconds;
+  if (!isfinite(dt) || dt <= 0.0 || dt > 0.25)
+    dt = 1.0 / (double)anvil_fixed_hz;
+
+  int contact_count = 0;
+  for (int i = 0; i < ANVIL_PHYSICS_BODIES; ++i) {
+    AnvilPhysicsBody *a = &anvil_physics_bodies[i];
+    if (!a->active)
+      continue;
+    for (int j = i + 1; j < ANVIL_PHYSICS_BODIES; ++j) {
+      AnvilPhysicsBody *b = &anvil_physics_bodies[j];
+      if (!b->active)
+        continue;
+      double dx = b->x - a->x, dy = b->y - a->y;
+      double radius = a->radius + b->radius;
+      if (dx * dx + dy * dy < radius * radius)
+        ++contact_count;
+    }
+  }
+
+  for (int i = 0; i < ANVIL_PHYSICS_BODIES; ++i) {
+    AnvilPhysicsBody *body = &anvil_physics_bodies[i];
+    if (!body->active)
+      continue;
+    if (body->mass > 0.0) {
+      body->vx += (anvil_physics_gravity_x + body->force_x / body->mass) * dt;
+      body->vy += (anvil_physics_gravity_y + body->force_y / body->mass) * dt;
+      body->vx = fmax(-ANVIL_PHYSICS_MAX_SPEED,
+                      fmin(ANVIL_PHYSICS_MAX_SPEED, body->vx));
+      body->vy = fmax(-ANVIL_PHYSICS_MAX_SPEED,
+                      fmin(ANVIL_PHYSICS_MAX_SPEED, body->vy));
+      body->x += body->vx * dt;
+      body->y += body->vy * dt;
+      if (body->x > ANVIL_PHYSICS_MAX_COORDINATE) {
+        body->x = ANVIL_PHYSICS_MAX_COORDINATE;
+        body->vx = 0.0;
+      } else if (body->x < -ANVIL_PHYSICS_MAX_COORDINATE) {
+        body->x = -ANVIL_PHYSICS_MAX_COORDINATE;
+        body->vx = 0.0;
+      }
+      if (body->y > ANVIL_PHYSICS_MAX_COORDINATE) {
+        body->y = ANVIL_PHYSICS_MAX_COORDINATE;
+        body->vy = 0.0;
+      } else if (body->y < -ANVIL_PHYSICS_MAX_COORDINATE) {
+        body->y = -ANVIL_PHYSICS_MAX_COORDINATE;
+        body->vy = 0.0;
+      }
+      if (!isfinite(body->x) || !isfinite(body->y) || !isfinite(body->vx) ||
+          !isfinite(body->vy)) {
+        body->x = body->y = body->vx = body->vy = 0.0;
+      }
+    }
+    body->force_x = 0.0;
+    body->force_y = 0.0;
+  }
+
+  for (int iteration = 0; iteration < ANVIL_PHYSICS_SOLVER_ITERATIONS;
+       ++iteration) {
+    for (int i = 0; i < ANVIL_PHYSICS_BODIES; ++i) {
+      AnvilPhysicsBody *a = &anvil_physics_bodies[i];
+      if (!a->active)
+        continue;
+      for (int j = i + 1; j < ANVIL_PHYSICS_BODIES; ++j) {
+        AnvilPhysicsBody *b = &anvil_physics_bodies[j];
+        if (!b->active)
+          continue;
+        double dx = b->x - a->x, dy = b->y - a->y;
+        double radius = a->radius + b->radius;
+        double distance_sq = dx * dx + dy * dy;
+        if (distance_sq >= radius * radius)
+          continue;
+        double distance = sqrt(distance_sq);
+        double nx = distance > 1.0e-12 ? dx / distance : 1.0;
+        double ny = distance > 1.0e-12 ? dy / distance : 0.0;
+        double inverse_a = a->mass > 0.0 ? 1.0 / a->mass : 0.0;
+        double inverse_b = b->mass > 0.0 ? 1.0 / b->mass : 0.0;
+        double inverse_sum = inverse_a + inverse_b;
+        if (inverse_sum <= 0.0)
+          continue;
+
+        double penetration = radius - distance;
+        double correction = fmax(penetration - 0.0001, 0.0) * 0.8 / inverse_sum;
+        a->x -= nx * correction * inverse_a;
+        a->y -= ny * correction * inverse_a;
+        b->x += nx * correction * inverse_b;
+        b->y += ny * correction * inverse_b;
+
+        double relative_x = b->vx - a->vx;
+        double relative_y = b->vy - a->vy;
+        double along_normal = relative_x * nx + relative_y * ny;
+        if (along_normal < 0.0) {
+          double restitution = fmin(a->restitution, b->restitution);
+          double impulse = -(1.0 + restitution) * along_normal / inverse_sum;
+          a->vx -= impulse * nx * inverse_a;
+          a->vy -= impulse * ny * inverse_a;
+          b->vx += impulse * nx * inverse_b;
+          b->vy += impulse * ny * inverse_b;
+        }
+      }
+    }
+  }
+
+  /* Collision impulses and positional corrections can exceed the integration
+   * limits above. Reapply the public bounds after the solver has finished. */
+  for (int i = 0; i < ANVIL_PHYSICS_BODIES; ++i) {
+    AnvilPhysicsBody *body = &anvil_physics_bodies[i];
+    if (!body->active)
+      continue;
+    body->vx = fmax(-ANVIL_PHYSICS_MAX_SPEED,
+                    fmin(ANVIL_PHYSICS_MAX_SPEED, body->vx));
+    body->vy = fmax(-ANVIL_PHYSICS_MAX_SPEED,
+                    fmin(ANVIL_PHYSICS_MAX_SPEED, body->vy));
+    if (body->x > ANVIL_PHYSICS_MAX_COORDINATE) {
+      body->x = ANVIL_PHYSICS_MAX_COORDINATE;
+      body->vx = 0.0;
+    } else if (body->x < -ANVIL_PHYSICS_MAX_COORDINATE) {
+      body->x = -ANVIL_PHYSICS_MAX_COORDINATE;
+      body->vx = 0.0;
+    }
+    if (body->y > ANVIL_PHYSICS_MAX_COORDINATE) {
+      body->y = ANVIL_PHYSICS_MAX_COORDINATE;
+      body->vy = 0.0;
+    } else if (body->y < -ANVIL_PHYSICS_MAX_COORDINATE) {
+      body->y = -ANVIL_PHYSICS_MAX_COORDINATE;
+      body->vy = 0.0;
+    }
+    if (!isfinite(body->x) || !isfinite(body->y) || !isfinite(body->vx) ||
+        !isfinite(body->vy)) {
+      body->x = body->y = body->vx = body->vy = 0.0;
+    }
+  }
+  return (double)contact_count;
 }
 
 static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
