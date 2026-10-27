@@ -13,6 +13,8 @@ Updated 2026-10-27 after independent review of exact commit `96b71fedca97facaff6
 - NEEDS VERIFICATION: 430
 - IN PROGRESS: 0
 
+Current formatting follow-up candidate `3f77eee` has passed the 72-test suite, Black 88-column check, compileall, QA arithmetic validation, and 12-example generated-C parity. Independent review is pending; the latest scored evaluation remains 91/100 on `96b71fe`.
+
 ## Audited current items
 
 | # | Item | Status | Evidence and remaining work |

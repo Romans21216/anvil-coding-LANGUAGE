@@ -193,3 +193,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Backlog status:** Items #101–#104 are COMPLETE. Counts are 17 complete, 3 partial, 0 in progress, and 430 needing verification.
 - **Remaining issues:** Issue #12 remains open because long lines remain and Black was unavailable to the reviewer. Other deductions are incomplete engine breadth, Windows/MSVC and C-only limits, and unverified newer VS Code highlighting; the latter follows the user's choice to keep 0.1.4 installed. No new functional bug was reproduced.
 - **Evaluation sync:** QA report, plain-text evaluation, status ledgers, and autonomous state were updated immediately after this critic run.
+
+
+### Batch 10 formatting follow-up candidate
+
+- **Candidate:** `3f77eee7bf23d70ae97e7f1968851882dd0d923e` wraps source lines in the five compiler modules cited by review `96b71fe`; generated C strings are split only as adjacent literals, preserving emitted bytes.
+- **Local verification:** 72 tests passed; Black 26.10.1 default 88-column check passed; no lines exceed 88 columns in the five cited modules; compileall, QA arithmetic, and diff check passed; 12 examples produce byte-identical generated C versus `854d36c`.
+- **Review:** Pending independent evaluation of this exact candidate. The last scored review remains 91/100 on `96b71fe`, FAIL against 98.
