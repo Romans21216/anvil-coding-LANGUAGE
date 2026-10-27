@@ -330,7 +330,7 @@
       ],
       "verification_result": "IN PROGRESS: full 73-test suite and all 3 native runtime tests pass locally; independent review pending.",
       "github_issue": "#23 item 144",
-      "commit": "pending candidate commit"
+      "commit": "296245532a12255c79e4092c66f0cbacb3b085d3"
     },
     {
       "number": 301,
@@ -626,7 +626,7 @@
       "Broader game-engine scope remains incomplete."
     ]
   },
-  "current_candidate_commit": "pending",
+  "current_candidate_commit": "296245532a12255c79e4092c66f0cbacb3b085d3",
   "status_counts_validated_on": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
   "candidate_validation": {
     "status": "unreviewed item #144 candidate; local validation passed",
@@ -637,7 +637,8 @@
     "compileall": "passed",
     "qa_report_validator": "passed; current reviewed score remains 92/100",
     "status_ledger": "21 audited entries; counts 17 complete, 3 partial, 1 in progress, 429 needing verification; total 450",
-    "diff_check": "passed"
+    "diff_check": "passed",
+    "commit": "296245532a12255c79e4092c66f0cbacb3b085d3"
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "current_active_item": 144

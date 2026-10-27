@@ -211,7 +211,7 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Remaining score deductions:** engine scope, Windows/MSVC and C-only limits, and unverified new-token highlighting because extension 0.1.4 remains installed per user preference.
 
 
-## Batch 11 — resizable game window (item #144)
+## Batch 11 — resizable game window (item #144; candidate `2962455`)
 
 - **Scope:** The native window is already resizable, but the old paint path always drew the 960×600 frame from the top-left, leaving clipping or unused space. The runtime now computes a centered 16:10 viewport, fills letterbox bars, and scales presentation without changing the internal resolution.
 - **Regression coverage:** A native C harness checks the original 960×600 size, a wide 1200×600 client (120-pixel side bars), a tall 600×800 client (212-pixel top bar), a 1280×720 client, and invalid dimensions. All 73 Python tests pass; the runtime test module passes all 3 tests.

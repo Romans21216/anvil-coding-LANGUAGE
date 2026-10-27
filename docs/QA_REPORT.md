@@ -8,7 +8,7 @@
 
 **Formatting follow-up review:** candidate `3f77eee` was independently reviewed on exact commit `5072597`; all 72 tests, Black check, compileall, QA arithmetic, diff check, and 12-example generated-C parity pass. The critic scored this snapshot 92/100, still below 98.
 
-**Current unreviewed engine candidate:** backlog item #144 adds resizable-window presentation with aspect-preserving letterboxing while retaining the 960×600 internal framebuffer. All 73 Python tests pass, including native viewport tests for original, wide, tall, letterboxed, and invalid dimensions. No new overall score is claimed until independent review.
+**Current unreviewed engine candidate `2962455`: backlog item #144 adds resizable-window presentation with aspect-preserving letterboxing while retaining the 960×600 internal framebuffer. All 73 Python tests pass, including native viewport tests for original, wide, tall, letterboxed, and invalid dimensions. No new overall score is claimed until independent review.
 
 ## Scope
 

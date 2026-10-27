@@ -6,12 +6,12 @@
   "last_completed_backlog_item": 104,
   "current_active_item": 144,
   "current_active_item_status": "Backlog item #144 is in progress: native-window resize presentation uses a centered aspect-preserving viewport; internal framebuffer remains 960\u00d7600. Full 73-test suite and 3 native runtime tests pass locally; independent review pending.",
-  "current_candidate_commit": "pending candidate commit",
+  "current_candidate_commit": "296245532a12255c79e4092c66f0cbacb3b085d3",
   "latest_verified_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
   "last_pushed_reviewed_below_threshold_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
   "latest_independently_reviewed_candidate_commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Latest scored commit 5072597 remains 92/100 \u2014 FAIL against 98. New item #144 window-resize candidate is uncommitted and unreviewed.",
+  "latest_push_result": "Item #144 candidate 2962455 is pushed; all 73 Python tests, 3 native runtime tests, extension validation, compileall, QA arithmetic, and diff check pass locally. Independent review pending; latest scored review remains 92/100 on 5072597.",
   "latest_independent_review": {
     "commit": "5072597f0fe8ed21a97774fa2582f7174ed242cd",
     "score": 92,
@@ -51,7 +51,7 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "73 passed locally on unreviewed item #144 candidate; independent review pending",
+    "python_unittest": "73 passed locally on exact item #144 candidate 2962455; independent review pending",
     "vscode_extension_validation": "passed; independently rerun on exact review commit 96b71fe",
     "python_compile": "passed; independently rerun on exact review commit 96b71fe",
     "msvc_numeric_demo": "built and ran successfully; output 17",
@@ -63,9 +63,9 @@
     "qa_report_validator": "passed; QA rubric totals 92/100 with category subtotals in agreement on exact review commit 5072597",
     "black": "passed independently: Black 26.10.1 --check compiler tests/test_compiler_modules.py; all five cited modules max 88 columns",
     "generated_c_parity": "12/12 examples byte-identical to baseline 854d36c after line wrapping",
-    "runtime_viewport_test": "3 native runtime tests passed, including item #144 resize viewport"
+    "runtime_viewport_test": "3 native runtime tests passed locally on item #144 candidate 2962455"
   },
-  "pending_documentation_review": "Item #144 docs and evaluation now describe the local 73-test candidate; obtain independent review of the exact pushed snapshot and update evaluation immediately.",
+  "pending_documentation_review": "Item #144 candidate 2962455 is documented and locally validated; obtain independent review of exact pushed snapshot, then update evaluation immediately.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -113,6 +113,7 @@
     "compileall": "passed",
     "qa_report_validator": "passed, rubric latest reviewed score remains 92",
     "generated_c_parity": "not applicable to runtime-only feature",
-    "git_diff_check": "passed"
+    "git_diff_check": "passed",
+    "commit": "296245532a12255c79e4092c66f0cbacb3b085d3"
   }
 }
