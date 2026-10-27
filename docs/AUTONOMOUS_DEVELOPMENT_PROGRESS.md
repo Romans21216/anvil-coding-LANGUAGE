@@ -276,3 +276,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Finding (criterion 38, P2):** both `docs/IMPLEMENTATION_STATUS.json` and `docs/CODEX_AUTONOMOUS_STATE.json` contain CP1252 bytes and fail strict UTF-8 JSON parsing. Permissive decoding also shows candidate SHA `ddf8c6f...` and pending/uncommitted status despite reviewed HEAD `d757c79...`. This is a report-integrity defect; no mouse code bug was reproduced.
 - **Verification:** 77 Python tests, npm extension test, Python compileall, QA arithmetic validator invocation, and exact-commit diff check passed. Mouse integration tested viewport mapping after resize, letterbox rejection, left/right/middle press/held/release, and wheel capture/reset. The QA validator still printed the previous 92/100 rubric before synchronization. No live mouse window was visually inspected.
 - **Next:** serialize both JSON files explicitly as UTF-8, correct candidate/review references, keep the 98 threshold, and re-review the corrected snapshot.
+
+
+### Fresh critic result — corrected report snapshot `c102604`
+
+- **Exact commit reviewed:** `c10260483eab6b5adaadd261a66a92a9138b9ed8`.
+- **Result:** **92/100 — FAIL** against the current 98/100 pass requirement. Categories: requirements 16/20; functionality/reliability 20/20; architecture 19/20; testing/verification 19/20; delivery 18/20. The full 50-item vector is unchanged from the prior `d757c79` review except criterion 38 is restored to 2/2.
+- **Verification:** strict UTF-8 parsing, status parity (26 audited; `424 + 3 + 21 + 2 = 450`; #391–394 COMPLETE), 77 Python tests, extension validation, compileall, QA arithmetic, and diff-check pass on the exact candidate. Mouse synthetic native tests pass for resize mapping, letterbox exclusion, all three button edges/held/release states, and wheel input.
+- **Finding status:** issue #48's JSON encoding and stale-review metadata defect is fixed and closed. The previous d757c79 result remains 91/100; corrected c102604 scores 92/100. No code defect was found. No live mouse-enabled window was visually inspected.
+- **Remaining partial criteria:** 2, 3, 5, 9, 27, 40, 47, and 50. Continue work toward 98; this result is six points below passing.

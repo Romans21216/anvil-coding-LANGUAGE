@@ -5,16 +5,16 @@
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
   "current_active_item": 185,
-  "current_active_item_status": "Mouse input items #391–394 are complete after independent code/runtime verification on d757c79. Issue #48 report encoding/SHA mismatch is fixed in UTF-8 status-sync changes; 91/100 remains the latest score on d757c79, below the 98/100 pass bar. Continue engine work.",
-  "current_candidate_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
-  "latest_verified_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
-  "last_pushed_reviewed_below_threshold_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
-  "latest_independently_reviewed_candidate_commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
+  "current_active_item_status": "Item #185 remains active. Mouse input items #391–394 are complete. Latest exact independent review c102604 scored 92/100, below 98; issue #48 is fixed and closed.",
+  "current_candidate_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+  "latest_verified_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+  "last_pushed_reviewed_below_threshold_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+  "latest_independently_reviewed_candidate_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Independent critic scored exact d757c797751f40eee47fd518c3cf6dd3a3ae790c at 91/100, below 98. It found invalid UTF-8 in both status JSON files and stale candidate metadata; no mouse code defect was reproduced.",
+  "latest_push_result": "Independent critic scored exact c10260483eab6b5adaadd261a66a92a9138b9ed8 at 92/100, below the 98 threshold. Strict UTF-8 and candidate metadata issue #48 is fixed; no code defect was found.",
   "latest_independent_review": {
-    "commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
-    "score": 91,
+    "commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+    "score": 92,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
     "current_required_threshold": 98,
@@ -23,7 +23,7 @@
       "requirements": "16/20",
       "functionality_reliability": "20/20",
       "code_architecture": "19/20",
-      "testing_verification": "18/20",
+      "testing_verification": "19/20",
       "developer_experience_delivery": "18/20"
     },
     "criterion_scores": [
@@ -64,7 +64,7 @@
       2,
       2,
       2,
-      1,
+      2,
       2,
       1,
       2,
@@ -79,11 +79,11 @@
       1
     ],
     "findings": [
-      "Criterion 38: strict UTF-8 JSON parsing fails for docs/IMPLEMENTATION_STATUS.json and docs/CODEX_AUTONOMOUS_STATE.json because they contain CP1252 bytes.",
-      "Criterion 38: permissive decoding reveals stale candidate metadata ddf8c6f8b923c6b7f8ee3bca154d0ffd5e5f7309 and pending/uncommitted status, while exact reviewed HEAD is d757c797751f40eee47fd518c3cf6dd3a3ae790c.",
-      "Mouse input implementation had no defect reproduced; native integration covers resized mapping, letterbox rejection, all three button press/held/release states, and wheel capture/reset.",
-      "No live mouse-enabled game window was visually inspected.",
-      "Current total passing threshold is 98/100; fresh score 91/100 is FAIL."
+      "Issue #48 is fixed: both JSON status files parse as strict UTF-8, and the prior candidate SHA/encoding mismatch is corrected.",
+      "Mouse input items #391–394 are COMPLETE and verified; native synthetic input regression passes.",
+      "No code defect was found in the fresh review.",
+      "No live mouse-enabled window was visually inspected.",
+      "Partial criteria 2, 3, 5, 9, 27, 40, 47, and 50 remain; score 92/100 is six points below the required 98/100."
     ]
   },
   "previous_independent_review": {
@@ -108,10 +108,11 @@
     "python_unittest": "77 passed; independently rerun on exact candidate d757c79",
     "vscode_extension_validation": "passed; extension 0.1.8 grammar validation; not installed",
     "python_compile": "compileall passed",
-    "qa_report_validator": "validator executed but reported old 92/100 record; synced to 91 after review",
+    "qa_report_validator": "passed on exact c102604; 50 criteria = 92/100; category and criterion scores agree",
     "git_diff_check": "passed on exact candidate",
     "mouse_input_integration": "passed resized viewport mapping, letterbox rejection, left/right/middle press/held/release, wheel capture/reset",
-    "visual_runtime": "No live mouse-enabled window visually inspected"
+    "visual_runtime": "No live mouse-enabled window visually inspected",
+    "strict_json": "both docs JSON files parse as UTF-8; status parity verified on exact c102604"
   },
   "pending_documentation_review": null,
   "blocked_items": [
@@ -125,8 +126,8 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
   "next_recommended_tasks": [
-    "Obtain a fresh independent review of the UTF-8/status-sync snapshot against 98/100; update every evaluation record immediately after review.",
-    "Continue evidence-backed engine work to address remaining scope and platform/editor rubric deductions."
+    "Continue evidence-backed implementation and verification to close remaining rubric gaps (criteria 2,3,5,9,27,40,47,50); maintain the 98/100 passing requirement.",
+    "After each critic run, synchronize every evaluation record to the exact score and commit."
   ],
   "master_backlog": {
     "issue": 23,
@@ -156,18 +157,20 @@
     48
   ],
   "candidate_validation": {
-    "status": "91/100 result on d757c79 synced; criterion-38 report defect fixed in follow-up snapshot; current threshold remains 98",
-    "item": "391–394",
-    "reviewed_score": 91,
+    "status": "corrected status snapshot independently reviewed; 92/100 below required 98",
+    "item": "391–394 complete",
+    "reviewed_score": 92,
+    "previous_reviewed_score": 91,
     "threshold": 98,
-    "result": "FAIL; follow-up review pending",
-    "python_unittest": "77 passed",
+    "result": "FAIL",
+    "python_unittest": "77 passed on exact c102604",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "old 92 record failed to reflect new review; report is being synchronized",
+    "qa_report_validator": "passed; 50 criteria = 92/100",
+    "strict_json": "both status JSON files parse as UTF-8; parity check passed",
     "git_diff_check": "passed",
-    "commit": "d757c797751f40eee47fd518c3cf6dd3a3ae790c",
-    "finding": "Issue #48 fixed after the exact d757c79 review; its evaluation remains 91/100. Fresh independent score on corrected status snapshot is pending."
+    "commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+    "finding": "Issue #48 fixed and closed. Remaining partial criteria 2,3,5,9,27,40,47,50."
   },
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775",
   "resolved_critic_issue_48": "Fixed strict UTF-8 JSON serialization and synchronized the evaluation SHA to reviewed commit d757c79; strict JSON parsing and QA arithmetic pass in the follow-up snapshot."
