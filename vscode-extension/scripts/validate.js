@@ -69,6 +69,8 @@ async function main() {
   expect('display cube(0, 0, 0, 1.8)', 'display', 'support.function.engine.anvil');
   expect('display cube(0, 0, 0, 1.8)', 'cube', 'support.function.anvil');
   expect('display ray_sphere(0, 0, 0, 1)', 'ray_sphere', 'support.function.anvil');
+  expect('set local(ok) = ray_backend("bvh")', 'ray_backend', 'support.function.anvil');
+  expect('set local(available) = ray_backend_available("dxr")', 'ray_backend_available', 'support.function.anvil');
   expect('set var(ball) = body_create(0, 0, 1, 1)', 'body_create', 'support.function.anvil');
   expect('set var(contacts) = physics_step()', 'physics_step', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');

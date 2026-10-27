@@ -75,6 +75,7 @@ The current language has `if`/`else`/`end`, `while`/`end`, numeric `for`/`end` l
 - Random/noise: `seed(value)`, `rnd(low, high)`, `noise(x, y, z)`, `fbm(x, y, z, octaves, lacunarity, gain)`.
 - Math: `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, `max`.
 - Drawing: `rect`, `circle`, `line`, `text`, `cube`, `sphere`, `ray_sphere`, `plane`.
+- Ray-tracing backend control: `ray_backend(name)`, `ray_backend_available(name)`.
 - Networking prototype: `net host(port)`, `net join("IPv4", port)`, `net send(number)`, `receive()`.
 - Physics: `body_create`, `body_destroy`, `body_active`, body position/velocity queries, `body_set_velocity`, `body_force`, `body_restitution`, `body_collision`, `physics_gravity`, and `physics_step` for fixed-step 2D circles.
 

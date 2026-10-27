@@ -15,6 +15,7 @@ Anvil is a small BASIC/Lua-inspired game language using `.ANVL` source files. It
 ## Current implementation
 
 See the [request completion matrix](../COMPLETION_MATRIX.md) for an explicit implemented/partial/missing audit of the user's requested language and engine capabilities.
+The [master improvement backlog](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) tracks the 450 concrete follow-up items.
 
 Working features include numeric global variables, fixed-size checked global and function-local numeric arrays, parameterized functions, numeric return values, function-local numeric state, branches, `while` and inclusive numeric `for` loops, recursion, 2D and basic 3D drawing, keyboard input, camera movement, time, deterministic random/noise helpers, CPU BVH ray-traced spheres, and a one-peer UDP numeric prototype.
 

@@ -56,6 +56,8 @@ void anvil_camera_control(double speed, double turn_degrees_per_second);
 void anvil_trace_sphere(double x, double y, double z, double radius, int r,
                         int g, int b, int a);
 void anvil_trace_finish(void);
+int anvil_ray_backend(const char *name);
+int anvil_ray_backend_available(const char *name);
 void anvil_clear(int r, int g, int b, int a);
 void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
                 int a);

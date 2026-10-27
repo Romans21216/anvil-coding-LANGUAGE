@@ -39,6 +39,58 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_trace_sphere(0.0, 0.0, 0.0, 1.0", generated)
             self.assertLess(generated.index("anvil_trace_sphere("), generated.index("anvil_trace_finish();", generated.index("anvil_trace_sphere(")))
 
+    def test_ray_backend_builtins_select_and_report_available_backends(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "ray-backend.ANVL"
+            out = pathlib.Path(temp) / "ray-backend.exe"
+            generated = out.with_suffix(".generated.c")
+            source.write_text(
+                'fn(main)\n'
+                '  if ray_backend_available("bvh") = false\n'
+                '    output 0\n'
+                '  end\n'
+                '  if ray_backend("bvh") = false\n'
+                '    output 0\n'
+                '  end\n'
+                '  if ray_backend_available("dxr") = true\n'
+                '    output 0\n'
+                '  end\n'
+                '  if ray_backend("dxr") = true\n'
+                '    output 0\n'
+                '  end\n'
+                '  if ray_backend_available("embree") = true\n'
+                '    output 0\n'
+                '  end\n'
+                '  if ray_backend("embree") = true\n'
+                '    output 0\n'
+                '  end\n'
+                '  if ray_backend("unknown") = true\n'
+                '    output 0\n'
+                '  end\n'
+                '  if ray_backend_available("unknown") = true\n'
+                '    output 0\n'
+                '  end\n'
+                '  output 1\n'
+                'end\n'
+                'call fn(main)\n',
+                encoding="utf-8")
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(generated), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stdout.strip(), "1")
+            self.assertIn("ray backend 'dxr' is unavailable", result.stderr)
+            self.assertIn("ray backend 'embree' is unavailable", result.stderr)
+            self.assertIn("unknown ray backend 'unknown'", result.stderr)
+            self.assertIn('anvil_ray_backend_available ( "bvh" )', generated.read_text(encoding="utf-8"))
+
+    def test_ray_backend_builtin_requires_a_string(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "ray-backend-type.ANVL"
+            source.write_text("fn(main)\n  output ray_backend(3)\nend\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("expected a string, got a number", result.stderr)
+
     def test_starter_game_links_native_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
             out = pathlib.Path(temp) / "world.exe"

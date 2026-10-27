@@ -1,0 +1,10 @@
+# Ray backend controls are built-ins. Only BVH is available in the current build.
+set var(bvh_selected) = ray_backend("bvh")
+set var(dxr_available) = ray_backend_available("dxr")
+set var(embree_available) = ray_backend_available("embree")
+
+fn(main)
+  output var(bvh_selected) + var(dxr_available) + var(embree_available)
+end
+
+call fn(main)

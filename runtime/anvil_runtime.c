@@ -14,6 +14,11 @@
 
 enum { ANVIL_WIDTH = 960, ANVIL_HEIGHT = 600, ANVIL_KEYS = 256 };
 enum { ANVIL_TRACE_SPHERES = 32 };
+enum {
+  ANVIL_RAY_BACKEND_BVH,
+  ANVIL_RAY_BACKEND_DXR,
+  ANVIL_RAY_BACKEND_EMBREE
+};
 enum { ANVIL_PHYSICS_BODIES = 128, ANVIL_PHYSICS_SOLVER_ITERATIONS = 4 };
 #define ANVIL_PHYSICS_MAX_COORDINATE 1000000000.0
 #define ANVIL_PHYSICS_MAX_RADIUS 1000000.0
@@ -60,6 +65,8 @@ static AnvilTraceSphere anvil_trace_spheres[ANVIL_TRACE_SPHERES];
 static int anvil_trace_sphere_count;
 static AnvilBvhNode anvil_trace_bvh[ANVIL_TRACE_SPHERES * 2];
 static int anvil_trace_bvh_count;
+static int anvil_active_ray_backend = ANVIL_RAY_BACKEND_BVH;
+static unsigned int anvil_ray_backend_warnings;
 static double anvil_delta_seconds = 1.0 / 60.0;
 static int anvil_fixed_hz = 60;
 static double anvil_elapsed_seconds;
@@ -523,6 +530,50 @@ void anvil_trace_sphere(double x, double y, double z, double radius, int r,
   sphere->a = a;
 }
 
+static int anvil_ray_backend_id(const char *name) {
+  if (!name)
+    return -1;
+  if (_stricmp(name, "bvh") == 0)
+    return ANVIL_RAY_BACKEND_BVH;
+  if (_stricmp(name, "dxr") == 0)
+    return ANVIL_RAY_BACKEND_DXR;
+  if (_stricmp(name, "embree") == 0)
+    return ANVIL_RAY_BACKEND_EMBREE;
+  return -1;
+}
+
+int anvil_ray_backend_available(const char *name) {
+  /* BVH is the only backend with a renderer implementation in this build. */
+  return anvil_ray_backend_id(name) == ANVIL_RAY_BACKEND_BVH;
+}
+
+int anvil_ray_backend(const char *name) {
+  int requested = anvil_ray_backend_id(name);
+  if (requested == ANVIL_RAY_BACKEND_BVH) {
+    anvil_active_ray_backend = requested;
+    return 1;
+  }
+  if (requested >= ANVIL_RAY_BACKEND_DXR &&
+      requested <= ANVIL_RAY_BACKEND_EMBREE) {
+    unsigned int warning = 1u << (unsigned int)requested;
+    if (!(anvil_ray_backend_warnings & warning)) {
+      const char *backend_name = requested == ANVIL_RAY_BACKEND_DXR ? "dxr" : "embree";
+      fprintf(stderr,
+              "Anvil: ray backend '%s' is unavailable in this build; active backend remains BVH.\n",
+              backend_name);
+      anvil_ray_backend_warnings |= warning;
+    }
+    return 0;
+  }
+  if (!(anvil_ray_backend_warnings & (1u << 31))) {
+    fprintf(stderr,
+            "Anvil: unknown ray backend '%s'; choose 'bvh', 'dxr', or 'embree'.\n",
+            name ? name : "(null)");
+    anvil_ray_backend_warnings |= 1u << 31;
+  }
+  return 0;
+}
+
 static int anvil_ray_sphere_hit(AnvilVec3 origin, AnvilVec3 direction,
                                 const AnvilTraceSphere *sphere, double *hit_t) {
   AnvilVec3 offset = anvil_sub(origin, sphere->center);
@@ -675,6 +726,10 @@ void anvil_trace_finish(void) {
   if (anvil_trace_sphere_count == 0 || !anvil_pixels || !anvil_depth_buffer ||
       !anvil_scene_is_3d)
     return;
+  if (anvil_active_ray_backend != ANVIL_RAY_BACKEND_BVH) {
+    anvil_trace_sphere_count = 0;
+    return;
+  }
 
   int indices[ANVIL_TRACE_SPHERES];
   anvil_trace_bvh_count = 0;

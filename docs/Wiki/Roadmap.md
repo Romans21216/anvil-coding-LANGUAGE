@@ -1,6 +1,6 @@
 # Roadmap
 
-The complete requested 360-point improvement list is preserved in [`docs/IMPROVEMENT_BACKLOG.md`](../IMPROVEMENT_BACKLOG.md). It spans language semantics, GPU/CPU renderers, graphics/assets, game systems, networking, tools, performance, testing/security, platform support, documentation, and release engineering.
+The complete requested 450-point improvement list is tracked in [GitHub issue #23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and preserved in [`IMPROVEMENT_BACKLOG.md`](../IMPROVEMENT_BACKLOG.md). It spans language semantics, GPU/CPU renderers, graphics/assets, game systems, networking, performance, testing, platform support, documentation, and release engineering.
 
 See the [request completion matrix](../COMPLETION_MATRIX.md) for a traceable implemented/partial/missing audit of the original request.
 

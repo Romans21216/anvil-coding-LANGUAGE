@@ -66,6 +66,7 @@ RUNTIME_C_NAMES = {
     "anvil_fbm", "anvil_net_host", "anvil_net_join", "anvil_net_send",
     "anvil_net_receive", "anvil_net_close", "anvil_array_get", "anvil_array_set",
     "anvil_local_array_alloc", "anvil_local_array_free",
+    "anvil_ray_backend", "anvil_ray_backend_available",
     "anvil_body_create", "anvil_body_destroy", "anvil_body_active",
     "anvil_body_x", "anvil_body_y", "anvil_body_vx", "anvil_body_vy",
     "anvil_body_set_velocity", "anvil_body_force", "anvil_body_restitution",
@@ -370,6 +371,7 @@ BUILTINS = {
     "body_set_velocity": (3, 3), "body_force": (3, 3),
     "body_restitution": (2, 2), "body_collision": (2, 2),
     "physics_gravity": (2, 2), "physics_step": (0, 0),
+    "ray_backend": (1, 1), "ray_backend_available": (1, 1),
 }
 BUILTIN_C_NAMES = {
     "time": "anvil_time", "delta": "anvil_delta", "rnd": "anvil_rnd",
@@ -383,7 +385,10 @@ BUILTIN_C_NAMES = {
     "body_force": "anvil_body_force", "body_restitution": "anvil_body_restitution",
     "body_collision": "anvil_body_collision", "physics_gravity": "anvil_physics_gravity",
     "physics_step": "anvil_physics_step",
+    "ray_backend": "anvil_ray_backend",
+    "ray_backend_available": "anvil_ray_backend_available",
 }
+BUILTIN_STRING_ARGUMENTS = {"ray_backend", "ray_backend_available"}
 
 
 class ExpressionParser:
@@ -455,6 +460,12 @@ class ExpressionParser:
             raise CompileError(f"{self.path}:{self.line}: expected a number, got a string")
         return code
 
+    def require_string(self, value: tuple[str, str]) -> str:
+        code, kind = value
+        if kind != "string":
+            raise CompileError(f"{self.path}:{self.line}: expected a string, got a number")
+        return code
+
     def parse(self, minimum: int = 0) -> tuple[str, str]:
         if not self.peek():
             raise CompileError(f"{self.path}:{self.line}: expected an expression")
@@ -514,7 +525,11 @@ class ExpressionParser:
             args = []
             if not self.peek(")"):
                 while True:
-                    args.append(self.require_number(self.parse()))
+                    argument = self.parse()
+                    if value in BUILTIN_STRING_ARGUMENTS:
+                        args.append(self.require_string(argument))
+                    else:
+                        args.append(self.require_number(argument))
                     if not self.peek(","):
                         break
                     self.take()

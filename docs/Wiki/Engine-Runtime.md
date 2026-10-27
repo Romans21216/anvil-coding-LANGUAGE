@@ -18,3 +18,5 @@ Screen-space `rect`, `circle`, `line`, and `text` commands can be mixed with `cu
 
 BVH CPU ray tracing is the only implemented ray-tracing backend. DXR and Embree are not implemented. Conventional rendering also has no GPU backend, window resizing, texture mapping, mesh import, or robust production clipping across all primitive paths.
 
+`ray_backend("bvh")` selects the ray-tracing backend at runtime, and `ray_backend_available("dxr")` checks whether a named backend is available. Both return numeric `1` or `0`. A failed selection keeps the current backend and prints a diagnostic. This build implements only `bvh`; DXR and Embree currently return unavailable.
+

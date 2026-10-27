@@ -1,379 +1,490 @@
-# Complete Improvement and Fix Backlog
+# Master backlog mirror — GitHub issue #23
 
-This file preserves the complete 360-item improvement request supplied for Anvil. It is a project backlog, not a statement that every item is implemented. Current status and sequencing are summarized in [the wiki roadmap](Wiki/Roadmap.md). Progress update: numeric function parameters, return values, local variables and arrays, recursion, `while`/inclusive numeric `for` loops, and fixed-size global numeric arrays with checked indexing have compiler support; other listed features remain backlog work.
+Synced from [issue #23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) on 2026-10-27. Issue #23 is the source of truth for the 450 backlog entries.
 
-ANVIL LANGUAGE AND GAME ENGINE — COMPLETE IMPROVEMENT AND FIX LIST
-CRITICAL — CORE LANGUAGE FIXES
-1. Add function parameters so functions can accept values.
-2. Add function return values.
-3. Add local variables and proper variable scoping.
-4. Add while loops.
-5. Add for loops.
-6. Add arrays and basic collections.
-7. Add user-defined structures for players, enemies, cameras, and other objects.
-8. Improve compiler error handling with file names, line numbers, and clear explanations.
-9. Add stronger semantic validation to prevent invalid programs from generating broken C code.
-10. Separate the compiler into lexer, parser, semantic analysis, code generation, and build-driver modules.
-11. Build comprehensive automated tests for every language feature.
-12. Establish proper memory and resource management rules.
-13. Define consistent behavior for variables, expressions, functions, and types.
-14. Add recursion support with defined limits and error handling.
-15. Add support for nested expressions and complex conditions.
-16. Add proper operator precedence and associativity rules.
-17. Add explicit initialization rules for variables.
-18. Add support for reusable functions without relying on global state.
-19. Add clear runtime error handling.
-20. Add a language specification documenting supported syntax and behavior.
-HIGH PRIORITY — RENDERING ENGINE
-21. Implement a dual-backend rendering architecture supporting both CPU and GPU rendering.
-22. Allow developers to manually select CPU rendering.
-23. Allow developers to manually select GPU rendering.
-24. Add an Auto rendering mode that selects an appropriate supported backend.
-25. Preserve CPU software rendering as a fully supported rendering option.
-26. Implement GPU-accelerated rendering without removing CPU rendering.
-27. Add hardware capability detection.
-28. Add configurable fallback behavior when the selected renderer is unavailable.
-29. Allow developers to select the rendering backend through project settings.
-30. Allow developers to select the rendering backend through Anvil code.
-31. Define whether rendering backends can be switched during runtime.
-32. Ensure core 2D drawing commands work across CPU and GPU backends.
-33. Ensure core 3D drawing commands work across CPU and GPU backends.
-34. Standardize rendering behavior between supported backends.
-35. Add backend-specific performance profiling.
-36. Add separate CPU rendering benchmarks.
-37. Add separate GPU rendering benchmarks.
-38. Add configurable rendering quality settings.
-39. Add configurable rendering resolution.
-40. Add dynamic window resizing.
-41. Remove the fixed 960 × 600 rendering limitation.
-42. Implement robust near-plane clipping.
-43. Implement far-plane clipping.
-44. Improve depth buffering and depth testing.
-45. Add proper viewport management.
-46. Add configurable vertical synchronization.
-47. Add configurable frame-rate limits.
-48. Add fullscreen and borderless window modes.
-49. Add resolution scaling.
-50. Design the rendering architecture to support additional graphics APIs.
-HIGH PRIORITY — GRAPHICS AND ASSETS
-51. Add texture loading.
-52. Add texture mapping for 3D objects.
-53. Add sprite rendering.
-54. Add sprite sheets.
-55. Add sprite animation.
-56. Add image loading from files.
-57. Add 3D mesh importing.
-58. Add support for common 3D model formats.
-59. Add material definitions.
-60. Add configurable object colors and transparency.
-61. Add alpha blending.
-62. Add texture filtering.
-63. Add mipmapping.
-64. Add configurable lighting.
-65. Add directional lights.
-66. Add point lights.
-67. Add spotlights.
-68. Add shadow rendering.
-69. Add object transformations.
-70. Add transformation hierarchies.
-71. Add camera projection configuration.
-72. Add orthographic camera support.
-73. Improve perspective camera controls.
-74. Add multiple-camera support.
-75. Add render layers.
-76. Add particle rendering.
-77. Add animation support for 3D objects.
-78. Add skeletal animation support.
-79. Add a shader system for supported GPU backends.
-80. Add asset caching and resource reuse.
-HIGH PRIORITY — GAME ENGINE SYSTEMS
-81. Add an entity and object management system.
-82. Add object creation and destruction.
-83. Add component-based game object organization.
-84. Add scene management.
-85. Add scene loading and unloading.
-86. Add level transitions.
-87. Add collision detection for rectangles.
-88. Add collision detection for circles.
-89. Add collision detection for spheres.
-90. Add collision detection for 3D bounding boxes.
-91. Add collision layers and masks.
-92. Add collision callbacks and events.
-93. Add basic rigid-body physics.
-94. Add gravity.
-95. Add velocity and acceleration.
-96. Add collision response.
-97. Add basic character movement utilities.
-98. Add a configurable physics update rate.
-99. Add consistent delta-time movement utilities.
-100. Add game state management.
-101. Add event dispatching.
-102. Add timers and scheduled callbacks.
-103. Add object lifecycle callbacks.
-104. Add basic UI elements.
-105. Add buttons and interactive menus.
-106. Add text input controls.
-107. Add audio file loading.
-108. Add sound effect playback.
-109. Add background music playback.
-110. Add volume and audio channel controls.
-HIGH PRIORITY — LANGUAGE FEATURES
-111. Add a proper string data type.
-112. Add string concatenation.
-113. Add string comparison.
-114. Add string formatting.
-115. Add Boolean data types.
-116. Add logical operators.
-117. Add constants.
-118. Add immutable variables.
-119. Add explicit numeric types where appropriate.
-120. Add type checking.
-121. Add type conversion rules.
-122. Add modules and imports.
-123. Add multi-file program support.
-124. Add reusable libraries.
-125. Add a standard library.
-126. Add file reading.
-127. Add file writing.
-128. Add save-data serialization.
-129. Add 2D vector types.
-130. Add 3D vector types.
-131. Add matrix types.
-132. Add vector and matrix operations.
-133. Add common trigonometric functions.
-134. Add mathematical constants.
-135. Add utility functions for interpolation.
-136. Add error and result handling.
-137. Add debugging and logging functions.
-138. Add language versioning.
-139. Add backward compatibility rules.
-140. Add documentation for all built-in functions.
-RAY-TRACING IMPROVEMENTS
-141. Increase or remove the current 32-sphere ray-tracing batch limit after performance testing.
-142. Optimize BVH construction.
-143. Optimize BVH traversal.
-144. Add configurable ray-tracing resolution.
-145. Add configurable ray-tracing quality.
-146. Add configurable samples per pixel.
-147. Add ray-traced triangle support.
-148. Add ray-traced mesh support.
-149. Add configurable ray-traced materials.
-150. Add reflection support.
-151. Add refraction support.
-152. Add transparency support.
-153. Add configurable roughness.
-154. Add configurable specular properties.
-155. Add configurable light sources.
-156. Improve ray-traced shadow handling.
-157. Add optional soft shadows.
-158. Add ray-tracing denoising.
-159. Add progressive rendering.
-160. Add CPU ray-tracing performance benchmarks.
-161. Add GPU ray-tracing support where hardware and APIs permit.
-162. Add optional DirectX Raytracing (DXR) support.
-163. Add optional Embree acceleration for CPU ray tracing.
-164. Add ray-tracing backend selection.
-165. Add ray-tracing hardware capability detection.
-166. Add configurable ray-tracing fallback behavior.
-167. Keep CPU BVH ray tracing available independently of GPU ray tracing.
-168. Add ray-tracing memory usage measurements.
-169. Add ray-tracing correctness tests.
-170. Add performance comparisons between ray-tracing backends.
-MULTIPLAYER AND NETWORKING
-171. Replace the single-numeric-value networking model with structured network messages.
-172. Add packet serialization.
-173. Add packet deserialization.
-174. Add packet size validation.
-175. Add malformed-packet rejection.
-176. Add network protocol versioning.
-177. Add support for multiple peers.
-178. Add connection management.
-179. Add disconnection management.
-180. Add connection timeout handling.
-181. Add reconnect handling.
-182. Add reliable message delivery where required.
-183. Add ordered message delivery where required.
-184. Add packet sequence numbers.
-185. Add network latency measurement.
-186. Add packet loss measurement.
-187. Add player state synchronization.
-188. Add entity state replication.
-189. Add interpolation for remote movement.
-190. Add optional prediction and reconciliation.
-191. Add server-authoritative networking support.
-192. Add network authentication.
-193. Add appropriate encryption for Internet networking.
-194. Add rate limiting.
-195. Add network error reporting.
-196. Add portable network packet formats.
-197. Add network debugging tools.
-198. Add simulated latency and packet loss testing.
-199. Add multiplayer stress tests.
-200. Add secure connection and session management.
-DEVELOPER TOOLS AND EDITOR
-201. Improve the VS Code syntax extension.
-202. Add autocomplete.
-203. Add live syntax diagnostics.
-204. Add semantic error highlighting.
-205. Add function and variable suggestions.
-206. Add hover documentation.
-207. Add go-to-definition support.
-208. Add find-references support.
-209. Add automatic code formatting.
-210. Add configurable indentation rules.
-211. Add a debugger.
-212. Add breakpoints.
-213. Add variable inspection.
-214. Add call stack inspection.
-215. Add step-through debugging.
-216. Add runtime logging.
-217. Add a developer console.
-218. Add compiler diagnostic summaries.
-219. Add a project creation command.
-220. Add project templates.
-221. Add a one-command build workflow.
-222. Add a one-command build-and-run workflow.
-223. Add configurable build profiles.
-224. Add debug and release build configurations.
-225. Add project dependency management.
-226. Add project configuration validation.
-227. Add integrated asset management.
-228. Add a simple scene editor.
-229. Add a visual object inspector.
-230. Add documentation integrated into development tools.
-PERFORMANCE AND OPTIMIZATION
-231. Create a standardized compiler benchmark suite.
-232. Create a standardized runtime benchmark suite.
-233. Measure compilation time.
-234. Measure generated executable size.
-235. Measure runtime memory usage.
-236. Measure CPU utilization.
-237. Measure GPU utilization when GPU rendering is enabled.
-238. Measure frame times.
-239. Measure frame-time consistency.
-240. Add performance profiling tools.
-241. Add function-level performance measurements.
-242. Add rendering bottleneck detection.
-243. Add memory allocation profiling.
-244. Add asset loading benchmarks.
-245. Add scene complexity benchmarks.
-246. Add ray-tracing scaling benchmarks.
-247. Add CPU-versus-GPU rendering comparisons.
-248. Add compiler optimization settings.
-249. Add dead-code elimination where appropriate.
-250. Add constant folding where appropriate.
-251. Add generated C code optimization tests.
-252. Reduce unnecessary runtime allocations.
-253. Add resource pooling where beneficial.
-254. Add asset caching.
-255. Add performance regression testing.
-256. Test increasingly large source files.
-257. Test increasingly complex scenes.
-258. Test long-running applications.
-259. Establish reproducible benchmark environments.
-260. Document verified performance results.
-STABILITY, TESTING, AND SECURITY
-261. Expand automated compiler unit tests.
-262. Add parser regression tests.
-263. Add semantic validation tests.
-264. Add generated C compilation tests.
-265. Add runtime integration tests.
-266. Add graphics correctness tests.
-267. Add CPU rendering regression tests.
-268. Add GPU rendering regression tests.
-269. Add cross-backend rendering consistency tests.
-270. Add ray-tracing correctness tests.
-271. Add input handling tests.
-272. Add audio system tests.
-273. Add asset loading tests.
-274. Add malformed file handling tests.
-275. Add memory leak detection.
-276. Add resource cleanup tests.
-277. Add crash reporting.
-278. Add graceful runtime failure handling.
-279. Add compiler fuzz testing.
-280. Add network packet fuzz testing.
-281. Add bounds checking for collections.
-282. Add resource limit enforcement.
-283. Add safe file path handling.
-284. Add input validation for runtime APIs.
-285. Add build reproducibility tests.
-286. Add automated continuous integration.
-287. Add automated release validation.
-288. Add compatibility regression tests.
-289. Fix the documented QA report test-count inconsistency.
-290. Keep test results synchronized with documented project capabilities.
-CROSS-PLATFORM SUPPORT
-291. Separate platform-specific runtime code from platform-independent engine code.
-292. Create a platform abstraction layer.
-293. Add Linux build support.
-294. Add macOS build support.
-295. Preserve Windows support.
-296. Add support for additional C compiler toolchains.
-297. Add cross-platform window management.
-298. Add cross-platform input handling.
-299. Add cross-platform audio handling.
-300. Add cross-platform file system utilities.
-301. Add platform-specific GPU backend selection.
-302. Add portable CPU rendering support.
-303. Add platform capability detection.
-304. Add platform-specific build configurations.
-305. Add automated builds for each supported operating system.
-306. Add platform-specific regression tests.
-307. Add clear unsupported-feature diagnostics.
-308. Add portable project configuration formats.
-309. Add cross-platform packaging tools.
-310. Document supported platforms and their limitations.
-DOCUMENTATION AND PROJECT ORGANIZATION
-311. Create a complete language reference.
-312. Create a complete engine API reference.
-313. Document every built-in function.
-314. Document supported data types.
-315. Document function and variable behavior.
-316. Document compiler errors.
-317. Document project configuration.
-318. Document CPU rendering configuration.
-319. Document GPU rendering configuration.
-320. Document Auto rendering behavior.
-321. Document rendering backend fallback rules.
-322. Document ray-tracing capabilities and limitations.
-323. Document multiplayer limitations and security requirements.
-324. Create beginner tutorials.
-325. Create intermediate programming tutorials.
-326. Create complete 2D game examples.
-327. Create complete 3D scene examples.
-328. Create CPU rendering examples.
-329. Create GPU rendering examples.
-330. Create ray-tracing examples.
-331. Create multiplayer examples.
-332. Create asset loading examples.
-333. Create debugging tutorials.
-334. Add migration guides for language updates.
-335. Add compiler and runtime architecture diagrams.
-336. Add contribution guidelines.
-337. Add coding standards.
-338. Add a public issue and bug tracking process.
-339. Add release notes and changelogs.
-340. Maintain a documented development roadmap.
-FINAL IMPLEMENTATION PRIORITIES
-341. Complete function parameters, return values, and local scopes.
-342. Implement loops, arrays, structures, and essential data types.
-343. Stabilize compiler validation, diagnostics, and generated code.
-344. Modularize the compiler and runtime.
-345. Implement selectable CPU, GPU, and Auto rendering modes.
-346. Preserve CPU software rendering as a first-class backend.
-347. Implement GPU acceleration with hardware detection and fallback rules.
-348. Improve rendering correctness, clipping, resizing, and resolution handling.
-349. Add textures, sprites, models, and asset loading.
-350. Add entity management, scenes, and object lifecycle systems.
-351. Add collision detection and basic physics.
-352. Add audio and essential game UI systems.
-353. Expand debugging, logging, and editor integration.
-354. Build comprehensive automated tests and continuous integration.
-355. Establish reproducible CPU, GPU, compiler, and ray-tracing benchmarks.
-356. Improve ray tracing while preserving CPU BVH support.
-357. Expand networking only after implementing safe structured messages.
-358. Introduce cross-platform support through a platform abstraction layer.
-359. Keep documentation, examples, and tests synchronized.
-360. Establish stable releases, compatibility rules, and measurable production-readiness criteria.
+# ANVIL LANGUAGE AND GAME ENGINE — 450-ITEM FIX AND IMPROVEMENT BACKLOG
 
+Based on the updated October 27, 2026 evaluation. Items include missing features, existing systems that need improvement, reliability fixes, and proposed future capabilities. Features already verified in the report are marked as enhancements rather than missing implementations.
+
+## 1. CORE LANGUAGE AND SYNTAX
+
+1. Expand the current numeric type system to support additional data types.
+2. Add a proper Boolean data type.
+3. Add a complete string data type.
+4. Add string concatenation.
+5. Add string comparison.
+6. Add string interpolation.
+7. Add string formatting.
+8. Add immutable variables.
+9. Add constant declarations.
+10. Add explicit numeric type declarations.
+11. Add integer types.
+12. Add floating-point types with documented precision.
+13. Add safe numeric conversion functions.
+14. Add explicit type casting.
+15. Add type inference where appropriate.
+16. Add user-defined structures.
+17. Add enumerations.
+18. Add optional values.
+19. Add structured error-result values.
+20. Add named function arguments.
+21. Add default function arguments.
+22. Add function overloading or an equivalent reusable-function mechanism.
+23. Add anonymous functions if compatible with Anvil's language design.
+24. Add function references or callbacks.
+25. Add methods associated with structured values.
+26. Add namespaces.
+27. Add modules.
+28. Add import statements.
+29. Add multi-file compilation.
+30. Add module visibility rules.
+31. Add public and private declarations.
+32. Add explicit variable lifetime rules.
+33. Improve nested scope handling.
+34. Add shadowing rules and diagnostics.
+35. Add compound assignment operators.
+36. Add increment and decrement operations where appropriate.
+37. Add conditional expressions.
+38. Add switch or match expressions.
+39. Add break statements for loops.
+40. Add continue statements for loops.
+41. Improve the existing numeric for-loop syntax and diagnostics.
+42. Improve the existing while-loop validation.
+43. Add iterator-based loops for collections.
+44. Add collection traversal utilities.
+45. Formalize operator precedence and associativity.
+46. Add short-circuit Boolean evaluation.
+47. Add explicit overflow behavior.
+48. Add division-by-zero diagnostics.
+49. Add language feature versioning.
+50. Publish a complete formal language specification.
+
+## 2. ARRAYS, COLLECTIONS, AND MEMORY
+
+51. Extend the implemented fixed-size arrays with dynamic arrays.
+52. Add array resizing.
+53. Add array append operations.
+54. Add array removal operations.
+55. Add array insertion operations.
+56. Add array slicing.
+57. Add array copying.
+58. Add array sorting.
+59. Add array searching.
+60. Add array filtering.
+61. Add array mapping utilities.
+62. Add multidimensional arrays.
+63. Add nested collections.
+64. Add dictionaries or maps.
+65. Add sets.
+66. Add queues.
+67. Add stacks.
+68. Add reusable collection iterators.
+69. Add collection capacity management.
+70. Add collection length and capacity queries.
+71. Extend checked indexing to all new collection types.
+72. Add safe access functions for collections.
+73. Add collection serialization.
+74. Add structured-value arrays.
+75. Add configurable collection memory limits.
+76. Improve diagnostics for array allocation failures.
+77. Benchmark the existing heap-backed local arrays.
+78. Optimize repeated local-array allocations.
+79. Investigate reusable allocation pools.
+80. Add configurable per-function allocation limits.
+81. Add configurable active-call memory limits.
+82. Add memory allocation profiling.
+83. Add memory leak detection.
+84. Add use-after-free prevention for future reference types.
+85. Add ownership and lifetime rules.
+86. Add resource cleanup guarantees.
+87. Add automatic cleanup for error paths.
+88. Add memory fragmentation testing.
+89. Add large-array stress tests.
+90. Add recursive allocation stress tests.
+91. Add collection memory usage reporting.
+92. Add stack usage monitoring.
+93. Add heap usage monitoring.
+94. Add configurable memory budgets.
+95. Add out-of-memory recovery policies.
+96. Add resource handles with validity checks.
+97. Add resource reference counting where appropriate.
+98. Add explicit resource release operations.
+99. Add memory diagnostics in debug builds.
+100. Document memory and collection behavior.
+
+## 3. COMPILER AND CODE GENERATION
+
+101. Separate lexical analysis from parsing.
+102. Separate parsing from semantic validation.
+103. Separate semantic validation from C generation.
+104. Separate C generation from build orchestration.
+105. Add an intermediate representation for Anvil programs.
+106. Add a formal symbol table.
+107. Add source-location tracking throughout compilation.
+108. Improve syntax error recovery.
+109. Report multiple independent errors in one compilation.
+110. Add precise diagnostics for type mismatches.
+111. Add precise diagnostics for undefined variables.
+112. Add precise diagnostics for undefined functions.
+113. Add precise diagnostics for incorrect argument counts.
+114. Add precise diagnostics for invalid return values.
+115. Add precise diagnostics for invalid array declarations.
+116. Add precise diagnostics for invalid array indexing.
+117. Add unreachable-code warnings.
+118. Add unused-variable warnings.
+119. Add unused-function warnings.
+120. Add uninitialized-variable analysis.
+121. Add constant folding.
+122. Add constant propagation.
+123. Add dead-code elimination.
+124. Add redundant expression elimination.
+125. Add basic control-flow analysis.
+126. Add call-graph generation.
+127. Add recursion-depth diagnostics or configurable guards.
+128. Add compiler optimization levels.
+129. Add debug-symbol generation.
+130. Add source mapping between Anvil and generated C.
+131. Add deterministic generated-code formatting.
+132. Add generated-code inspection commands.
+133. Add compiler output validation.
+134. Add incremental compilation.
+135. Add compilation caching.
+136. Add dependency tracking between source files.
+137. Add parallel compilation where beneficial.
+138. Add compiler performance profiling.
+139. Add compiler fuzz testing.
+140. Add parser fuzz testing.
+141. Add semantic analyzer regression tests.
+142. Add generated C regression tests.
+143. Add compiler compatibility tests.
+144. Add compiler version reporting.
+145. Add clear compiler exit codes.
+146. Add machine-readable compiler diagnostics.
+147. Add compiler warning levels.
+148. Add warnings-as-errors support.
+149. Add reproducible build output.
+150. Add compiler architecture documentation.
+
+## 4. CPU AND GPU RENDERING
+
+151. Implement a dual-backend rendering architecture.
+152. Preserve the existing CPU software renderer.
+153. Add a GPU-accelerated rendering backend.
+154. Add explicit CPU rendering selection.
+155. Add explicit GPU rendering selection.
+156. Add automatic rendering backend selection.
+157. Add rendering backend configuration in project manifests.
+158. Add rendering backend configuration through Anvil code.
+159. Define whether backend switching is supported during runtime.
+160. Add graphics hardware capability detection.
+161. Add GPU driver compatibility checks.
+162. Add configurable GPU-to-CPU fallback behavior.
+163. Add clear errors when a requested backend is unavailable.
+164. Add backend initialization diagnostics.
+165. Add backend shutdown and cleanup handling.
+166. Add backend resource ownership rules.
+167. Standardize core drawing commands across backends.
+168. Add cross-backend visual consistency tests.
+169. Add backend-specific feature detection.
+170. Add backend-specific performance reporting.
+171. Add configurable rendering resolution.
+172. Add dynamic window resizing.
+173. Remove the fixed-size rendering restriction.
+174. Add fullscreen mode.
+175. Add borderless fullscreen mode.
+176. Add display resolution selection.
+177. Add monitor selection.
+178. Add high-DPI display support.
+179. Add configurable vertical synchronization.
+180. Add frame-rate limiting.
+181. Add adaptive frame pacing.
+182. Add resolution scaling.
+183. Add dynamic resolution scaling.
+184. Add configurable anti-aliasing.
+185. Add robust near-plane clipping.
+186. Add far-plane clipping.
+187. Improve depth buffering.
+188. Add stencil buffering where supported.
+189. Add viewport management.
+190. Add render targets.
+191. Add offscreen rendering.
+192. Add framebuffer capture.
+193. Add screenshot export.
+194. Add GPU resource profiling.
+195. Add CPU rendering profiling.
+196. Add rendering performance overlays.
+197. Add graphics API abstraction.
+198. Add Direct3D support through the GPU backend.
+199. Add optional Vulkan support.
+200. Add optional OpenGL support.
+
+## 5. GRAPHICS, TEXTURES, AND MATERIALS
+
+201. Add texture file loading.
+202. Add texture unloading.
+203. Add texture caching.
+204. Add texture compression support.
+205. Add texture filtering.
+206. Add mipmapping.
+207. Add texture wrapping modes.
+208. Add texture atlases.
+209. Add sprite rendering.
+210. Add sprite sheets.
+211. Add sprite animation.
+212. Add sprite rotation and scaling.
+213. Add nine-slice sprite rendering.
+214. Add 2D tilemap rendering.
+215. Add tilemap collision integration.
+216. Add 3D mesh importing.
+217. Add support for a common mesh interchange format.
+218. Add mesh validation.
+219. Add mesh optimization.
+220. Add mesh instancing.
+221. Add mesh level-of-detail support.
+222. Add material definitions.
+223. Add material property editing.
+224. Add diffuse texture mapping.
+225. Add normal mapping.
+226. Add roughness mapping.
+227. Add metallic material properties.
+228. Add transparency and alpha blending.
+229. Add configurable blend modes.
+230. Add directional lights.
+231. Add point lights.
+232. Add spotlights.
+233. Add configurable ambient lighting.
+234. Add shadow mapping for supported GPU backends.
+235. Add shadow quality settings.
+236. Add gamma correction.
+237. Add color space management.
+238. Add HDR rendering where supported.
+239. Add tone mapping.
+240. Add bloom as an optional effect.
+241. Add post-processing effects.
+242. Add configurable shader programs.
+243. Add shader compilation diagnostics.
+244. Add shader hot reloading.
+245. Add particle rendering.
+246. Add particle emitters.
+247. Add configurable particle lifetimes.
+248. Add particle collision options.
+249. Add graphics resource budgeting.
+250. Add visual rendering regression tests.
+
+## 6. 3D ENGINE AND CAMERA SYSTEMS
+
+251. Add full 3D transformation support.
+252. Add translation, rotation, and scaling utilities.
+253. Add transformation hierarchies.
+254. Add parent-child object relationships.
+255. Add world-space and local-space transforms.
+256. Add quaternion rotations.
+257. Add matrix transformation utilities.
+258. Add multiple active camera configurations.
+259. Add orthographic camera support.
+260. Improve perspective camera configuration.
+261. Add camera movement smoothing.
+262. Add camera rotation constraints.
+263. Add first-person camera utilities.
+264. Add third-person camera utilities.
+265. Add orbit camera controls.
+266. Add camera follow behavior.
+267. Add camera shake.
+268. Add camera transitions.
+269. Add configurable camera clipping planes.
+270. Add camera projection tests.
+271. Add frustum culling.
+272. Add object visibility testing.
+273. Add spatial partitioning.
+274. Add bounding volume utilities.
+275. Add object picking with rays.
+276. Add 3D collision queries.
+277. Add terrain rendering.
+278. Add heightmap terrain support.
+279. Add terrain collision integration.
+280. Add skybox rendering.
+281. Add environment mapping.
+282. Add 3D animation playback.
+283. Add skeletal animation.
+284. Add animation blending.
+285. Add animation state machines.
+286. Add model attachment points.
+287. Add 3D debug drawing.
+288. Add scene hierarchy inspection.
+289. Add 3D object serialization.
+290. Add 3D scene loading.
+291. Add 3D scene unloading.
+292. Add scene streaming.
+293. Add level-of-detail management.
+294. Add instanced object rendering.
+295. Add object occlusion handling.
+296. Add 3D spatial audio integration.
+297. Add configurable world units.
+298. Add large-world coordinate handling.
+299. Add 3D performance benchmarks.
+300. Add 3D engine integration tests.
+
+## 7. PHYSICS AND COLLISION SYSTEM
+
+301. Improve the existing bounded 2D circle physics prototype.
+302. Make the current 128-body limit configurable where feasible.
+303. Add rectangle collision bodies.
+304. Add polygon collision bodies.
+305. Add capsule collision bodies.
+306. Add 3D sphere collision bodies.
+307. Add 3D box collision bodies.
+308. Add convex 3D collision shapes.
+309. Add collision meshes.
+310. Add continuous collision detection.
+311. Add friction.
+312. Add restitution configuration.
+313. Add physics joints.
+314. Add distance constraints.
+315. Add hinge constraints.
+316. Add spring constraints.
+317. Add trigger volumes.
+318. Add collision layers.
+319. Add collision masks.
+320. Add collision callbacks.
+321. Add collision enter events.
+322. Add collision exit events.
+323. Add collision stay events.
+324. Add physics raycasting.
+325. Add shape casting.
+326. Add overlap queries.
+327. Add broad-phase collision acceleration.
+328. Improve narrow-phase collision resolution.
+329. Add configurable solver iterations.
+330. Add physics sleeping.
+331. Add rigid-body mass properties.
+332. Add angular velocity.
+333. Add torque.
+334. Add rotational inertia.
+335. Add configurable gravity fields.
+336. Add kinematic bodies.
+337. Add static bodies.
+338. Add dynamic bodies.
+339. Add physics materials.
+340. Add character controller utilities.
+341. Add collision debug visualization.
+342. Add physics performance profiling.
+343. Add deterministic simulation tests.
+344. Add high-speed collision tests.
+345. Add physics stress tests.
+346. Add collision stability tests.
+347. Add physics save-state support.
+348. Add physics rollback support if required by networking.
+349. Add configurable physics world limits.
+350. Document the physics solver and its limitations.
+
+## 8. RAY TRACING
+
+351. Benchmark the existing CPU BVH ray tracer.
+352. Improve BVH construction efficiency.
+353. Improve BVH traversal efficiency.
+354. Increase the 32-sphere batch limit after performance testing.
+355. Add configurable ray-tracing resolution.
+356. Add configurable ray-tracing sample counts.
+357. Add ray-traced triangles.
+358. Add ray-traced meshes.
+359. Add ray-traced material properties.
+360. Add reflections.
+361. Add refractions.
+362. Add transparent materials.
+363. Add rough reflective surfaces.
+364. Add configurable ray-traced lights.
+365. Add soft shadows.
+366. Add ambient occlusion.
+367. Add progressive rendering.
+368. Add denoising.
+369. Add ray-tracing quality presets.
+370. Add ray-tracing memory budgets.
+371. Add ray-tracing backend abstraction.
+372. Preserve CPU BVH as a supported backend.
+373. Add optional GPU ray tracing.
+374. Add optional DXR support.
+375. Add optional Embree acceleration.
+376. Add backend capability detection.
+377. Add backend fallback policies.
+378. Add ray-tracing backend configuration.
+379. Add CPU-versus-GPU ray-tracing benchmarks.
+380. Add ray-tracing correctness tests.
+
+## 9. AUDIO, INPUT, AND USER INTERFACE
+
+381. Add audio file loading.
+382. Add sound effect playback.
+383. Add music playback.
+384. Add audio mixing.
+385. Add master volume controls.
+386. Add per-channel volume controls.
+387. Add audio looping.
+388. Add audio fading.
+389. Add positional audio.
+390. Add audio resource cleanup.
+391. Add mouse input support.
+392. Add mouse position tracking.
+393. Add mouse button events.
+394. Add mouse wheel input.
+395. Add gamepad support.
+396. Add controller mapping.
+397. Add configurable key bindings.
+398. Add input action mapping.
+399. Add input focus handling.
+400. Add text input handling.
+401. Add UI buttons.
+402. Add UI labels.
+403. Add UI panels.
+404. Add UI sliders.
+405. Add UI checkboxes.
+406. Add UI text fields.
+407. Add UI layout containers.
+408. Add UI scaling.
+409. Add keyboard navigation for UI.
+410. Add accessible focus indicators.
+
+## 10. MULTIPLAYER AND NETWORKING
+
+411. Replace numeric-only UDP messages with structured packets.
+412. Add packet serialization.
+413. Add packet deserialization.
+414. Add packet validation.
+415. Add packet size limits.
+416. Add network protocol versioning.
+417. Add multiple-peer support.
+418. Add peer connection management.
+419. Add peer disconnection management.
+420. Add connection timeouts.
+421. Add reconnection handling.
+422. Add reliable message delivery where needed.
+423. Add ordered message delivery where needed.
+424. Add packet sequence numbers.
+425. Add latency measurement.
+426. Add packet loss measurement.
+427. Add entity state replication.
+428. Add player state synchronization.
+429. Add interpolation.
+430. Add optional client prediction.
+431. Add server reconciliation.
+432. Add server-authoritative simulation support.
+433. Add network authentication.
+434. Add encryption for Internet communication.
+435. Add network rate limiting.
+436. Add malformed-packet fuzz testing.
+437. Add network debugging tools.
+438. Add simulated packet loss testing.
+439. Add simulated latency testing.
+440. Add multiplayer stress testing.
+
+## 11. DEVELOPER TOOLS, TESTING, AND RELEASES
+
+441. Expand the existing VS Code extension with autocomplete.
+442. Add live compiler diagnostics to the editor.
+443. Add go-to-definition and find-references support.
+444. Add a debugger with breakpoints.
+445. Add variable and call-stack inspection.
+446. Add a one-command build-and-run workflow.
+447. Add automated CPU and GPU performance benchmarks.
+448. Expand cross-platform build and runtime support beyond Windows/MSVC.
+449. Keep the existing automated tests, extension validation, and QA reports synchronized with every release.
+450. Establish stable release, compatibility, regression-testing, and production-readiness criteria.
