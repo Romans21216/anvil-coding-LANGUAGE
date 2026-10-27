@@ -183,3 +183,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Phase tests:** Added tests for parse→semantic→codegen, semantic rejection of an unresolved variable before generation, and compatibility-facade exports.
 - **Validation:** Full Python suite: 72 passed; extension validation passed; compileall, Black check, QA arithmetic validation, and diff check passed.
 - **Review state:** Items #101–#104 are marked IN PROGRESS pending independent review of the exact committed candidate. The last scored review remains 90/100 — FAIL against 98; no score change is claimed before review.
+
+
+## Batch 10 review — compiler phases independently verified
+
+- **Exact review commit:** `96b71fedca97facaff60f2c3b8362f16c64b8b9d`.
+- **Fresh score:** **91/100 — FAIL** against the user's 98/100 passing threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 18/20, testing 19/20, delivery 18/20. Criterion 23 improved from 1 to 2 after the reviewer confirmed separated compiler phases.
+- **Independent verification:** 72 Python tests, extension validation, compileall, QA validator, and diff check passed. Both CLI help paths work; all 21 previously exposed facade definitions remain available; generated C is byte-identical for 12 examples versus baseline `854d36c`. JSON and Markdown status agree on 20 audited rows and a 450-item total.
+- **Backlog status:** Items #101–#104 are COMPLETE. Counts are 17 complete, 3 partial, 0 in progress, and 430 needing verification.
+- **Remaining issues:** Issue #12 remains open because long lines remain and Black was unavailable to the reviewer. Other deductions are incomplete engine breadth, Windows/MSVC and C-only limits, and unverified newer VS Code highlighting; the latter follows the user's choice to keep 0.1.4 installed. No new functional bug was reproduced.
+- **Evaluation sync:** QA report, plain-text evaluation, status ledgers, and autonomous state were updated immediately after this critic run.

@@ -2,37 +2,42 @@
   "project": "Anvil language and game engine",
   "repository": "Romans21216/anvil-coding-LANGUAGE",
   "branch": "main",
-  "last_completed_batch": 9,
-  "last_completed_backlog_item": 50,
-  "current_active_item": 101,
-  "current_active_item_status": "Compiler architecture work is in progress for issue #12 and backlog items #101\u2013#104. Responsibilities are now separated across lexer, syntax parser, semantic validator, expression parser, C backend, build driver, and CLI. 72 tests and nine byte-identical C comparisons pass; independent review is pending.",
-  "current_candidate_commit": "43894d3",
-  "latest_verified_commit": "43894d3",
-  "last_pushed_reviewed_below_threshold_commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
-  "latest_independently_reviewed_candidate_commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
+  "last_completed_batch": 10,
+  "last_completed_backlog_item": 104,
+  "current_active_item": 22,
+  "current_active_item_status": "Compiler phase-separation items #101\u2013#104 are independently verified COMPLETE on review 96b71fe. The new critic score is 91/100, FAIL against 98. Issue #12 remains open for formatting follow-up: long lines remain and Black is unavailable in review environment.",
+  "current_candidate_commit": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
+  "latest_verified_commit": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
+  "last_pushed_reviewed_below_threshold_commit": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
+  "latest_independently_reviewed_candidate_commit": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Compiler refactor commit 43894d3 is locally verified: 72 Python tests, VS Code extension validation, compileall, QA arithmetic, Black check, diff check, and nine byte-identical generated-C comparisons pass. Independent review is pending; latest scored commit remains 7c1385c at 90/100, FAIL against 98.",
+  "latest_push_result": "Exact pushed review commit 96b71fe scored 91/100 \u2014 FAIL against 98. Critic confirmed 72 Python tests, extension/compileall/QA/diff checks, both CLI paths, legacy facade exports, and 12/12 byte-identical C outputs. Compiler items #101\u2013#104 are complete; formatting issue #12 remains open.",
   "latest_independent_review": {
-    "commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
-    "score": 90,
+    "commit": "96b71fedca97facaff60f2c3b8362f16c64b8b9d",
+    "score": 91,
     "reviewer_threshold_at_time": 98,
     "reviewer_result_at_time": "FAIL",
     "current_required_threshold": 98,
     "current_threshold_status": "BELOW_THRESHOLD",
-    "findings": [],
+    "findings": [
+      "Criterion 22: long lines remain in compiler modules; Black unavailable in review environment. Issue #12 remains open.",
+      "Criterion 27: Windows/MSVC and C-only backend constrain platform and backend breadth.",
+      "Criterion 47: visual highlighting for newer grammar tokens remains unverified; user chose to keep extension 0.1.4 installed.",
+      "Requirements and criterion 40 deductions remain for incomplete engine scope."
+    ],
     "categories": {
       "requirements": "16/20",
       "functionality_reliability": "20/20",
-      "code_architecture": "17/20",
+      "code_architecture": "18/20",
       "testing_verification": "19/20",
       "developer_experience_delivery": "18/20"
     }
   },
   "previous_independent_review": {
-    "commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
-    "score": 84,
+    "commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
+    "score": 90,
     "threshold_at_time": 98,
-    "result_at_time": "FAIL; language specification/compiler findings #37\u2013#42 tracked and later fixed"
+    "result_at_time": "FAIL; QA validator zero-score handling and criterion 38 were verified."
   },
   "earlier_independent_review": {
     "commit": "8ae53c4daaed0d2160262aa24a2a0d5178235a96",
@@ -47,18 +52,18 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "72 passed locally on compiler refactor commit 43894d3; independent review pending",
-    "vscode_extension_validation": "passed locally on compiler refactor commit 43894d3; npm test --prefix vscode-extension",
-    "python_compile": "passed locally on compiler refactor commit 43894d3; python -m compileall -q compiler tests scripts",
+    "python_unittest": "72 passed; independently rerun on exact review commit 96b71fe",
+    "vscode_extension_validation": "passed; independently rerun on exact review commit 96b71fe",
+    "python_compile": "passed; independently rerun on exact review commit 96b71fe",
     "msvc_numeric_demo": "built and ran successfully; output 17",
     "msvc_language_spec_example": "built with --release and ran successfully; output 6",
-    "git_diff_check": "passed locally on compiler refactor commit 43894d3",
-    "implementation_status_inventory": "Issue #23 contains the full 450-item list; compact audited subset has 20 entries. Counts: 13 complete, 3 partial, 4 in progress, 430 needing verification.",
+    "git_diff_check": "passed; independently rerun on exact review commit 96b71fe",
+    "implementation_status_inventory": "Issue #23 contains the full 450-item list; compact audited subset has 20 entries. Counts: 17 complete, 3 partial, 0 in progress, 430 needing verification.",
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)",
-    "qa_report_validator": "passed locally on compiler refactor commit 43894d3: 50 criteria total 90/100; category subtotals agree"
+    "qa_report_validator": "passed; QA rubric totals 91/100 with category subtotals in agreement on exact review commit 96b71fe"
   },
-  "pending_documentation_review": "No known QA arithmetic issue remains after 7c1385c; current compiler-refactor candidate has passed local tests and byte-identical output checks but awaits independent review.",
+  "pending_documentation_review": "Evaluation sync for exact critic review 96b71fe (91/100 \u2014 FAIL vs 98) is complete; QA arithmetic validates. Issue #12 remains open for long-line formatting.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -70,8 +75,8 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
   "next_recommended_tasks": [
-    "Finish and independently review compiler architecture items #101\u2013#104 and issue #12; synchronize the fresh score immediately after review.",
-    "After review, choose further real engine capability work from issue #23 to address the remaining scope deductions; preserve the 98-point passing requirement."
+    "Resolve remaining compiler formatting issue #12 by formatting long lines consistently and rerun the reviewer, while keeping 98 as the pass threshold.",
+    "Continue authentic engine features from issue #23, prioritizing missing renderer/assets/audio and platform/backend breadth; after each critic run, update all evaluation records immediately."
   ],
   "master_backlog": {
     "issue": 23,

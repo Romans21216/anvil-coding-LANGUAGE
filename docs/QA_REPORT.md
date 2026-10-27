@@ -1,10 +1,10 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **90/100 — FAIL** (exact commit `7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 17/20, testing 19/20, delivery 18/20.
+**Latest independent evaluation:** **91/100 — FAIL** (exact commit `96b71fedca97facaff60f2c3b8362f16c64b8b9d`) against the user's **98/100** threshold. Categories: requirements 16/20, functionality/reliability 20/20, architecture 18/20, testing 19/20, delivery 18/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
-**Latest review evidence:** the critic evaluated exact commit `7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6` and scored 90/100 (16/20, 20/20, 17/20, 19/20, 18/20). It ran 69 Python tests, extension validation, Python compilation, the QA validator, a valid-zero rubric fixture, a malformed subtotal fixture, and `git diff --check`; all passed. It verified JSON/Markdown counts (13 complete, 3 partial, 434 needing verification, 0 in progress; 450 total) and README invocation. Issue #44 acceptance is met and the issue is being closed. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
-**Latest finding:** the 0-point validator defect was fixed and independently verified. Criterion 38 rises to 2/2 on review `7c1385c`; the fresh score is 90/100, still below the 98-point threshold. Issue [#44](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/44) is resolved and closed after this review.
+**Latest review evidence:** the critic evaluated exact pushed commit `96b71fedca97facaff60f2c3b8362f16c64b8b9d` and scored 91/100 (16/20, 20/20, 18/20, 19/20, 18/20). It reran all 72 Python tests, extension validation, compileall, QA validation, and `git diff --check`; both CLI help paths and 21 legacy facade exports worked. Generated C matched byte-for-byte for 12 examples against `854d36c`. The 20-row audited subset matches Markdown/JSON and totals 450 with 430 needing verification, 3 partial, 17 complete, and 0 in progress. Issue #12 remains open for the remaining formatting requirement; extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
+**Latest finding:** compiler phase separation is independently verified and criterion 23 rises to 2/2 on review `96b71fe`, improving the score from 90 to 91. The 98-point threshold remains unmet. Issue [#12](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/12) stays open because long lines remain and Black was unavailable during review. Issue #44 remains resolved and closed.
 
 ## Scope
 
@@ -16,9 +16,9 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 72 tests on the unreviewed compiler-refactor candidate; includes numeric overflow, UDP behavior, language-spec regressions, and QA validator tests. The previous independent review ran 69 tests on `7c1385c` |
+| `python -m unittest discover -s tests -q` | PASS — 72 tests; independently rerun on exact reviewed commit `96b71fe` |
 | `python -m unittest discover -s tests -p test_qa_report.py -v` | PASS — zero-score rubric accepted; mismatched category subtotal rejected |
-| `python scripts/validate_qa_report.py` | PASS — 50 criteria total 90/100; category subtotals agree |
+| `python scripts/validate_qa_report.py` | PASS — 50 criteria total 91/100; category subtotals agree |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -45,17 +45,13 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Unreviewed compiler-architecture candidate
+## Latest independent review — compiler refactor snapshot `96b71fe`
 
-The current working candidate decomposes the 1,018-line compiler into `common.py`, `lexer.py`, `parser.py`, `semantics.py`, `expressions.py`, `codegen.py`, `build.py`, and `cli.py`; `anvil.py` remains the public CLI/API facade. Three phase-boundary tests were added. The full suite passes 72 tests, VS Code extension validation, compileall, Black check, QA arithmetic check, and diff check. A compatibility experiment compared generated C from the old and new compiler for nine representative examples; all outputs were byte-identical. No fresh independent score has been assigned to this candidate.
+**91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 18/20; testing and verification 19/20; developer experience and delivery 18/20. The exact reviewed commit was `96b71fedca97facaff60f2c3b8362f16c64b8b9d`. The critic reran 72 Python tests, extension validation, compileall, the QA validator, and diff check; verified both CLI help paths and 21 legacy facade exports; and compared generated C for 12 examples against `854d36c` with byte-identical results. The audited ledgers contain 20 matching rows and totals of 450. Criterion 23 rises from 1 to 2 after the compiler phase split. Criterion 22 remains 1 because several modules contain long lines and Black is unavailable in the review environment. Criterion 27 remains 1 for the Windows/MSVC and C-only backend. Criterion 47 remains 1 because new extension tokens are not visually verified in the installed editor. Scope deductions remain for the prototype not covering the full requested game-engine scope. The threshold remains 98/100. Issue #12 remains open for formatting follow-up.
 
-## Latest independent review — QA validator snapshot `7c1385c`
+## 50-criterion scoring for latest review `96b71fe`
 
-**90/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 19/20; developer experience and delivery 18/20. The critic evaluated exact commit `7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6` and reran 69 Python tests, extension validation, Python compilation, the report validator, valid-zero and malformed-subtotal fixtures, and `git diff --check`; all passed. It verified the status inventory totals 450 and confirmed issues #37–#44 resolved. Criterion 38 rises to 2/2 on this fresh rescore. Overall pass threshold remains 98/100. MSVC sample builds were not rerun.
-
-## Historical independent 50-criterion review — commit `2a745bb`
-
-The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and `51deb5d` scored **90/100 — PASS**. The review of `c4f3ec6` scored **88/100 — FAIL** because four docs contained stale complexity claims. Commit `560cee1` corrected those documents; a fresh independent review confirmed the fix and scored `560cee1` **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The friction feature commit `f7c91b0` scored **87/100 — FAIL** (15/20, 20/20, 17/20, 18/20, 17/20) because of stale high-level feature and QA records plus missing friction edge-case tests. Follow-up commits `e1e3768` and `83891c6` synchronized the records and added those tests. Its independent review scored **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The division-diagnostic commit `12b4e55` also scored **90/100 — PASS** with the same category totals; it reran all 56 tests, extension/Python validation, an MSVC numeric sample build/run, diff check, and verified the 450-item inventory. The reviewer found no defect in the new diagnostic, and item #48 is complete. Remaining deductions concern overall engine scope, compiler structure/platform breadth, and unverified new extension highlighting. See issues #8 and #24.
+Historical context: the independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and `51deb5d` scored **90/100 — PASS**. The review of `c4f3ec6` scored **88/100 — FAIL** because four docs contained stale complexity claims. Commit `560cee1` corrected those documents; a fresh independent review confirmed the fix and scored `560cee1` **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The friction feature commit `f7c91b0` scored **87/100 — FAIL** (15/20, 20/20, 17/20, 18/20, 17/20) because of stale high-level feature and QA records plus missing friction edge-case tests. Follow-up commits `e1e3768` and `83891c6` synchronized the records and added those tests. Its independent review scored **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The division-diagnostic commit `12b4e55` also scored **90/100 — PASS** with the same category totals; it reran all 56 tests, extension/Python validation, an MSVC numeric sample build/run, diff check, and verified the 450-item inventory. The reviewer found no defect in the new diagnostic, and item #48 is complete. Remaining deductions concern overall engine scope, compiler structure/platform breadth, and unverified new extension highlighting. See issues #8 and #24.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -80,8 +76,8 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 19 | No known critical defects | 2 | The recursive-array stack-exhaustion finding is fixed; the physics reviewer found no critical issue in the reviewed physics paths. |
 | 20 | Components integrate | 2 | Compiler, generated C, runtime, manifest, extension, and networking sample integrate. |
 | 21 | Logical project structure | 2 | Compiler, runtime, examples, tests, docs, and extension are organized. |
-| 22 | Readable and consistently formatted | 1 | Compiler remains densely formatted. The critic also found `git diff --check HEAD^ HEAD` fails on trailing spaces in the new spec; issue #42. |
-| 23 | Clear module responsibilities | 1 | Parsing, validation, C generation, and build orchestration remain concentrated in `compiler/anvil.py`. |
+| 22 | Readable and consistently formatted | 1 | Phase modules have clear responsibilities, but the critic found long lines in `codegen.py`, `parser.py`, `expressions.py`, `cli.py`, and `semantics.py`; Black was unavailable. Formatting follow-up remains in issue #12. |
+| 23 | Clear module responsibilities | 2 | Independent review of `96b71fe` confirmed separate lexer, parser, semantic, expression, code-generation, build, CLI, and shared-definition modules, with a compatibility facade and phase tests. |
 | 24 | Consistent descriptive naming | 2 | Anvil identity and `.ANVL` naming are consistent. |
 | 25 | Duplication minimized | 2 | Reviewer found no material duplicate/unused code issue. |
 | 26 | Dependencies appropriate | 2 | Core compiler uses Python standard library and the documented native toolchain. |
@@ -89,15 +85,15 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 28 | No unfinished placeholders | 2 | Unsupported capabilities are described as future work. |
 | 29 | Configuration understandable | 2 | TOML project settings are explicit and validated. |
 | 30 | Conventions followed | 2 | Current Python, C, TOML, and extension conventions are adequate. |
-| 31 | Automated tests provided | 2 | Independent review of `ed08f43` ran all 64 Python tests; its historical check of `2dd1d8e` ran 63. The previous wording incorrectly reported 59. |
+| 31 | Automated tests provided | 2 | The independent critic reran all 72 Python tests on exact commit `96b71fe`. |
 | 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, circle/box collisions, pool capacity, and generated executable paths are covered. |
 | 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
 | 34 | Edge cases explicitly tested | 2 | The current suite covers recursive allocation exhaustion/cleanup plus physics contact timing, extreme velocity/coordinate bounds, and repeatability. |
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 2 | Critic `7c1385c` verified the report arithmetic, persistent validator, zero-score fixture, status ledgers, and latest-review records. Issue #44 is resolved. |
-| 39 | Regression checks performed | 2 | The independent review of `ed08f43` reran 64 tests, extension validation, Python compilation, MSVC numeric demo, and diff check. The previous wording incorrectly reported 61 for `2dd1d8e`, which ran 63. |
+| 38 | Results recorded accurately | 2 | Critic `96b71fe` verified the current report arithmetic, 20 matching JSON/Markdown audited rows, and 450-item totals. |
+| 39 | Regression checks performed | 2 | Critic `96b71fe` reran the suite, extension validation, compileall, QA validator, and diff check; generated C matched 12/12 examples against baseline. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
@@ -111,10 +107,10 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
-| | **Code quality and architecture** | **17/20** | |
+| | **Code quality and architecture** | **18/20** | |
 | | **Testing and verification** | **19/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **90/100** | Exact review `7c1385c`; FAIL under the 98-point requirement. |
+| | **Total** | **91/100** | Exact review `96b71fe`; FAIL under the 98-point requirement. |
 
 ### Deduction details and follow-up
 
@@ -137,6 +133,13 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 - **Historical criteria 8, 38, and 44 finding — resolved.** On `f7c91b0`, the main completion/evaluation docs had not incorporated friction or the current review/test/package snapshot. Commits `e1e3768` and `83891c6` corrected these records, and independent review confirmed the documentation against implementation and verification; issue #27 is closed. The 87/100 score remains valid for that exact older snapshot. The independent reviewer also confirmed zero-friction and mixed-coefficient regression tests in `83891c6`; issue #26 is closed.
 - **Batch 3 tracking metadata note — resolved in the post-review docs sync.** The reviewer of `12b4e55` observed that `docs/IMPLEMENTATION_STATUS.json` still named `83891c6` as its repository head and item #48 was pending review at that snapshot. The current follow-up records the exact reviewed HEAD, promotes #48 to COMPLETE with test/build evidence, and synchronizes the cumulative state file. This was stale tracking metadata, not a runtime defect.
 - **Criterion 50 — practical for intended scope (1/2).** **Problem/evidence:** the engine lacks production graphics, assets, audio, mature physics, robust networking, portability, and performance evidence. **Impact:** it is not ready for production games. **Recommended fix:** continue implementation, benchmark real workloads, and define release criteria. **Status:** open; issue #15 and backlog #23.
+
+### Remaining deductions and follow-up
+
+- **Issue #12 — compiler formatting:** the refactor satisfies phase separation and compatibility acceptance. The reviewer identified long lines in `compiler/codegen.py`, `compiler/parser.py`, `compiler/expressions.py`, `compiler/cli.py`, and `compiler/semantics.py`. Black was not available in the review environment, so criterion 22 remains 1/2. The issue remains open until formatting is consistent and independently verified.
+- **Platform/backend breadth:** the project remains Windows/MSVC and generated-C only (criterion 27: 1/2).
+- **Editor visual verification:** newer extension grammar is automated-tested but the user chose to keep extension 0.1.4 installed, so criterion 47 remains 1/2.
+- **Engine scope:** asset/audio pipelines, GPU rendering, broad physics, and production multiplayer remain future work (criteria 2, 3, 5, 9, 40, and 50).
 
 ### Priorities from the review
 
