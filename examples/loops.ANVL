@@ -1,0 +1,27 @@
+# Inclusive for ranges support an optional signed step.
+fn(sum-range, first, last, step)
+  set local(total) = 0
+  for local(index) = var(first) to var(last) step var(step)
+    add local(total) local(index)
+  end
+  output local(total)
+end
+
+# while evaluates its condition before every pass.
+fn(sum-to, limit)
+  set local(index) = 1
+  set local(total) = 0
+  while local(index) <= var(limit)
+    add local(total) local(index)
+    add local(index) 1
+  end
+  output local(total)
+end
+
+fn(main)
+  # 1 + 2 + 3 + 4 + 5 = 15
+  output call fn(sum-range, 1, 5, 1)
+end
+
+call fn(main)
+
