@@ -26,7 +26,7 @@ WHAT ANVIL IS NOT GOOD AT YET
 1. It is not a complete engine: there is no mature asset pipeline, texture/sprite system, audio engine, physics/collision system, animation framework, scene graph, complete editor, or broad GUI system.
 2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. Resize handling, robust clipping, mesh import, texture mapping, and performance profiling remain future work.
 3. Only one ray-tracing path is implemented: CPU BVH is available. Hardware-accelerated RTX/DXR and Embree are not implemented, and there is no selector between those backends.
-4. The language remains narrow: loops, arrays, user-defined types, modules/imports, static types, and a general string model are not implemented. Function parameters, return values, recursion, and function-local numeric state are implemented.
+4. The language remains narrow: arrays, user-defined types, modules/imports, static types, and a general string model are not implemented. Function parameters, return values, recursion, function-local numeric state, and `while` loops are implemented.
 5. Multiplayer is experimental: the UDP API exchanges a numeric value with one peer. It lacks reliable delivery, authentication, encryption, matchmaking, replication, and robust peer lifecycle handling; it is only appropriate for trusted LAN experiments.
 6. The build target is narrow: the verified backend is Windows/MSVC with generated C. Rust output and a cross-platform runtime are not implemented.
 7. Efficiency claims are unproven: there is no benchmark suite comparing compile time or runtime performance. The software renderer and ray tracer are CPU-bound, so “hyper-efficient” is not supported by measurements.
@@ -35,7 +35,7 @@ HOW CLOSE IS IT TO A REAL PROGRAMMING LANGUAGE?
 ------------------------------------------------
 In the technical sense, Anvil is a programming language: it defines syntax and semantics, parses and validates programs, reports errors, translates code, and executes through a runtime. It is not merely pseudocode. It is a small compiled domain-specific language.
 
-In maturity, it is still an early prototype. The core can support simple, reusable programs, but it lacks loops, collections, user-defined types, modules, a mature standard library, portability, a debugger, and mature diagnostics. The game engine is less complete than the language implementation.
+In maturity, it is still an early prototype. The core can support simple, reusable programs, including `while` loops, but it lacks collections, user-defined types, modules, a mature standard library, portability, a debugger, and mature diagnostics. The game engine is less complete than the language implementation.
 
 Overall, Anvil is close to a custom scripting language for simple demos. It is not close to a general-purpose ecosystem or production game engine. The idea is credible; substantial work remains in language breadth, runtime systems, tooling, portability, and long-term compatibility.
 
@@ -55,14 +55,14 @@ Performance evidence: Not available
 
 INDEPENDENT REVIEW AND VERIFICATION
 -----------------------------------
-The latest independent 50-criterion review scored the current project 86/100 (FAIL against a 90-point target). The main deductions concern the intentionally incomplete engine scope, concentrated/compressed compiler architecture, inability to verify the extension installed in the reviewer's editor, and prior evaluation documents that contradicted current implementation and test counts. The reviewer filed the verified documentation inconsistency in the GitHub Issues tab as “Codex Bugs: evaluation documents contradict current compiler and test results” with the `Codex Bugs` label.
+The latest completed independent 50-criterion review scored the project 86/100 (FAIL against a 90-point target), before the new `while` loop feature was added. The main deductions concern the intentionally incomplete engine scope, concentrated/compressed compiler architecture, inability to verify the extension installed in the reviewer's editor, and prior evaluation documents that contradicted current implementation and test counts. A focused independent review of the loop feature is pending. The reviewer filed the verified documentation inconsistency in the GitHub Issues tab as “Codex Bugs: evaluation documents contradict current compiler and test results” with the `Codex Bugs` label; the docs were corrected and that issue was closed.
 
-The reviewer reran 30 Python tests, the VS Code extension grammar/manifest tests, a manifest-driven native build, and a function sample build/run (output `13`). These checks support the current prototype implementation; they do not establish production readiness or performance.
+The reviewer reran 30 Python tests, the VS Code extension grammar/manifest tests, a manifest-driven native build, and a function sample build/run (output `13`). Since that review, the Python suite passes 32 tests, including a compiled loop test and validation of a missing loop condition. These checks support the current prototype implementation; they do not establish production readiness or performance.
 
 PRIORITY IMPROVEMENTS
 ---------------------
-1. Continue the supplied 360-item improvement backlog in small, testable stages. It includes loops, arrays/types, renderer systems, assets, audio, physics, and multiplayer improvements.
-2. Split parsing, validation, C generation, and build orchestration into maintainable modules; add language compatibility/version rules.
+1. Continue the supplied 360-item improvement backlog in small, testable stages. Loop support is now in place; arrays/types, renderer systems, assets, audio, physics, and multiplayer improvements remain.
+2. Add arrays, structured values, and modules after specifying their syntax and semantics. Split parsing, validation, C generation, and build orchestration into maintainable modules; add language compatibility/version rules.
 3. Improve renderer foundations with resize support, clipping, GPU rendering, textures/assets, and broader visual regression coverage.
 4. Add a ray-tracing backend selector only as backends become genuinely available; retain CPU BVH as the current baseline.
 5. Evolve numeric UDP into portable, versioned, validated messages with reliable peer lifecycle before considering public network play.
