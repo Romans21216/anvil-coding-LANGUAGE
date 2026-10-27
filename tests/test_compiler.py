@@ -40,6 +40,15 @@ class CompilerTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn(f"{source}:{line}: {expected}", result.stderr)
 
+    def test_oversized_language_version_is_source_located(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "oversized-version.ANVL"
+            source.write_text("language version " + ("9" * 5000) + "\nfn(main)\nend\n", encoding="utf-8")
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "oversized.c")], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(f"{source}:1: unsupported Anvil language version value too large; compiler supports version 1", result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+
     def test_game_source_emits_native_renderer_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             c_file = pathlib.Path(temp) / "world.c"

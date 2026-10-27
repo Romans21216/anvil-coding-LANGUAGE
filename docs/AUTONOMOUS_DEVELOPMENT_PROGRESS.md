@@ -75,5 +75,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Files:** `compiler/anvil.py`, compiler regression tests, language/compiler/wiki docs, and the compact implementation ledger.
 - **Tests:** `python -m unittest discover -s tests -q` — 63 passed; `npm test --prefix vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; JSON summary totals 450 items with 15 audited entries; `git diff --check` — passed.
 - **Review:** The last overall review is `15439b54cd6e2b7a8165866d6054141f466f1b3e`, 90/100 below the new 98-point bar. Item #49's independent review is pending.
-- **Commit/push:** Item #49 implementation is pushed in `d5191d4ba2c7744b1b6207086abf0d8e05320afc`; its full validation passes. A small state-record correction is being committed before requesting review of the exact final snapshot.
-- **Next batch:** Complete review for item #49, update the evaluation, then continue addressing deductions toward 98/100.
+- **Commit/push:** Item #49 implementation is pushed in `d5191d4ba2c7744b1b6207086abf0d8e05320afc`; its full validation passed. The state-record correction is in pushed commit `2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2`. Review of that exact snapshot scored 85/100 and found an oversized-version diagnostic failure and this stale sentence, now tracked in issues [#32](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/32) and [#33](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/33).
+- **Next batch:** Fix and verify issues #32/#33, then obtain a fresh exact-commit review against 98/100.
+
+## Batch 7 — version diagnostics and QA-state corrections (in progress)
+
+- **Findings:** Independent review of `2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2` scored **85/100 — FAIL** and reported two issues, both labeled `Codex Bugs`: [#32](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/32) (5,000-digit version declarations raised uncaught `ValueError`) and [#33](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/33) (stale “being committed” progress wording).
+- **Fixes:** Version parsing now compares decimal text without unbounded integer conversion; long unsupported versions receive a bounded source-located diagnostic. Added a 5,000-digit regression test. Corrected the progress sentence to distinguish pushed commit state from pending review.
+- **Tests:** `python -m unittest discover -s tests -q` — 64 passed; `npm test --prefix vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; both status JSON files parse and the backlog summary totals 450; `git diff --check` — passed.
+- **Commit/push:** Fixes and QA synchronization are verified in the current worktree; commit and push are pending.
+- **Review:** Latest completed review is `2dd1d8e`, **85/100**, below 98. Request a new critic review after commit/push; #32 and #33 remain open until the exact committed fixes are confirmed.

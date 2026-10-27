@@ -156,9 +156,13 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
             if not declaration:
                 raise CompileError(f"{path}:{line_no}: language version declaration must use 'language version N'")
             version_declared = True
-            version = int(declaration.group(1))
-            if version != LANGUAGE_VERSION:
-                raise CompileError(f"{path}:{line_no}: unsupported Anvil language version {version}; compiler supports version {LANGUAGE_VERSION}")
+            version_text = declaration.group(1)
+            # Compare decimal text without constructing an unbounded Python int.
+            # Python limits extremely long int conversions and would leak ValueError.
+            version = version_text.lstrip("0") or "0"
+            if version != str(LANGUAGE_VERSION):
+                shown_version = version if len(version) <= 32 else "value too large"
+                raise CompileError(f"{path}:{line_no}: unsupported Anvil language version {shown_version}; compiler supports version {LANGUAGE_VERSION}")
             continue
         source_code_seen = True
         current_function = next((frame[2] for frame in reversed(stack)

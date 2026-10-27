@@ -2,9 +2,9 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **90/100 — FAIL** (commit `15439b54cd6e2b7a8165866d6054141f466f1b3e`) against the user's **98/100** threshold. It ran 61 Python tests, extension validation, Python compilation, an MSVC release build/run of `numeric_demo.ANVL` (output `17`), JSON validation, and `git diff --check`. It verified issue #23 still holds the full 450-item list. It confirmed issues [#30](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/30) and [#31](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/31) are fixed and may close; both are now closed. The previous 89/100 review of `c5d7d40`, 89/100 review of `bcbf221`, 85/100 review of `8ae53c4`, and 90/100 review of `2a745bb` remain historical and below 98.
+**Latest completed independent full review:** **85/100 — FAIL** (commit `2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2`) against the user's **98/100** threshold. It reran all 63 Python tests, extension validation, Python compilation, an MSVC release build/run of `numeric_demo.ANVL` (output `17`), JSON checks, and `git diff --check`. It verified issue #23 still holds 450 unique sequential items and the full list is not duplicated in the repository. It found two defects tracked as [#32](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/32) and [#33](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/33): a 5,000-digit version number raises uncaught `ValueError`, and the progress log incorrectly says a pushed correction is still being committed. The previous 90/100 review of `15439b5`, 89/100 reviews of `c5d7d40` and `bcbf221`, 85/100 review of `8ae53c4`, and earlier reviews remain historical and below 98.
 **Current passing threshold:** 98/100, set by the user on 2026-10-27. Historical reviews keep their original scores and results; a historical 90/100 PASS does not meet the new threshold.
-**Review snapshot:** the latest reviewer evaluated exact commit `15439b54cd6e2b7a8165866d6054141f466f1b3e`, reran all 61 Python tests, VS Code extension validation, Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), validated JSON, and passed `git diff --check`. It confirmed the full 450-item list remains in issue #23's body and comment, and repository files contain only the audited subset. It confirmed issues #30 and #31 are resolved and closed. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
+**Review snapshot:** the latest reviewer evaluated exact commit `2dd1d8ee4d9a2d30669ba5198a9de153bc9b01a2`, reran all 63 Python tests, VS Code extension validation, Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), validated status JSON, and passed `git diff --check`. It confirmed issue #23's full 450-item list and no repository duplicate. It identified issues #32 and #33. Both are fixed in the current worktree; the expanded 64-test suite, extension validation, Python compilation, JSON validation, and diff check pass. The fixes await commit/push and exact-commit review. Extension 0.1.4 remains installed; the user has not approved a newer install, so newer visible highlighting remains unverified.
 
 ## Scope
 
@@ -16,7 +16,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — current candidate: 63 tests, including numeric overflow, UDP NaN/finite/missing-socket behavior, and language-version declarations; the latest critic ran all 61 tests on `15439b5` |
+| `python -m unittest discover -s tests -q` | PASS — current candidate: 64 tests, including numeric overflow, UDP NaN/finite/missing-socket behavior, ordinary language-version declarations, and a 5,000-digit version diagnostic; the latest critic ran 63 tests on `2dd1d8e` |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -42,9 +42,9 @@ These checks verify the prototype workflows and selected regression cases. They 
 
 The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation, integration, contact counting, solver resolution, and post-solver bounds now iterate only over active capacity. The fixed backing table remains 128 slots, but the pair scan uses the selected active limit.
 
-## Latest independent review — commit `15439b5`
+## Latest independent review — commit `2dd1d8e`
 
-**90/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 17/20; testing and verification 19/20; developer experience and delivery 18/20. The reviewer verified 61 Python tests, VS Code extension validation, Python compilation, MSVC `numeric_demo` build/run (output `17`), JSON parsing, `git diff --check`, and issue #23's 450 unique sequential entries. It confirmed the issue #30 numeric guard and all issue #31 metadata fixes; both issues are resolved and closed. There are no new code or documentation defects in the reviewed snapshot. The user requires 98/100; this review does not pass.
+**85/100 — FAIL** against the required 98/100. Category totals: requirements 15/20; functionality and reliability 17/20; code quality and architecture 17/20; testing and verification 18/20; developer experience and delivery 18/20. The reviewer verified 63 Python tests, VS Code extension validation, Python compilation, MSVC `numeric_demo` build/run (output `17`), JSON parsing, `git diff --check`, and issue #23's 450 unique sequential entries. It identified two defects: an oversized numeric version declaration causes an uncaught `ValueError` instead of a source-located diagnostic (issue #32), and the Batch 6 progress row says a pushed update is still being committed (issue #33). Both are fixed in the current worktree; the new 64-test suite and documentation checks pass. The fixes await exact-commit review; the 98-point threshold is not met.
 
 ## Historical independent 50-criterion review — commit `2a745bb`
 
@@ -59,16 +59,16 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 5 | No essential feature missing | 1 | GPU renderer, assets, audio, 3D/advanced physics, and broader multiplayer remain unfinished. |
 | 6 | Stated constraints respected | 2 | `.ANVL` is consistently used as requested. |
 | 7 | Ambiguity resolved logically | 2 | Current C/MSVC prototype scope and limitations are documented. |
-| 8 | Behavior matches documentation | 2 | Reviewer of `12b4e55` confirmed the runtime division guard, source-located error/exit behavior, regular division, and documentation agree. Earlier friction documentation findings were resolved and independently verified. |
+| 8 | Behavior matches documentation | 1 | Latest critic found a 5,000-digit `language version` declaration leaks an uncaught `ValueError` instead of the documented path-and-line diagnostic; issue #32. |
 | 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
 | 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
 | 11 | Core functionality works | 2 | The reviewer confirmed `receive()` rejects a non-finite UDP value with the promised source-located diagnostic; issue #30 is resolved. |
 | 12 | Secondary functionality works | 2 | Timing, input, math/noise, networking primitive, and native-tested `while`/`for` loops are covered. |
 | 13 | Primary workflows functional | 2 | Direct source and manifest build/run workflows pass. |
-| 14 | Inputs validated | 2 | Native integration confirms NaN/infinity is rejected, finite `42.5` is returned, and missing-socket receive yields zero; issue #30 is resolved. |
-| 15 | Errors handled gracefully | 2 | The 16 MiB active-array budget fails with exit code 2 and a source-located diagnostic instead of exhausting the OS stack. |
+| 14 | Inputs validated | 1 | The 5,000-digit language-version declaration is not handled as a controlled invalid input; issue #32. |
+| 15 | Errors handled gracefully | 1 | Oversized language-version text escapes as Python `ValueError`/traceback instead of an Anvil diagnostic; issue #32. |
 | 16 | Edge cases covered | 2 | Tests cover overflow and non-finite UDP packets, finite network input, and unavailable sockets, along with recursion, array, and physics edge cases. |
-| 17 | Invalid inputs controlled | 2 | NaN/infinity network payloads are rejected at the expression boundary with source path, line, and exit code 2. |
+| 17 | Invalid inputs controlled | 1 | A very long version integer crashes during conversion instead of being rejected cleanly; issue #32. |
 | 18 | Stable across repeated operations | 2 | Compiler/runtime tests and repeatable random/noise checks pass. |
 | 19 | No known critical defects | 2 | The recursive-array stack-exhaustion finding is fixed; the physics reviewer found no critical issue in the reviewed physics paths. |
 | 20 | Components integrate | 2 | Compiler, generated C, runtime, manifest, extension, and networking sample integrate. |
@@ -89,7 +89,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 2 | Reviewer confirmed the progress/state records accurately describe the pushed snapshot; issue #31 is resolved and closed. |
+| 38 | Results recorded accurately | 1 | The Batch 6 progress line said a pushed correction was still being committed; corrected after the review and tracked in issue #33. |
 | 39 | Regression checks performed | 2 | The independent review reran all 61 tests, extension validation, Python compilation, MSVC numeric demo, and diff check. |
 | 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
@@ -98,19 +98,21 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 44 | Design decisions documented | 2 | High-level evaluation and completion docs now describe per-body friction range 0–1, default 0.5, geometric-mean mixing, and normal-impulse clamping. The reviewer confirmed consistency; issue #27 is resolved. |
 | 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
 | 46 | Opens in intended environment | 2 | The evaluator confirmed extension 0.1.4 installed; visible Anvil mode had previously been verified for the ray-backend sample. |
-| 47 | Editor integration works | 1 | **Problem:** new physics builtin highlighting has not been checked in an installed editor. **Evidence:** 0.1.7 grammar/package token checks pass, but the user kept 0.1.4 installed; it predates `body_create_box`, `physics_capacity`, and `body_friction`. **Impact:** visible syntax coloring for these built-ins is unverified in the user's editor. **Status:** pending user preference; tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24). |
+| 47 | Editor integration works | 1 | **Problem:** newer grammar tokens are not verified in the installed editor. **Evidence:** automated grammar validation passes, but the user kept 0.1.4 installed. **Impact:** visible syntax coloring for newer built-ins remains unverified. **Status:** pending user preference; tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24). |
 | 48 | Deliverables organized | 2 | Source, runtime, examples, tests, docs, extension grammar, and packaged VSIX are in their expected folders; the reviewer confirmed a clean worktree before and after verification. |
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
-| | **Requirement fulfillment** | **16/20** | |
-| | **Functionality and reliability** | **20/20** | |
+| | **Requirement fulfillment** | **15/20** | |
+| | **Functionality and reliability** | **17/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **19/20** | |
+| | **Testing and verification** | **18/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **90/100** | Latest review FAIL under the 98-point requirement. |
+| | **Total** | **85/100** | Latest review FAIL under the 98-point requirement. |
 
 ### Deduction details and follow-up
 
+- **Criterion 8 — behavior matches documentation (1/2), criterion 14 — inputs validated (1/2), criterion 15 — errors handled gracefully (1/2), criterion 17 — invalid inputs controlled (1/2):** The critic reproduced a 5,000-digit `language version` header that exits with Python `ValueError`/traceback rather than an Anvil path-and-line diagnostic. **Fix:** compare bounded version text without constructing an unbounded integer and add a regression asserting no traceback. **Status:** tracked in [issue #32](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/32); fix is in the current worktree pending full verification.
+- **Criterion 38 — results recorded accurately (1/2):** the Batch 6 progress entry said a pushed status correction was still being committed. **Fix:** corrected the sentence to identify the commit already pushed and the review as pending. **Status:** tracked in [issue #33](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/33); awaiting the next exact-commit review.
 - **Criterion 2 — implicit requirements addressed (1/2).** **Problem/evidence:** The 450-item backlog still lists major engine and language systems that are absent, including assets, audio, advanced physics, structured multiplayer, portability, and tooling. **Impact:** Anvil only supports a narrow subset of the intended engine. **Recommended fix:** continue implementing backlog capabilities with linked tests and docs. **Status:** open; issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) remains the user's master backlog.
 - **Criterion 3 — functionality matches intended goal (1/2).** **Problem/evidence:** Current renderer and runtime are Windows/MSVC-focused; actual GPU rendering, DXR/Embree, mature asset pipeline, robust multiplayer, and many full-engine systems are missing. **Impact:** it does not yet fulfill the requested general 2D/3D engine. **Recommended fix:** implement remaining engine subsystems and portable backends. **Status:** open; see issues #5, #6, #7, #10, #11, and #15.
 - **Criterion 5 — no essential feature missing (1/2).** **Problem/evidence:** GPU rasterization, DXR/Embree, joints, CCD, 3D physics, asset/audio pipelines, and robust multiplayer remain unavailable. **Impact:** important requested workflows cannot be built in Anvil today. **Recommended fix:** prioritize missing features by backlog and add executable integration evidence. **Status:** open; issues #5–#11 and #23.
