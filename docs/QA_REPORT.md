@@ -8,7 +8,7 @@
 
 Anvil is an early Windows-focused language and game-runtime prototype. The compiler validates BASIC/Lua-inspired `.ANVL` programs, emits C, and invokes MSVC to create a native `.exe`. The runtime has a fixed-size software 2D/3D renderer, keyboard camera controls, fixed-step updates, seeded random/noise functions, a minimal numeric UDP API, and built-in `ray_sphere(x,y,z,radius)`. Ray spheres use CPU BVH traversal, diffuse/specular lighting, and hard-shadow queries; the documented per-batch limit is 32. This is not a production engine. Assets, audio, physics, cross-platform support, a Rust backend, RTX/DXR, and Embree remain unimplemented.
 
-The `.ANVL` suffix was chosen by the user. Functions support numeric parameters, numeric return values, recursion, and function-local numeric state. Loops, arrays, user-defined structures, and modules/imports are not implemented.
+The `.ANVL` suffix was chosen by the user. Functions support numeric parameters, numeric return values, recursion, and function-local numeric state. `while` loops are implemented; `for` loops, arrays, user-defined structures, and modules/imports are not implemented.
 
 ## Verification
 
@@ -21,7 +21,8 @@ The `.ANVL` suffix was chosen by the user. Functions support numeric parameters,
 | Native runtime integration | PASS — fixed-step updates, delta, queued Space key edge, and clean shutdown covered |
 | Projected sphere bounds regression | PASS — compiled production projection helper sampled sphere surfaces at centered, off-axis, and near-camera positions |
 | VS Code package | PASS — VSIX package exists and extension grammar checks pass |
-| Installed VS Code editor verification | NOT VERIFIED — reviewer found no installed extension and could not confirm language mode |
+| VS Code extension installation | PASS — installed VSIX with VS Code 1.143.1; `code --list-extensions --show-versions` reports `anvil-engine.anvil-language-support@0.1.0` |
+| VS Code language mode and visible sample highlighting | NOT VISUALLY VERIFIED in this review |
 | Live game window visual inspection | NOT PERFORMED in the latest independent review |
 
 Earlier display and editor evidence in prior reports is historical, not part of the latest independent review. Current test/build results demonstrate a working prototype path, not production readiness or measured performance.
@@ -39,7 +40,7 @@ The latest completed full independent reviewer scored the project **86/100**, be
 | 41–50: Developer experience and delivery | 2, 2, 2, 2, 2, 1, 1, 2, 2, 1 (**17/20**) |
 | **Total** | **86/100 — FAIL** |
 
-Main deductions: the full engine backlog is substantially incomplete; compiler responsibilities and formatting are concentrated in one file; the extension could not be verified installed in the reviewer's editor; and evaluation documents had become stale and contradictory. Criterion 38 scored zero because the prior QA report had inaccurate test counts and a superseded score. Both confirmed documentation issues have since been corrected and closed. The Python suite now passes 32 tests, and this report records the added loop feature.
+Main deductions: the full engine backlog is substantially incomplete; compiler responsibilities and formatting are concentrated in one file; visible editor language mode was not verified; and evaluation documents had become stale and contradictory. Criterion 38 scored zero because the prior QA report had inaccurate test counts and a superseded score. Both confirmed documentation issues have since been corrected and closed. The Python suite now passes 32 tests, and this report records the added loop feature. VS Code installation was confirmed after the prior full review.
 
 ## Bug tracking
 
@@ -49,7 +50,7 @@ The reviewer filed [issue #1](https://github.com/Romans21216/anvil-coding-LANGUA
 
 1. Continue implementing the user's improvement backlog in small, tested increments.
 2. Split parser, validation, C generation, and build orchestration into modules.
-3. Verify extension installation and language mode in a supported editor session.
+3. Visually verify the installed extension's language mode and sample highlighting in an editor session.
 4. Expand renderer features and add pixel-level visual regression checks.
 5. Improve networking reliability and portability before treating it as multiplayer infrastructure.
 6. Add benchmarks before claiming high or “hyper-efficient” performance.
