@@ -111,7 +111,7 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Findings:** Unicode decimal digits reach invalid generated C; display text grammar omits required coordinates; display suffix ordering conflicts with implementation; camera grammar promises unsupported expressions; the accepted `null` cleanup statement is omitted; trailing whitespace makes the commit diff check fail. Tracked precisely in `Codex Bugs` issues #37–#42.
 - **Evaluation:** Updated `QA_REPORT.md`, `ANVIL_EVALUATION.txt`, both state ledgers, and this progress log immediately after the critic run. The score remains below 98. Fix all six findings and rerun the critic.
 
-### Finding corrections — candidate for fresh review
+### Finding corrections — candidate `b8213aa` for fresh review
 
 - **#37:** Numeric/version/array/port/display-integer token patterns now use ASCII `[0-9]`. Added a regression proving Arabic-Indic `١` returns a line diagnostic and emits no C. Also bounded huge array-size text before integer conversion and added a 5,000-digit array-size regression.
 - **#38–#41:** Updated the normative EBNF and semantic rules for mandatory text location, legacy display integer placement, whitespace-free camera coordinates, and accepted no-op `set var(name) = null`. Also included the text-number compatibility form.

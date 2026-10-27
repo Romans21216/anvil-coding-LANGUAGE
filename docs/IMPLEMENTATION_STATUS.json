@@ -172,7 +172,7 @@
       ],
       "verification_result": "IN PROGRESS: critic 3cd390c found issues #37–#42. Candidate fixes and listed checks are complete, but the fixes remain pending independent review; do not mark COMPLETE yet.",
       "github_issue": "#23",
-      "commit": "fix candidate pending"
+      "commit": "b8213aa6878b2f0c02f8f4655fbd443f7291a4ec"
     },
     {
       "number": 301,

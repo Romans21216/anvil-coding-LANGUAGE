@@ -6,7 +6,7 @@
   "last_completed_backlog_item": 49,
   "current_active_item": 50,
   "current_active_item_status": "Backlog item #50 is in progress. Critic 3cd390c scored 84/100 and findings #37–#42 are tracked as Codex Bugs. Candidate fixes align the spec/compiler, with 66 tests, extension validation, Python compilation, MSVC examples, and diff check passing; fixes await independent review.",
-  "current_candidate_commit": "fix candidate pending",
+  "current_candidate_commit": "b8213aa6878b2f0c02f8f4655fbd443f7291a4ec",
   "latest_verified_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
   "last_pushed_reviewed_below_threshold_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
   "latest_independently_reviewed_candidate_commit": "3cd390ce8490ce3ff5102dd1f85b1e2cb14c36ef",
