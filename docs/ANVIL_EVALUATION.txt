@@ -5,6 +5,10 @@ Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
 Basis: independent full review of exact pushed commit 8ae53c4daaed0d2160262aa24a2a0d5178235a96, with compiler/runtime tests, extension validation, and build workflows rerun by the reviewer.
 
+LATEST INDEPENDENT REVIEW AND CURRENT CANDIDATE
+-----------------------------------------------
+The latest completed independent review is exact commit c10260483eab6b5adaadd261a66a92a9138b9ed8 at 92/100, FAIL against the current 98/100 bar. The fresh review found no new code defect and verified the status correction. A later implementation candidate, source commit 9d9bf90e62e3e75ea94de7828d86800cbd382c99, adds BMP image loading and 2D sprite drawing with bounded memory, stale-handle protection, clipping, scaling, and cleanup. It passes all 79 tests and its Anvil example builds with MSVC, but this feature candidate has not yet received an independent score.
+
 SUMMARY
 -------
 Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The compiler translates supported Anvil programs into C and invokes Microsoft's C compiler to build a native Windows executable.
@@ -23,7 +27,7 @@ WHAT ANVIL IS GOOD AT
 
 WHAT ANVIL IS NOT GOOD AT YET
 -----------------------------
-1. It is not a complete engine: physics supports up to 128 fixed-step 2D circle and axis-aligned box bodies, configurable active capacity, restitution, and Coulomb friction. There is no continuous collision detection, polygon or 3D bodies, or joints. A mature asset pipeline, texture/sprite system, audio engine, animation framework, scene graph, complete editor, and broad GUI system are also absent.
+1. It is not a complete engine: physics supports up to 128 fixed-step 2D circle and axis-aligned box bodies, configurable active capacity, restitution, and Coulomb friction. There is no continuous collision detection, polygon or 3D bodies, or joints. A general asset pipeline, broad texture formats, sprite animation, texture atlases, 3D mesh textures, audio engine, animation framework, scene graph, complete editor, and broad GUI system are also absent; the current candidate adds only bounded BMP-based screen-space sprites.
 2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. The native window can be resized with aspect-preserving letterboxing, but internal resolution remains fixed at 960×600. The current unreviewed candidate adds near-plane clipping for triangle faces, grid segments, and rasterized spheres. Far-plane and side-frustum clipping, mesh import, texture mapping, and performance profiling remain future work.
 3. Only one ray-tracing path is implemented: CPU BVH is available. The runtime exposes `ray_backend(name)` and `ray_backend_available(name)`. The selector successfully chooses BVH; hardware-accelerated RTX/DXR and Embree are not implemented and cannot be selected successfully.
 4. The language remains narrow: fixed-size global and function-local numeric arrays are now implemented, but dynamic arrays, user-defined types, modules/imports, static types, and a general string model are not. Function parameters, return values, recursion, function-local numeric state, numeric `while`/`for` loops, and array bounds checks are implemented.
@@ -50,6 +54,7 @@ Native Windows executable generation: Implemented for documented MSVC toolchain
 Basic 2D/3D rendering and camera controls: Implemented with notable limits; native window resize uses aspect-preserving letterboxing
 BVH CPU ray-traced spheres: Implemented, limited to 32 per batch
 Ray backend selection and availability built-ins: Implemented and verified; only BVH is available; DXR/Embree unavailable
+BMP-based 2D image resources and sprite rendering: Implemented in candidate; 79 tests and MSVC sample build pass; independent review pending
 Fixed-step 2D circle/axis-aligned box physics: Implemented as a bounded prototype with active capacity 1–128, restitution, and Coulomb friction (no rotation, CCD, joints, or 3D/polygon bodies)
 RTX/DXR and Embree: Not implemented
 LAN multiplayer: Minimal UDP prototype
@@ -60,7 +65,7 @@ Performance evidence: Not available
 
 INDEPENDENT REVIEW AND VERIFICATION
 -----------------------------------
-Latest independent review: exact pushed commit `eec0608dd6f252090b50fda1027eba14c6af1292`, **92/100 — FAIL** against the user's **98/100** passing threshold. Categories: requirements 16/20, functionality and reliability 20/20, code quality and architecture 19/20, testing and verification 19/20, developer experience and delivery 18/20. The critic reran 74 Python tests, 4 native runtime tests, extension validation, compileall, QA arithmetic, JSON/count checks, and diff check. It confirmed the 22-row ledger totals 450 and maps #185 to robust near-plane clipping. The previous finite ±1e308 interpolation overflow now returns bounded finite geometry, screen lines are clipped before integer conversion, and the candidate JSON records all 74 tests. Issues #47's two findings are resolved. No live rendering was visually inspected. The prior 90/100 review of `4bc8bc3` and earlier 92/100 of `f12c0ac` remain historical. Issue #46 is closed; extension 0.1.4 remains installed per preference.
+Latest independent review: exact pushed commit `c10260483eab6b5adaadd261a66a92a9138b9ed8`, **92/100 — FAIL** against the user's **98/100** passing threshold. Categories: requirements 16/20, functionality and reliability 20/20, code quality and architecture 19/20, testing and verification 19/20, developer experience and delivery 18/20. The critic reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON/count checks, and diff check. It confirmed the 26-row ledger totals 450 and items #391–394 are complete. Issue #48 is fixed and closed. No live mouse-enabled rendering was visually inspected. The prior 90/100 review of `4bc8bc3` and 92/100 reviews of `f12c0ac` and `c102604` remain tied to their exact snapshots. Extension 0.1.4 remains installed per preference.
 
 The current item #185 implementation was independently reviewed at 92/100; issue #47 is closed after verifying the overflow correction and accurate test count. Far-plane and side-frustum clipping, broad engine scope, platform/backend breadth, and visible editor verification remain unfinished.
 

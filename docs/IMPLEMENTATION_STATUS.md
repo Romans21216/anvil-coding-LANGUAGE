@@ -2,18 +2,18 @@
 
 The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27 after independent review of exact candidate `d757c797751f40eee47fd518c3cf6dd3a3ae790c`; latest score is 92/100 — FAIL against 98. Criterion 38 lost one point because both status JSON files used CP1252 bytes and carried stale candidate metadata. The fresh critic reran 77 tests, verified the JSON correction, and reproduced no code defect; it did not visually inspect a live mouse-enabled window. Earlier item #185 and issue #46 fixes remain verified. Compiler items #101–#104 are COMPLETE; issues #12, #45, #46, and #47 are resolved.
+Updated 2026-10-27. Latest independent evaluation is still 92/100 — FAIL against 98 on exact snapshot `c10260483eab6b5adaadd261a66a92a9138b9ed8`; issue #48 is resolved. New BMP image/sprite source candidate `9d9bf90e62e3e75ea94de7828d86800cbd382c99` passes 79 tests, extension grammar validation, compileall, the image sample MSVC build, QA arithmetic, and diff check. Independent review is pending; do not replace the historical evaluation until that critic result is synchronized.
 
 ## Status counts
 
 - COMPLETE: 21
-- PARTIALLY IMPLEMENTED: 3
+- PARTIALLY IMPLEMENTED: 5
 - NOT IMPLEMENTED: 0
 - BLOCKED: 0
-- NEEDS VERIFICATION: 424
-- IN PROGRESS: 2
+- NEEDS VERIFICATION: 420
+- IN PROGRESS: 4
 
-Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` (92/100). The latest mouse input candidate `d757c79` scored 91/100, below the 98/100 threshold, due to invalid UTF-8 JSON and a stale candidate SHA; no mouse code defect was reproduced.
+Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` (92/100). The latest corrected status snapshot `c102604` scored 92/100, below the 98/100 threshold; its UTF-8/status mismatch is fixed. Candidate `9d9bf90` adds BMP resources and sprites and is pending independent review.
 
 ## Audited current items
 
@@ -30,6 +30,10 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 | 104 | Separate C generation from build orchestration. | COMPLETE | `compiler/codegen.py`, `compiler/build.py`, and `compiler/cli.py` have separate responsibilities. The critic confirmed both CLI invocation forms and the 21-definition legacy facade. Issue #12 is resolved and closed. |
 | 172 | Add dynamic window resizing. | IN PROGRESS | `runtime/anvil_projection.h::anvil_compute_viewport` computes a centered aspect-preserving viewport; `runtime/anvil_runtime.c` paints the fixed 960×600 image into the current client area. `tests/test_runtime.py` covers wide, tall, same-aspect, and invalid client sizes. The game window is already created with `WS_OVERLAPPEDWINDOW`; internal framebuffer resolution remains fixed. Canonical backlog source is issue #23 comment 6451810775; item #144 remains unverified. The critic confirmed the tracking correction on `f12c0ac`; a live resize was not visually inspected. |
 | 185 | Add robust near-plane clipping. | IN PROGRESS | Commit `cfce407` adds camera-space clipping for triangles, grid segments, and sphere hits. Commit `15ac43a` fixes the overflow reproduced by review `4bc8bc3` using stable interpolation, finite-output checks, and pre-raster screen clipping. Critic `eec0608` confirmed the regression fix and all 74 tests. No live window was visually inspected; far-plane and side-frustum clipping remain out of scope. |
+| 201 | Add texture file loading. | PARTIALLY IMPLEMENTED | `runtime/anvil_runtime.c::anvil_image_load` safely loads bounded uncompressed BMP images; other formats and 3D texture mapping remain unsupported. Full test suite and sample build pass; independent review pending. |
+| 202 | Add texture unloading. | IN PROGRESS | Explicit `image_destroy`, shutdown cleanup, and generation-checked stale-handle rejection are implemented and tested; independent review pending. |
+| 209 | Add sprite rendering. | IN PROGRESS | `image_draw` / `image_draw_scaled` render clipped, alpha-blended screen-space BMP sprites; native regression and `examples/image_sprite.ANVL` pass/build. Independent review pending. |
+| 212 | Add sprite rotation and scaling. | PARTIALLY IMPLEMENTED | Nearest-neighbor scaling is implemented and tested; sprite rotation remains absent. |
 | 391 | Add mouse input support. | COMPLETE | `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`, and `mouse_wheel()` are added to the compiler/runtime. Native integration coverage verifies input edges, wheel detents, resize mapping, and letterbox rejection. Independent critic verified the implementation and native regressions on `d757c79`; live mouse-window visual inspection remains absent. |
 | 392 | Add mouse position tracking. | COMPLETE | Pointer coordinates are mapped through the current aspect-preserving viewport into the fixed 960×600 frame; letterbox bars return `-1`. Native test coverage is added; independent critic verified the implementation on `d757c79`; live mouse-window visual inspection remains absent. |
 | 393 | Add mouse button events. | COMPLETE | Left/right/middle button edges and held state are captured; focus loss clears held state. Native regression covers left click edge, held, release, and edge clearing. Independent critic verified the implementation on `d757c79`; live mouse-window visual inspection remains absent. |
@@ -54,4 +58,4 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
 
 
-Issue #48 is resolved in the UTF-8 follow-up: strict UTF-8 parsing passes for both JSON status records, the exact reviewed candidate SHA and fresh 91/100 result are recorded, and QA rubric arithmetic validates. A follow-up independent review is pending; 98/100 remains the required passing threshold.
+Issue #48 is resolved. Strict UTF-8 parsing passes for both JSON status records; the latest reviewed snapshot `c102604` is recorded at 92/100, below the required 98. The current sprite candidate is pending independent review.

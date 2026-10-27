@@ -4,10 +4,10 @@
   "branch": "main",
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
-  "current_active_item": 185,
-  "current_active_item_status": "Item #185 remains active. Mouse input items #391–394 are complete. Latest exact independent review c102604 scored 92/100, below 98; issue #48 is fixed and closed.",
-  "current_candidate_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
-  "latest_verified_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+  "current_active_item": 201,
+  "current_active_item_status": "BMP image resources and 2D sprites are implemented in source candidate 9d9bf90. Full 79-test suite, MSVC sample build, extension validation, compileall, QA arithmetic, and diff check pass. Items #201/#202/#209/#212 are tracked in the audited ledger; independent review is pending. Latest reviewed evaluation remains 92/100, below the required 98.",
+  "current_candidate_commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99",
+  "latest_verified_commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99",
   "last_pushed_reviewed_below_threshold_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
   "latest_independently_reviewed_candidate_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
@@ -105,14 +105,14 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "77 passed; independently rerun on exact candidate d757c79",
-    "vscode_extension_validation": "passed; extension 0.1.8 grammar validation; not installed",
+    "python_unittest": "79 passed on source candidate 9d9bf90",
+    "vscode_extension_validation": "passed; extension 0.1.9 grammar validation; package not installed",
     "python_compile": "compileall passed",
-    "qa_report_validator": "passed on exact c102604; 50 criteria = 92/100; category and criterion scores agree",
-    "git_diff_check": "passed on exact candidate",
-    "mouse_input_integration": "passed resized viewport mapping, letterbox rejection, left/right/middle press/held/release, wheel capture/reset",
-    "visual_runtime": "No live mouse-enabled window visually inspected",
-    "strict_json": "both docs JSON files parse as UTF-8; status parity verified on exact c102604"
+    "qa_report_validator": "passed; historical latest reviewed rubric remains 50 criteria = 92/100",
+    "git_diff_check": "passed",
+    "sprite_integration": "MSVC native test covers BMP headers, 24-bit row padding, top-down 32-bit images, invalid/oversized files, draw/scaling/clipping, destroy/reload, and stale handles",
+    "msvc_sample_build": "examples/image_sprite.ANVL built successfully as Windows release EXE",
+    "strict_json": "current source-of-truth JSONs will be validated in documentation sync commit"
   },
   "pending_documentation_review": null,
   "blocked_items": [
@@ -126,8 +126,8 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
   "next_recommended_tasks": [
-    "Continue evidence-backed implementation and verification to close remaining rubric gaps (criteria 2,3,5,9,27,40,47,50); maintain the 98/100 passing requirement.",
-    "After each critic run, synchronize every evaluation record to the exact score and commit."
+    "Independent review the exact synchronized BMP sprite candidate and update every evaluation record to that result.",
+    "Continue evidence-backed work until the user-required 98/100 QA threshold is genuinely met."
   ],
   "master_backlog": {
     "issue": 23,
@@ -143,9 +143,9 @@
   "last_reviewed_rubric_criterion": 38,
   "implementation_status_counts": {
     "COMPLETE": 21,
-    "PARTIALLY IMPLEMENTED": 3,
-    "IN PROGRESS": 2,
-    "NEEDS VERIFICATION": 424,
+    "PARTIALLY IMPLEMENTED": 5,
+    "IN PROGRESS": 4,
+    "NEEDS VERIFICATION": 420,
     "TOTAL": 450
   },
   "resolved_critic_issues": [

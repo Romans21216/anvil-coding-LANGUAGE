@@ -9,11 +9,11 @@
     "COMPLETE": 21,
     "IN PROGRESS": 2
   },
-  "latest_verified_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+  "latest_verified_commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99",
   "latest_independently_reviewed_candidate_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
-  "latest_followup_status_change": "Independent critic scored corrected c102604 snapshot 92/100, FAIL vs 98. Issue #48 is fixed; strict JSON and 77-test validation pass. Remaining partial criteria 2,3,5,9,27,40,47,50.",
+  "latest_followup_status_change": "BMP image/sprite feature implemented in 9d9bf90 and verified locally: 79 tests, MSVC release build, extension grammar, compileall, QA arithmetic, and diff check pass. Canonical issue #23 items 201/202/209/212 are audited below; independent review pending. Latest scored commit remains c102604 at 92/100, below 98.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -735,6 +735,109 @@
       "verification_result": "Verified against source/tests as stated.",
       "github_issue": "#15",
       "commit": "f7c91b0"
+    },
+    {
+      "number": 201,
+      "section": "5. GRAPHICS, TEXTURES, AND MATERIALS",
+      "title": "Add texture file loading.",
+      "status": "PARTIALLY IMPLEMENTED",
+      "source_evidence": [
+        "runtime/anvil_runtime.c::anvil_image_load decodes uncompressed 24-bit and 32-bit BMP image assets with size and memory limits."
+      ],
+      "tests": [
+        "tests/test_runtime.py::RuntimeIntegrationTests::test_bmp_image_loading_scaling_clipping_and_release covers padded 24-bit and top-down 32-bit BMPs, malformed/oversized files, handle validity, drawing, and cleanup.",
+        "MSVC release build of examples/image_sprite.ANVL passed on source commit 9d9bf90."
+      ],
+      "missing_or_limitations": "Only bounded uncompressed BMP is supported; PNG/JPEG/other formats, compression, texture caching/filter modes, and 3D material texture mapping are not implemented.",
+      "dependencies": [],
+      "priority": "P1",
+      "assigned_agent": "Codex lead (sequential execution)",
+      "acceptance_criteria": [
+        "Load supported image data from a file into a bounded runtime resource.",
+        "Reject malformed, unsupported, or over-budget files safely.",
+        "Document supported formats and resource limits; add native regression coverage."
+      ],
+      "verification_result": "Feature-specific native test, full 79-test suite, MSVC example build, extension validation, compileall, QA arithmetic, and diff check pass locally. Independent candidate review is pending; remains partial due to narrow BMP-only format support.",
+      "github_issue": "#23",
+      "commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99"
+    },
+    {
+      "number": 202,
+      "section": "5. GRAPHICS, TEXTURES, AND MATERIALS",
+      "title": "Add texture unloading.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "runtime/anvil_runtime.c::anvil_image_destroy frees a decoded image; anvil_release_frame_resources releases any remaining image buffers at shutdown."
+      ],
+      "tests": [
+        "Native regression checks explicit destruction, invalidation, stale-handle rejection after slot reuse, and reload."
+      ],
+      "missing_or_limitations": "The feature-specific test and independent review of this candidate are still pending final audit; no cache exists to evict.",
+      "dependencies": [
+        201
+      ],
+      "priority": "P1",
+      "assigned_agent": "Codex lead (sequential execution)",
+      "acceptance_criteria": [
+        "Provide an explicit API to free a loaded image.",
+        "Reject already-freed and stale handles.",
+        "Release remaining image memory on runtime shutdown."
+      ],
+      "verification_result": "Local native regression passes; independent review pending before marking complete.",
+      "github_issue": "#23",
+      "commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99"
+    },
+    {
+      "number": 209,
+      "section": "5. GRAPHICS, TEXTURES, AND MATERIALS",
+      "title": "Add sprite rendering.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "runtime/anvil_runtime.c::anvil_image_draw and anvil_image_draw_scaled draw clipped screen-space sprites with alpha blending."
+      ],
+      "tests": [
+        "examples/image_sprite.ANVL demonstrates image loading, width query, and scaled sprite drawing.",
+        "Native runtime regression checks native-size drawing, scaled drawing, clipping, and resource lifetime."
+      ],
+      "missing_or_limitations": "This is a bounded 2D BMP sprite path; sprite rotation, animation, sheets, atlases, and 3D texture mapping are not included.",
+      "dependencies": [
+        201
+      ],
+      "priority": "P1",
+      "assigned_agent": "Codex lead (sequential execution)",
+      "acceptance_criteria": [
+        "Draw a loaded image as a 2D sprite.",
+        "Clip drawing safely to the framebuffer.",
+        "Document API semantics and provide a built example."
+      ],
+      "verification_result": "79 tests pass; the sample builds with MSVC and its rendering was previously visually inspected. Candidate-specific independent review pending.",
+      "github_issue": "#23",
+      "commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99"
+    },
+    {
+      "number": 212,
+      "section": "5. GRAPHICS, TEXTURES, AND MATERIALS",
+      "title": "Add sprite rotation and scaling.",
+      "status": "PARTIALLY IMPLEMENTED",
+      "source_evidence": [
+        "runtime/anvil_runtime.c::anvil_image_draw_scaled implements nearest-neighbor resizing."
+      ],
+      "tests": [
+        "Native regression checks 2D scaled draw dimensions and clipping."
+      ],
+      "missing_or_limitations": "Sprite rotation is not implemented. Scaling uses nearest-neighbor sampling only.",
+      "dependencies": [
+        209
+      ],
+      "priority": "P2",
+      "assigned_agent": "Codex lead (sequential execution)",
+      "acceptance_criteria": [
+        "Scale sprites to caller-specified positive dimensions.",
+        "Rotate sprites around a documented pivot with tests."
+      ],
+      "verification_result": "Scaling is implemented and regression-tested; rotation remains missing. Candidate independent review is pending.",
+      "github_issue": "#23",
+      "commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99"
     }
   ],
   "latest_evaluation": {
@@ -809,19 +912,24 @@
       "Partial criteria 2, 3, 5, 9, 27, 40, 47, and 50 remain; score 92/100 is six points below the required 98/100."
     ]
   },
-  "current_candidate_commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
-  "status_counts_validated_on": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+  "current_candidate_commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99",
+  "status_counts_validated_on": "9d9bf90e62e3e75ea94de7828d86800cbd382c99",
   "candidate_validation": {
-    "commit": "c10260483eab6b5adaadd261a66a92a9138b9ed8",
+    "status": "BMP image/sprite candidate locally verified; independent review pending",
+    "items": "201 partially implemented; 202 and 209 in progress pending review; 212 partially implemented (rotation missing)",
     "reviewed_score": 92,
     "previous_reviewed_score": 91,
     "threshold": 98,
-    "result": "FAIL",
-    "python_unittest": "77 passed; independently rerun on exact candidate",
-    "runtime_tests": "Native mouse integration passed resized mapping, letterbox exclusion, left/right/middle press/held/release, signed wheel capture/reset. Live mouse-enabled window not visually inspected.",
-    "status_ledger": "26 audited rows; 424 NEEDS VERIFICATION, 3 PARTIALLY IMPLEMENTED, 21 COMPLETE, 2 IN PROGRESS = 450; mouse items #391–394 COMPLETE.",
-    "finding": "Issue #48 fixed: both status JSON files parse as UTF-8 and candidate/review records are synchronized. Remaining 98-bar deductions are criteria 2,3,5,9,27,40,47,50.",
-    "status": "92/100 FAIL vs 98; issue #48 resolved and closed."
+    "result": "PENDING REVIEW; latest reviewed score remains 92/100 FAIL",
+    "python_unittest": "79 passed on candidate source 9d9bf90",
+    "msvc_release_build": "examples/image_sprite.ANVL built successfully",
+    "npm_test": "passed; VS Code package 0.1.9 grammar and sample token validation",
+    "compileall": "passed",
+    "qa_report_validator": "passed; historical latest reviewed rubric remains 50 criteria = 92/100",
+    "strict_json": "pending final status sync validation",
+    "git_diff_check": "passed on candidate source",
+    "commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99",
+    "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -829,11 +937,10 @@
   "current_active_item": 185,
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775",
   "implementation_status_counts": {
-    "NEEDS VERIFICATION": 424,
-    "PARTIALLY IMPLEMENTED": 3,
+    "NEEDS VERIFICATION": 420,
+    "PARTIALLY IMPLEMENTED": 5,
     "COMPLETE": 21,
-    "IN PROGRESS": 2,
-    "TOTAL": 450
+    "IN PROGRESS": 4
   },
   "resolved_critic_issue_48": "Fixed in the UTF-8 status synchronization after critic review d757c79: both files now parse as strict UTF-8 JSON and evaluation metadata records the exact reviewed candidate SHA. The fresh 91/100 evaluation remains attached to d757c79; a new review is required for the corrected snapshot."
 }

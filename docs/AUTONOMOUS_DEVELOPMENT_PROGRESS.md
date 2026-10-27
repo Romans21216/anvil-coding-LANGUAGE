@@ -285,3 +285,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Verification:** strict UTF-8 parsing, status parity (26 audited; `424 + 3 + 21 + 2 = 450`; #391–394 COMPLETE), 77 Python tests, extension validation, compileall, QA arithmetic, and diff-check pass on the exact candidate. Mouse synthetic native tests pass for resize mapping, letterbox exclusion, all three button edges/held/release states, and wheel input.
 - **Finding status:** issue #48's JSON encoding and stale-review metadata defect is fixed and closed. The previous d757c79 result remains 91/100; corrected c102604 scores 92/100. No code defect was found. No live mouse-enabled window was visually inspected.
 - **Remaining partial criteria:** 2, 3, 5, 9, 27, 40, 47, and 50. Continue work toward 98; this result is six points below passing.
+
+
+## Batch 13 — bounded BMP image and sprite resources (source candidate `9d9bf90`)
+
+- Added `image_load`, `image_width`, `image_height`, `image_destroy`, `image_draw`, and `image_draw_scaled` built-ins. The runtime accepts uncompressed 24-bit and 32-bit BMP images, handles padded rows and top-down files, applies bounds on dimensions/pixels/total memory, clips drawing, supports alpha, and frees resources on release or shutdown. Generation-checked numeric handles prevent a stale handle from aliasing a reused image slot.
+- Added a bundled sprite and `examples/image_sprite.ANVL`, API/compiler docs, formal language-spec entries, wiki notes, and VS Code grammar/sample validation (package 0.1.9; not installed over the user's 0.1.4).
+- Native runtime regression covers 24-bit and top-down 32-bit files, malformed/oversized inputs, dimension queries, clipped/scaled/native drawing, destruction, reload and stale-handle rejection. `python -m unittest discover -s tests -q` passed 79 tests; MSVC release build of the example, npm extension validation, compileall, QA arithmetic and diff check pass.
+- Canonical issue #23 status: #201 PARTIALLY IMPLEMENTED (BMP only), #202 IN PROGRESS pending independent review, #209 IN PROGRESS pending independent review, #212 PARTIALLY IMPLEMENTED (scaling present, rotation missing).
+- Latest independent score remains **92/100 — FAIL against 98** on `c102604`; review of the sprite source candidate is pending.
