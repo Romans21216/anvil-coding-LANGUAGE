@@ -13,7 +13,7 @@
   "latest_independently_reviewed_candidate_commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "7c1385c5abed78ebd2d8c0f60a7c6e2838f44bf6",
-  "latest_followup_status_change": "Compiler architecture refactor candidate is in progress for issue #12/backlog items 101–104: lexer, syntax parser, semantic validator, codegen, build, and CLI responsibilities are separated. Three module tests pass; full suite is 72 and nine prior C outputs are byte-identical. Independent review is pending.",
+  "latest_followup_status_change": "Compiler architecture refactor candidate is in progress for issue #12/backlog items 101\u2013104: lexer, syntax parser, semantic validator, codegen, build, and CLI responsibilities are separated. Three module tests pass; full suite is 72 and nine prior C outputs are byte-identical. Independent review is pending.",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
@@ -155,7 +155,7 @@
       "tests": [
         "Independent critic verified 69 Python tests, npm extension validation, Python compileall, and git diff --check on exact commit 7c1385c",
         "QA validator accepts a valid zero-point criterion fixture and rejects a mismatched category subtotal fixture",
-        "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37–#43 are resolved",
+        "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37\u2013#43 are resolved",
         "Compiler-refactor candidate: the full suite passes 72 tests; the latest independent specification review separately verified 67 tests on 65c15bf"
       ],
       "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
@@ -169,7 +169,7 @@
         "Link the specification from the README and language reference/wiki.",
         "Independently review the specification for consistency with implementation."
       ],
-      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37–#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
+      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37\u2013#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
       "github_issue": "#23",
       "commit": "e17eeac505cf12d70363bf658f598cb6d485a45b"
     },
@@ -203,7 +203,7 @@
       ],
       "verification_result": "IN PROGRESS: local tests and nine-sample byte-for-byte generated C compatibility check pass; independent review pending.",
       "github_issue": "#23",
-      "commit": "854d36c764240362a85fc22a801f8f36a609fde5"
+      "commit": "43894d3"
     },
     {
       "number": 102,
@@ -235,7 +235,7 @@
       ],
       "verification_result": "IN PROGRESS: local tests and nine-sample byte-for-byte generated C compatibility check pass; independent review pending.",
       "github_issue": "#23",
-      "commit": "854d36c764240362a85fc22a801f8f36a609fde5"
+      "commit": "43894d3"
     },
     {
       "number": 103,
@@ -267,7 +267,7 @@
       ],
       "verification_result": "IN PROGRESS: local tests and nine-sample byte-for-byte generated C compatibility check pass; independent review pending.",
       "github_issue": "#23",
-      "commit": "854d36c764240362a85fc22a801f8f36a609fde5"
+      "commit": "43894d3"
     },
     {
       "number": 104,
@@ -299,7 +299,7 @@
       ],
       "verification_result": "IN PROGRESS: local tests and nine-sample byte-for-byte generated C compatibility check pass; independent review pending.",
       "github_issue": "#23",
-      "commit": "854d36c764240362a85fc22a801f8f36a609fde5"
+      "commit": "43894d3"
     },
     {
       "number": 301,
