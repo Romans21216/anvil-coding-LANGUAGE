@@ -1,6 +1,6 @@
 # Language Reference
 
-Anvil files are UTF-8 `.ANVL` text. `#` starts a comment outside quoted strings. Names are case-sensitive. `end` closes functions, `if` blocks, and `while` loops; indentation is optional.
+Anvil files are UTF-8 `.ANVL` text. `#` starts a comment outside quoted strings. Names are case-sensitive. `end` closes functions, `if` blocks, `while` loops, and `for` loops; indentation is optional.
 
 ## Functions, parameters, and returns
 
@@ -29,6 +29,18 @@ Operators are `+`, `-`, `*`, `/`, `%`, comparisons (`=`, `==`, `!=`, `<`, `<=`, 
 
 `while condition` checks its numeric condition before each pass. The body repeats until the condition evaluates to zero. The body should update state used by the condition so the loop can terminate. Loops may be nested.
 
+`for local(index) = start to end [step amount]` runs an inclusive numeric range. Start, end, and step are evaluated once. The default step is `1`; a negative step counts downward, and a zero step runs no iterations. The variable is function-local and retains its final value. A parameter cannot be used as the control variable; nested `for` loops must use different local names.
+
+```anv
+fn(sum-odd, limit)
+  set local(total) = 0
+  for local(index) = 1 to var(limit) step 2
+    add local(total) local(index)
+  end
+  output local(total)
+end
+```
+
 ```anv
 fn(sum-to, limit)
   set local(index) = 1
@@ -51,7 +63,7 @@ fn(clamp-low, value, lower)
 end
 ```
 
-The current language has `if`/`else`/`end` and `while`/`end` loops, but does not yet have arrays, user-defined structures, static types, modules, or general-purpose strings.
+The current language has `if`/`else`/`end`, `while`/`end`, and numeric `for`/`end` loops, but does not yet have arrays, user-defined structures, static types, modules, or general-purpose strings.
 
 ## Built-ins
 
