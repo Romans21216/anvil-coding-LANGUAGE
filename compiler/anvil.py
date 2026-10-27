@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 9631)
+Total output lines: 716
+
 #!/usr/bin/env python3
 """Small ahead-of-time Anvil-to-C compiler. C is emitted as ordinary source."""
 from __future__ import annotations
@@ -124,13 +127,21 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
             if len(stack) == 1:
                 raise CompileError(f"{path}:{line_no}: unexpected 'end'")
             _, kind, _ = stack.pop()
-            if kind not in ("function", "if", "else"):
+            if kind not in ("function", "if", "else", "while"):
                 raise CompileError(f"{path}:{line_no}: mismatched block end")
             continue
         if line.startswith("if "):
             node = Node("if", line_no, value=line[3:].strip())
             stack[-1][0].append(node)
             stack.append((node.body, "if", node))
+            continue
+        if line == "while" or line.startswith("while "):
+            condition = line[len("while "):].strip()
+            if not condition:
+                raise CompileError(f"{path}:{line_no}: while needs a condition")
+            node = Node("while", line_no, value=condition)
+            stack[-1][0].append(node)
+            stack.append((node.body, "while", node))
             continue
         node = None
         if re.fullmatch(r"set\s+var\([A-Za-z_][\w-]*\)\s*=\s*null", line):
@@ -361,63 +372,7 @@ class ExpressionParser:
             args = []
             if not self.peek(")"):
                 while True:
-                    args.append(self.require_number(self.parse()))
-                    if not self.peek(","):
-                        break
-                    self.take()
-            self.expect(")")
-            low, high = BUILTINS[value]
-            if not low <= len(args) <= high:
-                expected = str(low) if low == high else f"{low}..{high}"
-                raise CompileError(f"{self.path}:{self.line}: {value}() expects {expected} argument(s), got {len(args)}")
-            name = BUILTIN_C_NAMES.get(value, value)
-            left = (f"{name} ( {', '.join(args)} )" if args else f"{name} ( )", "number")
-        elif kind == "word":
-            raise CompileError(f"{self.path}:{self.line}: unknown name {value!r}")
-        else:
-            raise CompileError(f"{self.path}:{self.line}: unexpected token {value!r} in expression")
-
-        while self.peek():
-            operator = self.tokens[self.index][1]
-            precedence = self.PRECEDENCE.get(operator, -1)
-            if precedence < minimum:
-                break
-            self.take()
-            if not self.peek() or self.peek(")") or self.peek(","):
-                raise CompileError(f"{self.path}:{self.line}: operator {operator!r} needs a right operand")
-            left_code = self.require_number(left)
-            right = self.require_number(self.parse(precedence + 1))
-            if operator == "%":
-                left = (f"fmod({left_code}, {right})", "number")
-            else:
-                c_operator = {"=": "==", "and": "&&", "or": "||"}.get(operator, operator)
-                left = (f"({left_code} {c_operator} {right})", "number")
-        return left
-
-    def compile(self, expected: str = "number") -> str:
-        result = self.parse()
-        if self.peek():
-            raise CompileError(f"{self.path}:{self.line}: unexpected token {self.tokens[self.index][1]!r} in expression")
-        code, actual = result
-        if actual != expected:
-            raise CompileError(f"{self.path}:{self.line}: expected {expected}, got {actual}")
-        return code
-
-
-def split_args(text: str) -> list[str]:
-    result, start, depth, quoted, escaped = [], 0, 0, False, False
-    for i, ch in enumerate(text):
-        if escaped:
-            escaped = False
-        elif ch == "\\" and quoted:
-            escaped = True
-        elif ch == '"':
-            quoted = not quoted
-        elif not quoted and ch == "(":
-            depth += 1
-        elif not quoted and ch == ")":
-            depth -= 1
-        elif not quoted and depth == 0 and ch == ",":
+          …631 tokens truncated…epth == 0 and ch == ",":
             result.append(text[start:i].strip()); start = i + 1
     tail = text[start:].strip()
     if tail or result:
@@ -524,6 +479,10 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
             if n.otherwise:
                 out.append(f"{indent}}} else {{")
                 out.extend(emit_nodes(path, n.otherwise, functions, indent + "    ", scope))
+            out.append(f"{indent}}}")
+        elif n.kind == "while":
+            out.append(f"{indent}while ({expr(path, n.line, n.value, functions, scope=scope)} != 0.0) {{")
+            out.extend(emit_nodes(path, n.body, functions, indent + "    ", scope))
             out.append(f"{indent}}}")
         elif n.kind == "scene": out.append(f"{indent}anvil_set_scene3d({1 if n.value == '3d' else 0});")
         elif n.kind == "camera":
