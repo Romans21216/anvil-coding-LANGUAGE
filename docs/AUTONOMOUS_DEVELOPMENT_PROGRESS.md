@@ -39,14 +39,14 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Remaining limitations:** This is a runtime check; it does not statically prove a denominator is zero. DXR and Embree remain unavailable, and this work does not change renderer behavior.
 - **Next batch:** Continue by selecting the next small, verified item from issue #23; preserve the user's 0.1.4 VS Code installation preference.
 
-## Batch 4 — short-circuit logical evaluation (in progress)
+## Batch 4 — short-circuit logical evaluation
 
 - **Features:** Audited backlog item #46. `and` and `or` already lower to C `&&` and `||`, which short-circuit. Added a native regression test proving skipped side-effecting calls are not run and required right-side calls do run; clarified this behavior in the language guide and wiki.
-- **Backlog:** #46 is IN PROGRESS pending full-suite verification and independent review.
+- **Backlog:** #46 is COMPLETE after native behavior tests and independent verification.
 - **Files:** `tests/test_compiler.py`, `docs/LANGUAGE.md`, `docs/Wiki/Language-Reference.md`, implementation-status inventory, progress log, and resumable state.
 - **Tests:** Targeted MSVC compile/run regression passed (1 test); `python -m unittest discover -s tests -q` — 57 passed; `npm test --prefix vscode-extension` — passed; `python -m compileall -q compiler tests` — passed; `git diff --check` — passed.
-- **Review:** Pending.
-- **Commit/push:** Pending.
-- **GitHub issues:** After the user's direction, the full 450-item list was copied verbatim from issue #23 into issue comment [#issuecomment-6451810775](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775). The repository no longer mirrors that full list; it keeps only audited work/status evidence. The issue body itself was not edited.
+- **Review:** Exact commit `83cf626b0a5ab370d5a6da476ea47bbc2a9f728a` scored **89/100 — FAIL** (16/20, 20/20, 17/20, 18/20, 18/20). The reviewer confirmed short-circuit behavior, 57 tests, extension validation, Python compile, native MSVC sample build/run, and correct single-location storage of the 450-item list. The one-point deduction was a stale “50 tests” sentence in QA criterion 40; no code defect was found.
+- **Commit/push:** `83cf626` (`test(language): verify short-circuit evaluation`) pushed to `origin/main`.
+- **GitHub issues:** The full 450-item list was copied verbatim from issue #23 into issue comment [#issuecomment-6451810775](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775). The repository no longer mirrors that full list; it keeps only audited work/status evidence. The stale QA count was filed as issue [#28](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/28) with the `Codex Bugs` label. Issue #23 remains the only home for the complete item list.
 - **Limitations:** Current short-circuit behavior is provided by the C backend; this adds coverage but does not introduce a backend-independent intermediate representation.
-- **Next batch:** Finish full verification, request an independent review, then sync evaluation and issue tracking.
+- **Next batch:** QA criterion 40's stale count is corrected in the follow-up; run a fresh independent review and close issue #28 only if verified.

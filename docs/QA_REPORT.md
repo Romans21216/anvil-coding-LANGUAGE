@@ -2,8 +2,8 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **90/100 — PASS** (commit `12b4e55b142d0fd48cccddfc6d6f67eefed16710`; threshold: 90/100).
-**Review snapshot:** the independent reviewer evaluated exact commit `12b4e55b142d0fd48cccddfc6d6f67eefed16710`, reran all 56 Python tests, VS Code extension validation, and Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), passed `git diff --check`, and validated 450 unique sequential backlog records present in that snapshot. After the user requested a single home for the full list, it was posted as a comment to issue #23; repository files now retain only an audited subset and point to the issue. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. The reviewer verified division-by-zero diagnostics report source path/line and exit code 2 while regular division remains functional. No defect was found in batch 3. Visual highlighting in 0.1.7 remains unverified.
+**Latest completed independent full review:** **89/100 — FAIL** (commit `83cf626b0a5ab370d5a6da476ea47bbc2a9f728a`; threshold: 90/100).
+**Review snapshot:** the independent reviewer evaluated exact commit `83cf626b0a5ab370d5a6da476ea47bbc2a9f728a`, reran all 57 Python tests, VS Code extension validation, and Python compilation, built and ran `examples/numeric_demo.ANVL` with MSVC (output `17`), and passed `git diff --check`. The reviewer confirmed short-circuit semantics for side-effecting calls and verified the full 450-item list appears in issue #23's body and comment, while repository docs contain only a compact audited subset. The review scored criterion 38 one point because QA criterion 40 still said “50 tests”; this exact documentation defect is tracked in issue #28. No short-circuit runtime defect was found. Extension 0.1.4 remains installed; 0.1.7 is not installed per user preference. Visual highlighting in 0.1.7 remains unverified.
 
 ## Scope
 
@@ -15,7 +15,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 56 tests, including friction edge cases and division-by-zero source diagnostics plus regular division |
+| `python -m unittest discover -s tests -q` | PASS — 57 tests, including friction edge cases, division diagnostics, and short-circuit side-effect calls |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -77,16 +77,16 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 28 | No unfinished placeholders | 2 | Unsupported capabilities are described as future work. |
 | 29 | Configuration understandable | 2 | TOML project settings are explicit and validated. |
 | 30 | Conventions followed | 2 | Current Python, C, TOML, and extension conventions are adequate. |
-| 31 | Automated tests provided | 2 | Independent review ran 52 Python tests successfully. |
+| 31 | Automated tests provided | 2 | Independent review of `83cf626` ran 57 Python tests successfully. |
 | 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, circle/box collisions, pool capacity, and generated executable paths are covered. |
 | 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
 | 34 | Edge cases explicitly tested | 2 | The current suite covers recursive allocation exhaustion/cleanup plus physics contact timing, extreme velocity/coordinate bounds, and repeatability. |
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 2 | This follow-up records the exact reviewed commit `12b4e55`, 56 passing tests, division diagnostics, the 450-entry status, and package 0.1.7 uninstalled. It also retains earlier exact-commit review history. |
-| 39 | Regression checks performed | 2 | Independent review reran all 53 tests and extension validation; native integration covers mixed-shape solver, pool capacity, and friction behavior. |
-| 40 | Verified against original goal | 1 | The 56-test suite verifies the prototype, not the full requested engine breadth. |
+| 38 | Results recorded accurately | 1 | On reviewed commit `83cf626`, criterion 40 used a stale test total despite 57 passing. The current sentence has been corrected; issue #28 remains open pending re-review. |
+| 39 | Regression checks performed | 2 | Independent review reran all 57 tests and extension validation; native integration covers mixed-shape solver, pool capacity, friction, and short-circuit behavior. |
+| 40 | Verified against original goal | 1 | The full suite verifies the current prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
 | 43 | Usage understandable | 2 | Guides and examples explain the supported syntax and build path. |
@@ -100,9 +100,9 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **19/20** | |
+| | **Testing and verification** | **18/20** | |
 | | **Developer experience and delivery** | **18/20** | |
-| | **Total** | **90/100 — PASS** | |
+| | **Total** | **89/100 — FAIL** | |
 
 ### Deduction details and follow-up
 
@@ -112,7 +112,8 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 - **Criterion 9 — important use cases supported (1/2).** **Problem/evidence:** mixed 2D circle/box contacts work, but no rotation, CCD, polygon or 3D body, asset/audio use, or secure multiplayer path exists. **Impact:** suitable use cases are limited to small demos and learning. **Recommended fix:** broaden physics and engine systems in staged releases. **Status:** open; issue #8 is updated with current physics scope.
 - **Criteria 22 and 23 — readability and module responsibility (each 1/2).** **Problem/evidence:** `compiler/anvil.py` remains densely formatted and combines parsing, semantic validation, C generation, and build orchestration. **Impact:** feature additions increase maintenance and regression risk. **Recommended fix:** split the compiler into lexer/parser, semantic analysis, C backend, and build-driver modules, then format and test each boundary. **Status:** open; issue #12.
 - **Criterion 27 — extensible architecture (1/2).** **Problem/evidence:** runtime and native toolchain are Windows/MSVC and C-only. **Impact:** additional host platforms and compiler backends require substantial rework. **Recommended fix:** define platform/runtime interfaces and add non-Windows and alternate code-generation targets. **Status:** open; issue #11.
-- **Criterion 40 — verified against original goal (1/2).** **Problem/evidence:** 50 tests verify current compiler/runtime/physics behavior, but do not cover the full engine request. **Impact:** the test suite cannot establish completion of missing systems. **Recommended fix:** map acceptance tests to every requested feature and backlog milestone as those systems are delivered. **Status:** open; matrix and issue #23 track remaining scope.
+- **Criterion 38 — results recorded accurately (1/2).** **Problem/evidence:** on `83cf626`, criterion 40 used a stale test total while the independent review ran 57 successfully. **Impact:** the outdated count contradicted current verification and reduced trust in the evaluation. **Fix:** remove the stale count; the current criterion now describes test scope without a numeric total. **Status:** issue [#28](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/28) is open pending critic confirmation.
+- **Criterion 40 — verified against original goal (1/2).** **Problem/evidence:** tests cover the current prototype, not the full engine request. **Impact:** the suite cannot establish completion of missing systems. **Recommended fix:** map acceptance tests to every requested feature and backlog milestone as those systems are delivered. **Status:** open; matrix and issue #23 track remaining scope.
 - **Criterion 47 — editor integration (1/2).** **Problem/evidence:** Extension 0.1.7 includes `body_friction` and automated token validation passes, but the user kept 0.1.4 installed; highlighting for newer built-ins has no visible editor verification. **Impact:** newly added highlighting is not confirmed in the user's editor. **Status:** pending user preference; exact evidence is tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24).
 - **Historical criteria 8, 38, and 44 finding — resolved.** On `f7c91b0`, the main completion/evaluation docs had not incorporated friction or the current review/test/package snapshot. Commits `e1e3768` and `83891c6` corrected these records, and independent review confirmed the documentation against implementation and verification; issue #27 is closed. The 87/100 score remains valid for that exact older snapshot. The independent reviewer also confirmed zero-friction and mixed-coefficient regression tests in `83891c6`; issue #26 is closed.
 - **Batch 3 tracking metadata note — resolved in the post-review docs sync.** The reviewer of `12b4e55` observed that `docs/IMPLEMENTATION_STATUS.json` still named `83891c6` as its repository head and item #48 was pending review at that snapshot. The current follow-up records the exact reviewed HEAD, promotes #48 to COMPLETE with test/build evidence, and synchronizes the cumulative state file. This was stale tracking metadata, not a runtime defect.

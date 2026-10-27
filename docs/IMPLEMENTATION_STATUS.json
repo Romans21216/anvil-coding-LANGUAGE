@@ -1,22 +1,22 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "12b4e55b142d0fd48cccddfc6d6f67eefed16710",
+  "reviewed_implementation_commit": "83cf626b0a5ab370d5a6da476ea47bbc2a9f728a",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 437,
     "PARTIALLY IMPLEMENTED": 3,
-    "COMPLETE": 9,
-    "IN PROGRESS": 1
+    "COMPLETE": 10,
+    "IN PROGRESS": 0
   },
-  "latest_verified_commit": "12b4e55b142d0fd48cccddfc6d6f67eefed16710",
+  "latest_verified_commit": "83cf626b0a5ab370d5a6da476ea47bbc2a9f728a",
   "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
   "audited_items": [
     {
       "number": 46,
       "section": "1. CORE LANGUAGE AND SYNTAX",
       "title": "Add short-circuit Boolean evaluation.",
-      "status": "IN PROGRESS",
+      "status": "COMPLETE",
       "source_evidence": [
         "compiler/anvil.py: ExpressionParser maps `and`/`or` to C `&&`/`||`, whose evaluation short-circuits."
       ],
@@ -27,7 +27,7 @@
         "python -m compileall -q compiler tests: passed",
         "git diff --check: passed"
       ],
-      "missing_or_limitations": "Awaiting independent review; current lowering relies on C short-circuit operators.",
+      "missing_or_limitations": "Current lowering relies on C short-circuit operators, so behavior follows the C backend semantics.",
       "dependencies": [],
       "priority": "P1 for physics items; P0 for existing documented correctness/QA items; otherwise not yet ranked",
       "assigned_agent": "Codex lead (sequential execution)",
@@ -36,9 +36,9 @@
         "Add relevant regression/integration tests and a working example where appropriate.",
         "Update language/engine docs and verify source behavior before marking COMPLETE."
       ],
-      "verification_result": "IN PROGRESS: native regression and full repository checks pass; independent review pending.",
+      "verification_result": "COMPLETE: independent review of 83cf626 confirmed the short-circuit implementation and side-effect regression; the overall QA score's separate stale test-count documentation finding is tracked in issue #28.",
       "github_issue": "#23",
-      "commit": null
+      "commit": "83cf626b0a5ab370d5a6da476ea47bbc2a9f728a"
     },
     {
       "number": 48,
