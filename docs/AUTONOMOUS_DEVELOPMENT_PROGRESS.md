@@ -225,3 +225,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - The latest full-list comment on issue #23 (`6451810775`) defines #144 as compiler version reporting and #172 as dynamic window resizing. The candidate had incorrectly recorded the feature as #144. This reduced criterion 38 from 2 to 1; issue #46 (`Codex Bugs`) records the finding.
 - The runtime viewport implementation passed the 73-test suite and 3 native runtime tests. Review inspected geometry and paint handling but did not visually launch a resized window. No code defect was reproduced.
 - The status and QA records are being corrected to canonical #172; fresh review is required before treating criterion 38 as restored.
+
+
+### Fresh critic result — corrected resize tracking candidate `f12c0ac`
+
+- **Exact reviewed commit:** `f12c0ac42f3d1f7b74fc78b9c37fa9ae4e8c1de`.
+- **Score:** **92/100 — FAIL** against the current **98/100** passing requirement. Categories: requirements 16/20, functionality/reliability 20/20, architecture 19/20, testing/verification 19/20, delivery 18/20.
+- **Change from the prior review:** Criterion 38 rises from 1/2 to 2/2 after the critic confirmed item #172 is dynamic window resizing and #144 remains unverified compiler version reporting. The 91/100 `bc4db99` score remains historical.
+- **Independent checks:** 73 Python tests, VS Code extension validation, compileall, QA arithmetic, and `git diff --check` passed. The 21 audited rows sum to the 450-item backlog. The critic did not visually inspect a resized game window.
+- **Issue tracking:** Issue #46's canonical-number correction has now been independently verified, documented with evidence, and closed. The 98-point goal remains unmet by 6 points. The fresh result was added to issue #23 without duplicating its 450-item list.
