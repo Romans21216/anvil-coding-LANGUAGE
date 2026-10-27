@@ -18,11 +18,11 @@ This log records verified implementation batches and is reconciled with Git befo
 ## Batch 2 — friction edge-case tests and tracking synchronization
 
 - **Features:** Added native integration coverage for frictionless contacts and geometric-mean combination of different per-body coefficients. Updated QA/evaluation/completion docs to reflect the reviewed friction feature and its limits. Added a 450-item evidence inventory, cumulative progress log, and resumable state file from the unchanged master backlog.
-- **Backlog:** Item #311 remains NEEDS VERIFICATION pending independent review. Its implementation and explicit edge cases are now present. Items #302/#303 remain complete; no other backlog item was promoted without source/test review.
+- **Backlog:** Item #311 is COMPLETE after independent review of the friction implementation and edge cases. Items #302/#303 remain complete; no other backlog item was promoted without source/test review.
 - **Files:** `tests/test_compiler.py`, `docs/QA_REPORT.md`, `docs/ANVIL_EVALUATION.txt`, `docs/COMPLETION_MATRIX.md`, `README.md`, `docs/IMPLEMENTATION_STATUS.json`, `docs/IMPLEMENTATION_STATUS.md`, `docs/AUTONOMOUS_DEVELOPMENT_PROGRESS.md`, and `docs/CODEX_AUTONOMOUS_STATE.json`.
 - **Tests:** Targeted zero/mixed friction case passed. Full follow-up: 54 Python tests passed; VS Code extension validation passed; Python compilation passed; native MSVC friction sample build passed; `git diff --check` passed; status JSON parses and contains all 450 backlog entries.
-- **Independent review:** Pending for this follow-up. The last review remains 87/100 on exact commit `f7c91b01ec0b4f91e2cf26c0ea08e95a5669c860`; do not apply that score to this new candidate.
-- **GitHub issues:** #26 updated with the added tests and pending review; #27 documents the stale records from the prior reviewed snapshot. #8 and #15 reflect current verified implementation and the 87-point review. Issue #23 was checked after that review and left unchanged.
-- **Commit/push:** `e1e3768` (`test(physics): cover friction edge cases and sync tracking`), pushed to `origin/main`.
+- **Independent review:** Exact commit `83891c6fe801659e350defa2e080b30fb914963b` scored **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). Reviewer ran 54 tests, extension validation, py_compile, MSVC friction sample build, diff check, and confirmed 450 unique sequential status entries. The older 87 score remains historical for exact commit `f7c91b0`.
+- **GitHub issues:** #26 (friction edge tests) and #27 (stale evaluation records) are resolved after independent verification. #8 and #15 reflect current implementation and the 90-point review. Issue #23 was checked after the critic and left unchanged.
+- **Commit/push:** `e1e3768` (`test(physics): cover friction edge cases and sync tracking`) and `83891c6` (resumable state), pushed to `origin/main`.
 - **Remaining blockers:** Visual verification of VSIX 0.1.7 remains deferred by user preference; 0.1.4 stays installed.
-- **Next batch:** Run independent review on the committed docs/test follow-up, synchronize score/issue statuses, then continue from the highest-priority unblocked backlog entry.
+- **Next batch:** Investigate backlog item #48 (division-by-zero diagnostics), implement source-located behavior and tests, then run the critic and sync reports/issues.

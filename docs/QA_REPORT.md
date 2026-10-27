@@ -2,8 +2,8 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **87/100 — FAIL** (commit `f7c91b0`; threshold: 90/100).
-**Review snapshot:** the independent reviewer evaluated exact commit `f7c91b01ec0b4f91e2cf26c0ea08e95a5669c860`, reran all 53 Python tests, VS Code extension validation, and Python compilation, confirmed extension 0.1.4 remains installed, built `examples/physics_friction.ANVL` with MSVC, and passed `git diff --check`. Extension 0.1.7 is packaged but not installed per user preference. The review found that the high-level evaluation/completion docs still called friction missing and still described the previous 52-test/0.1.6 snapshot. Those records are synchronized in this follow-up. The friction test does not yet separately cover a zero coefficient or differing per-body coefficients.
+**Latest completed independent full review:** **90/100 — PASS** (commit `83891c6`; threshold: 90/100).
+**Review snapshot:** the independent reviewer evaluated exact commit `83891c6fe801659e350defa2e080b30fb914963b`, reran all 54 Python tests, VS Code extension validation, and Python compilation, confirmed extension 0.1.4 remains installed, built `examples/physics_friction.ANVL` with MSVC, passed `git diff --check`, and validated 450 unique sequential backlog entries in `docs/IMPLEMENTATION_STATUS.json`. Extension 0.1.7 is packaged but not installed per user preference. The reviewer confirmed the friction documentation and edge-case tests match the implementation. Visual highlighting in 0.1.7 remains unverified.
 
 ## Scope
 
@@ -15,7 +15,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 54 tests in the post-review follow-up, including mixed-shape solver cases, configurable capacity, friction stopping/range validation, zero friction, and geometric-mean mixing |
+| `python -m unittest discover -s tests -q` | PASS — 54 tests, including mixed-shape solver cases, configurable capacity, friction stopping/range validation, zero friction, and geometric-mean mixing |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -42,7 +42,7 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 
 ## Independent 50-criterion review
 
-The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and `51deb5d` scored **90/100 — PASS**. The review of `c4f3ec6` scored **88/100 — FAIL** because four docs contained stale complexity claims. Commit `560cee1` corrected those documents; a fresh independent review confirmed the fix and scored `560cee1` **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The friction feature commit `f7c91b0` was reviewed independently and scored **87/100 — FAIL** (15/20, 20/20, 17/20, 18/20, 17/20). It ran 53 tests and all extension, Python, MSVC, and diff checks. The review found high-level docs had not yet caught up with the friction feature or its test/package versions; this report now records them. It also identified missing specific tests for zero friction and differing coefficients. Other deductions concern overall engine scope, compiler structure/platform breadth, and unverified new extension highlighting. See issues #8, #24, #26, and #27.
+The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and `51deb5d` scored **90/100 — PASS**. The review of `c4f3ec6` scored **88/100 — FAIL** because four docs contained stale complexity claims. Commit `560cee1` corrected those documents; a fresh independent review confirmed the fix and scored `560cee1` **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20). The friction feature commit `f7c91b0` scored **87/100 — FAIL** (15/20, 20/20, 17/20, 18/20, 17/20) because of stale high-level feature and QA records plus missing friction edge-case tests. Follow-up commits `e1e3768` and `83891c6` synchronized the records and added those tests. The independent review of exact commit `83891c6` scored **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20); it reran all 54 tests, extension/Python validation, the MSVC friction build, diff check, and verified the complete 450-entry status inventory. Issues #26 and #27 are resolved. Remaining deductions concern overall engine scope, compiler structure/platform breadth, and unverified new extension highlighting. See issues #8 and #24.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -53,7 +53,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 5 | No essential feature missing | 1 | GPU renderer, assets, audio, 3D/advanced physics, and broader multiplayer remain unfinished. |
 | 6 | Stated constraints respected | 2 | `.ANVL` is consistently used as requested. |
 | 7 | Ambiguity resolved logically | 2 | Current C/MSVC prototype scope and limitations are documented. |
-| 8 | Behavior matches documentation | 1 | **Finding on `f7c91b0`:** engine/language guides described `body_friction`, but completion/evaluation docs still said friction was missing. **Impact:** top-level feature status contradicted the implementation. Follow-up docs correct the status; detailed record in issue #27. |
+| 8 | Behavior matches documentation | 2 | Reviewer of `83891c6` confirmed high-level feature and physics documentation match the runtime friction model, edge-case tests, and current status. The prior `f7c91b0` mismatch is resolved in issue #27. |
 | 9 | Important use cases supported | 1 | Simple native 2D/3D demonstrations work; broader engine use cases are missing. |
 | 10 | Usable for intended purpose | 2 | Usable for small learning and prototyping scenes. |
 | 11 | Core functionality works | 2 | Compiler, native runtime, camera, rendering, CPU BVH ray spheres, and limited 2D circle/axis-aligned-box physics build. |
@@ -83,25 +83,25 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 1 | **Finding on `f7c91b0`:** evaluation records still identified the 560cee1/52-test/extension-0.1.6 snapshot as latest after commit `f7c91b0` added the 53rd test and packaged 0.1.7. This follow-up records the new review and artifacts; the older snapshot remains explicitly historical. See issue #27. |
+| 38 | Results recorded accurately | 2 | This report records the exact latest reviewed commit `83891c6`, 54 passing tests, package 0.1.7 uninstalled, and review evidence. The stale state on `f7c91b0` was corrected and independently confirmed; issue #27 is resolved. |
 | 39 | Regression checks performed | 2 | Independent review reran all 53 tests and extension validation; native integration covers mixed-shape solver, pool capacity, and friction behavior. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
 | 43 | Usage understandable | 2 | Guides and examples explain the supported syntax and build path. |
-| 44 | Design decisions documented | 1 | **Finding on `f7c91b0`:** the friction model was described in the engine guide but omitted from the high-level evaluation and completion matrix. The follow-up documents per-body 0–1 coefficients, default 0.5, geometric-mean mixing, and normal-impulse clamping. See issue #27. |
+| 44 | Design decisions documented | 2 | High-level evaluation and completion docs now describe per-body friction range 0–1, default 0.5, geometric-mean mixing, and normal-impulse clamping. The reviewer confirmed consistency; issue #27 is resolved. |
 | 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
 | 46 | Opens in intended environment | 2 | The evaluator confirmed extension 0.1.4 installed; visible Anvil mode had previously been verified for the ray-backend sample. |
 | 47 | Editor integration works | 1 | **Problem:** new physics builtin highlighting has not been checked in an installed editor. **Evidence:** 0.1.7 grammar/package token checks pass, but the user kept 0.1.4 installed; it predates `body_create_box`, `physics_capacity`, and `body_friction`. **Impact:** visible syntax coloring for these built-ins is unverified in the user's editor. **Status:** pending user preference; tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24). |
 | 48 | Deliverables organized | 2 | Source, runtime, examples, tests, docs, extension grammar, and packaged VSIX are in their expected folders; the reviewer confirmed a clean worktree before and after verification. |
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
-| | **Requirement fulfillment** | **15/20** | |
+| | **Requirement fulfillment** | **16/20** | |
 | | **Functionality and reliability** | **20/20** | |
 | | **Code quality and architecture** | **17/20** | |
-| | **Testing and verification** | **18/20** | |
-| | **Developer experience and delivery** | **17/20** | |
-| | **Total** | **87/100 — FAIL** | |
+| | **Testing and verification** | **19/20** | |
+| | **Developer experience and delivery** | **18/20** | |
+| | **Total** | **90/100 — PASS** | |
 
 ### Deduction details and follow-up
 
@@ -113,7 +113,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 - **Criterion 27 — extensible architecture (1/2).** **Problem/evidence:** runtime and native toolchain are Windows/MSVC and C-only. **Impact:** additional host platforms and compiler backends require substantial rework. **Recommended fix:** define platform/runtime interfaces and add non-Windows and alternate code-generation targets. **Status:** open; issue #11.
 - **Criterion 40 — verified against original goal (1/2).** **Problem/evidence:** 50 tests verify current compiler/runtime/physics behavior, but do not cover the full engine request. **Impact:** the test suite cannot establish completion of missing systems. **Recommended fix:** map acceptance tests to every requested feature and backlog milestone as those systems are delivered. **Status:** open; matrix and issue #23 track remaining scope.
 - **Criterion 47 — editor integration (1/2).** **Problem/evidence:** Extension 0.1.7 includes `body_friction` and automated token validation passes, but the user kept 0.1.4 installed; highlighting for newer built-ins has no visible editor verification. **Impact:** newly added highlighting is not confirmed in the user's editor. **Status:** pending user preference; exact evidence is tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24).
-- **Criteria 8, 38, and 44 — follow-up documentation required on the reviewed commit.** On `f7c91b0`, the main completion/evaluation docs had not incorporated friction or the current review/test/package snapshot. These updates make the status current; issue #27 records the exact mismatched files and evidence. The 87/100 score remains the score for that exact commit. New tests for zero friction and mixed per-body coefficients are tracked in issue #26.
+- **Historical criteria 8, 38, and 44 finding — resolved.** On `f7c91b0`, the main completion/evaluation docs had not incorporated friction or the current review/test/package snapshot. Commits `e1e3768` and `83891c6` corrected these records, and independent review confirmed the documentation against implementation and verification; issue #27 is closed. The 87/100 score remains valid for that exact older snapshot. The independent reviewer also confirmed zero-friction and mixed-coefficient regression tests in `83891c6`; issue #26 is closed.
 - **Criterion 50 — practical for intended scope (1/2).** **Problem/evidence:** the engine lacks production graphics, assets, audio, mature physics, robust networking, portability, and performance evidence. **Impact:** it is not ready for production games. **Recommended fix:** continue implementation, benchmark real workloads, and define release criteria. **Status:** open; issue #15 and backlog #23.
 
 ### Priorities from the review

@@ -2,7 +2,7 @@
   "source_of_truth": "GitHub issue #23",
   "source_mirror": "docs/IMPROVEMENT_BACKLOG.md",
   "generated_at": "2026-10-27",
-  "repository_head": "f7c91b01ec0b4f91e2cf26c0ea08e95a5669c860",
+  "repository_head": "83891c6fe801659e350defa2e080b30fb914963b",
   "branch": "main",
   "items": [
     {
@@ -6224,16 +6224,16 @@
       "number": 311,
       "section": "7. PHYSICS AND COLLISION SYSTEM",
       "title": "Add friction.",
-      "status": "NEEDS VERIFICATION",
+      "status": "COMPLETE",
       "source_evidence": [
         "runtime/anvil_runtime.c: Coulomb tangent impulse",
         "docs/ENGINE.md: coefficient range, default, mixing rule",
         "examples/physics_friction.ANVL"
       ],
       "tests": [
-        "tests/test_compiler.py: friction stopping/range validation plus zero-friction and geometric-mean mixing native cases; 54-test suite passed in follow-up working tree"
+        "tests/test_compiler.py: stopping/range validation; zero friction; geometric-mean mixing, all native integration cases passing"
       ],
-      "missing_or_limitations": "Independent review of the explicit zero/mixed coefficient regression cases is pending; broader 2D-only physics limitations remain.",
+      "missing_or_limitations": "Broader physics remains limited to 2D circles and axis-aligned boxes; this item adds friction behavior only.",
       "dependencies": [],
       "priority": "P1 for physics items; P0 for existing documented correctness/QA items; otherwise not yet ranked",
       "assigned_agent": "Codex lead (sequential execution)",
@@ -6242,9 +6242,9 @@
         "Add relevant regression/integration tests and a working example where appropriate.",
         "Update language/engine docs and verify source behavior before marking COMPLETE."
       ],
-      "verification_result": "54 full-suite tests passed after the review; pending independent review of follow-up commit.",
+      "verification_result": "Independent review of 83891c6 confirmed source, docs, tests, sample build, and behavior.",
       "github_issue": "#26",
-      "commit": "pending next commit"
+      "commit": "e1e3768"
     },
     {
       "number": 312,
@@ -9061,8 +9061,9 @@
     }
   ],
   "summary": {
-    "NEEDS VERIFICATION": 440,
+    "NEEDS VERIFICATION": 439,
     "PARTIALLY IMPLEMENTED": 3,
-    "COMPLETE": 7
-  }
+    "COMPLETE": 8
+  },
+  "latest_verified_commit": "83891c6fe801659e350defa2e080b30fb914963b"
 }
