@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 9631)
-Total output lines: 716
+Warning: truncated output (original token count: 10630)
+Total output lines: 793
 
 #!/usr/bin/env python3
 """Small ahead-of-time Anvil-to-C compiler. C is emitted as ordinary source."""
@@ -81,6 +81,32 @@ def validate_port(path: pathlib.Path, line: int, text: str) -> None:
         raise CompileError(f"{path}:{line}: UDP port must be between 1 and 65535")
 
 
+def split_keyword(text: str, keyword: str) -> tuple[str, str] | None:
+    """Split at a standalone keyword outside strings and parentheses."""
+    depth, quoted, escaped = 0, False, False
+    index = 0
+    while index < len(text):
+        ch = text[index]
+        if escaped:
+            escaped = False
+        elif ch == "\\" and quoted:
+            escaped = True
+        elif ch == '"':
+            quoted = not quoted
+        elif not quoted and ch == "(":
+            depth += 1
+        elif not quoted and ch == ")":
+            depth -= 1
+        elif not quoted and depth == 0 and text.startswith(keyword, index):
+            before_ok = index > 0 and text[index - 1].isspace()
+            after = index + len(keyword)
+            after_ok = after < len(text) and text[after].isspace()
+            if before_ok and after_ok:
+                return text[:index].strip(), text[after:].strip()
+        index += 1
+    return None
+
+
 def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node], set[str]]:
     functions: dict[str, Node] = {}
     top: list[Node] = []
@@ -127,7 +153,7 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
             if len(stack) == 1:
                 raise CompileError(f"{path}:{line_no}: unexpected 'end'")
             _, kind, _ = stack.pop()
-            if kind not in ("function", "if", "else", "while"):
+            if kind not in ("function", "if", "else", "while", "for"):
                 raise CompileError(f"{path}:{line_no}: mismatched block end")
             continue
         if line.startswith("if "):
@@ -142,6 +168,35 @@ def parse(path: pathlib.Path, source: str) -> tuple[dict[str, Node], list[Node],
             node = Node("while", line_no, value=condition)
             stack[-1][0].append(node)
             stack.append((node.body, "while", node))
+            continue
+        for_loop = re.fullmatch(
+            r"for\s+local\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line
+        )
+        if for_loop:
+            if current_function is None:
+                raise CompileError(f"{path}:{line_no}: for loops must be inside a function")
+            loop_name, range_text = for_loop.groups()
+            if loop_name in current_function.params:
+                raise CompileError(f"{path}:{line_no}: for-loop variable cannot be a function parameter")
+            if any(kind == "for" and block is not None and block.name == loop_name
+                   for _, kind, block in stack):
+                raise CompileError(f"{path}:{line_no}: nested for loops must use different local variables")
+            range_parts = split_keyword(range_text, "to")
+            if not range_parts:
+                raise CompileError(f"{path}:{line_no}: for loop expects 'to' between its bounds")
+            start_expr, end_and_step = range_parts
+            step_parts = split_keyword(end_and_step, "step")
+            if step_parts:
+                end_expr, step_expr = step_parts
+            else:
+                end_expr, step_expr = end_and_step, "1"
+            if not start_expr or not end_expr or not step_expr:
+                raise CompileError(f"{path}:{line_no}: for loop needs start, end, and step expressions")
+            current_function.locals.add(loop_name)
+            node = Node("for", line_no, name=loop_name,
+                        params=[start_expr, end_expr, step_expr])
+            stack[-1][0].append(node)
+            stack.append((node.body, "for", node))
             continue
         node = None
         if re.fullmatch(r"set\s+var\([A-Za-z_][\w-]*\)\s*=\s*null", line):
@@ -362,17 +417,24 @@ class ExpressionParser:
         elif kind == "word" and value in ("true", "false"):
             left = ("1.0" if value == "true" else "0.0", "number")
         elif kind == "word" and value in ("and", "or"):
-            raise CompileError(f"{self.path}:{self.line}: operator {value!r} needs a left operand")
-        elif kind == "word" and value in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" and len(value) == 1:
-            left = ("ANVIL_KEY_" + value, "number")
-        elif kind == "word" and value in ("SPACE", "UP", "DOWN", "LEFT", "RIGHT", "ENTER", "ESCAPE"):
-            left = ("ANVIL_KEY_" + value, "number")
-        elif kind == "word" and value in BUILTINS:
-            self.expect("(")
-            args = []
-            if not self.peek(")"):
-                while True:
-          …631 tokens truncated…epth == 0 and ch == ",":
+         …630 tokens truncated…    raise CompileError(f"{self.path}:{self.line}: expected {expected}, got {actual}")
+        return code
+
+
+def split_args(text: str) -> list[str]:
+    result, start, depth, quoted, escaped = [], 0, 0, False, False
+    for i, ch in enumerate(text):
+        if escaped:
+            escaped = False
+        elif ch == "\\" and quoted:
+            escaped = True
+        elif ch == '"':
+            quoted = not quoted
+        elif not quoted and ch == "(":
+            depth += 1
+        elif not quoted and ch == ")":
+            depth -= 1
+        elif not quoted and depth == 0 and ch == ",":
             result.append(text[start:i].strip()); start = i + 1
     tail = text[start:].strip()
     if tail or result:
@@ -483,6 +545,28 @@ def emit_nodes(path: pathlib.Path, nodes: list[Node], functions: dict[str, Node]
         elif n.kind == "while":
             out.append(f"{indent}while ({expr(path, n.line, n.value, functions, scope=scope)} != 0.0) {{")
             out.extend(emit_nodes(path, n.body, functions, indent + "    ", scope))
+            out.append(f"{indent}}}")
+        elif n.kind == "for":
+            if scope is None:
+                raise CompileError(f"{path}:{n.line}: for loops must be inside a function")
+            loop_var = c_name(scope.name + "__" + n.name)
+            suffix = f"{c_name(scope.name)}_{n.line}"
+            start_var = f"_anvil_for_start_{suffix}"
+            end_var = f"_anvil_for_end_{suffix}"
+            step_var = f"_anvil_for_step_{suffix}"
+            start_expr, end_expr, step_expr = n.params
+            inner = indent + "    "
+            out.append(f"{indent}{{")
+            out.append(f"{inner}const double {start_var} = {expr(path, n.line, start_expr, functions, scope=scope)};")
+            out.append(f"{inner}const double {end_var} = {expr(path, n.line, end_expr, functions, scope=scope)};")
+            out.append(f"{inner}const double {step_var} = {expr(path, n.line, step_expr, functions, scope=scope)};")
+            out.append(f"{inner}{loop_var} = {start_var};")
+            out.append(f"{inner}if ({step_var} != 0.0) {{")
+            condition = f"(({step_var} > 0.0 && {loop_var} <= {end_var}) || ({step_var} < 0.0 && {loop_var} >= {end_var}))"
+            out.append(f"{inner}    for (; {condition}; {loop_var} += {step_var}) {{")
+            out.extend(emit_nodes(path, n.body, functions, inner + "        ", scope))
+            out.append(f"{inner}    }}")
+            out.append(f"{inner}}}")
             out.append(f"{indent}}}")
         elif n.kind == "scene": out.append(f"{indent}anvil_set_scene3d({1 if n.value == '3d' else 0});")
         elif n.kind == "camera":
