@@ -53,6 +53,9 @@ async function main() {
   expect('fn(add, left, right)', 'left', 'variable.parameter.anvil');
   expect('call fn(reset-player)', 'reset-player', 'variable.function.anvil');
   expect('call fn(add, 2, 3)', 'add', 'variable.function.anvil');
+  expect('for local(index) = 1 to 5 step 2', 'for', 'keyword.control.anvil');
+  expect('for local(index) = 1 to 5 step 2', 'to', 'keyword.control.anvil');
+  expect('for local(index) = 1 to 5 step 2', 'step', 'keyword.control.anvil');
   expect('set var(player-health) = 24', 'player-health', 'variable.other.anvil');
   expect('set local(temporary) = 1', 'temporary', 'variable.other.anvil');
   expect('set flag(game-running) = true', 'game-running', 'variable.other.anvil');
