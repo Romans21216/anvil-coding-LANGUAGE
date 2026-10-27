@@ -2,8 +2,8 @@
 
 **Review date:** 2026-10-27
 **Source format:** `.ANVL`
-**Latest completed independent full review:** **90/100 — PASS** (commit `0d3b5ed`; threshold: 90/100).
-**Review snapshot:** the independent reviewer evaluated exact commit `0d3b5edbd9efa3ecb0967ddb54cc6f7426e6c38a`, reran all 50 Python tests, VS Code extension validation, and Python compilation, confirmed extension 0.1.4 remains installed, built `examples/physics_boxes.ANVL` with MSVC, and passed `git diff --check`. Extension 0.1.5 is packaged but was not installed because the user declined; criterion 47 reflects the missing visible verification for `body_create_box`. The prior reviews remain historical records below.
+**Latest completed independent full review:** **90/100 — PASS** (commit `51deb5d`; threshold: 90/100).
+**Review snapshot:** the independent reviewer evaluated exact commit `51deb5dbc182681991251e50b841283869fe53d8`, reran all 52 Python tests, VS Code extension validation, and Python compilation, confirmed extension 0.1.4 remains installed, built `examples/physics_boxes.ANVL` with MSVC, and passed `git diff --check`. Extension 0.1.6 is packaged but not installed per user preference; criterion 47 reflects missing visible verification for new physics built-ins. The reviewer found that the active capacity limits allocation but runtime contact/integration loops still scan all 128 slots. The prior reviews remain historical records below.
 
 ## Scope
 
@@ -15,8 +15,8 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -v` | PASS — 50 tests, including mixed circle-box and box-box solver integration, invalid dimensions, and arity validation |
-| `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray backend and box-physics built-ins |
+| `python -m unittest discover -s tests -v` | PASS — 52 tests, including mixed-shape solver cases and configurable pool growth, exhaustion, shrinking, and invalid values |
+| `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, and capacity built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
 | Nested `while` inside `if/else` and another `while` | PASS — independent build/run output `13` |
@@ -28,22 +28,20 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 | `examples/physics.ANVL` native release build | PASS — generated executable with MSVC |
 | `examples/physics_boxes.ANVL` native release build | PASS — generated executable with MSVC; interactive window not launched |
 | VS Code extension installation | 0.1.4 remains installed; user declined installing 0.1.5 |
-| VS Code package registration | PASS — 0.1.5 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
+| VS Code package registration | PASS — 0.1.6 package declares language ID `anvil`, `.ANVL`/`.anvl`, and grammar `vscode-extension/syntaxes/anvil.tmLanguage.json` |
 | Visible VS Code language mode/sample colors | PASS — 0.1.4 was opened on `examples/ray_backends.ANVL`; Anvil mode and visible highlighting for `ray_backend` and `ray_backend_available` were confirmed during installation verification. The independent evaluator confirmed installation and automated token tests, but did not take a fresh screenshot. |
-| `body_create_box` visible highlighting | NOT VERIFIED in installed editor — automated grammar test passes for 0.1.5; installation was declined, so 0.1.4 remains installed |
+| New physics built-ins visible highlighting | NOT VERIFIED in installed editor — automated grammar test passes for 0.1.6; 0.1.4 remains installed |
 | Ray backend API sample | PASS — MSVC release build and execution of `examples/ray_backends.ANVL`; output `1`. BVH works; DXR/Embree are reported unavailable. |
 | `git diff --check` | PASS — clean in independent review |
 | Live game window in latest review | NOT INSPECTED |
 
 These checks verify the prototype workflows and selected regression cases. They do not establish production readiness, cross-platform behavior, or performance.
 
-### Post-review physics-capacity candidate checks
-
-Since the reviewed `0d3b5ed` snapshot, `physics_capacity(n)` has been added to configure the active body pool from 1 through the compiled maximum of 128 slots. The complete suite now passes **52 tests**, including native pool growth, exhaustion, safe shrink refusal, shrink after release, and builtin-arity coverage. The box-physics example builds with the capacity setting enabled. Extension 0.1.6 is packaged and grammar-tested for `physics_capacity`; VS Code 0.1.4 remains installed and this new token has not been visually verified. These candidate changes require the next independent review below before they replace the latest reviewed baseline.
+The active physics capacity is configurable from 1 through the compiled maximum of 128. Allocation honors the active setting, while the runtime's integration/contact loops still traverse the fixed 128-slot array. This bounds allocation but does not reduce pair-scan work at smaller configured capacities.
 
 ## Independent 50-criterion review
 
-The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20), verifying 48 tests, extension 0.1.4, and the ray backend sample. The latest review of `0d3b5ed` scored **90/100 — PASS** (16/20, 20/20, 17/20, 19/20, 18/20), verifying 50 tests, extension validation, Python compilation, the MSVC box-physics sample build, and a clean diff check. Its remaining deductions concern overall engine scope, compiler structure/platform breadth, and missing visible `body_create_box` highlighting in an installed extension. The full latest rubric is below; issue #8 tracks the remaining physics scope.
+The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Although its 42 tests passed, the evaluator reproduced a Windows stack overflow (0xC00000FD) at recursion depth 20 when each recursive call declared an 8,192-element local array. This was tracked with exact reproduction steps in issue #21. Commit `8f82f1c` replaced stack arrays with checked heap allocations, frees them on explicit and implicit returns, and enforces a 16 MiB active-call budget. The independent reviewer evaluated that exact commit and scored it **91/100 (91%) — PASS**. A depth-1000 stress case now exits with a source-located allocation-budget error, while a 300-call loop completes without leaking its local arrays. A later physics review of the pre-synchronization tree (based on `b00f35a`) corrected its initial 89 score to **88/100 — FAIL**. After synchronizing records, installing and visibly checking 0.1.3, and resolving issue #22, reviews of `64a4101` and `ff88152` scored **91/100 — PASS** (16/20, 20/20, 17/20, 19/20, 19/20). The independent review of `7efdfb0` scored **90/100 — PASS** (16/20, 20/20, 17/20, 18/20, 19/20). Reviews of `0d3b5ed` and then `51deb5d` scored **90/100 — PASS**; the latest category scores are (16/20, 20/20, 17/20, 19/20, 18/20). The latest review reran 52 tests and extension validation, confirmed extension 0.1.4 installed and 0.1.6 packaged, and built the physics sample. Its remaining deductions concern overall engine scope, compiler structure/platform breadth, and missing visible highlighting of new built-ins. It also noted that physics loops scan the full 128-slot array despite a smaller active capacity. The full latest rubric is below; issue #8 tracks remaining physics scope and issue #24 tracks editor verification.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -77,15 +75,15 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 28 | No unfinished placeholders | 2 | Unsupported capabilities are described as future work. |
 | 29 | Configuration understandable | 2 | TOML project settings are explicit and validated. |
 | 30 | Conventions followed | 2 | Current Python, C, TOML, and extension conventions are adequate. |
-| 31 | Automated tests provided | 2 | Independent review ran 50 Python tests successfully. |
-| 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, circle/box collisions, and generated executable paths are covered. |
+| 31 | Automated tests provided | 2 | Independent review ran 52 Python tests successfully. |
+| 32 | Core tests covered | 2 | Compiler, runtime, networking, projection, circle/box collisions, pool capacity, and generated executable paths are covered. |
 | 33 | Failure scenarios tested | 2 | Invalid syntax, references, manifests, settings, and paths have regression tests. |
 | 34 | Edge cases explicitly tested | 2 | The current suite covers recursive allocation exhaustion/cleanup plus physics contact timing, extreme velocity/coordinate bounds, and repeatability. |
 | 35 | Integration behavior tested | 2 | Native runtime and compiler-to-executable flows are exercised. |
 | 36 | Documented test commands work | 2 | Documented Python and npm checks pass. |
 | 37 | Builds and compilation pass | 2 | MSVC builds pass for manifest, function, and physics samples. |
-| 38 | Results recorded accurately | 2 | QA records identify reviewed commit `0d3b5ed`, the 50-test result, extension 0.1.4 installed, 0.1.5 packaged but declined, and the exact sample build. |
-| 39 | Regression checks performed | 2 | Independent review reran all 50 tests and extension validation; native integration covers mixed-shape solver and creation validation. |
+| 38 | Results recorded accurately | 2 | QA records identify reviewed commit `51deb5d`, the 52-test result, extension 0.1.4 installed, 0.1.6 packaged, and the exact sample build; they record the fixed-table scan limitation. |
+| 39 | Regression checks performed | 2 | Independent review reran all 52 tests and extension validation; native integration covers mixed-shape solver and pool-capacity boundaries. |
 | 40 | Verified against original goal | 1 | Tests verify the prototype, not the full requested engine breadth. |
 | 41 | Installation instructions accurate | 2 | Python, MSVC, and VSIX workflows are documented. |
 | 42 | Setup reproducible | 2 | Compiler, runtime, and extension checks have repeatable commands. |
@@ -93,7 +91,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 | 44 | Design decisions documented | 2 | Runtime, compiler backend, renderer, ray tracing, and networking limits are described. |
 | 45 | Troubleshooting available | 2 | README and compiler guide provide setup/troubleshooting information. |
 | 46 | Opens in intended environment | 2 | The evaluator confirmed extension 0.1.4 installed; visible Anvil mode had previously been verified for the ray-backend sample. |
-| 47 | Editor integration works | 1 | **Problem:** new `body_create_box` highlighting has not been checked in an installed editor. **Evidence:** 0.1.5 grammar/package token checks pass, but the user declined installing 0.1.5; installed 0.1.4 predates this token. **Impact:** visible syntax coloring for this new builtin is unverified in the user's editor. **Recommended fix/status:** install 0.1.5 and open `physics_boxes.ANVL` for visible confirmation if the user later approves; currently pending by user choice. |
+| 47 | Editor integration works | 1 | **Problem:** new physics builtin highlighting has not been checked in an installed editor. **Evidence:** 0.1.6 grammar/package token checks pass, but the user kept 0.1.4 installed; it predates `body_create_box` and `physics_capacity`. **Impact:** visible syntax coloring for these built-ins is unverified in the user's editor. **Recommended fix/status:** install 0.1.6 and open `physics_boxes.ANVL` if the user later approves; currently pending by user choice. |
 | 48 | Deliverables organized | 2 | Source, runtime, examples, tests, docs, extension grammar, and packaged VSIX are in their expected folders; the reviewer confirmed a clean worktree before and after verification. |
 | 49 | Limitations and assumptions disclosed | 2 | Prototype scope, Windows/MSVC backend, ray trace cap, and network limits are stated. |
 | 50 | Practical for stated scope | 1 | Suitable for educational demos, not production game development. |
@@ -113,7 +111,7 @@ The independent review of commit `f96a212` scored **87/100 (87%) — FAIL**. Alt
 - **Criteria 22 and 23 — readability and module responsibility (each 1/2).** **Problem/evidence:** `compiler/anvil.py` remains densely formatted and combines parsing, semantic validation, C generation, and build orchestration. **Impact:** feature additions increase maintenance and regression risk. **Recommended fix:** split the compiler into lexer/parser, semantic analysis, C backend, and build-driver modules, then format and test each boundary. **Status:** open; issue #12.
 - **Criterion 27 — extensible architecture (1/2).** **Problem/evidence:** runtime and native toolchain are Windows/MSVC and C-only. **Impact:** additional host platforms and compiler backends require substantial rework. **Recommended fix:** define platform/runtime interfaces and add non-Windows and alternate code-generation targets. **Status:** open; issue #11.
 - **Criterion 40 — verified against original goal (1/2).** **Problem/evidence:** 50 tests verify current compiler/runtime/physics behavior, but do not cover the full engine request. **Impact:** the test suite cannot establish completion of missing systems. **Recommended fix:** map acceptance tests to every requested feature and backlog milestone as those systems are delivered. **Status:** open; matrix and issue #23 track remaining scope.
-- **Criterion 47 — editor integration (1/2).** **Problem/evidence:** Extension 0.1.5 includes `body_create_box` and automated token validation passes, but the user declined installation; installed 0.1.4 has no visible verification for this newly added builtin. **Impact:** the new highlighting has not been observed in the actual editor. **Recommended fix:** if later approved, install 0.1.5 and inspect `examples/physics_boxes.ANVL`. **Status:** pending user preference; exact evidence is tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24).
+- **Criterion 47 — editor integration (1/2).** **Problem/evidence:** Extension 0.1.6 includes `body_create_box` and `physics_capacity`, and automated token validation passes, but the user kept 0.1.4 installed; the new built-ins have no visible editor verification. **Impact:** newly added highlighting is not confirmed in the user's editor. **Recommended fix:** if later approved, install 0.1.6 and inspect `examples/physics_boxes.ANVL`. **Status:** pending user preference; exact evidence is tracked in issue [#24](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/24).
 - **Criterion 50 — practical for intended scope (1/2).** **Problem/evidence:** the engine lacks production graphics, assets, audio, mature physics, robust networking, portability, and performance evidence. **Impact:** it is not ready for production games. **Recommended fix:** continue implementation, benchmark real workloads, and define release criteria. **Status:** open; issue #15 and backlog #23.
 
 ### Priorities from the review
