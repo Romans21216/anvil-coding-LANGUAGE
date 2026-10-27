@@ -28,7 +28,7 @@ Earlier display and editor evidence in prior reports is historical, not part of 
 
 ## Independent 50-criterion review
 
-The latest completed independent reviewer scored the project **86/100**, below the 90-point acceptance threshold, before the `while` feature was added. The rubric assigns 0–2 points per criterion. A focused follow-up review of loop parsing, nesting, and code generation is in progress; the rubric below is retained as the previous full review until that review finishes.
+The latest completed full independent reviewer scored the project **86/100**, below the 90-point acceptance threshold, before the `while` feature was added. A focused follow-up review passed loop parsing, nesting, and code generation; it did not rescore the full 50-criterion rubric. The rubric below is retained as the previous full review.
 
 | Criteria | Scores |
 |---|---|
@@ -39,11 +39,11 @@ The latest completed independent reviewer scored the project **86/100**, below t
 | 41–50: Developer experience and delivery | 2, 2, 2, 2, 2, 1, 1, 2, 2, 1 (**17/20**) |
 | **Total** | **86/100 — FAIL** |
 
-Main deductions: the full engine backlog is substantially incomplete; compiler responsibilities and formatting are concentrated in one file; the extension could not be verified installed in the reviewer's editor; and evaluation documents had become stale and contradictory. Criterion 38 scored zero because the prior QA report had inaccurate test counts and a superseded score. The confirmed documentation issue has since been corrected and closed. The Python suite now passes 32 tests, and this report records the added loop feature.
+Main deductions: the full engine backlog is substantially incomplete; compiler responsibilities and formatting are concentrated in one file; the extension could not be verified installed in the reviewer's editor; and evaluation documents had become stale and contradictory. Criterion 38 scored zero because the prior QA report had inaccurate test counts and a superseded score. Both confirmed documentation issues have since been corrected and closed. The Python suite now passes 32 tests, and this report records the added loop feature.
 
 ## Bug tracking
 
-The reviewer filed the confirmed documentation inconsistency as [Codex Bugs: evaluation documents contradict current compiler and test results](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), labeled `Codex Bugs`. Missing roadmap features are not classified as bugs.
+The reviewer filed [issue #1](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/1), **Codex Bugs: evaluation documents contradict current compiler and test results**, and [issue #2](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/2), **Codex Bugs: compiler guide says while loops are unsupported**. Both carried the `Codex Bugs` label and were closed after the reports were corrected. Missing roadmap features are not classified as bugs.
 
 ## Next priorities
 
