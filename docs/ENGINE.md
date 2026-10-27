@@ -33,7 +33,7 @@ The renderer uses hand-written C software rasterization for conventional primiti
 - `noise(x,y,z)` is deterministic gradient noise; `fbm(x,y,z,octaves,lacunarity,gain)` combines octaves.
 - Math calls include `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, and `max`.
 
-Bindings written with `set var(name)` are global numeric state unless shadowed by a function parameter. Functions accept numeric parameters (`fn(name, value, ...)`), return numeric values with `output expression`, support recursion, and can declare function-local numeric state with `set local(name) = expression`. `while condition ... end` loops are supported. Engine callbacks `fn(update)` and `fn(draw)` must remain zero-argument. The compiler rejects strings in numeric expressions before C generation. Keep update/draw work small: the current loop does not implement interpolation, job scheduling, or a scene graph.
+Bindings written with `set var(name)` are global numeric state unless shadowed by a function parameter. Functions accept numeric parameters (`fn(name, value, ...)`), return numeric values with `output expression`, support recursion, and can declare function-local numeric state with `set local(name) = expression`. `while condition ... end` and inclusive numeric `for local(index) = start to end [step amount] ... end` loops are supported. Engine callbacks `fn(update)` and `fn(draw)` must remain zero-argument. The compiler rejects strings in numeric expressions before C generation. Keep update/draw work small: the current loop does not implement interpolation, job scheduling, or a scene graph.
 
 ## Planned extensions
 
