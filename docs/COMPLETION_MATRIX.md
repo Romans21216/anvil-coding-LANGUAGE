@@ -28,8 +28,8 @@ Status meanings: **Implemented** means code and verification exist for the state
 
 ## Verified baseline
 
-- Latest independently reviewed implementation: commit `83cf626b0a5ab370d5a6da476ea47bbc2a9f728a` (`83cf626`).
-- Independent evaluation: **89/100 — FAIL** for the 50-criterion quality rubric (threshold 90); this is not a completion score for all engine features. Category scores: 16/20 requirements, 20/20 functionality/reliability, 17/20 code/architecture, 18/20 testing/verification, and 18/20 developer experience/delivery. One point was deducted for a stale “50 tests” reference in criterion 40, tracked by issue #28. Remaining deductions concern broad engine scope, compiler architecture/platform constraints, and unverified extension highlighting.
+- Latest independently reviewed implementation: commit `71b818b20c3ae012ba33cec846f8a208220b7991` (`71b818b`).
+- Independent evaluation: **89/100 — FAIL** for the 50-criterion quality rubric (threshold 90); this is not a completion score for all engine features. Category scores: 16/20 requirements, 20/20 functionality/reliability, 17/20 code/architecture, 18/20 testing/verification, and 18/20 developer experience/delivery. One point was deducted because the plain-text evaluation mislabeled completed item #46 as pending review; this is tracked by issue #29. The previous stale test-count finding on `83cf626` was corrected and issue #28 is closed. Other deductions concern broad engine scope, compiler architecture/platform constraints, and unverified extension highlighting.
 - `python -m unittest discover -s tests -q`: 57 tests passed, including short-circuit side-effect behavior, native division-by-zero diagnostics and regular division, mixed circle/box, box/box, embedded-circle, capacity-boundary, zero-friction, and geometric-mean friction cases.
 - `npm test --prefix vscode-extension`: passed with `body_create_box`, `physics_capacity`, and `body_friction` token validation.
 - Native MSVC release build of `examples/physics.ANVL`: passed.
