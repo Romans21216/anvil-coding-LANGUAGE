@@ -2,7 +2,7 @@
 
 **Review date:** 2026-10-27  
 **Source format:** `.ANVL`  
-**Independent evaluation:** **86/100 — FAIL** (requested threshold: 90/100)
+**Latest completed independent evaluation:** **86/100 — FAIL** (requested threshold: 90/100; review preceded the new `while` feature)
 
 ## Scope
 
@@ -14,7 +14,7 @@ The `.ANVL` suffix was chosen by the user. Functions support numeric parameters,
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 30 tests |
+| `python -m unittest discover -s tests -q` | PASS — 32 tests (including `while` execution and missing-condition diagnostics) |
 | `npm test --prefix vscode-extension` | PASS — extension manifest/config and TextMate token scopes |
 | Build `game.ANVLproj` with MSVC | PASS — reviewer built `build/audit_360_game.exe` |
 | Build and run `examples/functions.ANVL` | PASS — reviewer built executable; it printed `13` |
@@ -28,7 +28,7 @@ Earlier display and editor evidence in prior reports is historical, not part of 
 
 ## Independent 50-criterion review
 
-The latest independent reviewer scored the project **86/100**, below the 90-point acceptance threshold. The rubric assigns 0–2 points per criterion.
+The latest completed independent reviewer scored the project **86/100**, below the 90-point acceptance threshold, before the `while` feature was added. The rubric assigns 0–2 points per criterion. A focused follow-up review of loop parsing, nesting, and code generation is in progress; the rubric below is retained as the previous full review until that review finishes.
 
 | Criteria | Scores |
 |---|---|
@@ -39,7 +39,7 @@ The latest independent reviewer scored the project **86/100**, below the 90-poin
 | 41–50: Developer experience and delivery | 2, 2, 2, 2, 2, 1, 1, 2, 2, 1 (**17/20**) |
 | **Total** | **86/100 — FAIL** |
 
-Main deductions: the full engine backlog is substantially incomplete; compiler responsibilities and formatting are concentrated in one file; the extension could not be verified installed in the reviewer's editor; and evaluation documents had become stale and contradictory. Criterion 38 scored zero because the prior QA report had inaccurate test counts and a superseded score. The evaluation and QA documents have since been refreshed to record the 30-test run, implemented function features, and latest 86-point result.
+Main deductions: the full engine backlog is substantially incomplete; compiler responsibilities and formatting are concentrated in one file; the extension could not be verified installed in the reviewer's editor; and evaluation documents had become stale and contradictory. Criterion 38 scored zero because the prior QA report had inaccurate test counts and a superseded score. The confirmed documentation issue has since been corrected and closed. The Python suite now passes 32 tests, and this report records the added loop feature.
 
 ## Bug tracking
 
