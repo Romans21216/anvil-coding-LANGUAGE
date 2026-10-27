@@ -4,10 +4,10 @@
   "reviewed_implementation_commit": "ed08f43ca0d9beb5440f18fade48faf556694b1f",
   "branch": "main",
   "summary": {
-    "NEEDS VERIFICATION": 435,
+    "NEEDS VERIFICATION": 434,
     "PARTIALLY IMPLEMENTED": 3,
     "COMPLETE": 12,
-    "IN PROGRESS": 0
+    "IN PROGRESS": 1
   },
   "latest_verified_commit": "ed08f43ca0d9beb5440f18fade48faf556694b1f",
   "latest_independently_reviewed_candidate_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
@@ -142,6 +142,35 @@
       "verification_result": "COMPLETE: independent review of ed08f43 ran all 64 tests and directly verified that a 5,000-digit version declaration reports a source-located diagnostic without traceback. Extension validation, Python compilation, status JSON checks, and diff check passed. Issues #32 and #33 are fixed and closed; overall project score remains 89/100, below the 98/100 threshold.",
       "github_issue": "#23",
       "commit": "f7372a6805d3324f91eb362d9f3e64f501c4090b"
+    },
+    {
+      "number": 50,
+      "section": "1. CORE LANGUAGE AND SYNTAX",
+      "title": "Publish a complete formal language specification.",
+      "status": "IN PROGRESS",
+      "source_evidence": [
+        "docs/LANGUAGE_SPEC.md: normative v1 specification for current lexer/parser, expression semantics, built-ins, engine statements, runtime limits, diagnostics, and a complete conformance example.",
+        "README.md, docs/LANGUAGE.md, docs/Wiki/Home.md, and docs/Wiki/Language-Reference.md link to the formal specification."
+      ],
+      "tests": [
+        "Documented conformance example accepted by compiler/anvil.py --emit-c; generated C written successfully",
+        "Pending independent conformance review against compiler/anvil.py and runtime/anvil_runtime.c",
+        "git diff --check: passed"
+      ],
+      "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
+      "dependencies": [],
+      "priority": "P0 documentation deliverable",
+      "assigned_agent": "Codex lead (sequential execution)",
+      "acceptance_criteria": [
+        "Publish a normative grammar and semantics reference for the current language version.",
+        "Document lexical rules, declarations, statements, expressions, built-ins, diagnostics, and implementation limits.",
+        "Provide a complete example accepted by the compiler.",
+        "Link the specification from the README and language reference/wiki.",
+        "Independently review the specification for consistency with implementation."
+      ],
+      "verification_result": "IN PROGRESS: specification and entry-point links are drafted; compiler accepted its conformance example and emitted C. Independent conformance review remains.",
+      "github_issue": "#23",
+      "commit": "pending"
     },
     {
       "number": 301,

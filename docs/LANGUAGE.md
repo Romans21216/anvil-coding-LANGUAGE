@@ -1,5 +1,7 @@
 # Anvil Language Guide
 
+For the normative version 1 syntax and behavior contract, see the [formal language specification](LANGUAGE_SPEC.md).
+
 Anvil uses UTF-8 text in `.ANVL` files. Its syntax is designed to read like a small BASIC/Lua-inspired scripting language: define a function with `fn(name)` or `fn(name, parameter, ...)`, indent the body for readability, and close it with `end`. Indentation is optional; `end` defines the block.
 
 ```anv

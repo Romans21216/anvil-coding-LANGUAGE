@@ -1,5 +1,7 @@
 # Language Reference
 
+For the complete normative grammar and version 1 behavior contract, see the [formal language specification](../LANGUAGE_SPEC.md).
+
 Anvil files are UTF-8 `.ANVL` text. `#` starts a comment outside quoted strings. Names are case-sensitive. `end` closes functions, `if` blocks, `while` loops, and `for` loops; indentation is optional.
 
 ## Language versions

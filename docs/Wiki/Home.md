@@ -6,6 +6,7 @@ Anvil is a small BASIC/Lua-inspired game language using `.ANVL` source files. It
 
 - [Getting Started](Getting-Started.md): install the current Windows toolchain and build a sample.
 - [Language Reference](Language-Reference.md): functions, expressions, scope, drawing, and built-ins.
+- [Formal Language Specification](../LANGUAGE_SPEC.md): normative grammar, expression rules, runtime limits, and conformance example.
 - [Engine Runtime](Engine-Runtime.md): rendering, camera controls, timing, and ray tracing.
 - [Compiler and Build](Compiler-and-Build.md): project files, C generation, and native builds.
 - [Multiplayer](Multiplayer.md): the experimental UDP host/client API and its limits.

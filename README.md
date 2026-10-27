@@ -43,6 +43,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 ## Files
 
 - [Language guide](docs/LANGUAGE.md)
+- [Formal language specification](docs/LANGUAGE_SPEC.md)
 - [Engine runtime](docs/ENGINE.md)
 - [Completion matrix](docs/COMPLETION_MATRIX.md)
 - [Audited implementation status](docs/IMPLEMENTATION_STATUS.md)

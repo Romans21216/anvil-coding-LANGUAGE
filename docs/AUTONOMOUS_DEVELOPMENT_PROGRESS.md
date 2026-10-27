@@ -94,3 +94,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tracking:** Issues #35 and #36 are labeled `Codex Bugs`; both are fixed and closed after independent confirmation.
 - **Review:** Exact documentation commit `702d8792d4270a75c0db67b2300fc03da3409240` scored 89/100. The critic verified rubric arithmetic, Markdown/JSON status counts, JSON validity, and the 450-item backlog invariant; no new defect was found. The overall score is below the user's 98/100 threshold.
 - **Next batch:** Continue from issue #23 item #50 (formal language specification); address the remaining engine breadth, compiler architecture, and editor-verification deductions.
+
+## Batch 9 — formal language specification (in progress)
+
+- **Backlog:** Issue #23 item #50 is being implemented as a normative specification of the language currently accepted by the compiler. The full backlog remains only in issue #23.
+- **Deliverable:** `docs/LANGUAGE_SPEC.md` documents UTF-8 line syntax, language versioning, declarations, scope, arrays, control flow, expression precedence/evaluation, built-ins, rendering statements, runtime limits/errors, compilation, and a complete example. README, guide, and wiki now link to it.
+- **Scope:** The document states current Windows/MSVC and CPU renderer/BVH limitations; it does not present roadmap capabilities as implemented.
+- **Review:** The compiler accepted the documented conformance example and emitted C. Independent conformance check against `compiler/anvil.py` and `runtime/anvil_runtime.c` is pending. Do not mark #50 complete or change the latest QA score until reviewed.
+- **QA:** Latest critic remains 89/100 — FAIL against 98. The new document has not yet received a fresh critic review.
+- **Next:** Validate and correct the specification, obtain an independent review of the exact candidate commit, then update the evaluation and ledger with that result.

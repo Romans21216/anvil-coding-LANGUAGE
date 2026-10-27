@@ -5,8 +5,8 @@
   "last_completed_batch": 8,
   "last_completed_backlog_item": 49,
   "current_active_item": 50,
-  "current_active_item_status": "Backlog item #49 and critic follow-ups #32–#36 are complete. Documentation review of 727d349 confirmed score arithmetic, Markdown/JSON counts, and the 450-item issue #23 invariant. Latest score is 89/100, below 98; proceed with backlog item #50 and broader deductions.",
-  "current_candidate_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
+  "current_active_item_status": "Backlog item #50 is in progress. docs/LANGUAGE_SPEC.md defines the current v1 language, the conformance example was accepted by the compiler's --emit-c path, and independent source review is pending. Latest critic score remains 89/100, below the required 98/100.",
+  "current_candidate_commit": "pending item #50 documentation commit",
   "latest_verified_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
   "last_pushed_reviewed_below_threshold_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
   "latest_independently_reviewed_candidate_commit": "702d8792d4270a75c0db67b2300fc03da3409240",
@@ -46,11 +46,11 @@
     "python_compile": "passed (python -m compileall -q compiler tests)",
     "msvc_numeric_demo": "built and ran successfully; output 17",
     "git_diff_check": "passed",
-    "implementation_status_inventory": "Full 450-item list only in issue #23 body/comment; compact audited subset now has 15 entries including in-progress item #49",
+    "implementation_status_inventory": "Full 450-item list only in issue #23 body/comment; compact audited subset has 16 entries including in-progress item #50",
     "targeted_overflow_regressions": "passed direct arithmetic/comparison/math/accumulation/loop-step overflow checks, UDP NaN source-line diagnostic, finite UDP receive, and missing-socket zero; division and short-circuit controls passed",
     "npm_test": "npm test --prefix vscode-extension: passed; root npm test is not applicable (no package.json)"
   },
-  "pending_documentation_review": "Latest exact review 702d879 scored 89/100 and confirmed score arithmetic, Markdown/JSON status synchronization, and 450-item source-of-truth consistency. Issues #32–#36 are fixed and closed. No documentation review remains pending; continue work toward the 98/100 threshold.",
+  "pending_documentation_review": "The latest completed review 702d879 scored 89/100 and confirmed score arithmetic, Markdown/JSON status synchronization, and 450-item source-of-truth consistency. Issues #32–#36 are fixed and closed. The item #50 formal language specification is pending independent conformance review; 98/100 is the pass threshold.",
   "blocked_items": [
     {
       "item": "VS Code visible verification for extension 0.1.7",
@@ -62,7 +62,7 @@
     "Visual highlighting of newer VS Code grammar tokens if user later approves installation"
   ],
     "next_recommended_tasks": [
-    "Continue issue #23 item #50 (formal language specification), then pursue architecture and engine-scope deductions. Latest overall score is 89/100, below 98/100.",
+    "Review and complete issue #23 item #50 (formal language specification), then pursue architecture and engine-scope deductions. Latest overall score is 89/100, below 98/100.",
     "Continue selecting work directly from issue #23; keep the full item list only in that issue."
   ],
   "master_backlog": {
