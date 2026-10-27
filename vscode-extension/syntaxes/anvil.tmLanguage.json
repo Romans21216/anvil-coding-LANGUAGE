@@ -1,0 +1,95 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Anvil",
+  "scopeName": "source.anvil",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#function-definition" },
+    { "include": "#function-call" },
+    { "include": "#variables" },
+    { "include": "#engine-commands" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#builtins" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [{ "name": "comment.line.number-sign.anvil", "match": "#.*$" }]
+    },
+    "strings": {
+      "name": "string.quoted.double.anvil",
+      "begin": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.anvil" } },
+      "end": "\"|$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.anvil" } },
+      "patterns": [
+        { "name": "constant.character.escape.anvil", "match": "\\\\(?:[\\\\\"nt]|u[0-9A-Fa-f]{4})" },
+        { "name": "invalid.illegal.escape.anvil", "match": "\\\\." }
+      ]
+    },
+    "function-definition": {
+      "begin": "\\b(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?=\\s*(?:,|\\)))",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.function.anvil" },
+        "3": { "name": "punctuation.section.function.begin.anvil" },
+        "4": { "name": "entity.name.function.anvil" }
+      },
+      "end": "\\)",
+      "endCaptures": { "0": { "name": "punctuation.section.function.end.anvil" } },
+      "patterns": [
+        { "name": "variable.parameter.anvil", "match": "[A-Za-z_][A-Za-z0-9_-]*" },
+        { "name": "punctuation.separator.anvil", "match": "," }
+      ]
+    },
+    "function-call": {
+      "match": "\\b(call)(\\s+)(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?=\\s*(?:,|\\)))",
+      "captures": {
+        "1": { "name": "keyword.control.call.anvil" },
+        "3": { "name": "support.type.function.anvil" },
+        "5": { "name": "punctuation.section.function.begin.anvil" },
+        "6": { "name": "variable.function.anvil" }
+      }
+    },
+    "variables": {
+      "patterns": [
+        { "match": "\\b(var|local|flag)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))", "captures": { "1": { "name": "support.type.anvil" }, "2": { "name": "punctuation.section.group.begin.anvil" }, "3": { "name": "variable.other.anvil" }, "4": { "name": "punctuation.section.group.end.anvil" } } },
+        { "match": "\\b(world)\\s+(var)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))", "captures": { "1": { "name": "storage.modifier.anvil" }, "2": { "name": "support.type.anvil" }, "4": { "name": "variable.other.anvil" } } }
+      ]
+    },
+    "engine-commands": {
+      "match": "\\b(scene|camera|clear|display|wait|load|start|import|lookup|save|load-save|net|seed|create)\\b",
+      "name": "support.function.engine.anvil"
+    },
+    "keywords": {
+      "match": "\\b(fn|set|add|sub|local|output|call|if|else|end|repeat|while|and|or|not|where|get|to|from|all|pressed|held|released)\\b",
+      "name": "keyword.control.anvil"
+    },
+    "constants": {
+      "match": "\\b(true|false|null|2d|3d|perspective|orthographic|reliable|unreliable)\\b",
+      "name": "constant.language.anvil"
+    },
+    "builtins": {
+      "match": "\\b(compute|floor|ceil|sqrt|sin|cos|abs|min|max|clamp|rnd|noise|fbm|time|delta|axis|rgba|rgb|cube|sphere|ray_sphere|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave)\\b(?=\\s*\\()",
+      "name": "support.function.anvil"
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.float.anvil", "match": "\\b[0-9]+\\.[0-9]+(?:[eE][+-]?[0-9]+)?\\b" },
+        { "name": "constant.numeric.integer.anvil", "match": "\\b[0-9]+\\b" }
+      ]
+    },
+    "operators": {
+      "match": "(?:<=|>=|!=|==|[=<>+*/%-])",
+      "name": "keyword.operator.anvil"
+    },
+    "punctuation": {
+      "match": "[(),{}\\[\\].]",
+      "name": "punctuation.separator.anvil"
+    }
+  }
+}
+

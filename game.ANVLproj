@@ -1,0 +1,6 @@
+name = "First World"
+entry = "examples/first_world.ANVL"
+
+[engine]
+fixed_hz = 60
+

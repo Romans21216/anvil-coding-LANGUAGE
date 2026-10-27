@@ -1,0 +1,19 @@
+# Bootstrap compiler example: numeric functions and a returned value.
+fn(add-bonus)
+  set var(score) = 12
+  add var(score) 5
+  output var(score)
+  set var(score) = null
+end
+
+fn(main)
+  set var(final-score) = call fn(add-bonus)
+  if var(final-score) >= 15
+    output var(final-score)
+  else
+    output 0
+  end
+end
+
+call fn(main)
+

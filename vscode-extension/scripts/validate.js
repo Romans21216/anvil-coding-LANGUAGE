@@ -1,0 +1,78 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { Registry, INITIAL, parseRawGrammar } = require('vscode-textmate');
+const oniguruma = require('vscode-oniguruma');
+
+const root = path.resolve(__dirname, '..');
+const manifestPath = path.join(root, 'package.json');
+const configPath = path.join(root, 'language-configuration.json');
+const grammarPath = path.join(root, 'syntaxes', 'anvil.tmLanguage.json');
+const samplePath = path.resolve(root, '..', 'examples', 'first_world.ANVL');
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+JSON.parse(fs.readFileSync(grammarPath, 'utf8'));
+const sample = fs.readFileSync(samplePath, 'utf8');
+const check = (condition, message) => { if (!condition) throw new Error(message); };
+
+check(manifest.contributes.languages.some(x => x.id === 'anvil' && x.extensions.includes('.ANVL')), 'Anvil language or extension is not registered');
+check(manifest.capabilities?.untrustedWorkspaces?.supported === true, 'syntax-only language support should work in Restricted Mode');
+check(manifest.contributes.grammars.some(x => x.language === 'anvil' && x.scopeName === 'source.anvil' && x.path === './syntaxes/anvil.tmLanguage.json'), 'Anvil grammar contribution is missing or mismatched');
+check(config.comments.lineComment === '#', 'line comment configuration is missing');
+check(config.brackets.some(pair => pair[0] === '(' && pair[1] === ')'), 'parenthesis pairing is missing');
+
+async function main() {
+  const wasmBuffer = fs.readFileSync(require.resolve('vscode-oniguruma/release/onig.wasm'));
+  await oniguruma.loadWASM(wasmBuffer.buffer.slice(wasmBuffer.byteOffset, wasmBuffer.byteOffset + wasmBuffer.byteLength));
+  const registry = new Registry({
+    onigLib: Promise.resolve({
+      createOnigScanner: sources => new oniguruma.OnigScanner(sources),
+      createOnigString: value => new oniguruma.OnigString(value)
+    }),
+    loadGrammar: async scopeName => scopeName === 'source.anvil'
+      ? parseRawGrammar(fs.readFileSync(grammarPath, 'utf8'), grammarPath)
+      : null
+  });
+  const grammar = await registry.loadGrammar('source.anvil');
+  check(grammar, 'TextMate grammar did not load');
+
+  function scopesAt(line, needle) {
+    const result = grammar.tokenizeLine(line, INITIAL);
+    const index = line.indexOf(needle);
+    check(index >= 0, `test token '${needle}' is missing from '${line}'`);
+    const token = result.tokens.find(t => t.startIndex <= index && index < t.endIndex);
+    check(token, `no token scope covers '${needle}'`);
+    return token.scopes;
+  }
+  function expect(line, needle, scope) {
+    const scopes = scopesAt(line, needle);
+    check(scopes.includes(scope), `'${needle}' expected ${scope}; got ${scopes.join(' ')} in ${line}`);
+  }
+  expect('fn(update)', 'fn', 'keyword.declaration.function.anvil');
+  expect('fn(update)', 'update', 'entity.name.function.anvil');
+  expect('fn(add, left, right)', 'add', 'entity.name.function.anvil');
+  expect('fn(add, left, right)', 'left', 'variable.parameter.anvil');
+  expect('call fn(reset-player)', 'reset-player', 'variable.function.anvil');
+  expect('call fn(add, 2, 3)', 'add', 'variable.function.anvil');
+  expect('set var(player-health) = 24', 'player-health', 'variable.other.anvil');
+  expect('set local(temporary) = 1', 'temporary', 'variable.other.anvil');
+  expect('set flag(game-running) = true', 'game-running', 'variable.other.anvil');
+  expect('display cube(0, 0, 0, 1.8)', 'display', 'support.function.engine.anvil');
+  expect('display cube(0, 0, 0, 1.8)', 'cube', 'support.function.anvil');
+  expect('display ray_sphere(0, 0, 0, 1)', 'ray_sphere', 'support.function.anvil');
+  expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
+  expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
+  expect('set var(size) = 3 + 4', '+', 'keyword.operator.anvil');
+  expect('set var(title) = "fn(not-a-call)"', 'fn(not-a-call)', 'string.quoted.double.anvil');
+  expect('# scene 3d', 'scene', 'comment.line.number-sign.anvil');
+  const unrelated = scopesAt('functionality = 1', 'functionality');
+  check(!unrelated.some(scope => scope.startsWith('keyword.control') || scope.startsWith('support.function') || scope.startsWith('storage.')), `unrelated identifier received a keyword/API scope: ${unrelated.join(' ')}`);
+
+  for (const required of ['fn(update)', 'var(spin)', '"Anvil Engine"', 'scene 3d', 'ray_sphere(', 'camera control(']) {
+    check(sample.includes(required), `sample does not demonstrate ${required}`);
+  }
+  console.log('PASS: VS Code manifest/config are valid; TextMate grammar loads and token scopes match Anvil samples.');
+  registry.dispose();
+}
+
+main().catch(error => { console.error(error.stack || String(error)); process.exitCode = 1; });
+

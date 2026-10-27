@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anvil Engine Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brand-mark">C</span><span>ANVIL <b>ENGINE</b></span></a>
+    <div class="project-name"><span class="dot"></span> first_world.ANVL <span class="saved">Ready</span></div>
+    <div class="top-actions"><button id="help-button" class="icon-button" title="Language guide">?</button><button id="run-button" class="run-button"><span>▶</span> Run</button></div>
+  </header>
+  <main class="workspace">
+    <section class="editor-panel panel">
+      <div class="panel-head"><div><span class="panel-title">SOURCE</span><span class="file-chip">.ANVL</span></div><button id="reset-button" class="text-button">Reset example</button></div>
+      <div class="editor-wrap"><div id="line-numbers" class="line-numbers"></div><textarea id="source" spellcheck="false" aria-label="Anvil source code"></textarea></div>
+      <div class="editor-foot"><span>Anvil · custom game language</span><span id="cursor-status">Ln 1, Col 1</span></div>
+    </section>
+    <section class="right-column">
+      <section class="preview-panel panel">
+        <div class="panel-head"><div><span class="panel-title">GAME VIEW</span><span id="mode-chip" class="mode-chip">3D</span></div><div class="view-actions"><button id="pause-button" class="text-button">Ⅱ Pause</button><button id="fullscreen-button" class="icon-button" title="Fullscreen">⛶</button></div></div>
+        <div class="screen-wrap"><canvas id="game" width="960" height="600" aria-label="Anvil game preview"></canvas><div id="overlay" class="overlay hidden"></div></div>
+        <div class="preview-foot"><span><i class="live-dot"></i><span id="run-status">Engine ready</span></span><span id="fps">60 FPS</span></div>
+      </section>
+      <section class="console-panel panel">
+        <div class="panel-head"><div><span class="panel-title">CONSOLE</span><span id="message-count" class="count">0 messages</span></div><button id="clear-console" class="text-button">Clear</button></div>
+        <div id="console" class="console-output"><div class="console-welcome">Anvil Engine Lab <span>·</span> ready to run</div></div>
+      </section>
+    </section>
+  </main>
+  <div class="statusbar"><span>ANVIL ENGINE LAB <span class="muted">0.1.0</span></span><span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> Run</span><span>2D · 3D · Noise · Input</span></div>
+  <dialog id="help-dialog"><form method="dialog">
+    <div class="dialog-head"><div><span class="panel-title">ANVIL QUICK GUIDE</span><h2>Small language, big worlds.</h2></div><button class="icon-button" aria-label="Close">×</button></div>
+    <div class="guide-grid">
+      <article><h3>Functions & values</h3><pre>fn(start)
+  set var(score) = 0
+  output true
+  set var(score) = null
+end
+
+call fn(start)</pre></article>
+      <article><h3>World & drawing</h3><pre>scene 3d
+camera perspective 0 3 8
+clear rgba(10,16,30,255)
+display cube(0,0,0,2) -rgb(90,170,255)
+display text("Hello") 1 -l(24,32)</pre></article>
+      <article><h3>Game loop</h3><pre>fn(update)
+  set var(t) = time()
+  set var(x) = compute(sin(var(t))*2)
+  display sphere(var(x),1,0,0.7) -rgb(255,150,90)
+end</pre></article>
+      <article><h3>Built-ins</h3><p><code>rnd(min,max)</code>, <code>floor(x)</code>, <code>sin(x)</code>, <code>cos(x)</code>, <code>sqrt(x)</code>, <code>noise(x,y)</code>, <code>time()</code>, <code>pressed(KEY)</code>, <code>held(KEY)</code>.</p><p>Use <code>scene 2d</code> with <code>display rect(...)</code>, <code>circle(...)</code>, <code>line(...)</code> or <code>text(...)</code>.</p></article>
+    </div>
+    <p class="guide-note">The preview reads scene and display declarations. Native compilation and full language execution are planned for the next build stage.</p>
+  </form></dialog>
+  <script src="engine.js"></script>
+</body>
+</html>
+

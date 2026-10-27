@@ -1,0 +1,28 @@
+# Anvil starter scene: one mixed 2D/3D world.
+scene 3d
+camera perspective 0 3 8
+camera fov(70)
+camera control(4, 80)
+clear rgba(11, 16, 27, 255)
+
+set var(spin) = 0.0
+set var(score) = 0
+
+fn(update)
+  set var(spin) = compute(var(spin) + delta())
+  if pressed(SPACE)
+    add var(score) 1
+  end
+end
+
+fn(draw)
+  display plane(0, -1, 0, 12, 12) -rgb(33, 47, 64)
+  display cube(0, 0, 0, 1.8) -rgb(88, 164, 255) -rotate(0, var(spin), 0)
+  display sphere(2, 0.2, 0, 0.7) -rgb(255, 157, 91)
+  display ray_sphere(-2, 0.15, 0, 0.85) -rgb(172, 106, 255)
+  display ray_sphere(-3.25, 0.85, -0.7, 0.42) -rgb(93, 223, 199)
+  display text("Anvil Engine") 1 -l(20, 24) -rgb(237, 243, 255)
+  display text("Space presses: " + var(score)) 2 -l(20, 52) -rgb(157, 199, 255)
+  display text("WASD move | arrows look | Q/E rise") 3 -l(20, 80) -rgb(187, 202, 221)
+end
+

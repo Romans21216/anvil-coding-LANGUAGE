@@ -1,0 +1,21 @@
+# Start examples/network_counter.ANVL first, then run this client on the same LAN.
+scene 2d
+clear rgba(13, 19, 31, 255)
+net join("127.0.0.1", 7777)
+set var(local-count) = 0
+set var(peer-count) = 0
+
+fn(update)
+  if pressed(SPACE)
+    add var(local-count) 1
+  end
+  net send(var(local-count))
+  set var(peer-count) = receive()
+end
+
+fn(draw)
+  display text("Anvil LAN client") -l(24, 24) -rgb(235, 241, 255)
+  display text("Local count: " + var(local-count)) -l(24, 60) -rgb(100, 190, 255)
+  display text("Host count: " + var(peer-count)) -l(24, 96) -rgb(255, 175, 110)
+end
+

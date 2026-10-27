@@ -1,0 +1,52 @@
+{
+  "name": "anvil-language-support",
+  "displayName": "Anvil Language Support",
+  "description": "Syntax highlighting and editor support for the Anvil game language.",
+  "version": "0.1.0",
+  "publisher": "anvil-engine",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "license": "UNLICENSED",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "This extension provides static Anvil syntax highlighting and editor configuration only."
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "anvil",
+        "aliases": [
+          "Anvil",
+          "anvil"
+        ],
+        "extensions": [
+          ".ANVL",
+          ".anvl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "anvil",
+        "scopeName": "source.anvil",
+        "path": "./syntaxes/anvil.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node ./scripts/validate.js",
+    "validate": "npm test"
+  },
+  "devDependencies": {
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
+  }
+}
+

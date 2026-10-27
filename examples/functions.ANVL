@@ -1,0 +1,16 @@
+# Function arguments, returned expressions, and function-local state.
+fn(double, value)
+  output var(value) * 2
+end
+
+fn(add-and-double, left, right)
+  output call fn(double, var(left)) + var(right)
+end
+
+fn(main)
+  set local(result) = call fn(add-and-double, 4, 5)
+  output local(result)
+end
+
+call fn(main)
+
