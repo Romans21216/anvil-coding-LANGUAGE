@@ -1,20 +1,20 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **71/100 - FAIL** for exact commit `fc37b1fbb8824822a99789ee0f4c1954d9cbc438` against **98/100**. Categories: requirements 12/20, functionality/reliability 18/20, architecture 13/20, testing 17/20, delivery 11/20.
+**Latest independent evaluation:** **73/100 - FAIL** for exact commit `ce5bd2d30e5b2c429e8244f1000655069e78bf9f` against **98/100**. Categories: requirements 12/20, functionality/reliability 19/20, architecture 13/20, testing 18/20, delivery 11/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
 
-**Native QA follow-up (reviewed):** the latest review found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. Review of `f330d4b` verified fractional formatting and closed issue #49. Review of `ade1ff6` opened #53 for signed-minimum rejection and #54 for missing non-finite arithmetic diagnostics. Review of `120482e` verified fixes for both, along with #52 range handling; issues #49 and #52–#54 are closed.
+**Historical native QA fixture repair:** the review of573cb44 found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. Review of `f330d4b` verified fractional formatting and closed issue #49. Review of `ade1ff6` opened #53 for signed-minimum rejection and #54 for missing non-finite arithmetic diagnostics. Review of `120482e` verified fixes for both, along with #52 range handling; issues #49 and #52–#54 are closed.
 
-**Unreviewed implementation candidate:** source commit `9d9bf90e62e3e75ea94de7828d86800cbd382c99` adds bounded 24/32-bit BMP loading, generation-checked handles, image queries/release, and clipped/scaled alpha-blended 2D sprite drawing. The full suite passes (79 tests), the sprite sample builds with MSVC, extension 0.1.9 grammar validation, compileall, QA arithmetic, and diff checks pass. These checks are implementation evidence only. The later direct-native candidate received a 49/100 review on a pre-short-circuit-fix local snapshot; see the current native follow-up and full rubric below. Canonical issue #23 items #201 and #209 are under review, #202 awaits review, and #212 remains partial because rotation is not implemented.
-**Latest review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
-**Current finding:** exact commit `120482e85e77c19216a793ab17190dbf1ae025ff` scored 58/100, below the 98/100 threshold. All 89 tests passed. The reviewer verified fixes for fractional output, large values, signed minimum, and non-finite diagnostics; issues #49 and #52–#54 are closed. Native game-engine migration remains incomplete.
+**Historical BMP implementation candidate:** source commit `9d9bf90e62e3e75ea94de7828d86800cbd382c99` adds bounded 24/32-bit BMP loading, generation-checked handles, image queries/release, and clipped/scaled alpha-blended 2D sprite drawing. The full suite passes (79 tests), the sprite sample builds with MSVC, extension 0.1.9 grammar validation, compileall, QA arithmetic, and diff checks pass. These checks are implementation evidence only. The later direct-native candidate received a 49/100 review on a pre-short-circuit-fix local snapshot; see the current native follow-up and full rubric below. Canonical issue #23 items #201 and #209 are under review, #202 awaits review, and #212 remains partial because rotation is not implemented.
+**Historical C-backed review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
+**Historical native finding:** exact commit `120482e85e77c19216a793ab17190dbf1ae025ff` scored 58/100, below the 98/100 threshold. All 89 tests passed. The reviewer verified fixes for fractional output, large values, signed minimum, and non-finite diagnostics; issues #49 and #52–#54 are closed. Native game-engine migration remains incomplete.
 
-**Current review:** independent review of `fc37b1fbb8824822a99789ee0f4c1954d9cbc438` scored 71/100. All 95 tests and static/extension checks passed. Native 2D is real and tested; the user reports flicker and source inspection confirms unbuffered visible painting. User issue #57 remains open. Full native engine parity and Forge scope remain incomplete.
+**Current review:** independent review of `ce5bd2d30e5b2c429e8244f1000655069e78bf9f` scored 73/100. All 96 tests and extension/static checks passed. The reviewer independently ran the slow-draw regression against old fc37b1f (it failed with visible intermediate painting) and the fixed candidate (it passes). User issue #57 is independently verified and closed. Full native engine parity and Forge scope remain incomplete.
 
-**Unreviewed fix:** issue #57 now has persistent offscreen bitmap/DC composition and one completed-frame presentation per paint. A regression samples visible pixels while drawing is deliberately delayed; it passes with buffering and fails against fc37b1f with “partially drawn frame became visible”. Repeated-resize GDI counts and a simulated bitmap-allocation failure also pass. All 96 Python tests, extension validation, compileall, QA arithmetic, JSON and diff checks pass. The code correction awaits independent verification.
+**Verified flicker fix:** a persistent offscreen bitmap/DC composes each frame and one BitBlt presents it. Independent testing covers visible pixels during slow drawing, resize GDI counts, and injected bitmap-allocation failure. No new runtime defect was reproduced. No CUA was resumed after the prior physical-Escape stop.
 
-**Latest reviewed correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
+**Historical near-plane correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
 **Formatting follow-up review:** candidate `3f77eee` was independently reviewed on exact commit `5072597`; all 72 tests, Black check, compileall, QA arithmetic, diff check, and 12-example generated-C parity pass. The critic scored this snapshot 92/100, still below 98.
 
@@ -30,12 +30,12 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 74 tests; independently rerun on exact review candidate `eec0608` |
+| `python -m unittest discover -s tests -q` | PASS — 96 tests independently rerun on exact native review candidate `ce5bd2d` |
 | Canonical item #172 resize suite | PASS — all 74 suite tests passed on exact review candidate `eec0608` |
 | Canonical item #185 near-plane clipping regression | PASS — native MSVC tests cover extreme finite segments, triangles, and sphere near caps on exact review candidate `eec0608` |
 | `python -m unittest discover -s tests -p test_runtime.py -v` | PASS — 4 native runtime tests, including resize, clipping, and aspect-preserving viewport cases |
 | `python -m unittest discover -s tests -p test_qa_report.py -v` | PASS — zero-score rubric accepted; mismatched category subtotal rejected |
-| `python scripts/validate_qa_report.py` | PASS — latest synchronized rubric totals 92/100; category subtotals agree |
+| `python scripts/validate_qa_report.py` | PASS — current synchronized rubric totals73/100; category subtotals agree |
 | `npm test --prefix vscode-extension` | PASS — manifest/config and representative TextMate token scopes, including ray-backend, box-physics, capacity, and friction built-ins |
 | MSVC release build of `game.ANVLproj` | PASS |
 | MSVC release build/run of `examples/functions.ANVL` | PASS — output `13` |
@@ -66,9 +66,9 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 
 **91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 19/20; testing and verification 18/20; developer experience and delivery 18/20. The exact reviewed commit was `bc4db99368b3af2953e49adc4e4cbd8f5706bb4e`. The critic reran 73 Python tests, 3 native runtime tests, extension validation, compileall, the QA validator, and diff check. It verified the viewport geometry helper and inspected the WM_PAINT path, but did not visually launch a resized window. The audited ledgers contain 21 rows and total 450. Criterion 38 scores 1 because the prior ledger labeled dynamic window resizing as #144; canonical issue #23 comment 6451810775 defines it as #172. Issue #46 tracks the correction. Criterion 22 remains 2 after formatting; criterion 23 remains 2 for phase separation. Criterion 27 remains 1 for Windows/MSVC and C-only backend. Criterion 47 remains 1 because newer extension tokens are not visually verified. The 98-point threshold remains unmet; issues #12 and #45 are closed.
 
-## Latest 50-criterion scoring — direct native commit `fc37b1f`
+## Latest 50-criterion scoring — direct native commit `ce5bd2d`
 
-Independent reviewer evaluated exact pushed commit `fc37b1fbb8824822a99789ee0f4c1954d9cbc438`: **71/100 — FAIL** against **98/100**. All 95 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and diff checks pass. The native functions sample prints 13; client-pixel tests verify native paint, updates, resize and exit. The reviewer confirmed an unbuffered paint path consistent with the user's flicker report (#57); visual inspection was interrupted by physical Escape and was not completed.
+Independent reviewer evaluated exact pushed commit `ce5bd2d30e5b2c429e8244f1000655069e78bf9f`: **73/100 — FAIL** against **98/100**. All 96 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and diff checks pass. Native functions print 13; the native 2D sample builds to a 7,680-byte PE. The reviewer independently ran the current slow-draw regression against isolated fc37b1f and reproduced visible intermediate painting, then verified the fixed pass. Issue #57 is closed. No manual CUA inspection was resumed.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -82,15 +82,15 @@ Independent reviewer evaluated exact pushed commit `fc37b1fbb8824822a99789ee0f4c
 | 8 | Behavior matches documentation | 2 | Docs distinguish the limited native backend and broader C/MSVC path. |
 | 9 | Important use cases supported | 1 | Animated rectangles work; native 3D/input/assets/physics/networking remain unavailable (open). |
 | 10 | Usable for intended purpose | 1 | Usable for a small native demo; complete engine workflows remain unavailable (open). |
-| 11 | Core functionality works | 1 | Window, paint, resize, updates and close are pixel-tested; full engine core is incomplete (open). |
+| 11 | Core functionality works | 1 | Native window, buffered paint, resize, fixed updates and shutdown work; full engine core remains partial. |
 | 12 | Secondary functionality works | 2 | Time, delta, compute and fixed updates work. |
 | 13 | Primary workflows functional | 2 | Native source builds directly to PE; functions sample prints 13. |
 | 14 | Inputs validated | 2 | Unsupported graphics/configuration/alpha inputs receive diagnostics. |
-| 15 | Errors handled gracefully | 2 | Compiler/runtime failures have controlled diagnostics. |
+| 15 | Errors handled gracefully | 2 | Source-located compile errors and controlled code-2 bitmap-allocation failure are tested. |
 | 16 | Edge cases covered | 2 | Tests exercise fractional/clipped edges, resize, updates and shutdown. |
 | 17 | Invalid inputs controlled | 2 | Unsupported native configurations fail instead of silently changing backend. |
-| 18 | Stable across repeated operations | 2 | All 95 tests pass, including repeated native window updates. |
-| 19 | No known critical defects | 1 | User-reported flicker matches visible-HDC painting; fix buffered presentation (open, #57). |
+| 18 | Stable across repeated operations | 2 | All 96 tests pass, including repeated resize and bounded GDI-object counts. |
+| 19 | No known critical defects | 2 | Independent old-versus-fixed slow-draw regression verifies issue #57; no new critical runtime defect reproduced. |
 | 20 | Components integrate | 2 | Parser, codegen, PE and runtime integrate for supported scenes. |
 | 21 | Logical project structure | 2 | Compiler, encoder, native runtime, examples and tests are separated. |
 | 22 | Readable and consistently formatted | 1 | Raw x64 bytes are hard to maintain; add instruction abstractions and formatting (open). |
@@ -103,37 +103,38 @@ Independent reviewer evaluated exact pushed commit `fc37b1fbb8824822a99789ee0f4c
 | 29 | Configuration understandable | 1 | Backend choice documented; add native manifests and complete default migration (open). |
 | 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
 | 31 | Automated tests provided | 2 | Native compiler/runtime automated tests exist. |
-| 32 | Core tests covered | 2 | Core native pixels, updates, resize and close are integration-tested. |
-| 33 | Failure scenarios tested | 2 | Invalid native configurations are covered. |
-| 34 | Edge cases explicitly tested | 2 | Fractional/clipped geometry and timing cases are tested. |
+| 32 | Core tests covered | 2 | Native tests inspect client pixels during slow drawing, animation, resize and resource lifetime. |
+| 33 | Failure scenarios tested | 2 | A NULL CreateCompatibleBitmap result is fault-injected in the emitted EXE and exits cleanly. |
+| 34 | Edge cases explicitly tested | 2 | Delayed drawing, clipped/fractional edges, resize replacement and GDI counts are tested. |
 | 35 | Integration behavior tested | 2 | Generated PE is launched and actual client pixels sampled. |
-| 36 | Documented test commands work | 1 | Test commands work; complete native engine setup remains unavailable (open). |
-| 37 | Builds and compilation pass | 2 | 95 Python tests, native samples and static checks pass. |
-| 38 | Results recorded accurately | 2 | Exact reviewed SHA and pending candidate status are recorded. |
-| 39 | Regression checks performed | 2 | Full regressions, extension, compile, QA, JSON and diff checks pass. |
+| 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
+| 37 | Builds and compilation pass | 2 | All 96 Python tests and static checks pass; native examples build and run. |
+| 38 | Results recorded accurately | 2 | The reviewed commit accurately records the preceding 71/100 review and pending fix status. |
+| 39 | Regression checks performed | 2 | The reviewer reproduced the old regression failure and fixed pass, resize checks and allocation failure. |
 | 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
 | 41 | Installation instructions accurate | 1 | Subset installation is documented; complete native engine installation is missing (open). |
 | 42 | Setup reproducible | 1 | Subset setup is reproducible; full engine setup is missing (open). |
 | 43 | Usage understandable | 1 | Sample is understandable; broader native workflows remain absent (open). |
 | 44 | Design decisions documented | 2 | Migration design and limits are documented. |
-| 45 | Troubleshooting available | 0 | Observed flicker lacks a sufficient remedy; implement and document buffered presentation (#57). |
+| 45 | Troubleshooting available | 0 | Native runtime troubleshooting remains limited; expand API/resource/platform failure guidance (open). |
 | 46 | Opens in intended environment | 1 | CLI/editor automation works; complete native project/editor/runtime workflow (open). |
 | 47 | Editor integration works | 1 | Grammar checks pass; current installed package is 0.1.4, fresh visual check absent (open). |
 | 48 | Deliverables organized | 2 | Deliverables are organized and pushed. |
 | 49 | Limitations disclosed | 2 | Native limitations are disclosed. |
 | 50 | Practical for intended scope | 0 | Full game-engine/Forge scope remains incomplete (open). |
 | | **Requirement fulfillment** | **12/20** | |
-| | **Functionality and reliability** | **18/20** | |
+| | **Functionality and reliability** | **19/20** | |
 | | **Code quality and architecture** | **13/20** | |
-| | **Testing and verification** | **17/20** | |
+| | **Testing and verification** | **18/20** | |
 | | **Developer experience and delivery** | **11/20** | |
-| | **Total** | **71/100** | Exact commit `fc37b1f`; FAIL against 98. |
+| | **Total** | **73/100** | Exact commit `ce5bd2d`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
-- **User issue #57 — flicker: OPEN.** Visible painting clears the window and submits rectangles individually. Intermediate frames can be seen. Implement an offscreen framebuffer and one presentation copy; verify animation, resizing, cleanup and failure paths.
+- **User issue #57 — flicker: FIXED AND INDEPENDENTLY VERIFIED.** Frames compose into a persistent bitmap/DC and present once. The independent old-versus-fixed regression confirms that intermediate drawing no longer becomes visible. Resize GDI counts and bitmap-allocation failure pass.
 - **Native product scope: OPEN.** The runtime has opaque rectangles, fixed updates and a window. Remaining native graphics/input/assets/physics/networking/language/project features and Forge requirements prevent full-engine use. Continue the master issue #23 backlog.
-- **Architecture and delivery: OPEN.** Reduce raw-opcode/ABI duplication, complete target/project interfaces and troubleshooting, and verify current editor integration.
+- **Architecture and delivery: OPEN.** Reduce raw-opcode/ABI duplication, complete target/project interfaces and runtime troubleshooting, and verify current editor integration.
+- **Post-review metadata correction #58: FIXED AND INDEPENDENTLY CHECKED.** Current candidate/score fields agree, and audit counts derive from actual rows (21 complete, 5 partial, 4 in progress, 420 unverified; total450). Both JSON files, Markdown, 50 scores and categories have independent parity verification. This correction changes no runtime code or product score.
 
 ## Historical 50-criterion scoring — direct native commit `120482e`
 

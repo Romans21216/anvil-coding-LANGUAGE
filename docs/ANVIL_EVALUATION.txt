@@ -3,22 +3,22 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 
 Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: independent full 50-criterion review of exact pushed commit fc37b1fbb8824822a99789ee0f4c1954d9cbc438.
+Basis: independent full 50-criterion review of exact pushed commit ce5bd2d30e5b2c429e8244f1000655069e78bf9f.
 
 LATEST INDEPENDENT REVIEW
 -------------------------
-Score: 71/100 — FAIL against 98/100.
+Score: 73/100 — FAIL against 98/100.
 Evaluator: separate final_review agent.
-Categories: requirements 12/20, functionality/reliability 18/20, architecture 13/20, testing/verification 17/20, delivery 11/20.
-Scores in criterion order 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,2,2,2,2,2,2,1,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,2,1,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
+Categories: requirements 12/20, functionality/reliability 19/20, architecture 13/20, testing/verification 18/20, delivery 11/20.
+Scores in criterion order 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,2,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,2,2,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
 
-The native backend now emits a real Win32 2D runtime, with opaque rectangles, top-level initialization, fixed 60 Hz update callbacks, draw callbacks, time(), delta() and compute(). The reviewer passed all 95 tests, extension validation, compileall, QA arithmetic, strict JSON and diff checks. A native functions sample printed 13. Client-pixel integration covers geometry, animation, resize and shutdown. The full criterion evidence, deductions and recommended fixes are in docs/QA_REPORT.md.
+The native backend emits a Win32 2D runtime with opaque rectangles, top-level numeric initialization, fixed 60 Hz updates, draw callbacks, time(), delta() and compute(). It now composes frames in a persistent offscreen bitmap/DC and presents one completed frame per paint, with resize replacement and stock-object restoration/cleanup.
 
-The user observed flicker in the native sample. The reviewer confirmed that the code clears and draws directly onto the visible window HDC without an offscreen buffer. This matches the report; completed live visual reproduction was not claimed because Computer Use was stopped by physical Escape. The user-reported issue is #57 (Romans21216 - Bugs). Buffered rendering/presentation is the priority fix and remains unverified.
+All 96 Python tests, extension validation, compileall, QA arithmetic, strict JSON and diff checks passed independently. The reviewer reproduced the slow-draw visibility test failing against isolated fc37b1f, then passing on ce5bd2d. Repeated resizing kept GDI resources bounded, and injected bitmap-allocation failure exited with a controlled diagnostic/code 2. The native functions sample printed 13; the native 2D example builds to a 7,680-byte PE. No CUA was resumed after the earlier physical-Escape stop; evidence comes from actual generated-app pixel/resource tests and code inspection.
 
-Earlier exact native scores: 64/100 on 2b0a7b1, 63/100 on 71ddfec, 61/100 on 9eaf1b6, 58/100 on 120482e. Issues #55 and #56 are independently verified and closed. Current score remains below 98; full native engine parity and the new Forge requirements are incomplete. The C backend remains default.
+User issue #57 (Romans21216 - Bugs) is fixed, independently verified and closed. No new runtime defect was reproduced. During report synchronization, development found obsolete autonomous-state metadata and inconsistent audit-summary counts; issue #58 records that documentation-only correction, now fixed and independently checked. The exact reviewed code and its score remain unchanged by the report sync.
 
-Unreviewed issue #57 fix: the current candidate composes frames in a reusable offscreen bitmap/DC and presents once with BitBlt. It recreates the bitmap on resize and releases GDI resources on shutdown/backbuffer error. The visible-pixel regression passes with the fix and fails against the reviewed unbuffered runtime, proving the test detects the reported intermediate frame exposure. Repeated-resize resource counts and simulated allocation failure pass. All 96 Python tests and the extension/static validation checks pass. Independent verification remains pending.
+Earlier native scores: 71/100 on fc37b1f, 64/100 on 2b0a7b1, 63/100 on 71ddfec, 61/100 on 9eaf1b6, 58/100 on 120482e. Full native 3D/input/assets/physics/networking/language/project parity and the Forge requirements remain incomplete. The C backend is still default. Full criterion evidence and open recommendations are in docs/QA_REPORT.md.
 
 SUMMARY
 -------
