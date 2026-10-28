@@ -1,17 +1,12 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
-====================================
-Assessment date: 2026-10-28
-Exact independently reviewed snapshot: 86681061c3e6d564b315dd571be4958202ac295d
-Evaluator: separate semantic_full_review agent; full 50-criterion rubric.
-Score: 72/100 — FAIL against 98/100.
-Categories: requirements 11/20; functionality 16/20; architecture 14/20; testing 16/20; delivery 15/20.
-Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,1,1,2,2,2,2,2,2,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Assessment date:2026-10-28
+Exact independent source:1570abdd429683759f31066f04e5982ec10de386
+Evaluator:project_full_review
+Score:73/100 — FAIL against98.
+Categories12/15/14/17/15.
+Scores 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,1,1,2,1,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-146 tests independently passed in125.935s; npm0.1.11, compileall, QA arithmetic, UTF8JSON, diff and VSIX parity pass. #74 private formatter labels, #75 literal-safe drawing suffixes and#76 complete array expression context are verified fixed. An extra local-array shape/color capture prints17,17. Installed0.1.4 is preserved; source/package0.1.11 has automated verification with no fresh visible-editor claim.
-
-New confirmed#77: ray flush selection searches generated C, so text containing anvil_trace_sphere( omits the flush before text. Actual compiled call order changes and rays may overwrite the HUD. Correct classification using parsed shape/structured lowering, then add call-order regressions. No fix or score is claimed for this open finding. #63 untouched coordinate dispatch remains unverified; current tests use no global input injection. This report update changes no implementation.
-
-Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previousc8b01e7 review:69/100 with139tests. Input validation/error handling gains raise the score to72; full scope and the new rendering-order defect remain.
+150 tests independently passed152.822s; extension0.1.11/VSIX, compileall, QA arithmetic, UTF8/diff pass. #77 ray composition fixed. Native project builds, Unicode title, configurable1–240Hz clocks and no-C-fallback behavior verified, including extra17Hz wall-clock probe. #78 escaped-NUL manifest entry traceback remains open; local control-character validation/subprocess regression passes, full151 follow-up and independent review pending. Installed0.1.4 preserved; #63 untouched pointer integration remains unverified. Full engine/Forge/OS/rich types/backends/benchmarks remain incomplete.
 
 SUMMARY
 -------
@@ -68,7 +63,4 @@ Cross-platform runtime: Not implemented
 Performance evidence: Not available
 
 CURRENT PRIORITIES
-------------------
-Fix semantic ray flush classification#77 and add native project/title/fixed-rate settings. Continue full native language/runtime parity, 3D/assets/audio/physics/networking, actual selectable ray backends, rich types and Forge/OS outputs. Measure resource use before claiming hyper-efficiency. Keep full reviews, all50 criteria and detailed GitHub findings synchronized. The goal remains active below98/100.
-
-Current unscored implementation batch: internal display lowering now carries validated shape identity for ray flushing while emit_display keeps its string-return API. Native .ANVLproj builds now carry project-root include boundaries, Unicode title and1–240Hz graphical settings; direct source and console defaults remain. Focused compiled order/project/clock tests pass; Local full150 tests passed200.762s; focused tests, npm, compileall, QA arithmetic and diff checks pass. Independent review pending. The latest independent72/100 score still applies to8668106. #58 ancillary metadata was independently rechecked and closed.
+Verify malformed-entry correction#78, then implement native local arrays/allocation limits and stronger instruction/ABI helpers. Continue native engine parity, actual ray backends, rich types, Forge/OS and benchmarks. Goal remainsactive below98.

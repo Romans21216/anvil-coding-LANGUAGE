@@ -94,6 +94,8 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: manifest needs a non-empty string 'entry'"
                 )
+            if any(ord(char) < 32 for char in entry):
+                raise CompileError(f"{args.source}: entry must not contain control characters")
             project_root = args.source.resolve().parent
             include_root = project_root
             source_path = (project_root / entry).resolve()

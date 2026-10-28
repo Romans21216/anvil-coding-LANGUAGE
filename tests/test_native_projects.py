@@ -56,6 +56,24 @@ class NativeProjectTests(unittest.TestCase):
                 self.assertIn(str(entry.resolve()),errors.getvalue())
                 self.assertFalse(output.exists())
 
+    def test_control_character_entries_have_clean_cli_errors(self):
+        import json
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            project = root/'bad.ANVLproj'
+            for entry in ('\0', 'bad\npath', 'bad\tpath', 'bad\x01path'):
+                project.write_text('entry=' + json.dumps(entry),encoding='utf-8')
+                for backend in ('c','native'):
+                    output=root/'result.exe'
+                    with self.subTest(entry=entry,backend=backend):
+                        result=subprocess.run([sys.executable,'-m','compiler.anvil',str(project),'--backend',backend,'-o',str(output)],capture_output=True,text=True,timeout=10)
+                        self.assertEqual(result.returncode,1)
+                        self.assertIn(str(project),result.stderr)
+                        self.assertIn('entry must not contain control characters',result.stderr)
+                        self.assertNotIn('Traceback',result.stderr)
+                        self.assertFalse(output.exists())
+                        self.assertFalse(list(root.glob('*.c')))
+
     @unittest.skipUnless(sys.platform == 'win32', 'native window execution')
     def test_clock_title_and_shutdown(self):
         source = '''scene 2d

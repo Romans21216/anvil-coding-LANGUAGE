@@ -2,11 +2,9 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated2026-10-28. Latest full independent review: `86681061c3e6d564b315dd571be4958202ac295d`, **72/100 — FAIL against98/100**, with146 passing tests. Categories11/16/14/16/15. Full rubric: [QA_REPORT.md](QA_REPORT.md).
+Updated2026-10-28. Latest independent source `1570abdd429683759f31066f04e5982ec10de386`: **73/100 FAIL against98**,150tests152.822s; categories12/15/14/17/15. #77 and native project settings independently verified. #78 entry validation follow-up is unscored. Full scope and #63 remain open.
 
-That review verified #74–76 and found literal-dependent ray flush classification#77. #77 is open; no correction is claimed yet. #63 untouched coordinate dispatch and full native engine/Forge/OS scope remain unfinished. Next: semantic ray composition and native project manifests/settings. Earlier reviews retain exact snapshots in evaluation records.
-
-Direct AMD64/PE output supports numeric functions, checked global arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language and project support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
+Direct AMD64/PE output supports numeric functions, checked global arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 
 The source extension package is 0.1.11 and passes grammar/package checks. Installed version 0.1.4 is preserved per user preference; newer tokens have no fresh visible-editor verification.
 
@@ -62,5 +60,3 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 - `PARTIALLY IMPLEMENTED` means a working subset exists but one or more listed acceptance parts are missing.
 - These audited status counts summarize the original 450 entries; later backlog additions remain only in issue #23 until individually audited. `NEEDS VERIFICATION` is a conservative status, not a claim that a feature is absent.
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
-
-Unscored follow-up: semantic ray-flush classification and native project/title/update-rate settings are implemented locally with focused tests; independent review pending. #77 remains open until verified. #58 ancillary records passed independent recheck.
