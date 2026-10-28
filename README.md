@@ -42,7 +42,7 @@ python compiler/anvil.py examples/native_2d.ANVL --backend native --output build
 ./build/native_2d.exe
 ```
 
-This backend writes x64 machine code and a PE32+ executable directly. In the native 2D sample, Left/Right move the panel, Space pauses the animated marker, and R resets its position; closing the window ends the program. Native rendering currently supports opaque rectangles in client pixels. Other shapes, text, mouse input, 3D, assets, physics, networking, and project manifests remain unavailable on this path. See [the native compiler migration plan](docs/NATIVE_X64_COMPILER_MIGRATION.md) for its exact limits and status.
+This backend writes x64 machine code and a PE32+ executable directly. In the native 2D sample, Left/Right move the panel, Space pauses the animated marker, and R resets its position. Left drag positions the panel, the wheel moves it horizontally, right click pauses, and middle click resets. Closing the window ends the program. Native rendering supports opaque rectangles in client pixels, with keyboard input and client-pixel mouse queries for pointer position, three buttons, and vertical wheel input. Other shapes, text, 3D, assets, physics, networking, and project manifests remain unavailable on this path. See [the native compiler migration plan](docs/NATIVE_X64_COMPILER_MIGRATION.md) for its exact limits and status.
 
 ## Run checks
 

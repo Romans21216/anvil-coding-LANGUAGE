@@ -2,15 +2,15 @@
 
 The master backlog is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23): its original 450-item inventory and the later additions remain there. This compact ledger records evidence only for audited items and does not duplicate the backlog. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27. Latest independent review is exact commit `21fc960b04c2df317f3e0b3580987526f14d63e2` at 73/100 — FAIL against 98. All 99 tests pass. The keyboard milestone is independently verified with no new defect reproduced. Earlier native reviews include 73/100 on ce5bd2d (buffered flicker fix), 71/100 on fc37b1f, and 64/100 on 2b0a7b1.
+Updated 2026-10-27. Latest independent review is exact commit `900106eedc9f3aa09c5d2e909a033903a563c989` at 72/100 — FAIL against 98. All 102 tests pass. Native mouse is verified; evaluator README mismatch #59 is corrected in a documentation follow-up without rescoring. Previous keyboard review21fc960 scored73/100 with99tests.
 
-Latest reviewed native follow-up: direct AMD64/PE compilation supports numeric programs, checked global arrays and an initial Win32 2D runtime with fixed updates, buffered presentation and keyboard held/edge input. C remains default pending broader parity. Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
+Latest reviewed native follow-up: direct AMD64/PE compilation supports numeric programs, checked global arrays and an initial Win32 2D runtime with fixed updates, buffered presentation and keyboard and mouse input. C remains default pending broader parity. Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
 
 Verified flicker fix: persistent offscreen bitmap/DC resources compose each frame before one BitBlt presentation, replacing the bitmap only on client-size changes. The reviewer independently confirmed slow-draw visibility, repeated-resize GDI counts, and controlled bitmap-allocation failure. The same test fails against the former renderer. Post-review issue #58 synchronizes stale autonomous-state and audit-summary metadata; the record parity is independently verified and no runtime code changed.
 
-Verified native keyboard milestone: `compiler/native_input.py` emits held/pressed queries, transition state, focus clearing and update/draw edge lifetime. Named constants are shared by both backends. Independent generated-app tests cover repeat/release/system-key/focus/tap/draw-only behavior and numeric arguments; the native2D sample accepts Left/Right, Space and R. All 99 tests and static/extension checks pass. The full-product score remains73/100; native mouse and broader engine/Forge parity remain unfinished.
+Historical keyboard milestone (21fc960, 73/100, 99 tests): held/pressed, repeat/focus/system-key handling, numeric key bounds and edge lifetimes were independently verified. Those regressions still pass in the current 102-test suite.
 
-Native mouse candidate awaiting independent review: all five mouse query built-ins now emit direct x64 handlers and state. Generated-app tests cover coordinates, three buttons, OS capture, focus/cancel behavior, wheel fractions and draw-only edges. All 102 Python tests, extension validation, compileall, QA arithmetic and diff checks pass; the sample builds to a 13,312-byte PE. The last completed score above remains the keyboard review until a new independent review finishes.
+Verified native mouse milestone: all five mouse query built-ins emit direct x64 handlers and state. Independent generated-app tests cover coordinates, three buttons, OS capture, focus/cancel, wheel fractions and draw-only edges. All 102 tests and static/extension checks pass; sample13,312 bytes. README finding #59 is corrected in documentation follow-up; source900106e score remains72/100.
 
 ## Status counts
 
@@ -66,4 +66,4 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
 
 
-Historical issue #48 is resolved. Its C-backed snapshot `c102604` scored92/100. The current reviewed native implementation is `21fc960` at 73/100 with 99 tests, below 98; issue #58 synchronizes both structured state records and preserves the old subsystem records as history.
+Historical issue #48 is resolved; its C-backed c102604 snapshot scored92/100. Current native900106e scores72/100 with102tests, below98. Issue #58 record parity was previously corrected; #59 addresses the README mouse contradiction.

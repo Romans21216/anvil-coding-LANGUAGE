@@ -39,7 +39,7 @@ The compiler emits the keyboard state/helpers only when a query is used; state u
 
 ## Native mouse input
 
-`mouse_x()` and `mouse_y()` return client-pixel coordinates, matching native rectangles. Both return `-1` before any position message, outside the client bounds, after a mouse-leave message, or on focus loss/cancellation. Bounds are checked against the current client rectangle, including after resize. This differs from the broader C renderer's fixed 960×600 virtual viewport.
+`mouse_x()` and `mouse_y()` return client-pixel coordinates, matching native rectangles. Both return `-1` before any position message, outside the client bounds, after a mouse-leave message, or on focus loss/cancellation. Bounds are checked against the current client rectangle, including after resize. This differs from the broader C renderer's fixed 960Ã—600 virtual viewport.
 
 `mouse_held("left")`, `mouse_held("right")`, and `mouse_held("middle")` report button-down state. `mouse_pressed(...)` exposes a pending down transition throughout the next fixed update, then clears it. Repeated down messages do not create new edges; a short down/up tap survives until the next update. In draw-only scenes, the next draw consumes edges. Buttons require a literal string (case-insensitive); unsupported names and nonliteral arguments produce source-line diagnostics. General native string values remain unsupported.
 
@@ -47,7 +47,7 @@ The compiler emits the keyboard state/helpers only when a query is used; state u
 
 Mouse state, handlers and the additional system imports are emitted only when a mouse query is used. `tests/test_native_mouse.py` runs real emitted PE windows and tests signed/outside coordinates, resized client bounds, all three buttons, repeats, taps, actual OS capture ownership, simultaneous buttons, focus/capture/cancel clearing, fractional wheel accumulation, draw-only consumption and invalid source diagnostics. Tests send messages only to their own generated window and never inject global pointer input. Win32 behavior follows [Microsoft's mouse input contract](https://learn.microsoft.com/en-us/windows/win32/inputdev/using-mouse-input).
 
-The native2D example supports left drag, wheel movement, right-click pause, middle-click reset, a pointer marker and the existing keyboard controls. This mouse implementation is a candidate awaiting independent review; the last completed full review below applies to the preceding keyboard implementation.
+The native2D example supports left drag, wheel movement, right-click pause, middle-click reset, a pointer marker and the existing keyboard controls. The mouse implementation is independently verified on 900106e. The README contradiction found in that review is corrected in a documentation follow-up (#59); no new score is claimed.
 
 ## Troubleshooting the direct backend
 
@@ -75,7 +75,7 @@ The native2D example supports left drag, wheel movement, right-click pause, midd
 1. Machine-code and PE writer primitives; emit a minimal console EXE and verify it runs. **Implemented.**
 2. Arithmetic, checked numeric operations, functions, branches, and loops. **Partially implemented:** arithmetic, simple function calls, `if`, and `while` work; complete numeric diagnostics and language parity remain outstanding.
 3. Global slots and fixed-size global arrays, including checked indexing. **Partially implemented:** global slots and global arrays now compile directly; function-local heap arrays and their allocation/lifetime rules remain.
-4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, keyboard held/edge input, background clearing, and buffered opaque rectangles work; mouse input is now implemented in a candidate pending review; remaining shapes and image resources are outstanding.
+4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, keyboard held/edge input, background clearing, and buffered opaque rectangles work; mouse input is independently verified; remaining shapes and image resources are outstanding.
 5. Camera, 3D primitives, BVH ray tracing, physics, procedural noise, and networking.
 6. Switch the default build to the direct x64/PE backend, port regression coverage, then remove C generation and MSVC-specific compiler invocation.
 
@@ -88,4 +88,4 @@ The native2D example supports left drag, wheel movement, right-click pause, midd
 - Native regression tests cover code generation, PE metadata/fixups, execution, resource lifetime, and engine behavior.
 - Documentation and evaluation reports distinguish implemented native features from migration work still in progress.
 
-The latest completed independent review evaluated `21fc960b04c2df317f3e0b3580987526f14d63e2` at 73/100, below 98. All 99 tests passed, including the keyboard transition and prior flicker/resource tests. No new defect was reproduced. Full engine migration and Forge work remain unfinished. See `docs/ANVIL_EVALUATION.txt`.
+The latest completed independent review evaluated `900106eedc9f3aa09c5d2e909a033903a563c989` at 72/100, below 98. All 102 tests passed, including native mouse and prior keyboard/flicker/resource tests. No new runtime defect was reproduced. README mismatch #59 is corrected in documentation follow-up without rescoring. Full engine migration and Forge remain unfinished. See `docs/ANVIL_EVALUATION.txt`.
