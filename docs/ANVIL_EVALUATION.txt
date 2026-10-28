@@ -2,25 +2,23 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 ====================================
 
 Assessment date: 2026-10-28
-Project reviewed: Anvil, source files ending in .ANVL
-Basis: independent full 50-criterion review of exact pushed commit 3270998384367be7b763cc605c0492208a72c988.
+Project reviewed: Anvil .ANVL language and engine
+Basis: independent full50-criterion review of exact pushed edfbe86252deb5af39504161f6e8571ae917fbb9.
 
 LATEST INDEPENDENT REVIEW
 -------------------------
-Score: 72/100 — FAIL against 98/100.
-Evaluator: separate final_review agent.
-Categories: requirements 12/20, functionality/reliability 19/20, architecture 13/20, testing/verification 17/20, delivery 11/20.
-Scores in criterion order 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,2,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,1,2,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
+Score:71/100 — FAIL against98/100.
+Evaluator: fresh separate include_full_review agent.
+Categories: requirements11/20, functionality16/20, architecture13/20, testing17/20, delivery14/20.
+Scores1–50: 2,1,1,1,0,1,2,1,1,1 / 1,2,1,2,1,2,1,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,1,1,1,2,2,0
 
-The direct backend includes buffered 2D rectangles, keyboard/mouse input, basic math, deterministic seeded RNG, gradient noise and fBm. Procedural routines are Anvil source compiled on demand. Numeric calls support sixteen parameters, stack arguments, larger scalar-local offsets and a 4096-byte frame limit. The reviewer verified that explicit console main arguments now preserve values, evaluation side effects, stack parameters and library dependencies; missing/extra arguments receive diagnostics.
+Local source includes and native function dependency selection work in125 independently passing tests. The native include demo builds to3072bytes and prints20; the C/MSVC demo also prints20. Source graph limits/order, cross-file recursion, physical expression/runtime provenance and Unicode diagnostics have tests. Extension0.1.10 grammar and packaged VSIX CRC/source parity pass; installed0.1.4 remains unchanged. No CUA/global input or fresh manual editor inspection was performed.
 
-All111 tests passed independently, along with five repeated mouse suites (15tests), focused mouse/procedural tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and diff checks. The terrain example builds to a34,304-byte AMD64 PE without C/Rust compilation. No new runtime defect was reproduced. No CUA/manual editor or terrain-window inspection is claimed; extension0.1.4 remains installed per preference.
+The reviewer reproduced two P2 defects: native configuration errors can report the entry filename with an included library's line (#64), and1200 nested parentheses trigger uncaught RecursionError in either backend (#65). The existing1500-block test only proves iterative source marking/call discovery, not code generation. Follow-up changes consistently use node/function provenance and enforce bounded expression and statement processing; focused tests pass, but independent fix verification is pending. The score above remains tied toedfbe86.
 
-Issues#60 (stale Wiki),#61 (discarded explicit-main arguments) and#62 (mouse test timing race) are independently verified fixed. Criterion8 returns to2/2. Criterion35 is now1/2: the coordinate test uses an explicit test-only WndProc wrapper to dispatch the requested message and sample production queries atomically. This avoids unrelated queued pointer events replacing the test state. It exercises unchanged production handler/query code but does not prove untouched end-to-end OS coordinate dispatch. Issue#63 records that remaining evidence gap; other tests retain actual capture/button/focus/wheel integration. The score therefore stays72/100.
+Issue#58 wording corrections are independently verified. Issue#63's untouched OS coordinate-dispatch coverage gap remains open; instrumented handler/query tests do not close it. Native/C pipeline parity, native3D/assets/physics/networking, DXR/Embree, rich types, package registries/object linking, Forge and freestanding OS targets remain unfinished. The complete450-item backlog plus Forge451–457 and OS458–497 remain only in issue23/comments.
 
-The earlier7b528d5 review scored72/100 with109tests. Development then found#61 and a111-test run exposed#62; the final corrected111-test run and independent rerun pass. The previous mouse900106e review was72/100 with102tests. These snapshots remain historical.
-
-Native3D/camera, broader graphics/assets, physics, networking, language/project parity, general include/plugins, Forge and OS targets remain unfinished. C/MSVC remains the broader default backend. The new40-section OS specification is retained only as parent items458–497 in issue23/comments, alongside the original450-item inventory and Forge additions. The final no-C/no-Rust engine and freestanding OS toolchain have not been delivered.
+Previous reviewed3270998 scored72/100 with111tests. The new score reflects independent discovery of additional failure behavior and grading against the complete goal, with setup/usage documentation also receiving credit. No completion is claimed.
 
 SUMMARY
 -------

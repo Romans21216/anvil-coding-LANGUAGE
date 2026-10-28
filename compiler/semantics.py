@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from compiler.common import CompileError, ParsedProgram, RUNTIME_C_NAMES, c_name
+from compiler.common import CompileError, MAX_BLOCK_DEPTH, ParsedProgram, RUNTIME_C_NAMES, c_name
 
 
 def validate_program(program: ParsedProgram) -> None:
@@ -13,6 +13,17 @@ def validate_program(program: ParsedProgram) -> None:
     arrays = program.arrays
     if not functions:
         raise CompileError(f"{path}: define at least one fn(name) function")
+
+    pending = [(node, 0) for node in program.top]
+    pending.extend((node, 0) for fn in functions.values() for node in fn.body)
+    while pending:
+        node, depth = pending.pop()
+        if node.kind in ("if", "while", "for"):
+            depth += 1
+            if depth > MAX_BLOCK_DEPTH:
+                raise CompileError(f"{node.source or path}:{node.line}: statement nesting exceeds {MAX_BLOCK_DEPTH} blocks")
+        pending.extend((child, depth) for child in node.body)
+        pending.extend((child, depth) for child in node.otherwise)
 
     for name, line_no, function_name, source in program.variable_references:
         fn = functions.get(function_name) if function_name else None

@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-28",
-  "reviewed_implementation_commit": "3270998384367be7b763cc605c0492208a72c988",
+  "reviewed_implementation_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,12 +9,12 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "3270998384367be7b763cc605c0492208a72c988",
-  "latest_independently_reviewed_candidate_commit": "3270998384367be7b763cc605c0492208a72c988",
+  "latest_verified_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+  "latest_independently_reviewed_candidate_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "3270998384367be7b763cc605c0492208a72c988",
-  "latest_followup_status_change": "Review3270998:72/100,111 tests;#60/#61/#62 fixed and independently verified;#63 is remaining integration gap.",
-  "latest_evaluation_score": 72,
+  "last_pushed_reviewed_below_threshold_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+  "latest_followup_status_change": "Full include reviewedfbe86:71/100 with125tests;#64/#65 reproduced and now corrected in follow-up pending review.",
+  "latest_evaluation_score": 71,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
   "audited_items": [
@@ -843,16 +843,16 @@
     }
   ],
   "latest_evaluation": {
-    "score": 72,
+    "score": 71,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "3270998384367be7b763cc605c0492208a72c988",
+    "commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
     "categories": {
-      "requirements": "12/20",
-      "functionality_reliability": "19/20",
+      "requirements": "11/20",
+      "functionality_reliability": "16/20",
       "code_architecture": "13/20",
       "testing_verification": "17/20",
-      "developer_experience_delivery": "11/20"
+      "developer_experience_delivery": "14/20"
     },
     "criterion_scores": [
       2,
@@ -862,16 +862,16 @@
       0,
       1,
       2,
-      2,
       1,
       1,
       1,
+      1,
       2,
+      1,
       2,
+      1,
       2,
-      2,
-      2,
-      2,
+      1,
       2,
       2,
       2,
@@ -895,11 +895,11 @@
       2,
       2,
       0,
-      1,
-      1,
+      2,
       1,
       2,
-      0,
+      2,
+      1,
       1,
       1,
       2,
@@ -907,30 +907,29 @@
       0
     ],
     "findings": [
-      "Wiki mismatch#60, native entry arguments#61 and mouse test timing race#62 independently verified fixed.",
-      "All111 tests, five repeated mouse suites and static/extension checks pass; no new runtime defect reproduced.",
-      "Coordinate test uses explicit test-only WndProc wrapper; untouched OS-dispatch coverage remains incomplete (#63).",
-      "Full engine/Forge/no-C default migration remain incomplete; new OS requirements are only in issue23 items458\u2013497.",
-      "Installed extension0.1.4 preserved; no fresh manual editor/CUA verification."
+      "All125 tests, native/C include demos and extension0.1.10 package checks independently pass.",
+      "Configuration provenance defect#64 and deep-expression traceback#65 independently reproduced; follow-up fixes pending review.",
+      "Issue#58 historical/current wording corrections independently verified.",
+      "Native/Forge/OS scope remains incomplete;#63 untouched coordinate dispatch gap remains."
     ]
   },
-  "current_candidate_commit": "3270998384367be7b763cc605c0492208a72c988",
-  "status_counts_validated_on": "3270998384367be7b763cc605c0492208a72c988",
+  "current_candidate_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+  "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "3270998384367be7b763cc605c0492208a72c988",
-    "reviewed_score": 72,
+    "commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+    "reviewed_score": 71,
     "previous_reviewed_score": 72,
-    "previous_review_commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
+    "previous_review_commit": "3270998384367be7b763cc605c0492208a72c988",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "111 passed independently on exact3270998",
+    "python_unittest": "125 independently pass on exactedfbe86",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "72/100 synchronized rubric arithmetic; full 50 criteria",
+    "qa_report_validator": "71/100 current rubric arithmetic",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "3270998 implementation diff passed",
-    "finding": "Corrections#60/#61/#62 independently verified; coordinate OS-dispatch coverage gap#63 remains."
+    "git_diff_check": "edfbe86 diff passed",
+    "finding": "Includes/dependency selection work; diagnostic#64 and compiler recursion#65 require follow-up."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -944,20 +943,15 @@
     "IN PROGRESS": 4
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
-  "latest_independent_candidate_score": 72,
-  "latest_independent_candidate_result": "FAIL against98; exact3270998,72/100,111 tests; full scope incomplete.",
+  "latest_independent_candidate_score": 71,
+  "latest_independent_candidate_result": "FAIL against98;71/100; configuration provenance and depth failures require verification.",
   "current_unscored_followup": {
-    "feature": "Local include graphs, original source diagnostics and native function dependency selection",
-    "status": "All125 tests pass, including14 include tests. Native/C include demo prints20; native demo3072bytes. Extension0.1.10 packaged and grammar/zip verified; compileall, QA, UTF-8 and diff checks pass. Independent full review pending.",
-    "source_files": [
-      "compiler/modules.py",
-      "tests/test_includes.py",
-      "docs/INCLUDES.md"
-    ],
-    "reviewed_baseline": "3270998384367be7b763cc605c0492208a72c988",
-    "python_tests_passed": 125
+    "feature": "Configuration provenance#64 and compiler expression/statement budgets#65",
+    "status": "All131 tests pass after#64/#65 fixes; targeted29, extension, compileall, QA, UTF-8 and diff checks pass. Fresh full independent review pending.",
+    "reviewed_baseline": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+    "python_tests_passed": 131
   },
-  "latest_independently_scored_candidate_commit": "3270998384367be7b763cc605c0492208a72c988",
+  "latest_independently_scored_candidate_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1048,5 +1042,5 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Independently reviewed3270998 at72/100 with111 tests; full scope incomplete and coordinate integration gap#63 remains."
+  "current_candidate_status": "Full review71/100 onedfbe86/125tests. Corrections#64/#65 are pending fresh review; engine/Forge/OS goal remains incomplete."
 }

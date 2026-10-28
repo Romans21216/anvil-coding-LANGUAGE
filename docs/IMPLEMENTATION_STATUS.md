@@ -2,7 +2,7 @@
 
 The master backlog is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23): its original 450-item inventory and the later additions remain there. This compact ledger records evidence only for audited items and does not duplicate the backlog. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated2026-10-28. Latest full independent review: exact `3270998384367be7b763cc605c0492208a72c988`,72/100—FAIL against98;111tests pass. Corrections#60/#61/#62 verified. Coordinate integration gap#63 remains. New OS parent items458–497 are only in issue23/comments.
+Updated2026-10-28. Latest full review exact `edfbe86252deb5af39504161f6e8571ae917fbb9`:71/100—FAIL against98;125tests pass. Source includes work;#64 provenance and#65 compiler recursion were independently found. Follow-up fixes are pending review. #63 remains open; all full backlog additions stay only in issue23/comments.
 
 Latest reviewed native follow-up: direct AMD64/PE compilation supports numeric programs, checked global arrays and an initial Win32 2D runtime with fixed updates, buffered presentation and keyboard and mouse input. C remains default pending broader parity. Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
 
@@ -14,7 +14,7 @@ Historical verified mouse milestone900106e:72/100 with102tests. Pointer/buttons/
 
 Verified procedural milestone: basic math/RNG/noise/fBm, Anvil-written runtime helpers, sixteen-argument calls and larger locals pass. The completed 111-test review verified explicit-main values/side effects/arity and the test-race correction. The newer include candidate below is still awaiting a full review.
 
-Include/dependency candidate awaiting independent review: local recursive source includes now resolve once with original file/line diagnostics; native code generation selects functions and runtime imports from the static call graph. Tests cover graph errors/bounds, duplicate definitions, UTF-8 diagnostics, cross-file calls/recursion and graphical initialization. Extension0.1.10 adds include scopes; installed0.1.4 remains unchanged. All125 tests and static/build/package checks pass; independent scoring is pending; the last completed review above remains unchanged.
+Verified include/dependency implementation onedfbe86: local source graphs and native static function selection pass125tests and native/C demos. Two adversarial diagnostic/depth findings#64/#65 require the current unreviewed follow-up; VSIX0.1.10 validated and installed0.1.4 preserved.
 
 ## Status counts
 
@@ -70,4 +70,4 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
 
 
-Historical issue#48 is resolved. Current3270998 scores72/100 with111tests;#60/#61/#62 independently verified fixed;#63 remains open. All scores identify exact snapshots.
+Historical issue#48 is resolved. Current reviewedfbe86 scores71/100 with125tests;#58 wording verified;#64/#65 fixes pending and#63 remains open. Scores always identify exact snapshots.

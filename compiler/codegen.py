@@ -436,7 +436,7 @@ def emit_c(
     ]
     if invalid:
         raise CompileError(
-            f"{path}:{invalid[0].line}: only configuration, initial values, "
+            f"{invalid[0].source or path}:{invalid[0].line}: only configuration, initial values, "
             "and calls are allowed at top level"
         )
     for n in calls:
@@ -458,7 +458,7 @@ def emit_c(
     )
     if has_engine and "main" in functions and functions["main"].params:
         raise CompileError(
-            f"{path}:{functions['main'].line}: main cannot have parameters "
+            f"{functions['main'].source or path}:{functions['main'].line}: main cannot have parameters "
             "when used as an engine callback program"
         )
     lines.append("int main(void) {")
@@ -481,7 +481,7 @@ def emit_c(
     elif "main" in functions:
         if functions["main"].params:
             raise CompileError(
-                f"{path}:{functions['main'].line}: main function parameters "
+                f"{functions['main'].source or path}:{functions['main'].line}: main function parameters "
                 "require an explicit call with arguments"
             )
         lines.append(f'    printf("%.15g\\n", {c_name("main")}());')

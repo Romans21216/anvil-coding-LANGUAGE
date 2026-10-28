@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextvars import ContextVar
 import math
 import pathlib
 import re
@@ -16,6 +17,28 @@ from compiler.common import (
     c_name,
     variable_code,
 )
+
+MAX_EXPRESSION_DEPTH = 64
+_PARSE_DEPTH = ContextVar("anvil_expression_parse_depth", default=0)
+
+
+def validate_expression_depth(source, path, line):
+    depth, quoted, escaped = 0, False, False
+    for char in source:
+        if escaped:
+            escaped = False
+        elif quoted and char == "\\":
+            escaped = True
+        elif char == '"':
+            quoted = not quoted
+        elif not quoted:
+            if char == "(":
+                depth += 1
+                if depth > MAX_EXPRESSION_DEPTH:
+                    raise CompileError(f"{path}:{line}: expression nesting exceeds {MAX_EXPRESSION_DEPTH} levels")
+            elif char == ")":
+                depth -= 1
+
 
 TOKEN = re.compile(
     r"""\s*(?:([0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)|("(?:\\.|[^"\\])*")|"""
@@ -160,6 +183,7 @@ class ExpressionParser:
         )
         self.scope = scope
         self.arrays = arrays or {}
+        validate_expression_depth(source, path, line)
         self.tokens: list[tuple[str, str]] = []
         pos = 0
         while pos < len(source):
@@ -257,6 +281,16 @@ class ExpressionParser:
         return code
 
     def parse(self, minimum: int = 0) -> tuple[str, str]:
+        depth = _PARSE_DEPTH.get() + 1
+        if depth > MAX_EXPRESSION_DEPTH:
+            raise CompileError(f"{self.path}:{self.line}: expression nesting exceeds {MAX_EXPRESSION_DEPTH} parser levels")
+        token = _PARSE_DEPTH.set(depth)
+        try:
+            return self._parse_impl(minimum)
+        finally:
+            _PARSE_DEPTH.reset(token)
+
+    def _parse_impl(self, minimum: int = 0) -> tuple[str, str]:
         if not self.peek():
             raise CompileError(f"{self.path}:{self.line}: expected an expression")
         kind, value = self.take()

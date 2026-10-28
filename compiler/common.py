@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / "runtime" / "anvil_runtime.c"
 INCLUDE = ROOT / "runtime"
+MAX_BLOCK_DEPTH = 128
 
 
 @dataclass

@@ -31,3 +31,11 @@ The native backend compiles functions reachable from the console entry, graphica
 This is source composition and native function selection. Namespaced modules, public/private exports, separately compiled object files, package registries, versioned package resolution, binary plugins, resource packaging and Forge artifacts remain future work. The master backlog is only in GitHub issue #23 and its comments.
 
 Extension package 0.1.10 adds tested include highlighting. Installed extension 0.1.4 remains unchanged per user preference; new highlighting has not been visually verified in that installed editor.
+
+## Compiler depth limits and troubleshooting
+
+The follow-up for issue #65 bounds expression delimiter nesting and recursive expression parser/emitter work to64 levels, including across nested function/array argument parsing. Quoted parentheses do not count as delimiters. Recursive statement code generation is protected by a128-block semantic limit. Split deeply nested expressions into intermediate variables and nested blocks into helper functions. These are compiler resource limits, not claims that the OS/type/runtime goals are complete.
+
+A missing file or boundary error reports the include site; duplicate definitions name both declarations. A syntax/expression/configuration error should name the original physical file and line. Use an `.ANVLproj` project root for C builds whose entry lives below sibling library directories; direct source builds use the entry directory as the boundary. Package downloads, version solving and external plugin binaries are not performed.
+
+The edfbe86 review found configuration provenance and deep-expression failures (#64/#65); the fixes and new CLI regressions are pending independent review. Its125-test count and71/100 score apply to that prior snapshot.

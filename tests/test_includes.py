@@ -95,6 +95,23 @@ class IncludeTests(IncludeFixture):
             NativeCodegen(path, *program).generate()
         self.assertIn(str(library) + ':2:', str(error.exception))
 
+
+    def test_included_configuration_and_callback_errors_keep_location(self):
+        cases = [
+            ('set var(x) = 7\n', 'fn(main)\n output var(x)\nend\n'),
+            ('scene 3d\n', 'fn(draw)\n display rect(0,0,1,1)\nend\n'),
+            ('clear rgba(1,2,3,4)\n', 'scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n'),
+            ('fn(update, dt)\n output 0\nend\n', 'scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n'),
+            ('fn(draw, dt)\n output 0\nend\n', 'scene 2d\n'),
+            ('output 1\n', 'scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n'),
+        ]
+        for library_source, entry_source in cases:
+            library = self.write('configuration.ANVL', library_source)
+            path, program = self.load('include "configuration.ANVL"\n' + entry_source)
+            with self.subTest(library=library_source), self.assertRaises(CompileError) as error:
+                NativeCodegen(path, *program).generate()
+            self.assertIn(str(library) + ':1:', str(error.exception))
+
     def test_graph_limits_and_invalid_utf8_are_controlled(self):
         self.write('one.ANVL', 'include "two.ANVL"\n')
         self.write('two.ANVL', 'fn(main)\n output 1\nend\n')

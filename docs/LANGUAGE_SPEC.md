@@ -251,3 +251,5 @@ call fn(main)
 For the reader-friendly guide and engine-specific examples, see [Language Guide](LANGUAGE.md), [Language Reference](Wiki/Language-Reference.md), and [Engine Guide](ENGINE.md).
 
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
+
+Compiler resource validation bounds expressions to64 delimiter/parser levels and control-flow nesting to128 blocks before code generation. Both backends issue a source-located compile error above these limits; split complex code into variables and functions. String-literal parentheses are excluded from delimiter counting.

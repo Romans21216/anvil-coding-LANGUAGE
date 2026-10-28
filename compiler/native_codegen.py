@@ -9,7 +9,7 @@ import struct
 from dataclasses import dataclass
 
 from compiler.common import CompileError, KEY_CODES, Node
-from compiler.expressions import ExpressionParser, split_args
+from compiler.expressions import ExpressionParser, MAX_EXPRESSION_DEPTH, split_args
 from compiler.lexer import strip_comment
 from compiler.native_x64 import Pe32Plus, X64Code
 
@@ -58,6 +58,15 @@ class _Expression:
         return token
 
     def emit(self, minimum: int = 0) -> _Value:
+        self.owner._expression_depth += 1
+        try:
+            if self.owner._expression_depth > MAX_EXPRESSION_DEPTH:
+                raise CompileError(f"{self.owner.path}:{self.line}: expression nesting exceeds {MAX_EXPRESSION_DEPTH} parser levels")
+            return self._emit_impl(minimum)
+        finally:
+            self.owner._expression_depth -= 1
+
+    def _emit_impl(self, minimum: int = 0) -> _Value:
         if not self._peek():
             raise CompileError(f"{self.owner.path}:{self.line}: expected expression")
         kind, value = self._take()
@@ -246,6 +255,7 @@ class NativeCodegen:
         self.arrays = arrays or {}
         self.code = X64Code()
         self._error_messages = {}
+        self._expression_depth = 0
         self._label_counter = 0
         self._frame_slots: dict[str, int] = {}
         self._scratch_base = 0
@@ -832,7 +842,7 @@ class NativeCodegen:
         if any(node.kind not in ("call", "seed") for node in self.top):
             unsupported = next(node for node in self.top if node.kind not in ("call", "seed"))
             raise CompileError(
-                f"{self.path}:{unsupported.line}: top-level configuration is not implemented by the native x64 backend yet"
+                f"{unsupported.source or self.path}:{unsupported.line}: top-level configuration is not implemented by the native x64 backend yet"
             )
         from compiler.modules import reachable_functions
         for name, fn in reachable_functions(self.functions, self.top, graphical=False):
@@ -874,12 +884,12 @@ class NativeCodegen:
 
         scenes = [node for node in self.top if node.kind == "scene"]
         if len(scenes) != 1 or scenes[0].value != "2d":
-            raise CompileError(f"{self.path}:{scenes[0].line}: native graphics currently requires one scene 2d declaration")
+            raise CompileError(f"{scenes[0].source or self.path}:{scenes[0].line}: native graphics currently requires one scene 2d declaration")
         draw = self.functions.get("draw")
         if draw is None or draw.params:
-            raise CompileError(f"{self.path}: native scene 2d requires fn(draw) with no parameters")
+            raise CompileError(f"{draw.source or self.path}:{draw.line}: native scene 2d requires fn(draw) with no parameters" if draw else f"{self.path}: native scene 2d requires fn(draw) with no parameters")
         if "update" in self.functions and self.functions["update"].params:
-            raise CompileError(f"{self.path}:{self.functions['update'].line}: native fn(update) cannot have parameters")
+            raise CompileError(f"{self.functions['update'].source or self.path}:{self.functions['update'].line}: native fn(update) cannot have parameters")
         clear = [11, 16, 27, 255]
         setup = []
         for node in self.top:
@@ -889,12 +899,12 @@ class NativeCodegen:
                 parts = split_args(node.value[1:-1])
                 if (len(parts) != 4 or any(not re.fullmatch(r"[0-9]{1,3}", part) for part in parts)
                         or any(int(part) > 255 for part in parts) or parts[3] != "255"):
-                    raise CompileError(f"{self.path}:{node.line}: native clear requires four literal channels in 0..255 and alpha 255")
+                    raise CompileError(f"{node.source or self.path}:{node.line}: native clear requires four literal channels in 0..255 and alpha 255")
                 clear = [int(part) for part in parts]
             elif node.kind in ("set", "add", "sub", "call", "seed"):
                 setup.append(node)
             else:
-                raise CompileError(f"{self.path}:{node.line}: native scene setup does not support {node.kind!r}")
+                raise CompileError(f"{node.source or self.path}:{node.line}: native scene setup does not support {node.kind!r}")
         self._window = NativeWindow(self, clear[0] | (clear[1] << 8) | (clear[2] << 16))
         from compiler.modules import reachable_functions
         for name, function in reachable_functions(self.functions, self.top, graphical=True):
