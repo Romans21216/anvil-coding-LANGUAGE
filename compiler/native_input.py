@@ -15,7 +15,6 @@ class NativeKeyboard:
         self.pressed = self.held + self.KEY_COUNT
         self.down_label = owner.label("key_down")
         self.up_label = owner.label("key_up")
-        self.focus_label = owner.label("keyboard_focus_lost")
 
     def emit_query(self, name: str) -> None:
         """Convert the numeric key once, returning false outside the byte table."""
@@ -49,7 +48,6 @@ class NativeKeyboard:
         for message, label in (
             (0x100, self.down_label), (0x104, self.down_label),
             (0x101, self.up_label), (0x105, self.up_label),
-            (0x008, self.focus_label),
         ):
             self.code.bytes(b"\x81\xfa" + struct.pack("<I", message))
             self.code.conditional_jump(0x84, label)
@@ -76,7 +74,3 @@ class NativeKeyboard:
         c.rip_lea_data(0, self.held)
         c.bytes(b"\x42\xc6\x04\x00\x00")
         c.jump(default_label)
-        c.label(self.focus_label)
-        c.call("native:clear_keys")
-        c.mov_imm(0, 0)
-        window.return_frame(window.FRAME)

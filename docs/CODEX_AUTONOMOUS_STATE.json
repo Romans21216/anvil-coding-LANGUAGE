@@ -135,7 +135,7 @@
     "last_checked": "2026-10-27",
     "changed_by_this_work": true,
     "item_status_inventory": "docs/IMPLEMENTATION_STATUS.json",
-    "change": "Original 450 inventory plus appended Forge items451–457 remain only in issue #23/comments; no full list copied locally."
+    "change": "Original 450 inventory plus appended Forge items451\u2013457 remain only in issue #23/comments; no full list copied locally."
   },
   "current_required_qa_threshold": 98,
   "audited_item_50_status": "COMPLETE",
@@ -189,5 +189,14 @@
     57
   ],
   "current_candidate_status": "Independently reviewed native keyboard implementation,73/100 below98. Full native engine and Forge scope remain incomplete.",
-  "current_unscored_followup": null
+  "current_unscored_followup": {
+    "feature": "Direct native mouse input",
+    "status": "102-test full suite, extension validation, compileall, QA arithmetic, native sample build and diff checks pass; independent full review pending.",
+    "source_files": [
+      "compiler/native_mouse.py",
+      "tests/test_native_mouse.py"
+    ],
+    "reviewed_baseline": "21fc960b04c2df317f3e0b3580987526f14d63e2",
+    "python_tests_passed": 102
+  }
 }

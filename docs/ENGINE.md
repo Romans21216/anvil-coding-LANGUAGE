@@ -52,3 +52,5 @@ Bindings written with `set var(name)` are global numeric state unless shadowed b
 
 Audio, 3D physics, polygon collision, a GPU-backed DXR renderer, persistence, controller input, platform backends, and profiling tools remain future work. The compiler rejects statements that have not been implemented instead of silently treating them as active features.
 
+
+The direct native backend also supports the five mouse query built-ins, using resizable client pixels rather than the C renderer's virtual viewport. Its button arguments are literal strings. See [native mouse behavior and limits](NATIVE_X64_COMPILER_MIGRATION.md#native-mouse-input).

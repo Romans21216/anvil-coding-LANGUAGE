@@ -157,7 +157,7 @@
       "tests": [
         "Independent critic verified 69 Python tests, npm extension validation, Python compileall, and git diff --check on exact commit 7c1385c",
         "QA validator accepts a valid zero-point criterion fixture and rejects a mismatched category subtotal fixture",
-        "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37–#43 are resolved",
+        "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37\u2013#43 are resolved",
         "Compiler-refactor candidate: the full suite passes 72 tests; the latest independent specification review separately verified 67 tests on 65c15bf"
       ],
       "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
@@ -171,7 +171,7 @@
         "Link the specification from the README and language reference/wiki.",
         "Independently review the specification for consistency with implementation."
       ],
-      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37–#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
+      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37\u2013#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
       "github_issue": "#23",
       "commit": "e17eeac505cf12d70363bf658f598cb6d485a45b"
     },
@@ -311,14 +311,14 @@
       "source_evidence": [
         "runtime/anvil_projection.h: anvil_compute_viewport computes a centered, aspect-preserving destination rectangle",
         "runtime/anvil_runtime.c: WM_PAINT fills letterbox bars and scales the fixed frame into the current client rectangle",
-        "docs/ENGINE.md: fixed 960×600 rendering and resizable-window presentation behavior documented"
+        "docs/ENGINE.md: fixed 960\u00d7600 rendering and resizable-window presentation behavior documented"
       ],
       "tests": [
         "tests/test_runtime.py: native viewport tests pass for original, wide, tall, centered letterbox, and invalid dimensions",
         "python -m unittest discover -s tests -q: 73 passed locally on unreviewed candidate",
         "python -m unittest discover -s tests -p test_runtime.py -v: 3 native runtime tests passed"
       ],
-      "missing_or_limitations": "Internal framebuffer remains fixed at 960×600. The reviewer did not visually inspect a live resized window. Canonical item #144 is compiler version reporting and remains unverified.",
+      "missing_or_limitations": "Internal framebuffer remains fixed at 960\u00d7600. The reviewer did not visually inspect a live resized window. Canonical item #144 is compiler version reporting and remains unverified.",
       "dependencies": [
         "Windows GDI presentation path"
       ],
@@ -945,7 +945,16 @@
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 73,
   "latest_independent_candidate_result": "FAIL against98; exact21fc960 review passed99tests and verified keyboard input. No new defect reproduced.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "feature": "Direct native mouse input",
+    "status": "102-test full suite, extension validation, compileall, QA arithmetic, native sample build and diff checks pass; independent full review pending.",
+    "source_files": [
+      "compiler/native_mouse.py",
+      "tests/test_native_mouse.py"
+    ],
+    "reviewed_baseline": "21fc960b04c2df317f3e0b3580987526f14d63e2",
+    "python_tests_passed": 102
+  },
   "latest_independently_scored_candidate_commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
   "historical_c_backed_evaluation": {
     "score": 92,
@@ -1013,7 +1022,7 @@
     ],
     "findings": [
       "Issue #48 is fixed: both JSON status files parse as strict UTF-8, and the prior candidate SHA/encoding mismatch is corrected.",
-      "Mouse input items #391–394 are COMPLETE and verified; native synthetic input regression passes.",
+      "Mouse input items #391\u2013394 are COMPLETE and verified; native synthetic input regression passes.",
       "No code defect was found in the fresh review.",
       "No live mouse-enabled window was visually inspected.",
       "Partial criteria 2, 3, 5, 9, 27, 40, 47, and 50 remain; score 92/100 is six points below the required 98/100."

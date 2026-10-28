@@ -4,8 +4,25 @@ clear rgba(11, 16, 27, 255)
 set var(panel-x) = 40
 set var(offset) = 0
 set var(paused) = 0
+set var(pointer-x) = -1
+set var(pointer-y) = -1
 
+# Left drag positions the panel; wheel moves it horizontally.
+# Right click pauses; middle click resets (keyboard controls also work).
 fn(update)
+  set var(pointer-x) = mouse_x()
+  set var(pointer-y) = mouse_y()
+  if mouse_held("left") and var(pointer-x) >= 0
+    set var(panel-x) = var(pointer-x) - 250
+  end
+  add var(panel-x) mouse_wheel() * 30
+  if mouse_pressed("right")
+    set var(paused) = 1 - var(paused)
+  end
+  if mouse_pressed("middle")
+    set var(panel-x) = 40
+    set var(offset) = 0
+  end
   if held(LEFT)
     sub var(panel-x) 180 * delta()
   end
@@ -33,4 +50,7 @@ fn(draw)
   display rect(var(panel-x) + 228, 64, 248, 72) -rgb(172, 106, 255)
   display rect(var(panel-x) + 228, 160, 248, 84) -rgb(93, 223, 199)
   display rect(var(panel-x) + var(offset), 276, 30, 8) -rgb(255, 210, 90)
+  if var(pointer-x) >= 0
+    display rect(var(pointer-x) - 3, var(pointer-y) - 3, 6, 6) -rgb(255, 255, 255)
+  end
 end

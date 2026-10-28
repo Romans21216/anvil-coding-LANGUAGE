@@ -173,6 +173,20 @@ class _Expression:
             self._require_number(self.emit())
             self._expect(")")
             return
+        if name.startswith("mouse_"):
+            button = None
+            if name in ("mouse_held", "mouse_pressed"):
+                if not self._peek() or self.tokens[self.index][0] != "string":
+                    raise CompileError(f"{self.owner.path}:{self.line}: {name}() expects a literal mouse button: left, right or middle")
+                raw = self._take()[1][1:-1].lower()
+                if raw not in ("left", "right", "middle"):
+                    raise CompileError(f"{self.owner.path}:{self.line}: unknown mouse button {raw!r}; choose left, right or middle")
+                button = ("left", "right", "middle").index(raw)
+            self._expect(")")
+            if self.owner._window is None:
+                raise CompileError(f"{self.owner.path}:{self.line}: {name}() requires native scene 2d")
+            self.owner._window.emit_mouse_query(name, button)
+            return
         if name in ("held", "pressed"):
             if self._peek(")"):
                 raise CompileError(f"{self.owner.path}:{self.line}: {name}() expects one numeric key argument")
@@ -212,7 +226,8 @@ class NativeCodegen:
     IMPORTS = [("KERNEL32.dll", "GetStdHandle"),
                ("KERNEL32.dll", "WriteFile"),
                ("KERNEL32.dll", "ExitProcess")]
-    BUILTIN_NAMES = {"compute", "time", "delta", "held", "pressed"}
+    BUILTIN_NAMES = {"compute", "time", "delta", "held", "pressed",
+                     "mouse_x", "mouse_y", "mouse_held", "mouse_pressed", "mouse_wheel"}
     MAX_DATA_BYTES = 16 * 1024 * 1024
 
     def __init__(self, path, functions, top, variables, arrays=None):

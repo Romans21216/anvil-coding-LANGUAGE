@@ -71,6 +71,8 @@ class NativeWindow:
         self.simulation_time = owner.reserve_data(b"\0" * 8)
         self.clock_requested = False
         self.keyboard = None
+        self.mouse = None
+        self.window_handle = owner.reserve_data(b"\0" * 8)
         self.back_dc = owner.reserve_data(b"\0" * 8)
         self.back_bitmap = owner.reserve_data(b"\0" * 8)
         self.stock_bitmap = owner.reserve_data(b"\0" * 8)
@@ -80,7 +82,7 @@ class NativeWindow:
 
     @property
     def clock_enabled(self) -> bool:
-        return "update" in self.owner.functions or self.clock_requested or self.keyboard is not None
+        return "update" in self.owner.functions or self.clock_requested or self.keyboard is not None or self.mouse is not None
 
     def emit_key_query(self, name: str) -> None:
         if self.keyboard is None:
@@ -88,9 +90,16 @@ class NativeWindow:
             self.keyboard = NativeKeyboard(self.owner)
         self.keyboard.emit_query(name)
 
+    def emit_mouse_query(self, name, button=None):
+        if self.mouse is None:
+            from compiler.native_mouse import NativeMouse
+            self.mouse = NativeMouse(self)
+        self.mouse.emit_query(name, button)
+
     @property
     def imports(self) -> list[tuple[str, str]]:
-        return self.IMPORTS + (self.CLOCK_IMPORTS if self.clock_enabled else [])
+        return (self.IMPORTS + (self.CLOCK_IMPORTS if self.clock_enabled else [])
+                + (self.mouse.IMPORTS if self.mouse is not None else []))
 
     def call(self, name: str) -> None:
         self.code.rip_call_import(name)
@@ -111,6 +120,8 @@ class NativeWindow:
         self._release_buffer()
         if self.keyboard is not None:
             self.keyboard.emit_helpers()
+        if self.mouse is not None:
+            self.mouse.emit_helpers()
         self._window_proc()
         self._entry()
 
@@ -156,6 +167,7 @@ class NativeWindow:
         c.label("native:window_proc")
         self.frame(self.FRAME)
         c.stack_int(1, self.HWND, store=True)
+        c.rip_int(1, self.window_handle, store=True)
         c.mov_imm(0, 0)
         c.stack_int(0, self.PAINT_DC, store=True)
         paint = self.owner.label("paint")
@@ -174,8 +186,15 @@ class NativeWindow:
         if self.clock_enabled:
             c.bytes(b"\x81\xfa\x13\x01\x00\x00")  # WM_TIMER
             c.conditional_jump(0x84, timer)
+        focus = self.owner.label("input_focus_lost")
+        if self.keyboard is not None or self.mouse is not None:
+            for message in (0x008, 0x01F):  # WM_KILLFOCUS / WM_CANCELMODE
+                c.bytes(b"\x81\xfa" + struct.pack("<I", message))
+                c.conditional_jump(0x84, focus)
         if self.keyboard is not None:
             self.keyboard.emit_dispatch()
+        if self.mouse is not None:
+            self.mouse.emit_dispatch()
         c.label(default)
         self.call("DefWindowProcW")  # original four Win64 argument registers
         self.return_frame(self.FRAME)
@@ -215,6 +234,8 @@ class NativeWindow:
         c.call("function:draw")
         if self.keyboard is not None and "update" not in self.owner.functions:
             c.call("native:clear_pressed")
+        if self.mouse is not None and "update" not in self.owner.functions:
+            self.mouse.clear_edges()
         c.stack_int(1, self.PAINT_DC)
         c.mov_imm(2, 0)
         c.mov_imm(8, 0)
@@ -248,6 +269,16 @@ class NativeWindow:
             self.return_frame(self.FRAME)
         if self.keyboard is not None:
             self.keyboard.emit_handlers(self, default)
+        if self.mouse is not None:
+            self.mouse.emit_handlers()
+        if self.keyboard is not None or self.mouse is not None:
+            c.label(focus)
+            if self.keyboard is not None:
+                c.call("native:clear_keys")
+            if self.mouse is not None:
+                self.mouse.clear_focus()
+            c.mov_imm(0, 0)
+            self.return_frame(self.FRAME)
         c.label(failure)
         no_paint = self.owner.label("failure_without_paint")
         c.stack_int(0, self.PAINT_DC)
@@ -389,6 +420,8 @@ class NativeWindow:
             c.call("function:update")
             if self.keyboard is not None:
                 c.call("native:clear_pressed")
+            if self.mouse is not None:
+                self.mouse.clear_edges()
         c.jump(loop)
         c.label(done)
         c.stack_int(1, self.HWND)

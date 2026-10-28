@@ -10,6 +10,8 @@ Verified flicker fix: persistent offscreen bitmap/DC resources compose each fram
 
 Verified native keyboard milestone: `compiler/native_input.py` emits held/pressed queries, transition state, focus clearing and update/draw edge lifetime. Named constants are shared by both backends. Independent generated-app tests cover repeat/release/system-key/focus/tap/draw-only behavior and numeric arguments; the native2D sample accepts Left/Right, Space and R. All 99 tests and static/extension checks pass. The full-product score remains73/100; native mouse and broader engine/Forge parity remain unfinished.
 
+Native mouse candidate awaiting independent review: all five mouse query built-ins now emit direct x64 handlers and state. Generated-app tests cover coordinates, three buttons, OS capture, focus/cancel behavior, wheel fractions and draw-only edges. All 102 Python tests, extension validation, compileall, QA arithmetic and diff checks pass; the sample builds to a 13,312-byte PE. The last completed score above remains the keyboard review until a new independent review finishes.
+
 ## Status counts
 
 - COMPLETE: 21
