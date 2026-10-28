@@ -3,25 +3,22 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 
 Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: independent full 50-criterion review of exact pushed commit ce5bd2d30e5b2c429e8244f1000655069e78bf9f.
+Basis: independent full50-criterion review of exact pushed commit 21fc960b04c2df317f3e0b3580987526f14d63e2.
 
 LATEST INDEPENDENT REVIEW
 -------------------------
-Score: 73/100 — FAIL against 98/100.
+Score:73/100 — FAIL against98/100.
 Evaluator: separate final_review agent.
-Categories: requirements 12/20, functionality/reliability 19/20, architecture 13/20, testing/verification 18/20, delivery 11/20.
-Scores in criterion order 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,2,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,2,2,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
+Categories: requirements12/20, functionality/reliability19/20, architecture13/20, testing/verification18/20, delivery11/20.
+Scores in criterion order1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,2,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,2,2,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
 
-The native backend emits a Win32 2D runtime with opaque rectangles, top-level numeric initialization, fixed 60 Hz updates, draw callbacks, time(), delta() and compute(). It now composes frames in a persistent offscreen bitmap/DC and presents one completed frame per paint, with resize replacement and stock-object restoration/cleanup.
+The direct backend now includes held()/pressed() keyboard input in its buffered Win32 rectangle runtime. Named constants are shared with C expression lowering. Window key messages set held and pending edge state, repeats are suppressed, short taps survive until the next update, and release/focus loss clear state. Draw-only scenes consume an edge after the next draw. Numeric query arguments evaluate once, truncate toward zero and return false outside the key table.
 
-All 96 Python tests, extension validation, compileall, QA arithmetic, strict JSON and diff checks passed independently. The reviewer reproduced the slow-draw visibility test failing against isolated fc37b1f, then passing on ce5bd2d. Repeated resizing kept GDI resources bounded, and injected bitmap-allocation failure exited with a controlled diagnostic/code 2. The native functions sample printed 13; the native 2D example builds to a 7,680-byte PE. No CUA was resumed after the earlier physical-Escape stop; evidence comes from actual generated-app pixel/resource tests and code inspection.
+The separate evaluator passed all99Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and the full implementation diff check. It inspected Win64 register preservation and bounded key addressing, and verified repeats, taps, focus loss, system messages, numeric arguments and draw-only behavior through actual emitted PE windows. The example builds to a9,728-byte PE. No new defect was reproduced. No CUA was resumed after physical Escape; no fresh manual editor/window visual check is claimed.
 
-User issue #57 (Romans21216 - Bugs) is fixed, independently verified and closed. No new runtime defect was reproduced. During report synchronization, development found obsolete autonomous-state metadata and inconsistent audit-summary counts; issue #58 records that documentation-only correction, now fixed and independently checked. The exact reviewed code and its score remain unchanged by the report sync.
+The example now supports Left/Right movement, Space pause and R reset. This makes the demo interactive but does not satisfy the full engine objective, so the overall score remains73/100. Native mouse,3D/camera, other shapes/assets, physics, networking, manifests, broader language parity and Forge items451–457 remain unfinished. C/MSVC is still the broader default backend; final no-C/no-Rust engine parity remains open. Full per-criterion evidence and recommendations are in docs/QA_REPORT.md.
 
-Earlier native scores: 71/100 on fc37b1f, 64/100 on 2b0a7b1, 63/100 on 71ddfec, 61/100 on 9eaf1b6, 58/100 on 120482e. Full native 3D/input/assets/physics/networking/language/project parity and the Forge requirements remain incomplete. The C backend is still default. Full criterion evidence and open recommendations are in docs/QA_REPORT.md.
-
-UNREVIEWED KEYBOARD CANDIDATE
-The direct runtime now implements held()/pressed(), shared named key constants, numeric key queries, release and focus-loss clearing, repeat suppression, and edge consumption after the next update (or draw in a draw-only scene). Keyboard helpers/state are emitted only when used. Targeted generated-app tests send messages only to their own window and verify held/edge state, system messages, short taps, draw-only behavior, invalid keys, and single evaluation. The native2D example now has arrow movement, Space pause and R reset. All 99 Python tests, extension validation and compile checks pass. This candidate awaits independent review; the latest scored implementation remains ce5bd2d at73/100. Mouse and broader engine/Forge features remain unfinished.
+Previous native review: ce5bd2d scored73/100 with96tests and independently verified the flicker fix (#57). Metadata correction#58 is fixed and verified. Earlier review fc37b1f scored71/100. The complete master backlog remains only in issue23 and its comments.
 
 SUMMARY
 -------
@@ -41,8 +38,8 @@ WHAT ANVIL IS GOOD AT
 
 WHAT ANVIL IS NOT GOOD AT YET
 -----------------------------
-1. It is not a complete engine: physics supports up to 128 fixed-step 2D circle and axis-aligned box bodies, configurable active capacity, restitution, and Coulomb friction. There is no continuous collision detection, polygon or 3D bodies, or joints. A general asset pipeline, broad texture formats, sprite animation, texture atlases, 3D mesh textures, audio engine, animation framework, scene graph, complete editor, and broad GUI system are also absent; the current candidate adds only bounded BMP-based screen-space sprites.
-2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. The native window can be resized with aspect-preserving letterboxing, but internal resolution remains fixed at 960×600. The current unreviewed candidate adds near-plane clipping for triangle faces, grid segments, and rasterized spheres. Far-plane and side-frustum clipping, mesh import, texture mapping, and performance profiling remain future work.
+1. It is not a complete engine: physics supports up to 128 fixed-step 2D circle and axis-aligned box bodies, configurable active capacity, restitution, and Coulomb friction. There is no continuous collision detection, polygon or 3D bodies, or joints. A general asset pipeline, broad texture formats, sprite animation, texture atlases, 3D mesh textures, audio engine, animation framework, scene graph, complete editor, and broad GUI system are also absent; the C-backed runtime includes bounded BMP-based screen-space sprites.
+2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. The native window can be resized with aspect-preserving letterboxing, but internal resolution remains fixed at 960×600. The earlier independently verified C-backed implementation includes near-plane clipping for triangle faces, grid segments, and rasterized spheres. Far-plane and side-frustum clipping, mesh import, texture mapping, and performance profiling remain future work.
 3. Only one ray-tracing path is implemented: CPU BVH is available. The runtime exposes `ray_backend(name)` and `ray_backend_available(name)`. The selector successfully chooses BVH; hardware-accelerated RTX/DXR and Embree are not implemented and cannot be selected successfully.
 4. The language remains narrow: fixed-size global and function-local numeric arrays are now implemented, but dynamic arrays, user-defined types, modules/imports, static types, and a general string model are not. Function parameters, return values, recursion, function-local numeric state, numeric `while`/`for` loops, and array bounds checks are implemented.
 5. Multiplayer is experimental: the UDP API exchanges a numeric value with one peer. It lacks reliable delivery, authentication, encryption, matchmaking, replication, and robust peer lifecycle handling; it is only appropriate for trusted LAN experiments.

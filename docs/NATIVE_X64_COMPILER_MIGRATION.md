@@ -76,4 +76,4 @@ The compiler emits the keyboard state/helpers only when a query is used; state u
 - Native regression tests cover code generation, PE metadata/fixups, execution, resource lifetime, and engine behavior.
 - Documentation and evaluation reports distinguish implemented native features from migration work still in progress.
 
-The latest completed independent review evaluated `ce5bd2d30e5b2c429e8244f1000655069e78bf9f` at 73/100, below 98. All 96 tests passed. It independently reproduced the former slow-draw flicker regression and verified the buffered version passes; issue #57 is closed. Full engine migration and Forge work remain unfinished. See `docs/ANVIL_EVALUATION.txt`.
+The latest completed independent review evaluated `21fc960b04c2df317f3e0b3580987526f14d63e2` at 73/100, below 98. All 99 tests passed, including the keyboard transition and prior flicker/resource tests. No new defect was reproduced. Full engine migration and Forge work remain unfinished. See `docs/ANVIL_EVALUATION.txt`.

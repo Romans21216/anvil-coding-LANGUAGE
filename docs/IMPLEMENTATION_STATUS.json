@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+  "reviewed_implementation_commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,11 +9,11 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
-  "latest_independently_reviewed_candidate_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+  "latest_verified_commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
+  "latest_independently_reviewed_candidate_commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
-  "latest_followup_status_change": "Independent ce5bd2d review scored73/100 with96tests; buffered flicker fix#57 is verified and closed. Post-review metadata/count/revision correction#58 independently verified. Full engine/Forge scope remains incomplete.",
+  "last_pushed_reviewed_below_threshold_commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
+  "latest_followup_status_change": "Native keyboard review on21fc960 scored73/100 with99tests. Held/pressed, focus/repeat/edge/numeric semantics verified; full engine/Forge goal remains incomplete.",
   "latest_evaluation_score": 73,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
@@ -846,7 +846,7 @@
     "score": 73,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+    "commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
     "categories": {
       "requirements": "12/20",
       "functionality_reliability": "19/20",
@@ -907,24 +907,29 @@
       0
     ],
     "findings": [
-      "Issue #57 independently verified with old-failure/fixed-pass slow-draw pixel test; closed.",
-      "All 96 tests, extension validation and static checks pass.",
-      "No new runtime bug reproduced; full engine and Forge scope remain incomplete.",
-      "CUA was not resumed after physical Escape; generated-app tests provide pixel/resource evidence."
+      "Native keyboard held/pressed and transition semantics independently verified.",
+      "All99tests and static/extension checks pass; no new runtime defect reproduced.",
+      "Full native engine/Forge scope and C-default migration remain incomplete.",
+      "No CUA/manual live editor check resumed; installed extension remains0.1.4 by user preference."
     ]
   },
-  "current_candidate_commit": null,
-  "status_counts_validated_on": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+  "current_candidate_commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
+  "status_counts_validated_on": "21fc960b04c2df317f3e0b3580987526f14d63e2",
   "candidate_validation": {
-    "status": "LOCAL_VERIFIED_PENDING_INDEPENDENT_REVIEW",
-    "commit": null,
-    "latest_completed_review_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
-    "latest_completed_review_score": 73,
+    "status": "INDEPENDENTLY_REVIEWED",
+    "commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
+    "reviewed_score": 73,
+    "previous_reviewed_score": 73,
+    "previous_review_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
     "threshold": 98,
-    "python_unittest": "99 passed locally; new input/focus assertions also pass in focused tests",
-    "npm_test": "passed; grammar unchanged",
+    "result": "FAIL",
+    "python_unittest": "99 passed independently on exact21fc960",
+    "npm_test": "passed",
     "compileall": "passed",
-    "finding": "Native keyboard feature candidate; no new independent score yet."
+    "qa_report_validator": "73/100 arithmetic passes; full50criteria",
+    "strict_json": "both structured records parse as UTF-8",
+    "git_diff_check": "053ecac..21fc960 passed",
+    "finding": "Keyboard milestone verified; no new defect; full scope remains unfinished."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -939,9 +944,9 @@
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 73,
-  "latest_independent_candidate_result": "FAIL against 98/100; independent review of ce5bd2d passed96tests and verified the buffered flicker fix. User issue #57 is closed.",
-  "current_unscored_followup": "Native held/pressed keyboard messages, shared key constants, repeat/focus/edge semantics and interactive example. Local99-test suite and targeted input tests pass; latest independent review is still ce5bd2d/73/96.",
-  "latest_independently_scored_candidate_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+  "latest_independent_candidate_result": "FAIL against98; exact21fc960 review passed99tests and verified keyboard input. No new defect reproduced.",
+  "current_unscored_followup": null,
+  "latest_independently_scored_candidate_commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1032,5 +1037,5 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Locally verified native keyboard implementation pending independent evaluation; exact reviewed revision will be recorded after the review. Null denotes no independently associated candidate revision yet."
+  "current_candidate_status": "Independently reviewed native keyboard implementation,73/100 below98. Full native engine and Forge scope remain incomplete."
 }
