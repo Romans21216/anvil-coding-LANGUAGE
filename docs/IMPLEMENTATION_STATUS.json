@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-28",
-  "reviewed_implementation_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
+  "reviewed_implementation_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,12 +9,12 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
-  "latest_independently_reviewed_candidate_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
+  "latest_verified_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+  "latest_independently_reviewed_candidate_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
-  "latest_followup_status_change": "Full review ecdf681: 76/100, 162 tests in 139.160s; native numeric ABI and scalar addressing independently verified; no new finding. Full goal active.",
-  "latest_evaluation_score": 76,
+  "last_pushed_reviewed_below_threshold_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+  "latest_followup_status_change": "Full review f11240c: 73/100, 168 tests in 176.154s; native circles/lines independently verified; pre-existing default C-circle stall confirmed as #79. Full goal active.",
+  "latest_evaluation_score": 73,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
   "audited_items": [
@@ -843,15 +843,15 @@
     }
   ],
   "latest_evaluation": {
-    "score": 76,
+    "score": 73,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
+    "commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
     "categories": {
       "requirements": "12/20",
-      "functionality_reliability": "18/20",
+      "functionality_reliability": "16/20",
       "code_architecture": "14/20",
-      "testing_verification": "17/20",
+      "testing_verification": "16/20",
       "developer_experience_delivery": "15/20"
     },
     "criterion_scores": [
@@ -866,6 +866,9 @@
       1,
       1,
       1,
+      1,
+      1,
+      2,
       2,
       1,
       2,
@@ -873,9 +876,6 @@
       2,
       2,
       2,
-      2,
-      2,
-      2,
       1,
       1,
       2,
@@ -886,7 +886,7 @@
       2,
       1,
       2,
-      2,
+      1,
       2,
       2,
       1,
@@ -907,29 +907,30 @@
       0
     ],
     "findings": [
-      "162 tests independently passed in 139.160s; extension 0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass.",
-      "Shared numeric ABI and scalar addressing verified: 2048 executed register/base/displacement combinations, 0-16 argument calls, independent callee shadow/alignment checks; extra nested/200-local/8192-element-array probe returns 1063.25. Additional 512 disp32 endpoint encodings checked without executing invalid addresses.",
-      "No new confirmed finding. Broader parsing/IR duplication, runtime/platform encoding and systems ABI remain incomplete, along with full engine/Forge/OS/backends/types/benchmarks. Existing issues #5-11/#14-15/#24/#63 cover gaps. Issue #23 and all 41 comments re-read after suite; installed 0.1.4 preserved."
+      "168 tests independently passed in 176.154s; npm 0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass.",
+      "Native circles/lines verified: 31920 randomized/extreme circle pixels and 25536 randomized fractional/clipped/thick line pixels match independent references. Kernels are compiled Anvil, viewport bounded, no C/Rust shim.",
+      "#79 OPEN: unchanged default C anvil_circle scans its entire bounding box; a wholly offscreen radius1000000 circle times out at2.024s after before/no after versus radius10 completing0.0604s. Fix viewport clipping/conversion handling and add C regressions.",
+      "Full engine/Forge/OS/types/actual backends/benchmarks and architecture gaps remain; #63 integration remains unverified. Issue23 and43 comments re-read after suite; installed0.1.4 preserved."
     ],
     "reviewer": "project_full_review"
   },
-  "current_candidate_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
+  "current_candidate_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
-    "reviewed_score": 76,
+    "commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+    "reviewed_score": 73,
     "previous_reviewed_score": 76,
-    "previous_review_commit": "2f7cd743ba37101c87a0daa5d1c9c017d9ab5dc2",
+    "previous_review_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "162 independently passed in 139.160s",
+    "python_unittest": "168 independently passed in 176.154s",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "76/100 current rubric",
+    "qa_report_validator": "73/100 current rubric",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "ecdf681 diff passed",
-    "finding": "162 tests independently passed in 139.160s; extension 0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. Shared numeric ABI and scalar addressing verified: 2048 executed register/base/displacement combinations, 0-16 argument calls, independent callee shadow/alignment checks; extra nested/200-local/8192-element-array probe returns 1063.25. Additional 512 disp32 endpoint encodings checked without executing invalid addresses. No new confirmed finding. Broader parsing/IR duplication, runtime/platform encoding and systems ABI remain incomplete, along with full engine/Forge/OS/backends/types/benchmarks. Existing issues #5-11/#14-15/#24/#63 cover gaps. Issue #23 and all 41 comments re-read after suite; installed 0.1.4 preserved."
+    "git_diff_check": "f11240c diff passed",
+    "finding": "168 tests independently passed in 176.154s; npm 0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. Native circles/lines verified: 31920 randomized/extreme circle pixels and 25536 randomized fractional/clipped/thick line pixels match independent references. Kernels are compiled Anvil, viewport bounded, no C/Rust shim. #79 OPEN: unchanged default C anvil_circle scans its entire bounding box; a wholly offscreen radius1000000 circle times out at2.024s after before/no after versus radius10 completing0.0604s. Fix viewport clipping/conversion handling and add C regressions. Full engine/Forge/OS/types/actual backends/benchmarks and architecture gaps remain; #63 integration remains unverified. Issue23 and43 comments re-read after suite; installed0.1.4 preserved."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -943,14 +944,10 @@
     "IN PROGRESS": 4
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
-  "latest_independent_candidate_score": 76,
-  "latest_independent_candidate_result": "FAIL against 98; 76/100 on ecdf681; ABI/addressing verified; no new finding.",
-  "current_unscored_followup": {
-    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
-    "features": "Native Anvil-written filled-circle and clipped-line kernels; opaque colours, bounded viewport work, source-located coordinate limits and static demand selection.",
-    "local_checks": "168 tests passed in 155.565s; targeted drawing/window/project13 passed; native_shapes CLI build, npm, compileall and diff checks pass. Latest scored source remains ecdf681 at76/100."
-  },
-  "latest_independently_scored_candidate_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
+  "latest_independent_candidate_score": 73,
+  "latest_independent_candidate_result": "FAIL against98;73/100 on f11240c; new native shapes verified; #79 open.",
+  "current_unscored_followup": null,
+  "latest_independently_scored_candidate_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1041,5 +1038,5 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Full review ecdf681: 76/100, 162 tests in 139.160s; native numeric ABI and scalar addressing independently verified; no new finding. Full goal active."
+  "current_candidate_status": "Full review f11240c: 73/100, 168 tests in 176.154s; native circles/lines independently verified; pre-existing default C-circle stall confirmed as #79. Full goal active."
 }

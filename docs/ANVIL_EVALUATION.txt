@@ -1,25 +1,25 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 Assessment date:2026-10-28
-Exact independent source:ecdf68109fd5932d8ae572a8f16446194e93b935
+Exact independent source:f11240c19d708718d8b94bae5f3b3764df435f88
 Evaluator:project_full_review
-Score:76/100 — FAIL against98.
-Categories12/18/14/17/15.
-Scores 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Score:73/100 — FAIL against98.
+Categories12/16/14/16/15.
+Scores 1-50: 2,1,1,1,0,1,2,2,1,1 / 1,1,1,2,2,1,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-162 tests independently passed in 139.160s; npm 0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. No new confirmed defect. Native numeric ABI transport and scalar addressing now use shared helpers, verified by 2048 executed addressing combinations, 0-16 argument calls and an independent callee checking stack/register positions, shadow space and alignment. Extra nested-call/200-local/8192-element-array probe returns 1063.25; 512 disp32 endpoint combinations checked for encoding only. Arrays, projects/settings and #77/#78 regressions pass. Broader parsing/IR duplication, runtime/platform encoding and systems ABI remain architecture deductions. Installed 0.1.4 preserved; #63 and full engine/Forge/OS/rich types/backends/benchmarks remain incomplete. Existing issues #5-11/#14-15/#24/#63 cover remaining gaps. Evaluator re-read #23 and its 41 comments after the full suite. Goal remains active.
+168 tests independently passed in176.154s; npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. New native circles/lines are real Anvil-written kernels compiled directly to the PE; 31,920 extra circle pixels and25,536 line pixels match independent references. No new native defect confirmed. Pre-existing default C-circle traversal stalls on valid wholly offscreen radius1,000,000 input: timeout2.024s after before/no after, compared with radius10 exiting0.0604s. Filed Codex Bugs #79 with reproduction/impact/acceptance. Score76->73 reflects this discovery on criteria12/16/32. Fix #79 next; broader engine/Forge/OS/backends/types/benchmarks/architecture gaps remain. Installed0.1.4 preserved; #63 remains unverified. Evaluator re-read #23 and43 comments after suite. Full goal remains active.
 
-Previous independent source 2f7cd74: 76/100, 158 tests in 145.917s, native local arrays verified. Current ABI batch improves foundations without resolving the remaining full-scope deductions.
+Previous independent source ecdf681:76/100,162 tests in139.160s; numeric ABI verified. Native drawing improves capabilities; discovery of an older C defect reduces the current full-goal score.
 
 SUMMARY
 -------
-Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The current default compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for numeric programs and an initial rectangle-based 2D runtime. The requested no-C/no-Rust engine remains incomplete.
+Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The current default compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for numeric programs and an initial rectangle/circle/line 2D runtime. The requested no-C/no-Rust engine remains incomplete.
 
 The fairest description is a small game scripting language connected to a Windows software-rendering prototype. Its syntax is approachable and it has a working path from source to executable, including parameterized functions and numeric loops, but it is much closer to a learning project than to a complete game engine or mature language ecosystem.
 
 WHAT ANVIL IS GOOD AT
 ---------------------
 1. Readable source: named functions use a small BASIC/Lua-inspired set of commands, expressions, branches, and explicit end markers.
-2. Native compilation: the direct backend emits Windows x64 machine code and PE executables for numeric programs and an initial 2D rectangle runtime. Broader engine programs currently use the existing generated-C/MSVC path.
+2. Native compilation: the direct backend emits Windows x64 machine code and PE executables for numeric programs and an initial 2D rectangle/circle/line runtime. Broader engine programs currently use the existing generated-C/MSVC path.
 3. Small interactive scenes: the runtime provides 2D drawing, basic 3D primitives, a perspective camera, keyboard controls, a fixed-step update loop, and a way to combine a 2D HUD with 3D content.
 4. Reusable numeric functions and loops: functions support parameters, numeric return values, recursion, and function-local numeric state. Inclusive `for` ranges support ascending or descending steps; `while` loops support condition-controlled repetition.
 5. Procedural math: seeded random values, deterministic gradient/fractal noise, and common math operations are available.
@@ -29,7 +29,7 @@ WHAT ANVIL IS GOOD AT
 WHAT ANVIL IS NOT GOOD AT YET
 -----------------------------
 1. It is not a complete engine: physics supports up to 128 fixed-step 2D circle and axis-aligned box bodies, configurable active capacity, restitution, and Coulomb friction. There is no continuous collision detection, polygon or 3D bodies, or joints. A general asset pipeline, broad texture formats, sprite animation, texture atlases, 3D mesh textures, audio engine, animation framework, scene graph, complete editor, and broad GUI system are also absent; the C-backed runtime includes bounded BMP-based screen-space sprites.
-2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. The C-backed window can be resized with aspect-preserving letterboxing, while its internal resolution remains 960×600. The direct backend resizes its rectangle-rendering surface to client dimensions. The earlier independently verified C-backed implementation includes near-plane clipping for triangle faces, grid segments, and rasterized spheres. Far-plane and side-frustum clipping, mesh import, texture mapping, and performance profiling remain future work.
+2. Rendering is limited: conventional drawing uses a fixed-size software renderer rather than a modern GPU renderer. The C-backed window can be resized with aspect-preserving letterboxing, while its internal resolution remains 960×600. The direct backend resizes its 2D rendering surface to client dimensions. The earlier independently verified C-backed implementation includes near-plane clipping for triangle faces, grid segments, and rasterized spheres. Far-plane and side-frustum clipping, mesh import, texture mapping, and performance profiling remain future work.
 3. Only one ray-tracing path is implemented: CPU BVH is available. The runtime exposes `ray_backend(name)` and `ray_backend_available(name)`. The selector successfully chooses BVH; hardware-accelerated RTX/DXR and Embree are not implemented and cannot be selected successfully.
 4. The language remains narrow: fixed-size global and function-local numeric arrays are now implemented, but dynamic arrays, user-defined types, namespaced modules, static types, and a general string model are not. Function parameters, return values, recursion, function-local numeric state, numeric `while`/`for` loops, and array bounds checks are implemented.
 5. Multiplayer is experimental: the UDP API exchanges a numeric value with one peer. It lacks reliable delivery, authentication, encryption, matchmaking, replication, and robust peer lifecycle handling; it is only appropriate for trusted LAN experiments.
@@ -72,5 +72,3 @@ Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 cat
 Focused independent record recheckfbf6143 passes after #58 corrections: total-row source2f7cd74 and native local-array rollout agree with all four50-score vectors,76/100 and158/145.917s evidence. No rescore or implementation change.
 
 Focused independent record-only recheck of 91b06cd: PASS. All six current records, all 50 scores and both candidate_validation objects agree on exact source ecdf681, 76/100, categories 12/18/14/17/15 and 162 tests in 139.160s. Historical 2f7cd74/158 evidence remains identified as history. No implementation change or rescore.
-
-Unscored follow-up: native Anvil-written circle/line kernels implemented; local 168-test suite passed in 155.565s plus targeted pixels/limits/lifetime/selection and CLI sample checks. Awaiting separate FULL50 review. Latest independent ecdf681/76/162 evidence above remains unchanged until that review.
