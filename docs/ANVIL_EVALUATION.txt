@@ -7,7 +7,7 @@ Basis: latest completed independent full review of exact pushed commit f330d4b19
 
 LATEST INDEPENDENT REVIEW AND CURRENT CANDIDATE
 -----------------------------------------------
-The latest independent review evaluated exact commit f330d4b19225e46c2f32fcefda8e78d8719ef26f and scored 55/100 — FAIL against 98 (requirements 9/20, functionality 9/20, architecture 12/20, testing 14/20, delivery 11/20). All 87 tests passed. The reviewer verified the six-place fractional-output fix for issue #49 and reproduced a separate large-finite-value formatting bug, filed as issue #52. The current unreviewed candidate detects values outside signed 64-bit range, emits a controlled error, and exits with code 2; focused regression tests pass. The previous direct-native score was 54/100 for 597867f and 50/100 for 573cb44; the earlier C-backed score was 92/100 for c102604. Rust code generation is not a project target; direct x64 machine-code PE output is the selected direction. The legacy C backend is still the default and must be removed after native runtime parity is achieved.
+The latest independent review evaluated exact commit ade1ff6b434b6c66d67a155320dc538ff2eb6ac3 and scored 56/100 — FAIL against 98 (requirements 9/20, functionality 10/20, architecture 12/20, testing 14/20, delivery 11/20). All 88 tests passed. Issue #49 fractional output was fixed. The reviewer verified the controlled range guard for issue #52 and found two boundaries: valid `-9223372036854775808` is rejected (#53), and non-finite arithmetic exits without a diagnostic (#54). The current unreviewed candidate supports the signed minimum and emits a line-numbered numeric error; its 89-test suite passes. Previous direct-native scores were 55/100 for f330d4b, 54/100 for 597867f, and 50/100 for 573cb44; the earlier C-backed score was 92/100 for c102604. Rust code generation is not a project target; direct x64 machine-code PE output is the selected direction. The legacy C backend is still the default and must be removed after native runtime parity is achieved.
 
 SUMMARY
 -------
@@ -99,14 +99,14 @@ Anvil's strengths are simplicity, inspectable C output, approachable examples, r
 
 LATEST INDEPENDENT REVIEW — DIRECT NATIVE COMMIT 573CB44
 ======================================================
-Exact reviewed commit: `f330d4b19225e46c2f32fcefda8e78d8719ef26f`
+Exact reviewed commit: `ade1ff6b434b6c66d67a155320dc538ff2eb6ac3`
 Evaluator: separate independent review agent; complete 50-criterion review.
-Score: **55/100 — FAIL** against the user's 98/100 threshold. Category subtotals: requirement fulfillment 9/20, functionality and reliability 9/20, code quality and architecture 12/20, testing and verification 14/20, developer experience and delivery 11/20.
-The evaluator ran all 87 tests, extension tests, compileall, QA arithmetic, strict UTF-8 status JSON parsing, and diff checks successfully. It built native executables and confirmed ordinary fractional rounding; it also reproduced the large-value defect in issue #52. Full scoring is recorded in `docs/QA_REPORT.md`.
+Score: **56/100 — FAIL** against the user's 98/100 threshold. Category subtotals: requirement fulfillment 9/20, functionality and reliability 10/20, code quality and architecture 12/20, testing and verification 14/20, developer experience and delivery 11/20.
+The evaluator ran all 88 tests, extension tests, compileall, QA arithmetic, strict UTF-8 status JSON parsing, and diff checks successfully. It verified native fractional rounding and the controlled large-value diagnostic, then reproduced the signed-minimum rejection (#53) and missing non-finite arithmetic diagnostic (#54). Full scoring is recorded in `docs/QA_REPORT.md`.
 
 The two QA failures were from tests that included historical score tables and hardcoded the old category subtotal. Issue #51 records the exact failures. The follow-up in commit 150a042 scopes rows to the current table and adjusts its subtotal dynamically; both QA tests and the entire 86-test suite pass. Issue #51 is closed as fixed. The latest independent review of commit 597867f scored 54/100; this section records the prior 50/100 evaluation for commit 573cb44. The early pre-fix native snapshot scored 49/100. The old C-backed 92/100 score remains tied to c102604 and does not apply to native compiler work.
 
-50-CRITERION BREAKDOWN — EXACT REVIEWED COMMIT F330D4B
+50-CRITERION BREAKDOWN — EXACT REVIEWED COMMIT ADE1FF6
 -----------------------------------------------------
 Each criterion is worth 2 points. The detailed evidence below refers to exact commit f330d4b.
 
@@ -122,16 +122,16 @@ A. REQUIREMENT FULFILLMENT — 9/20
 9. 1 — Supported numeric workflows work; game workflows do not.
 10. 0 — Native path cannot build the intended game engine.
 
-B. FUNCTIONALITY AND RELIABILITY — 9/20
+B. FUNCTIONALITY AND RELIABILITY — 10/20
 11. 0 — Requested native game engine is not implemented.
 12. 1 — Legacy C engine remains functional; native supports a small numeric subset.
 13. 1 — Simple `.ANVL` to EXE workflow works; project/engine workflows are unsupported.
 14. 1 — Parser validation exists but native construct coverage is limited.
 15. 1 — Unsupported syntax diagnoses; finite failures lack source-located diagnostics.
 16. 1 — Basic native cases tested; broad ABI/PE/numeric coverage is absent.
-17. 1 — Parser rejects malformed source; native stack/output extremes lack guards.
+17. 2 — Out-of-range native output now prints a controlled message and exits with code 2.
 18. 1 — Simple repeated runs work; recursion/stress stability is unverified.
-19. 1 — Issue #49 fractional output is fixed for six-place rounding, but finite values above signed-64 range are corrupted; issue #52 tracks the exact reproduction.
+19. 1 — Fractional output and large-value rejection work, but valid signed minimum is rejected (#53).
 20. 1 — Parser/codegen/PE work together on small numeric programs, not engine runtime.
 
 C. CODE QUALITY AND ARCHITECTURE — 12/20
@@ -153,7 +153,7 @@ D. TESTING AND VERIFICATION — 10/20
 34. 2 — Negative output, args, booleans, and ascending/descending/zero-step loops are covered.
 35. 1 — CLI EXE build/run works; engine integration is absent.
 36. 1 — Documented Python/npm commands are reproducible.
-37. 2 — All 87 Python tests pass; extension, compileall, QA, JSON, and diff checks pass.
+37. 2 — All 88 Python tests pass; extension, compileall, QA, JSON, and diff checks pass.
 38. 2 — The exact reviewed SHA and the candidate-under-review status were recorded accurately.
 39. 2 — QA fixture regression and fractional formatting are covered by focused and full-suite tests.
 40. 0 — Full user objective remains unfulfilled.
@@ -167,7 +167,7 @@ E. DEVELOPER EXPERIENCE AND DELIVERY — 11/20
 46. 1 — CLI works; full native project/editor/runtime integration is absent.
 47. 1 — Grammar automation passes; live extension install/highlighting is unverified.
 48. 2 — Commit is pushed, organized, and available on main.
-49. 2 — Numeric formatting limits and confirmed issue #52 are disclosed; issue #49 is resolved.
+49. 2 — Numeric limits and issues #52–#54 are disclosed; issue #49 is resolved.
 50. 0 — This is not a practical full game-engine deliverable.
 
-Independent verification on `f330d4b19225e46c2f32fcefda8e78d8719ef26f`: all 87 Python tests, extension npm tests, compileall, QA arithmetic, strict UTF-8 JSON parsing, diff check, and native output samples passed. Issue #49 is fixed and closed. The reviewer reproduced large finite output corruption, now tracked in issue #52. The full no-C game-engine migration remains incomplete; 55/100 is below the 98-point threshold.
+Independent verification on `ade1ff6b434b6c66d67a155320dc538ff2eb6ac3`: all 88 Python tests, extension npm tests, compileall, QA arithmetic, strict UTF-8 JSON parsing, diff check, and native output samples passed. Issue #49 is fixed and closed; issue #52 is guarded with an error. The review filed issues #53 and #54 for signed-minimum rejection and missing non-finite diagnostic. The current working-tree candidate addresses both, with focused tests passing; full suite and independent review are pending. The full no-C game-engine migration remains incomplete; 56/100 is below the 98-point threshold.

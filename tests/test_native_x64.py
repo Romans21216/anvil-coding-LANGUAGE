@@ -56,6 +56,7 @@ call fn(main)
             "12.5": "12.5\n",
             "12.9999999": "13\n",
             "-1.9999999": "-2\n",
+            "-9223372036854775808": "-9223372036854775808\n",
         }
         for expression, expected in cases.items():
             with self.subTest(expression=expression):
@@ -78,6 +79,23 @@ call fn(main)
                 )
             self.assertEqual(result.returncode, 2)
             self.assertEqual(result.stdout, "Anvil output out of range\n")
+
+    def test_native_backend_reports_nonfinite_arithmetic_with_source_line(self):
+        for expression in ("0 / 0", "1 / 0"):
+            with self.subTest(expression=expression), tempfile.TemporaryDirectory() as temp:
+                path = pathlib.Path(temp) / "bad-math.ANVL"
+                source = f"fn(main)\n  output {expression}\nend\ncall fn(main)\n"
+                path.write_text(source, encoding="utf-8")
+                functions, top, variables, arrays = parse(path, source)
+                executable = pathlib.Path(temp) / "bad-math.exe"
+                executable.write_bytes(
+                    NativeCodegen(path, functions, top, variables, arrays).generate()
+                )
+                result = subprocess.run(
+                    [str(executable)], capture_output=True, text=True, timeout=5
+                )
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, "Anvil numeric error at line 2\n")
 
     def test_native_backend_compiles_loop_and_boolean_operators(self):
         source = """\
