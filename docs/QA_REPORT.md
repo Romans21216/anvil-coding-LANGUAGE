@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-10-28
-**Latest independent evaluation:** **73/100 - FAIL** on exact `1570abdd429683759f31066f04e5982ec10de386`.
+**Latest independent evaluation:** **76/100 - FAIL** on exact `2b4e5e8d84bb0695af92eadd3740a4a84a6410dd`.
 **Current passing threshold:** 98/100. Historical 90-point passes do not pass the current requirement.
 **Evaluator:** separate `project_full_review` agent, full 50-criterion review.
 
@@ -9,20 +9,20 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 
 ## Independent verification for this snapshot
 
-- `python -m unittest discover -s tests -q`: **150 passed**, 152.822 seconds.
+- `python -m unittest discover -s tests -q`: **151 passed**, 142.480 seconds.
 - Extension 0.1.11 grammar validation and VSIX CRC/source parity passed. Language ID `anvil`, extensions `.ANVL`/`.anvl`, grammar `vscode-extension/syntaxes/anvil.tmLanguage.json`. Installed 0.1.4 remains per preference; newer visible tokens are unverified.
 - Python compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
 - Adversarial probes combine 128 statement blocks with 63 grouped/unary/user-call/abs levels; accepted inputs pass. Over-budget mixed expressions return controlled diagnostics. #64 configuration locations and #65 uncontrolled compiler recursion are verified fixed.
 - Source includes and native function selection were verified in the preceding `edfbe86` review: native demo 3,072 bytes, native and C/MSVC demos print 20. The full regression suite includes those execution paths.
 - Direct-backend window/input tests target only their generated windows. Coordinate coverage uses explicit test instrumentation; untouched OS coordinate dispatch remains unverified (#63). No CUA or fresh manual editor/sample inspection occurred. A later audit found the legacy C mouse harness called SetCursorPos during full suites; prior blanket no-global-input claims were too broad. #71 records this and removes that behavior in the current follow-up.
 
-## Latest 50-criterion scoring — `1570abd`
+## Latest 50-criterion scoring — `2b4e5e8`
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
 | 1 | Explicit requirements identified | 2 | Language/compiler/runtime and direct target are identified. |
 | 2 | Implicit requirements addressed | 1 | Runtime/input support is growing; most engine/Forge breadth remains unavailable (open). |
-| 3 | Functionality matches intended goal | 1 | Custom language/native subset works; full engine absent and drawing composition still depends on literal contents (#77). |
+| 3 | Functionality matches intended goal | 1 | Custom language/native subset works; complete engine/Forge/OS functionality remains absent. |
 | 4 | Required deliverables present | 1 | Compiler, extension, tests and docs exist; native engine parity is missing (open). |
 | 5 | No essential feature missing | 0 | GPU rendering, broader engine systems and Forge requirements remain absent (open). |
 | 6 | Stated constraints respected | 1 | Native avoids C/Rust, but C is default; port remaining APIs before switching (open). |
@@ -33,12 +33,12 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 11 | Core functionality works | 1 | Numeric/namespace/local/scratch/formatter cases pass; complete native engine core remains partial. |
 | 12 | Secondary functionality works | 2 | Actual compiled ray/text order, input/procedural/resource primitives pass. |
 | 13 | Primary workflows functional | 1 | Hosted subset builds work; Forge/plugin/assembly/UEFI/kernel primary workflows are absent (open). |
-| 14 | Inputs validated | 1 | Escaped NUL entry bypasses validation and reaches filesystem ValueError (#78). |
-| 15 | Errors handled gracefully | 1 | Malformed entry leaks Python traceback on both backends (#78); reject controls before path operations. |
+| 14 | Inputs validated | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
+| 15 | Errors handled gracefully | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
 | 16 | Edge cases covered | 2 | Tests cover signed/outside mouse coordinates, resize, capture, taps, wheel fractions, focus and draw-only scenes. |
-| 17 | Invalid inputs controlled | 1 | Both backends expose uncontrolled ValueError for invalid NUL manifest entries (#78). |
+| 17 | Invalid inputs controlled | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
 | 18 | Stable across repeated operations | 2 | Repeated calls/resources/input/includes and new per-call initialization regressions pass. |
-| 19 | No known critical defects | 2 | No critical runtime corruption or numeric miscompilation reproduced; remaining confirmed compile/display defects are P2. |
+| 19 | No known critical defects | 2 | No critical corruption or numeric miscompilation reproduced; no new confirmed finding in latest review. |
 | 20 | Components integrate | 2 | Includes, project settings/native runtime and semantic ray/HUD order integrate in executable tests. |
 | 21 | Logical project structure | 2 | Input emitter, window emitter, encoder, examples, tests and docs are separated. |
 | 22 | Readable and consistently formatted | 1 | Raw x64 bytes are hard to maintain; add instruction abstractions and formatting (open). |
@@ -50,14 +50,14 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 28 | No unfinished placeholders | 1 | Input handlers are real; native graphics still restricts scenes and opaque rectangle coverage (open). |
 | 29 | Configuration understandable | 2 | Backend/TOML/include/title and1–240Hz settings are organized and documented. |
 | 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
-| 31 | Automated tests provided | 2 | 150 tests and extension0.1.11 validation independently pass. |
+| 31 | Automated tests provided | 2 | 151 tests and extension0.1.11 validation independently pass. |
 | 32 | Core tests covered | 2 | Numeric/differential/include/runtime and compiled semantic ray-order regressions cover implemented core. |
 | 33 | Failure scenarios tested | 2 | Invalid mouse arguments/keys and bitmap allocation-failure injection are covered. |
 | 34 | Edge cases explicitly tested | 2 | Taps, repeats, simultaneous buttons, actual OS capture, wheel accumulation and draw-only behavior are tested. |
 | 35 | Integration behavior tested | 1 | Coordinate test uses an explicit test-only WndProc wrapper; untouched OS-dispatch coverage is incomplete (#63, open). |
 | 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
-| 37 | Builds and compilation pass | 2 | 150 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
-| 38 | Results recorded accurately | 2 | Exact baseline and unscored follow-up separated; prior cursor-movement claim and failed development run disclosed. |
+| 37 | Builds and compilation pass | 2 | 151 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
+| 38 | Results recorded accurately | 2 | Exact2b4e5e8/76/151 evidence agrees across records; historical input-test limitations disclosed. |
 | 39 | Regression checks performed | 2 | Full suite and prior slow-draw/failure/resource regressions pass. |
 | 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
 | 41 | Installation instructions accurate | 2 | Python/native and Python/MSVC routes match independently exercised builds; extension installation documented. |
@@ -65,32 +65,33 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 43 | Usage understandable | 2 | Corrected compiler/migration guides identify actual support, usage and backend limits. |
 | 44 | Design decisions documented | 2 | Migration design and limits are documented. |
 | 45 | Troubleshooting available | 2 | README, native diagnostic tables and include/depth troubleshooting provide actionable subset guidance. |
-| 46 | Opens in intended environment | 1 | CLI/editor automation works; complete native project/editor/runtime workflow (open). |
+| 46 | Opens in intended environment | 1 | CLI/runtime/static extension validate; full editor workflows and fresh visible verification remain incomplete. |
 | 47 | Editor integration works | 1 | Grammar, corrected indentation/folding and VSIX parity pass; current newer installed-editor behavior remains unverified. |
 | 48 | Deliverables organized | 2 | Deliverables are organized and pushed. |
 | 49 | Limitations disclosed | 2 | Native limitations are disclosed. |
 | 50 | Practical for intended scope | 0 | Full game-engine/Forge scope remains incomplete (open). |
 | | **Requirement fulfillment** | **12/20** | |
-| | **Functionality and reliability** | **15/20** | |
+| | **Functionality and reliability** | **18/20** | |
 | | **Code quality and architecture** | **14/20** | |
 | | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **73/100** | Exact commit `1570abd`; FAIL against 98. |
+| | **Total** | **76/100** | Exact commit `2b4e5e8`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
-- **#78 — invalid manifest entry (14/15/17):** Escaped NUL passes TOML parsing and leaks ValueError during path resolution/read on both backends. Validate entry controls before filesystem operations; assert manifest-located exit1, no traceback and no artifacts. Local fix and subprocess regressions pass; independent review pending.
+- **#78 RESOLVED:** All64 independent control-character entry cases pass on both backends; diagnostics name the manifest and no traceback/artifact leaks. No new confirmed finding.
 - **Scope (2–6/9–10/13/28/40/50):** Complete native engine, actual DXR/Embree, rich types, Forge/OS outputs and measured efficiency remain absent. Deliver full issue23 scope with executable acceptance evidence before default migration/completion.
 - **Architecture (22/23/25/27/30):** Raw opcode/ABI duplication and semantic/frame/runtime coupling increase maintenance risk. Consolidate instruction/ABI helpers and validated lowering/storage interfaces.
 - **Integration (35):** Instrumented/synchronized coordinate samples do not prove untouched OS pointer dispatch (#63). Gather independent integration evidence within input constraints.
 - **Setup/editor (42/46/47):** Full project/engine/Forge/OS setup cannot be reproduced; newer installed-editor visuals remain unverified (#24). Implement missing workflows and respect installed0.1.4 preference.
 
-The full1570abd review independently verifies #77 structured ray classification and native project/title/fixed-rate support. Actual order SSFTFRF and an extra17Hz wall-clock probe pass. #58 ancillary metadata was independently rechecked and closed. Current #78 control-entry repair is unscored; full151 follow-up and review pending.
+The final2b4e5e8 review independently verifies the first planned batch: record synchronization, structured ray flushing, native project builds/title/rates, boundary validation and explicit no-fallback failures.151tests passed142.480s, plus64 adversarial entry cases and a positive spacedUnicode project. Installed0.1.4 is preserved; #63 remains unverified. Next: native local arrays/allocation limits and instruction/ABI helpers. Full goal remains active below98.
 
 ## Review history
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
+| `1570abdd429683759f31066f04e5982ec10de386` |73 /98 FAIL|150tests152.822s; #77/projects verified; #78 found.|
 | `86681061c3e6d564b315dd571be4958202ac295d` |72 /98 FAIL|146tests125.935s; #74–76 verified; #77 found.|
 | `c8b01e70dccfe777b490f5eec2d469b6e1c50800` | 69 / 98 — FAIL | 139tests; #72/#73 verified; #74/#75 found. Categories11/13/14/16/15. |
 | `be0d591a82578d397ee1bfb88c31fe99f4749637` | 68 / 98 — FAIL | 136tests; #58/#67–71 verified; #72/#73 found. Categories11/12/14/16/15. |
@@ -105,7 +106,4 @@ Earlier reports and their complete rubric tables remain available in Git history
 
 ## Bug tracking
 
-All confirmed findings have detailed reproduction, impact and acceptance criteria in GitHub with `Codex Bugs`; user reports use `Romans21216 - Bugs`. Current confirmed finding: [#78 manifest entry validation](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/78). [#63 coordinate integration](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/63) and broader systems in#5–11/#14–15/#24 remain open. Complete backlog only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
-
-
-Full1570abd review verifies #77 and native project/title/rate support; extra17Hz probe8updates0.4684s matches0.4706s expected. All150 tests pass independently152.822s. Current unscored follow-up addresses#78; no new score claimed.
+All confirmed findings have detailed reproduction, impact and acceptance criteria in GitHub with `Codex Bugs`; user reports use `Romans21216 - Bugs`. No new confirmed defect in the latest review; #78 is independently resolved. [#63 coordinate integration](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/63) and broader systems in#5–11/#14–15/#24 remain open. Complete backlog only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).

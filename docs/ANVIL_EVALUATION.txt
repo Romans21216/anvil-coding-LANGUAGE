@@ -1,12 +1,12 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 Assessment date:2026-10-28
-Exact independent source:1570abdd429683759f31066f04e5982ec10de386
+Exact independent source:2b4e5e8d84bb0695af92eadd3740a4a84a6410dd
 Evaluator:project_full_review
-Score:73/100 — FAIL against98.
-Categories12/15/14/17/15.
-Scores 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,1,1,2,1,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Score:76/100 — FAIL against98.
+Categories12/18/14/17/15.
+Scores 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-150 tests independently passed152.822s; extension0.1.11/VSIX, compileall, QA arithmetic, UTF8/diff pass. #77 ray composition fixed. Native project builds, Unicode title, configurable1–240Hz clocks and no-C-fallback behavior verified, including extra17Hz wall-clock probe. #78 escaped-NUL manifest entry traceback remains open; local control-character validation/subprocess regression passes, full151 follow-up and independent review pending. Installed0.1.4 preserved; #63 untouched pointer integration remains unverified. Full engine/Forge/OS/rich types/backends/benchmarks remain incomplete.
+151tests independently passed142.480s; npm0.1.11/VSIX, compileall, QA arithmetic, UTF8 and diff pass. #78 independently resolved with64 malformed-entry cases and positive Unicode/spaced-entry execution. No new confirmed finding. First planned batch is implemented and verified: #58 records, #77 composition, native project/title/rate settings, validation and no-C-fallback behavior. Installed0.1.4 preserved. #63 integration and full engine/Forge/OS/rich types/backends/benchmarks remain incomplete.
 
 SUMMARY
 -------
@@ -63,4 +63,4 @@ Cross-platform runtime: Not implemented
 Performance evidence: Not available
 
 CURRENT PRIORITIES
-Verify malformed-entry correction#78, then implement native local arrays/allocation limits and stronger instruction/ABI helpers. Continue native engine parity, actual ray backends, rich types, Forge/OS and benchmarks. Goal remainsactive below98.
+Implement native local arrays/allocation limits and stronger instruction/ABI helpers. Continue native engine parity, actual ray backends, rich types, Forge/OS and benchmarks. Goal remainsactive below98.

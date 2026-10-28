@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-28",
-  "reviewed_implementation_commit": "1570abdd429683759f31066f04e5982ec10de386",
+  "reviewed_implementation_commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,12 +9,12 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "1570abdd429683759f31066f04e5982ec10de386",
-  "latest_independently_reviewed_candidate_commit": "1570abdd429683759f31066f04e5982ec10de386",
+  "latest_verified_commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
+  "latest_independently_reviewed_candidate_commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "1570abdd429683759f31066f04e5982ec10de386",
-  "latest_followup_status_change": "Full independent review8668106:72/100,146 tests; #74–76 verified fixed; #77 remains open. Native project workflow and full engine/Forge/OS goal remain active.",
-  "latest_evaluation_score": 73,
+  "last_pushed_reviewed_below_threshold_commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
+  "latest_followup_status_change": "Full independent review2b4e5e8:76/100,151tests; first planned batch verified; #78closed; full goal remains active.",
+  "latest_evaluation_score": 76,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
   "audited_items": [
@@ -843,13 +843,13 @@
     }
   ],
   "latest_evaluation": {
-    "score": 73,
+    "score": 76,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "1570abdd429683759f31066f04e5982ec10de386",
+    "commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
     "categories": {
       "requirements": "12/20",
-      "functionality_reliability": "15/20",
+      "functionality_reliability": "18/20",
       "code_architecture": "14/20",
       "testing_verification": "17/20",
       "developer_experience_delivery": "15/20"
@@ -868,10 +868,10 @@
       1,
       2,
       1,
-      1,
-      1,
       2,
-      1,
+      2,
+      2,
+      2,
       2,
       2,
       2,
@@ -907,30 +907,29 @@
       0
     ],
     "findings": [
-      "150 tests independently passed152.822s; npm0.1.11, VSIX parity, compileall, QA, UTF8 and diff pass.",
-      "#77 semantic ray composition independently verified; native projects/title/rate/no-fallback checks and extra17Hz wall-clock probe pass.",
-      "#78 escaped NUL in manifest entry leaks ValueError on both backends; local fix awaiting independent review.",
-      "Full native engine/Forge/OS/actualDXR/Embree/rich types/benchmarks remain incomplete; #63 integration gap remains."
+      "151 tests independently passed142.480s; extension0.1.11/VSIX, compileall, QA, UTF8 and diff pass.",
+      "#78 independently verified fixed in64 control-character CLI cases; positive spacedUnicode entry runs24; no new finding.",
+      "Native projects/title/rates and #77 semantic ray composition verified; full native engine/Forge/OS scope incomplete; #63 remains unverified."
     ],
     "reviewer": "project_full_review"
   },
-  "current_candidate_commit": "1570abdd429683759f31066f04e5982ec10de386",
+  "current_candidate_commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "1570abdd429683759f31066f04e5982ec10de386",
-    "reviewed_score": 73,
-    "previous_reviewed_score": 72,
-    "previous_review_commit": "86681061c3e6d564b315dd571be4958202ac295d",
+    "commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
+    "reviewed_score": 76,
+    "previous_reviewed_score": 73,
+    "previous_review_commit": "1570abdd429683759f31066f04e5982ec10de386",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "150 independently passed152.822s",
+    "python_unittest": "151 independently passed142.480s",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "73/100 current rubric",
+    "qa_report_validator": "76/100 current rubric",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "1570abd diff passed",
-    "finding": "150 tests independently passed152.822s; npm0.1.11, VSIX parity, compileall, QA, UTF8 and diff pass.; #77 semantic ray composition independently verified; native projects/title/rate/no-fallback checks and extra17Hz wall-clock probe pass.; #78 escaped NUL in manifest entry leaks ValueError on both backends; local fix awaiting independent review.; Full native engine/Forge/OS/actualDXR/Embree/rich types/benchmarks remain incomplete; #63 integration gap remains."
+    "git_diff_check": "2b4e5e8 diff passed",
+    "finding": "#78 verified fixed; no new confirmed finding; full scope incomplete."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -944,15 +943,10 @@
     "IN PROGRESS": 4
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
-  "latest_independent_candidate_score": 73,
-  "latest_independent_candidate_result": "FAIL against98;73/100 on1570abd; manifest-entry diagnostic#78 open.",
-  "current_unscored_followup": {
-    "feature": "Reject control characters in manifest entry before filesystem calls (#78)",
-    "status": "Local151 tests passed148.471s; targeted both-backend entry/control tests pass; compileall, QA73 arithmetic and diff pass. Fresh independent full review pending.",
-    "reviewed_baseline": "1570abdd429683759f31066f04e5982ec10de386",
-    "python_tests_passed": 151
-  },
-  "latest_independently_scored_candidate_commit": "1570abdd429683759f31066f04e5982ec10de386",
+  "latest_independent_candidate_score": 76,
+  "latest_independent_candidate_result": "FAIL against98;76/100 on2b4e5e8; no new confirmed defect; full scope incomplete.",
+  "current_unscored_followup": null,
+  "latest_independently_scored_candidate_commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1043,5 +1037,5 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Full review1570abd:73/100,150 tests; native projects/ray composition verified; #78 local validation repair pending independent review. Full goal active."
+  "current_candidate_status": "Full independent review2b4e5e8:76/100,151tests; first planned batch verified; #78closed; full goal remains active."
 }

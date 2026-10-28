@@ -2,7 +2,7 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated2026-10-28. Latest independent source `1570abdd429683759f31066f04e5982ec10de386`: **73/100 FAIL against98**,150tests152.822s; categories12/15/14/17/15. #77 and native project settings independently verified. #78 entry validation follow-up is unscored. Full scope and #63 remain open.
+Updated2026-10-28. Latest independent source `2b4e5e8d84bb0695af92eadd3740a4a84a6410dd`: **76/100 FAIL against98**,151tests142.480s; categories12/18/14/17/15. First planned batch verified; #78closed with no new finding. Next: native local arrays/allocation limits and ABI helpers. Full scope and #63 remain open.
 
 Direct AMD64/PE output supports numeric functions, checked global arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 
