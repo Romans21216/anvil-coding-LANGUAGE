@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-10-28
-**Latest independent evaluation:** **76/100 - FAIL** on exact `2b4e5e8d84bb0695af92eadd3740a4a84a6410dd`.
+**Latest independent evaluation:** **76/100 - FAIL** on exact `2f7cd743ba37101c87a0daa5d1c9c017d9ab5dc2`.
 **Current passing threshold:** 98/100. Historical 90-point passes do not pass the current requirement.
 **Evaluator:** separate `project_full_review` agent, full 50-criterion review.
 
@@ -9,14 +9,14 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 
 ## Independent verification for this snapshot
 
-- `python -m unittest discover -s tests -q`: **151 passed**, 142.480 seconds.
+- `python -m unittest discover -s tests -q`: **158 passed**, 145.917 seconds.
 - Extension 0.1.11 grammar validation and VSIX CRC/source parity passed. Language ID `anvil`, extensions `.ANVL`/`.anvl`, grammar `vscode-extension/syntaxes/anvil.tmLanguage.json`. Installed 0.1.4 remains per preference; newer visible tokens are unverified.
 - Python compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
 - Adversarial probes combine 128 statement blocks with 63 grouped/unary/user-call/abs levels; accepted inputs pass. Over-budget mixed expressions return controlled diagnostics. #64 configuration locations and #65 uncontrolled compiler recursion are verified fixed.
 - Source includes and native function selection were verified in the preceding `edfbe86` review: native demo 3,072 bytes, native and C/MSVC demos print 20. The full regression suite includes those execution paths.
 - Direct-backend window/input tests target only their generated windows. Coordinate coverage uses explicit test instrumentation; untouched OS coordinate dispatch remains unverified (#63). No CUA or fresh manual editor/sample inspection occurred. A later audit found the legacy C mouse harness called SetCursorPos during full suites; prior blanket no-global-input claims were too broad. #71 records this and removes that behavior in the current follow-up.
 
-## Latest 50-criterion scoring — `2b4e5e8`
+## Latest 50-criterion scoring — `2f7cd74`
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -37,27 +37,27 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 15 | Errors handled gracefully | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
 | 16 | Edge cases covered | 2 | Tests cover signed/outside mouse coordinates, resize, capture, taps, wheel fractions, focus and draw-only scenes. |
 | 17 | Invalid inputs controlled | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
-| 18 | Stable across repeated operations | 2 | Repeated calls/resources/input/includes and new per-call initialization regressions pass. |
+| 18 | Stable across repeated operations | 2 | Repeated maximum arrays, recursive unwind/reuse and GUI callback allocations pass. |
 | 19 | No known critical defects | 2 | No critical corruption or numeric miscompilation reproduced; no new confirmed finding in latest review. |
 | 20 | Components integrate | 2 | Includes, project settings/native runtime and semantic ray/HUD order integrate in executable tests. |
-| 21 | Logical project structure | 2 | Input emitter, window emitter, encoder, examples, tests and docs are separated. |
+| 21 | Logical project structure | 2 | NativeArrays owns allocation/lifetime emission; compiler, window/input and encoder responsibilities are separated. |
 | 22 | Readable and consistently formatted | 1 | Raw x64 bytes are hard to maintain; add instruction abstractions and formatting (open). |
 | 23 | Clear module responsibilities | 1 | Input has its own module; instruction encoding/state/platform behavior remain coupled (open). |
 | 24 | Consistent descriptive naming | 2 | Names are consistent and descriptive. |
 | 25 | Duplication minimized | 1 | ABI/instruction patterns repeat; consolidate encoder helpers (open). |
-| 26 | Dependencies appropriate | 2 | Direct backend imports Windows APIs without a C/Rust shim. |
-| 27 | Supports future extensions | 1 | Labels/fixups provide a base; complete runtime and backend interfaces (open). |
+| 26 | Dependencies appropriate | 2 | Direct heap/window imports require no C/Rust shim; unused array functions omit heap imports. |
+| 27 | Supports future extensions | 1 | Labels/fixups/demand loading and array module provide a base; complete runtime/target interfaces (open). |
 | 28 | No unfinished placeholders | 1 | Input handlers are real; native graphics still restricts scenes and opaque rectangle coverage (open). |
 | 29 | Configuration understandable | 2 | Backend/TOML/include/title and1–240Hz settings are organized and documented. |
 | 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
-| 31 | Automated tests provided | 2 | 151 tests and extension0.1.11 validation independently pass. |
+| 31 | Automated tests provided | 2 | 158 tests and extension0.1.11 validation independently pass. |
 | 32 | Core tests covered | 2 | Numeric/differential/include/runtime and compiled semantic ray-order regressions cover implemented core. |
 | 33 | Failure scenarios tested | 2 | Invalid mouse arguments/keys and bitmap allocation-failure injection are covered. |
 | 34 | Edge cases explicitly tested | 2 | Taps, repeats, simultaneous buttons, actual OS capture, wheel accumulation and draw-only behavior are tested. |
 | 35 | Integration behavior tested | 1 | Coordinate test uses an explicit test-only WndProc wrapper; untouched OS-dispatch coverage is incomplete (#63, open). |
 | 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
-| 37 | Builds and compilation pass | 2 | 151 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
-| 38 | Results recorded accurately | 2 | Exact2b4e5e8/76/151 evidence agrees across records; historical input-test limitations disclosed. |
+| 37 | Builds and compilation pass | 2 | 158 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
+| 38 | Results recorded accurately | 2 | Exact2f7cd74/76/158 evidence agrees across records; historical input-test limitations disclosed. |
 | 39 | Regression checks performed | 2 | Full suite and prior slow-draw/failure/resource regressions pass. |
 | 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
 | 41 | Installation instructions accurate | 2 | Python/native and Python/MSVC routes match independently exercised builds; extension installation documented. |
@@ -85,12 +85,13 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 - **Integration (35):** Instrumented/synchronized coordinate samples do not prove untouched OS pointer dispatch (#63). Gather independent integration evidence within input constraints.
 - **Setup/editor (42/46/47):** Full project/engine/Forge/OS setup cannot be reproduced; newer installed-editor visuals remain unverified (#24). Implement missing workflows and respect installed0.1.4 preference.
 
-The final2b4e5e8 review independently verifies the first planned batch: record synchronization, structured ray flushing, native project builds/title/rates, boundary validation and explicit no-fallback failures.151tests passed142.480s, plus64 adversarial entry cases and a positive spacedUnicode project. Installed0.1.4 is preserved; #63 remains unverified. Next: native local arrays/allocation limits and instruction/ABI helpers. Full goal remains active below98.
+The full2f7cd74 review independently verifies native local arrays: zeroing/shadowing, recursive isolation, all return cleanup, exact16MiB boundary, repeated reuse, 16-parameter/201-local disp32 frames, GUI callbacks and included Unicode source allocation/release diagnostics.158tests passed145.917s; no new confirmed finding. The score remains76 because broader full-scope/architecture/integration/tooling deductions remain open. Next: instruction/ABI interfaces and native rendering parity. Installed0.1.4 preserved; #63 remains unverified.
 
 ## Review history
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
+| `2b4e5e8d84bb0695af92eadd3740a4a84a6410dd` |76 /98 FAIL|151tests142.480s; #78 verified; no new finding.|
 | `1570abdd429683759f31066f04e5982ec10de386` |73 /98 FAIL|150tests152.822s; #77/projects verified; #78 found.|
 | `86681061c3e6d564b315dd571be4958202ac295d` |72 /98 FAIL|146tests125.935s; #74–76 verified; #77 found.|
 | `c8b01e70dccfe777b490f5eec2d469b6e1c50800` | 69 / 98 — FAIL | 139tests; #72/#73 verified; #74/#75 found. Categories11/13/14/16/15. |
@@ -109,5 +110,3 @@ Earlier reports and their complete rubric tables remain available in Git history
 All confirmed findings have detailed reproduction, impact and acceptance criteria in GitHub with `Codex Bugs`; user reports use `Romans21216 - Bugs`. No new confirmed defect in the latest review; #78 is independently resolved. [#63 coordinate integration](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/63) and broader systems in#5–11/#14–15/#24 remain open. Complete backlog only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
 
 Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 categories, exact2b4e5e8 and151/142.480s evidence agree; current native project/settings docs and ancillary fields match. No rescore or implementation change.
-
-Unscored native-local-array batch: per-call zeroed heap block, checked access/local shadowing, all return cleanup,8192elements/function and16MiB active element budget. Direct Windows heap imports only when used; noC/Rust shim.157localtests passed168.443s; subsequent seven array tests include one extra loop/fractional case. Fresh158-test independent review pending; score remains76 on2b4e5e8.
