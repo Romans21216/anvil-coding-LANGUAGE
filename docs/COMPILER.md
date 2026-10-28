@@ -21,13 +21,13 @@ The command-line path remains `compiler/anvil.py`; it is now a small compatibili
 | `compiler/codegen.py` | Emit C statements, runtime calls, and complete translation units from validated nodes. |
 | `compiler/build.py` | Discover MSVC and invoke the native compiler/linker. |
 | `compiler/cli.py` | Parse CLI/project settings and orchestrate source loading, semantic validation, C generation, and build output. |
-| `compiler/native_codegen.py` | Experimental direct x64 code generation for a limited numeric Anvil subset. |
+| `compiler/native_codegen.py` | Direct x64 code generation for numeric programs and an initial 2D runtime. |
 | `compiler/native_x64.py` | Anvil-owned x64 code fixups and PE32+ executable image writing. |
 | `compiler/common.py` | Shared AST/data types, language limits, runtime names, and repository paths. |
 
 The C CLI order is source reading → syntax parsing → semantic validation → C generation → optional MSVC build. The native order is source reading → syntax parsing and validation → x64 code generation → PE writing. The parser and semantic checker expose phase-level entry points for focused tests, while existing `compiler/anvil.py` commands and importable functions remain compatible. The phase boundary regression tests live in `tests/test_compiler_modules.py`.
 
-Python compiler files use Black's default 88-column formatting. Contributors can check formatting with `python -m black --check compiler tests/test_compiler_modules.py` when Black is installed. The project does not require Black to run or build Anvil.
+The compiler formatting convention is Black's default 88-column style; some native emitters still require formatting and instruction abstractions. Contributors can check formatting with `python -m black --check compiler tests/test_compiler_modules.py` when Black is installed. The project does not require Black to run or build Anvil.
 
 ```powershell
 python compiler/anvil.py examples/first_world.ANVL --emit-c build/first_world.c
@@ -36,7 +36,7 @@ python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
 python compiler/anvil.py examples/functions.ANVL --backend native --output build/functions-native.exe
 ```
 
-The existing C backend requires Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC `cl` is the verified native compiler and is the only automatic compiler choice. `--emit-c` stops after C generation. The experimental `--backend native` path requires only Python and Windows; it supports a limited numeric subset and writes an EXE directly.
+The existing C backend requires Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC `cl` is the verified native compiler and is the only automatic compiler choice. `--emit-c` stops after C generation. The experimental `--backend native` path requires only Python and Windows; it supports numeric programs and an initial 2D runtime and writes an EXE directly.
 
 ## Current language slice
 
@@ -50,5 +50,6 @@ Ahead-of-time compilation removes VM dispatch from generated function calls. MSV
 
 ## Native backend limits
 
-The direct backend currently handles simple numeric functions, up to four numeric parameters, arithmetic except remainder, comparisons, short-circuit Boolean operators, `if`, `while`, inclusive ascending/descending `for` loops, numeric locals/globals, and console output rounded to six fractional digits. It does not yet include arrays, project files, 2D/3D graphics, camera/input, ray tracing, physics, noise, multiplayer, or the engine runtime. The fractional-output change was independently reviewed in commit `f330d4b`; the current unreviewed candidate also rejects output values outside its signed 64-bit formatting range with a controlled error. The backend is not the default until the remaining features are ported and verified.
+The direct backend supports up to sixteen numeric parameters, scalar globals/locals, checked fixed-size global arrays, arithmetic except remainder, comparisons, short-circuit Boolean operators, branches and numeric loops. It emits console output rounded to six fractional digits and rejects values outside the signed 64-bit formatting range with a controlled diagnostic. Its initial buffered Win32 2D runtime supports opaque rectangles, fixed updates, keyboard/mouse input and time/delta queries. Basic math, seeded RNG, gradient noise/fBm and local source includes with reachable-function selection are also available.
 
+Function-local arrays, native project manifests, other graphics primitives, text/alpha blending, 3D/camera, assets/audio, physics/networking and trigonometry remain unsupported on the direct path. The broader C/MSVC backend remains the default until native parity is verified. See [native semantics and limits](NATIVE_X64_COMPILER_MIGRATION.md), [include troubleshooting](INCLUDES.md#compiler-depth-limits-and-troubleshooting) and [current evaluation evidence](QA_REPORT.md).

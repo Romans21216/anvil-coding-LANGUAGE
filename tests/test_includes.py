@@ -1,5 +1,6 @@
 import json
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -8,7 +9,7 @@ from unittest import mock
 
 from compiler.cli import main
 from compiler.codegen import emit_c
-from compiler.common import CompileError, Node
+from compiler.common import CompileError, Node, ROOT, RUNTIME_C_NAMES
 from compiler.modules import called_functions
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse, parse_syntax
@@ -140,6 +141,27 @@ class IncludeTests(IncludeFixture):
         self.assertIn(str(first) + ':2', str(error.exception))
         self.assertIn(str(second) + ':3', str(error.exception))
         self.assertIn("both map to C name 'anvil_foo_bar'", str(error.exception))
+
+    def test_all_public_runtime_symbols_are_reserved(self):
+        header = (ROOT / 'runtime/anvil_runtime.h').read_text(encoding='utf-8')
+        names = set(re.findall(r'\b(anvil_[A-Za-z_][A-Za-z_0-9]*)\s*\(', header))
+        self.assertTrue(names)
+        self.assertFalse(names - RUNTIME_C_NAMES, names - RUNTIME_C_NAMES)
+
+    def test_previously_missing_runtime_names_reject_all_symbol_kinds(self):
+        for name in ('camera_control', 'camera_fov', 'set_fixed_hz', 'trace_finish', 'trace_sphere'):
+            for declaration in (f'fn({name})\n output 0\nend\n', f'set var({name}) = 1\n', f'array {name}(2)\n'):
+                library = self.write('reserved.ANVL', '# header\n' + declaration)
+                entry = self.write('main.ANVL', 'include "reserved.ANVL"\nfn(main)\n output 0\nend\n')
+                for options in (['--backend', 'native', '--output', str(self.root / 'out.exe')],
+                                ['--emit-c', str(self.root / 'out.c')]):
+                    with self.subTest(name=name, declaration=declaration, options=options):
+                        result = subprocess.run([sys.executable, '-m', 'compiler.anvil', str(entry), *options],
+                                                capture_output=True, text=True, timeout=10)
+                        self.assertEqual(result.returncode, 1)
+                        self.assertIn(str(library) + ':2:', result.stderr)
+                        self.assertIn('reserved runtime name', result.stderr)
+                        self.assertNotIn('Traceback', result.stderr)
 
     def test_graph_limits_and_invalid_utf8_are_controlled(self):
         self.write('one.ANVL', 'include "two.ANVL"\n')

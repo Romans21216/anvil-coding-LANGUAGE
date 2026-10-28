@@ -2,13 +2,13 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated 2026-10-28. Latest full independent review: `148363296d51de59e3b92db3bf768d19ad5d2ee2`, **71/100 — FAIL against 98/100**, with 131 passing tests. Category scores are 11/20 requirements, 17/20 functionality, 13/20 architecture, 16/20 testing and 14/20 delivery. The complete rubric and evidence are in [QA_REPORT.md](QA_REPORT.md); historical reviews retain their own snapshots.
+Updated 2026-10-28. Latest full independent review: `5e80af327d1cedf9aafdc6af11a196702a866da5`, **68/100 — FAIL against 98/100**, with133 passing tests. Categories11/14/14/15/14. The complete rubric/evidence is in [QA_REPORT.md](QA_REPORT.md).
 
-That review verified configuration provenance #64 and compiler depth guards #65. It found semantic diagnostic provenance #66 and stale capability/review wording #58. The current follow-up fixes those findings and is awaiting full validation and independent review. Issue #63 remains an untouched OS coordinate-dispatch coverage gap.
+The review verified semantic physical provenance #66, then found native namespace alias #67, missing runtime reservations #68, editor indentation #69 and remaining stale compiler/migration prose #58. Current corrections await validation and independent review. #63 remains an untouched OS coordinate-dispatch coverage gap. Historical reviews retain their exact snapshots in the evaluation records.
 
 Direct AMD64/PE output supports numeric functions, checked global arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language and project support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 
-The source extension package is 0.1.10 and passes grammar/package checks. Installed version 0.1.4 is preserved per user preference; newer tokens have no fresh visible-editor verification.
+The source extension package is 0.1.11 and passes grammar/package checks. Installed version 0.1.4 is preserved per user preference; newer tokens have no fresh visible-editor verification.
 
 ## Status counts
 

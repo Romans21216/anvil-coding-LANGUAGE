@@ -18,3 +18,5 @@ The grammar scopes comments, escaped strings, `fn(name)` declarations, `call fn(
 
 Run `npm ci` once, then `npm run validate` to validate the JSON manifest, language configuration, grammar structure, and representative Anvil tokens using the included checks.
 
+
+Version 0.1.11 corrects indentation and folding for function, if, while, for, else and end statements, including trailing comments. Automated configuration tests exercise real control-flow headers and unrelated text. This package has not been installed or visibly verified; installed 0.1.4 is preserved per user preference.

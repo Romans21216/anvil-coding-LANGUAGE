@@ -1,5 +1,7 @@
 # Getting Started
 
+For direct source-to-EXE builds using Python alone, see [the direct compiler workflow](Compiler-and-Build.md). The broader engine workflow below uses the transitional C/MSVC backend.
+
 ## Requirements
 
 - Windows

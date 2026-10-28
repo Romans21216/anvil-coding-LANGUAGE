@@ -360,7 +360,7 @@ class NativeCodegen:
         self.code.bytes(self._store_xmm_operand(0, offset))
 
     def load_variable(self, name: str, scope: Node | None, line: int) -> None:
-        if scope is not None and name in self._frame_slots:
+        if scope is not None and name in scope.params:
             self.load_local(name, scope, line)
             return
         offset = self._data_offsets.get(name)
@@ -369,7 +369,7 @@ class NativeCodegen:
         self.code.rip_load_data(0, offset)
 
     def store_variable(self, name: str, scope: Node | None, line: int) -> None:
-        if scope is not None and name in self._frame_slots:
+        if scope is not None and name in scope.params:
             self.store_local(name)
             return
         offset = self._data_offsets.get(name)
@@ -596,13 +596,20 @@ class NativeCodegen:
                 self._window.emit_display(node, scope)
             elif node.kind in ("add", "sub", "local_add", "local_sub"):
                 name = node.name
-                self.load_variable(name, scope, node.line)
+                is_local = node.kind in ("local_add", "local_sub")
+                if is_local:
+                    self.load_local(name, scope, node.line)
+                else:
+                    self.load_variable(name, scope, node.line)
                 temp = self.push_temp()
                 self.store_local(temp)
                 self.emit_expression(node.value, node.line, scope)
                 self.emit_binary("+" if node.kind in ("add", "local_add") else "-", temp, node.line)
                 self.pop_temp()
-                self.store_variable(name, scope, node.line)
+                if is_local:
+                    self.store_local(name)
+                else:
+                    self.store_variable(name, scope, node.line)
             elif node.kind == "output":
                 self.emit_expression(node.value, node.line, scope)
                 self.code.bytes(b"\xc9\xc3")  # leave; ret
@@ -711,6 +718,11 @@ class NativeCodegen:
                 self.code.bytes(self._store_xmm_operand(0, -self._frame_slots[param]))
             else:
                 raise CompileError(f"{self.path}:{fn.line}: native backend supports at most sixteen parameters")
+        if fn.locals:
+            # Parameters are saved before XMM0 is used to initialize local state.
+            self.code.bytes(b"\x66\x0f\xef\xc0")  # pxor xmm0,xmm0
+            for local in sorted(fn.locals):
+                self.store_local(local)
         self.emit_nodes(fn.body, fn)
         self.code.bytes(b"\x0f\x57\xc0\xc9\xc3")  # zero return; leave; ret
 

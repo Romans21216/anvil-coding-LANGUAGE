@@ -47,7 +47,7 @@ The compiler emits the keyboard state/helpers only when a query is used; state u
 
 Mouse state, handlers and the additional system imports are emitted only when a mouse query is used. `tests/test_native_mouse.py` runs real emitted PE windows and tests signed/outside coordinates, resized client bounds, all three buttons, repeats, taps, actual OS capture ownership, simultaneous buttons, focus/capture/cancel clearing, fractional wheel accumulation, draw-only consumption and invalid source diagnostics. Tests send messages only to their own generated window and never inject global pointer input. The coordinate test uses an explicit test-only PE wrapper to dispatch its message and sample coordinate queries synchronously, avoiding races with unrelated posted mouse messages (#62). It executes the original production handler/query code; ordinary generated applications contain no test hook. Win32 behavior follows [Microsoft's mouse input contract](https://learn.microsoft.com/en-us/windows/win32/inputdev/using-mouse-input).
 
-The native2D example supports left drag, wheel movement, right-click pause, middle-click reset, a pointer marker and the existing keyboard controls. The mouse implementation is independently verified on 900106e. The README contradiction found in that review is corrected in a documentation follow-up (#59); no new score is claimed.
+The native2D example supports left drag, wheel movement, right-click pause, middle-click reset, a pointer marker and the existing keyboard controls. Mouse execution evidence and its remaining coordinate-dispatch coverage limit are recorded in [QA_REPORT.md](QA_REPORT.md).
 
 ## Native math and procedural runtime
 
@@ -89,7 +89,7 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 ## Rollout sequence
 
 1. Machine-code and PE writer primitives; emit a minimal console EXE and verify it runs. **Implemented.**
-2. Arithmetic, checked numeric operations, functions, branches, and loops. **Partially implemented:** arithmetic, simple function calls, `if`, and `while` work; complete numeric diagnostics and language parity remain outstanding.
+2. Arithmetic, checked numeric operations, functions, branches, and loops. **Partially implemented:** checked numeric operations, functions with sixteen arguments, branches and numeric loops work; full language parity remains outstanding.
 3. Global slots and fixed-size global arrays, including checked indexing. **Partially implemented:** global slots and global arrays now compile directly; function-local heap arrays and their allocation/lifetime rules remain.
 4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, keyboard held/edge input, background clearing, and buffered opaque rectangles work; mouse input is independently verified; remaining shapes and image resources are outstanding.
 5. Camera, 3D primitives, BVH ray tracing, physics, procedural noise, and networking.
@@ -104,8 +104,6 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 - Native regression tests cover code generation, PE metadata/fixups, execution, resource lifetime, and engine behavior.
 - Documentation and evaluation reports distinguish implemented native features from migration work still in progress.
 
-The latest completed independent review evaluated `3270998384367be7b763cc605c0492208a72c988` at72/100, below98. All111tests and five repeated mouse suites passed;#60/#61/#62 corrections verified. No new runtime defect was reproduced. Coordinate instrumentation coverage remains partial (#63); full engine/Forge/OS migration remains unfinished.
+Local source includes preserve physical source locations and select reachable native functions. Runtime numeric/index diagnostics use pooled UTF-8 source paths. See [include semantics and limits](INCLUDES.md). Expression processing has a 64-level budget and statement nesting a 128-block limit; [troubleshooting](INCLUDES.md#compiler-depth-limits-and-troubleshooting) explains how to split larger expressions/functions.
 
-A source-include candidate now preserves physical source locations and compiles reachable native functions only. See [include rules and limits](INCLUDES.md). Runtime numeric/index diagnostics now include UTF-8 source paths using pooled data. Independent evaluation of this candidate is pending; the latest completed review above remains tied to its exact earlier snapshot.
-
-The include implementation was independently reviewed onedfbe86 at71/100 with125tests; configuration provenance and deep expressions were found defective (#64/#65). Their current follow-up enforces64-level expression/128-block budgets and uses original configuration sources; independent verification is pending. See [include troubleshooting](INCLUDES.md#compiler-depth-limits-and-troubleshooting).
+Current exact review identifiers, scores, findings and verified fixes are maintained in [QA_REPORT.md](QA_REPORT.md) and [structured state](CODEX_AUTONOMOUS_STATE.json). The full engine/Forge/OS migration remains active. Coordinate integration uses test instrumentation and retains the untouched-dispatch gap #63. Current native namespace, reserved-name and extension findings are tracked in GitHub; development changes receive no independent score until reviewed.

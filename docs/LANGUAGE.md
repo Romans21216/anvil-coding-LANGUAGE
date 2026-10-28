@@ -1,5 +1,8 @@
 # Anvil Language Guide
 
+The broader engine APIs below describe the C/MSVC-backed Windows runtime. Direct `--backend native` output currently supports a smaller numeric and 2D rectangle/input/procedural subset; see [native backend availability](NATIVE_X64_COMPILER_MIGRATION.md).
+
+
 For the normative version 1 syntax and behavior contract, see the [formal language specification](LANGUAGE_SPEC.md).
 
 Anvil uses UTF-8 text in `.ANVL` files. Its syntax is designed to read like a small BASIC/Lua-inspired scripting language: define a function with `fn(name)` or `fn(name, parameter, ...)`, indent the body for readability, and close it with `end`. Indentation is optional; `end` defines the block.
@@ -142,7 +145,7 @@ fixed_hz = 60
 
 ## Not implemented yet
 
-Static types, dynamically sized arrays, structures, modules/imports, general asset formats and 3D mesh assets, sprite animation, audio, 3D/polygon physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables and arrays, `while`/inclusive numeric `for` loops, fixed-size global numeric arrays, BMP-based 2D sprites, and fixed-step 2D circle/axis-aligned-box physics are supported, but the language and engine remain much smaller than a general-purpose game engine today.
+Static types, dynamically sized arrays, structures, namespaced modules, general asset formats and 3D mesh assets, sprite animation, audio, 3D/polygon physics, save files, full 2D/3D scene management, a GPU renderer, and reliable Internet multiplayer remain future work. Parameters, returns, recursion, function-local numeric variables and arrays, `while`/inclusive numeric `for` loops, fixed-size global numeric arrays, BMP-based 2D sprites, and fixed-step 2D circle/axis-aligned-box physics are supported, but the language and engine remain much smaller than a general-purpose game engine today.
 
 
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.

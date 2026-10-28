@@ -1,19 +1,19 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 ====================================
 Assessment date: 2026-10-28
-Exact independently reviewed snapshot: 148363296d51de59e3b92db3bf768d19ad5d2ee2
-Evaluator: separate include_full_review agent; full 50-criterion rubric.
-Score: 71/100 — FAIL against 98/100.
-Categories: requirements 11/20; functionality 17/20; architecture 13/20; testing 16/20; delivery 14/20.
-Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,2,1,2,1,2,2,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,1,2,2,1,2,0 / 2,1,2,2,1,1,1,2,2,0
+Exact independently reviewed snapshot: 5e80af327d1cedf9aafdc6af11a196702a866da5
+Evaluator: separate semantic_full_review agent; full 50-criterion rubric.
+Score: 68/100 — FAIL against 98/100.
+Categories: requirements 11/20; functionality 14/20; architecture 14/20; testing 15/20; delivery 14/20.
+Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,2,1,1,1,2,2,2,1,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,1,2,0 / 2,1,1,2,2,1,1,2,2,0
 
-131 tests passed independently in 90.231 seconds. Extension grammar/VSIX parity, compileall, QA arithmetic, UTF-8 JSON and diff checks passed. Configuration provenance #64 and compiler depth guards #65 are independently verified fixed, including mixed-depth probes.
+133 tests independently passed in98.487s; npm, compileall, QA arithmetic, UTF8JSON, diff and VSIX0.1.10 parity passed. Eight extra CLI probes independently verify #66 semantic physical provenance fixed.
 
-New findings: #66 included local-array/parameter conflicts use the wrong filename; #58 status/capability documents contain stale C-only and review claims. Local corrections and regression tests are in progress and await independent review. The score above applies to the exact snapshot, not those changes. #63 untouched OS coordinate-dispatch verification remains open.
+New findings: #67 native global/local names alias, silently printing4 instead of9; #68 five unreserved runtime names cause generated-C build errors; #69 indentation rejects actual if/while/for headers; #58 compiler/migration guides remain stale. A development follow-up also reproduced #70 scalar locals retaining old stack values when assignments are skipped (77 instead of specified70). Local namespace/zero-initialization corrections and differential/configuration tests are in progress and await independent review. #63 untouched OS coordinate dispatch remains unverified.
 
-Local source includes and native function selection are implemented. Native/C include demos print 20; the direct native example is 3,072 bytes. Include graph limits, once/order semantics, cross-file recursion and UTF-8 runtime diagnostics are tested. Source extension 0.1.10 is packaged/tested; installed 0.1.4 is preserved. No CUA/global input or fresh manual editor inspection is claimed.
+Local source includes and native function selection are implemented. Native/C include demos print 20; the direct native example is 3,072 bytes. Include graph limits, once/order semantics, cross-file recursion and UTF-8 runtime diagnostics are tested. Source extension 0.1.10 is packaged/tested; installed 0.1.4 is preserved. No CUA or fresh manual editor inspection occurred. A later audit found legacy C mouse tests moved the desktop pointer; prior blanket no-global-input claims were inaccurate. #71 corrects that fixture and its draw/update timing race after a136-test run failed coordinates. Three repeated C mouse runs and final136-test suite passed in116.325s; npm0.1.11, compileall, QA, UTF8/VSIX parity and diff checks pass. Fresh independent review is pending.
 
-Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previous edfbe86 review: 71/100 with 125 tests; configuration/depth fixes raise functionality while stale metadata lowers testing, leaving the same total.
+Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previous1483632 review:71/100 with131tests. New adversarial evidence exposes additional correctness/tooling defects; the lower score remains tied to the exact snapshot.
 
 SUMMARY
 -------

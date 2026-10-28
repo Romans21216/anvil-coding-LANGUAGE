@@ -30,7 +30,7 @@ The native backend compiles functions reachable from the console entry, graphica
 
 This is source composition and native function selection. Namespaced modules, public/private exports, separately compiled object files, package registries, versioned package resolution, binary plugins, resource packaging and Forge artifacts remain future work. The master backlog is only in GitHub issue #23 and its comments.
 
-Extension package 0.1.10 adds tested include highlighting. Installed extension 0.1.4 remains unchanged per user preference; new highlighting has not been visually verified in that installed editor.
+Extension package 0.1.11 adds tested include highlighting. Installed extension 0.1.4 remains unchanged per user preference; new highlighting has not been visually verified in that installed editor.
 
 ## Compiler depth limits and troubleshooting
 
@@ -38,4 +38,4 @@ The follow-up for issue #65 bounds expression delimiter nesting and recursive ex
 
 A missing file or boundary error reports the include site; duplicate definitions name both declarations. A syntax/expression/configuration error should name the original physical file and line. Use an `.ANVLproj` project root for C builds whose entry lives below sibling library directories; direct source builds use the entry directory as the boundary. Package downloads, version solving and external plugin binaries are not performed.
 
-Configuration provenance and depth guards (#64/#65) were independently verified on 1483632. Exact current evaluation evidence is maintained in [QA_REPORT.md](QA_REPORT.md). Semantic declaration diagnostics (#66) are corrected in the current follow-up and await independent review.
+Configuration provenance and depth guards (#64/#65) were independently verified on 1483632. Exact current evaluation evidence is maintained in [QA_REPORT.md](QA_REPORT.md). Semantic declaration diagnostics (#66) were independently verified on5e80af3.

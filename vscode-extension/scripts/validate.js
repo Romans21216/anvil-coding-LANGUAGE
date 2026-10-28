@@ -28,6 +28,33 @@ check(manifest.contributes.grammars.some(x => x.language === 'anvil' && x.scopeN
 check(config.comments.lineComment === '#', 'line comment configuration is missing');
 check(config.brackets.some(pair => pair[0] === '(' && pair[1] === ')'), 'parenthesis pairing is missing');
 
+// Exercise actual block syntax, including nested indentation and comments.
+const increase = new RegExp(config.indentationRules.increaseIndentPattern);
+const decrease = new RegExp(config.indentationRules.decreaseIndentPattern);
+const foldStart = new RegExp(config.folding.markers.start);
+const foldEnd = new RegExp(config.folding.markers.end);
+for (const line of ['fn(main)', '  fn(add, left, right) # helper', 'if true',
+  '  if local(x) > 0 # condition', 'while local(i) < 3',
+  'for local(i) = 1 to 3', '  for local(i) = 3 to 1 step -1 # backwards']) {
+  check(increase.test(line), `block does not increase indentation: ${line}`);
+  check(foldStart.test(line), `block does not start folding: ${line}`);
+}
+for (const line of ['else', '  else # alternative']) {
+  check(increase.test(line) && decrease.test(line), `else indentation failed: ${line}`);
+  check(!foldStart.test(line), `else incorrectly starts a new fold: ${line}`);
+}
+for (const line of ['end', '  end # finish']) {
+  check(decrease.test(line) && foldEnd.test(line), `end does not close block: ${line}`);
+  check(!increase.test(line), `end incorrectly increases indentation: ${line}`);
+}
+for (const line of ['# if true', '  # for local(i) = 1 to 3', 'output "if true"',
+  '"while local(i) < 3"', 'different', 'while-loop', 'forage', 'elsewhere',
+  'endless', 'if', 'if # missing condition', 'while # missing condition',
+  'for local(i) = # missing range', 'repeat', 'set var(end) = 1']) {
+  check(!increase.test(line) && !decrease.test(line), `unrelated line changes indentation: ${line}`);
+  check(!foldStart.test(line) && !foldEnd.test(line), `unrelated line changes folding: ${line}`);
+}
+
 async function main() {
   const wasmBuffer = fs.readFileSync(require.resolve('vscode-oniguruma/release/onig.wasm'));
   await oniguruma.loadWASM(wasmBuffer.buffer.slice(wasmBuffer.byteOffset, wasmBuffer.byteOffset + wasmBuffer.byteLength));
