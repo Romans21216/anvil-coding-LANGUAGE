@@ -14,6 +14,8 @@
 
 **Verified flicker fix:** a persistent offscreen bitmap/DC composes each frame and one BitBlt presents it. Independent testing covers visible pixels during slow drawing, resize GDI counts, and injected bitmap-allocation failure. No new runtime defect was reproduced. No CUA was resumed after the prior physical-Escape stop.
 
+**Unreviewed keyboard candidate:** the native emitter now supports held()/pressed(), named/numeric key values, repeat suppression, focus-loss clearing, short taps, and edge lifetime in update/draw-only scenes. Input helpers/state are emitted only when needed. Focused generated-app tests use bounded window-local messages and inspect actual compiled state. The interactive native2D example uses Left/Right, Space and R. All 99 Python tests, extension validation and compile checks pass. A fresh independent review remains required; the current score is still73/100 on ce5bd2d.
+
 **Historical near-plane correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
 **Formatting follow-up review:** candidate `3f77eee` was independently reviewed on exact commit `5072597`; all 72 tests, Black check, compileall, QA arithmetic, diff check, and 12-example generated-C parity pass. The critic scored this snapshot 92/100, still below 98.

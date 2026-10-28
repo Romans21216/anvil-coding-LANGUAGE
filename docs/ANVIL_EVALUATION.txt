@@ -20,6 +20,9 @@ User issue #57 (Romans21216 - Bugs) is fixed, independently verified and closed.
 
 Earlier native scores: 71/100 on fc37b1f, 64/100 on 2b0a7b1, 63/100 on 71ddfec, 61/100 on 9eaf1b6, 58/100 on 120482e. Full native 3D/input/assets/physics/networking/language/project parity and the Forge requirements remain incomplete. The C backend is still default. Full criterion evidence and open recommendations are in docs/QA_REPORT.md.
 
+UNREVIEWED KEYBOARD CANDIDATE
+The direct runtime now implements held()/pressed(), shared named key constants, numeric key queries, release and focus-loss clearing, repeat suppression, and edge consumption after the next update (or draw in a draw-only scene). Keyboard helpers/state are emitted only when used. Targeted generated-app tests send messages only to their own window and verify held/edge state, system messages, short taps, draw-only behavior, invalid keys, and single evaluation. The native2D example now has arrow movement, Space pause and R reset. All 99 Python tests, extension validation and compile checks pass. This candidate awaits independent review; the latest scored implementation remains ce5bd2d at73/100. Mouse and broader engine/Forge features remain unfinished.
+
 SUMMARY
 -------
 Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The current default compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for numeric programs and an initial rectangle-based 2D runtime. The requested no-C/no-Rust engine remains incomplete.

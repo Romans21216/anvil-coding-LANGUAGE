@@ -5,8 +5,8 @@
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
   "current_active_item": null,
-  "current_active_item_status": "Direct native engine migration remains active without a single numbered backlog item claimed. Native 2D buffer/flicker fix is independently verified at 73/100 on ce5bd2d; full engine and Forge scope remain incomplete.",
-  "current_candidate_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+  "current_active_item_status": "Native keyboard input implementation locally verified and awaiting independent review; full native engine and Forge scope remain incomplete.",
+  "current_candidate_commit": null,
   "latest_verified_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
   "last_pushed_reviewed_below_threshold_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
   "latest_independently_reviewed_candidate_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
@@ -168,23 +168,21 @@
     58
   ],
   "candidate_validation": {
-    "status": "independently reviewed buffered native runtime",
-    "reviewed_score": 73,
-    "previous_reviewed_score": 71,
+    "status": "LOCAL_VERIFIED_PENDING_INDEPENDENT_REVIEW",
+    "commit": null,
+    "latest_completed_review_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+    "latest_completed_review_score": 73,
     "threshold": 98,
-    "result": "FAIL",
-    "python_unittest": "96 passed on ce5bd2d",
-    "npm_test": "passed",
+    "python_unittest": "99 passed locally; new input/focus assertions also pass in focused tests",
+    "npm_test": "passed; grammar unchanged",
     "compileall": "passed",
-    "qa_report_validator": "73/100 arithmetic checked after sync",
-    "strict_json": "both state files UTF-8; audited row counts synchronized",
-    "git_diff_check": "passed",
-    "commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
-    "finding": "Issue #57 fixed and independently verified; full scope remains incomplete."
+    "finding": "Native keyboard feature candidate; no new independent score yet."
   },
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775",
   "resolved_critic_issue_48": "Fixed strict UTF-8 JSON serialization and synchronized the evaluation SHA to reviewed commit d757c79; strict JSON parsing and QA arithmetic pass in the follow-up snapshot.",
   "resolved_user_reported_issues": [
     57
-  ]
+  ],
+  "current_candidate_status": "Locally verified native keyboard implementation pending independent evaluation; exact reviewed revision will be recorded after the review. Null denotes no independently associated candidate revision yet.",
+  "current_unscored_followup": "Native held/pressed keyboard messages, shared key constants, repeat/focus/edge semantics and interactive example. Local99-test suite and targeted input tests pass; latest independent review is still ce5bd2d/73/96."
 }

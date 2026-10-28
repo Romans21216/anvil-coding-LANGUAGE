@@ -8,6 +8,8 @@ Latest reviewed native follow-up: direct AMD64/PE compilation supports numeric p
 
 Verified flicker fix: persistent offscreen bitmap/DC resources compose each frame before one BitBlt presentation, replacing the bitmap only on client-size changes. The reviewer independently confirmed slow-draw visibility, repeated-resize GDI counts, and controlled bitmap-allocation failure. The same test fails against the former renderer. Post-review issue #58 synchronizes stale autonomous-state and audit-summary metadata; the record parity is independently verified and no runtime code changed.
 
+Unreviewed native keyboard candidate: `compiler/native_input.py` emits held/pressed queries, transition state, focus clearing and update/draw edge lifetime. Named constants are shared by both backends. Window-local generated-app tests cover repeat/release/system-key/focus/tap/draw-only behavior and numeric arguments; the native2D sample now accepts Left/Right, Space and R. All 99 Python tests, extension validation and compile checks pass. This candidate does not yet have an independent score. Native mouse input and broader engine parity remain unfinished.
+
 ## Status counts
 
 - COMPLETE: 21

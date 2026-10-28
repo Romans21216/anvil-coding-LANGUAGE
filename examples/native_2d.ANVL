@@ -3,9 +3,25 @@ scene 2d
 clear rgba(11, 16, 27, 255)
 set var(panel-x) = 40
 set var(offset) = 0
+set var(paused) = 0
 
 fn(update)
-  add var(offset) compute(80 * delta())
+  if held(LEFT)
+    sub var(panel-x) 180 * delta()
+  end
+  if held(RIGHT)
+    add var(panel-x) 180 * delta()
+  end
+  if pressed(SPACE)
+    set var(paused) = 1 - var(paused)
+  end
+  if pressed(R)
+    set var(panel-x) = 40
+    set var(offset) = 0
+  end
+  if var(paused) = 0
+    add var(offset) compute(80 * delta())
+  end
   if var(offset) > 440
     set var(offset) = 0
   end

@@ -217,6 +217,9 @@ end
 
     def test_unsupported_native_graphics_have_compile_diagnostics(self):
         cases = [
+            ("fn(main)\n output held(A)\nend\n", "held() requires native scene 2d"),
+            ("scene 2d\nfn(draw)\n output held()\nend\n", "expects one numeric key argument"),
+            ("scene 2d\nfn(draw)\n output pressed(A, B)\nend\n", "expects one numeric key argument"),
             ("scene 3d\nfn(draw)\nend\n", "one scene 2d"),
             ("scene 2d\nfn(draw, x)\nend\n", "fn(draw) with no parameters"),
             ("scene 2d\nfn(update, value)\nend\nfn(draw)\nend\n", "fn(update) cannot have parameters"),

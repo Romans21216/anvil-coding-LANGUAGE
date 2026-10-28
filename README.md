@@ -5,7 +5,7 @@
 ## What works now
 
 - A Windows C backend for numeric globals, checked fixed-size global and function-local arrays, function-local variables, parameterized and recursive functions with numeric return values, calls, branches, inclusive `for`/`while` loops, input, time, seeded random numbers, gradient noise, and fractal noise.
-- An experimental direct x64/PE32+ backend for numeric functions, checked fixed-size global arrays (up to 16 MiB total program data), arithmetic, comparisons, branches, loops, and console output rounded to six fractional digits. Its initial Win32 2D runtime supports a resizable window, opaque rectangles, `fn(draw)`, optional fixed 60 Hz `fn(update)`, and `time()`/`delta()`/`compute()`. It emits the EXE directly from `.ANVL` and imports Windows drawing APIs without a C/Rust runtime shim. Full native engine parity remains incomplete.
+- An experimental direct x64/PE32+ backend for numeric functions, checked fixed-size global arrays (up to 16 MiB total program data), arithmetic, comparisons, branches, loops, and console output rounded to six fractional digits. Its initial Win32 2D runtime supports a resizable window, buffered opaque rectangles, `fn(draw)`, fixed 60 Hz `fn(update)`, `time()`/`delta()`/`compute()`, and `held(key)`/`pressed(key)`. It emits the EXE directly from `.ANVL` and imports Windows APIs without a C/Rust runtime shim. Full native engine parity remains incomplete.
 - A small native software renderer for 2D rectangles, circles, lines and text, plus shaded 3D cubes, spheres, and grid planes with a perspective camera and depth buffer.
 - Keyboard camera movement/look, adjustable field of view, and a built-in BVH-accelerated CPU ray-traced sphere with shadows and specular lighting.
 - Keyboard edge/held state, configurable fixed-step updates, deterministic RNG and noise helpers.
@@ -42,7 +42,7 @@ python compiler/anvil.py examples/native_2d.ANVL --backend native --output build
 ./build/native_2d.exe
 ```
 
-This backend writes x64 machine code and a PE32+ executable directly. The native 2D sample opens a window with an animated marker; closing the window ends the program. Native rendering currently supports opaque rectangles in client pixels. Other shapes, text, input, 3D, assets, physics, networking, and project manifests remain unavailable on this path. See [the native compiler migration plan](docs/NATIVE_X64_COMPILER_MIGRATION.md) for its exact limits and status.
+This backend writes x64 machine code and a PE32+ executable directly. In the native 2D sample, Left/Right move the panel, Space pauses the animated marker, and R resets its position; closing the window ends the program. Native rendering currently supports opaque rectangles in client pixels. Other shapes, text, mouse input, 3D, assets, physics, networking, and project manifests remain unavailable on this path. See [the native compiler migration plan](docs/NATIVE_X64_COMPILER_MIGRATION.md) for its exact limits and status.
 
 ## Run checks
 

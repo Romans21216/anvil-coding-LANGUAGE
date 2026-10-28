@@ -9,6 +9,7 @@ import re
 
 from compiler.common import (
     CompileError,
+    KEY_CODES,
     Node,
     array_code,
     array_size,
@@ -334,19 +335,7 @@ class ExpressionParser:
             raise CompileError(
                 f"{self.path}:{self.line}: operator {value!r} needs a left operand"
             )
-        elif (
-            kind == "word" and value in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" and len(value) == 1
-        ):
-            left = ("ANVIL_KEY_" + value, "number")
-        elif kind == "word" and value in (
-            "SPACE",
-            "UP",
-            "DOWN",
-            "LEFT",
-            "RIGHT",
-            "ENTER",
-            "ESCAPE",
-        ):
+        elif kind == "word" and value in KEY_CODES:
             left = ("ANVIL_KEY_" + value, "number")
         elif kind == "word" and value in BUILTINS:
             self.expect("(")

@@ -913,22 +913,18 @@
       "CUA was not resumed after physical Escape; generated-app tests provide pixel/resource evidence."
     ]
   },
-  "current_candidate_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+  "current_candidate_commit": null,
   "status_counts_validated_on": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
   "candidate_validation": {
-    "status": "independently reviewed buffered native runtime",
-    "reviewed_score": 73,
-    "previous_reviewed_score": 71,
+    "status": "LOCAL_VERIFIED_PENDING_INDEPENDENT_REVIEW",
+    "commit": null,
+    "latest_completed_review_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
+    "latest_completed_review_score": 73,
     "threshold": 98,
-    "result": "FAIL",
-    "python_unittest": "96 passed on ce5bd2d",
-    "npm_test": "passed",
+    "python_unittest": "99 passed locally; new input/focus assertions also pass in focused tests",
+    "npm_test": "passed; grammar unchanged",
     "compileall": "passed",
-    "qa_report_validator": "73/100 arithmetic checked after sync",
-    "strict_json": "both state files UTF-8; audited row counts synchronized",
-    "git_diff_check": "passed",
-    "commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
-    "finding": "Issue #57 fixed and independently verified; full scope remains incomplete."
+    "finding": "Native keyboard feature candidate; no new independent score yet."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -944,7 +940,7 @@
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 73,
   "latest_independent_candidate_result": "FAIL against 98/100; independent review of ce5bd2d passed96tests and verified the buffered flicker fix. User issue #57 is closed.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": "Native held/pressed keyboard messages, shared key constants, repeat/focus/edge semantics and interactive example. Local99-test suite and targeted input tests pass; latest independent review is still ce5bd2d/73/96.",
   "latest_independently_scored_candidate_commit": "ce5bd2d30e5b2c429e8244f1000655069e78bf9f",
   "historical_c_backed_evaluation": {
     "score": 92,
@@ -1035,5 +1031,6 @@
     "commit": "9d9bf90e62e3e75ea94de7828d86800cbd382c99",
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
-  "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed."
+  "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
+  "current_candidate_status": "Locally verified native keyboard implementation pending independent evaluation; exact reviewed revision will be recorded after the review. Null denotes no independently associated candidate revision yet."
 }

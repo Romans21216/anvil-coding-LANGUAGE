@@ -41,6 +41,9 @@ call fn(main)
     def test_native_compute_builtin_keeps_numeric_expression_semantics(self):
         self.assertEqual(self._run_source("fn(main)\n output compute(2 + 3) * 2\nend\n"), "10\n")
 
+    def test_native_key_constants_are_numeric_values(self):
+        self.assertEqual(self._run_source("fn(main)\n output A + SPACE + UP + ESCAPE + ENTER\nend\n"), "175\n")
+
     def test_native_backend_prints_negative_integer_result(self):
         source = """\
 fn(main)

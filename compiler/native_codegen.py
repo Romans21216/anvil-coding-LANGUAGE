@@ -8,7 +8,7 @@ import re
 import struct
 from dataclasses import dataclass
 
-from compiler.common import CompileError, Node
+from compiler.common import CompileError, KEY_CODES, Node
 from compiler.expressions import ExpressionParser, split_args
 from compiler.lexer import strip_comment
 from compiler.native_x64 import Pe32Plus, X64Code
@@ -87,6 +87,9 @@ class _Expression:
         elif kind == "word" and value in ("true", "false"):
             self.owner.emit_float(1.0 if value == "true" else 0.0)
             left = _Value("number", value)
+        elif kind == "word" and value in KEY_CODES:
+            self.owner.emit_float(float(KEY_CODES[value]))
+            left = _Value("number", value)
         elif kind == "call":
             self._emit_user_call(value)
             left = _Value("number", "call")
@@ -105,10 +108,6 @@ class _Expression:
         elif kind == "string":
             raise CompileError(
                 f"{self.owner.path}:{self.line}: string expressions are not available in the native numeric backend"
-            )
-        elif kind == "word" and value in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" and len(value) == 1:
-            raise CompileError(
-                f"{self.owner.path}:{self.line}: key constants require the native input runtime"
             )
         else:
             raise CompileError(f"{self.owner.path}:{self.line}: unsupported native expression token {value!r}")
@@ -174,6 +173,17 @@ class _Expression:
             self._require_number(self.emit())
             self._expect(")")
             return
+        if name in ("held", "pressed"):
+            if self._peek(")"):
+                raise CompileError(f"{self.owner.path}:{self.line}: {name}() expects one numeric key argument")
+            self._require_number(self.emit())
+            if self._peek(","):
+                raise CompileError(f"{self.owner.path}:{self.line}: {name}() expects one numeric key argument")
+            self._expect(")")
+            if self.owner._window is None:
+                raise CompileError(f"{self.owner.path}:{self.line}: {name}() requires native scene 2d")
+            self.owner._window.emit_key_query(name)
+            return
         self._expect(")")
         if self.owner._window is None:
             raise CompileError(f"{self.owner.path}:{self.line}: {name}() requires native scene 2d")
@@ -202,7 +212,7 @@ class NativeCodegen:
     IMPORTS = [("KERNEL32.dll", "GetStdHandle"),
                ("KERNEL32.dll", "WriteFile"),
                ("KERNEL32.dll", "ExitProcess")]
-    BUILTIN_NAMES = {"compute", "time", "delta"}
+    BUILTIN_NAMES = {"compute", "time", "delta", "held", "pressed"}
     MAX_DATA_BYTES = 16 * 1024 * 1024
 
     def __init__(self, path, functions, top, variables, arrays=None):
