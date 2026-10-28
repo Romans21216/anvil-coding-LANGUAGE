@@ -112,6 +112,35 @@ class IncludeTests(IncludeFixture):
                 NativeCodegen(path, *program).generate()
             self.assertIn(str(library) + ':1:', str(error.exception))
 
+    def test_included_local_array_conflict_cli_reports_library_line(self):
+        library = self.write('lib.ANVL', 'fn(value, parameter)\n array parameter(2)\n output 1\nend\n')
+        entry = self.write('main.ANVL', 'include "lib.ANVL"\nfn(main)\n output call fn(value, 7)\nend\n')
+        for options in (['--backend', 'native', '--output', str(self.root / 'out.exe')],
+                        ['--emit-c', str(self.root / 'out.c')]):
+            with self.subTest(options=options):
+                result = subprocess.run([sys.executable, '-m', 'compiler.anvil', str(entry), *options],
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(str(library) + ':2:', result.stderr)
+                self.assertIn('conflicts with a local variable or parameter', result.stderr)
+                self.assertNotIn('Traceback', result.stderr)
+
+    def test_semantic_symbol_errors_identify_physical_declarations(self):
+        for declaration in ('fn(array_get)\n output 0\nend\n',
+                            'set var(array_get) = 1\n', 'array array_get(2)\n'):
+            library = self.write('symbols.ANVL', '# header\n' + declaration)
+            with self.subTest(declaration=declaration), self.assertRaises(CompileError) as error:
+                self.load('include "symbols.ANVL"\nfn(main)\n output 0\nend\n')
+            self.assertIn(str(library) + ':2:', str(error.exception))
+            self.assertIn('reserved runtime name', str(error.exception))
+        first = self.write('first.ANVL', '# header\nfn(foo-bar)\n output 0\nend\n')
+        second = self.write('second.ANVL', '# header\n# header\nfn(foo_bar)\n output 0\nend\n')
+        with self.assertRaises(CompileError) as error:
+            self.load('include "first.ANVL"\ninclude "second.ANVL"\nfn(main)\n output 0\nend\n')
+        self.assertIn(str(first) + ':2', str(error.exception))
+        self.assertIn(str(second) + ':3', str(error.exception))
+        self.assertIn("both map to C name 'anvil_foo_bar'", str(error.exception))
+
     def test_graph_limits_and_invalid_utf8_are_controlled(self):
         self.write('one.ANVL', 'include "two.ANVL"\n')
         self.write('two.ANVL', 'fn(main)\n output 1\nend\n')

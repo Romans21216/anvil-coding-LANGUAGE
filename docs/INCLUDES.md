@@ -38,4 +38,4 @@ The follow-up for issue #65 bounds expression delimiter nesting and recursive ex
 
 A missing file or boundary error reports the include site; duplicate definitions name both declarations. A syntax/expression/configuration error should name the original physical file and line. Use an `.ANVLproj` project root for C builds whose entry lives below sibling library directories; direct source builds use the entry directory as the boundary. Package downloads, version solving and external plugin binaries are not performed.
 
-The edfbe86 review found configuration provenance and deep-expression failures (#64/#65); the fixes and new CLI regressions are pending independent review. Its125-test count and71/100 score apply to that prior snapshot.
+Configuration provenance and depth guards (#64/#65) were independently verified on 1483632. Exact current evaluation evidence is maintained in [QA_REPORT.md](QA_REPORT.md). Semantic declaration diagnostics (#66) are corrected in the current follow-up and await independent review.

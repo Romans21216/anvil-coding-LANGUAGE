@@ -43,38 +43,71 @@ def validate_program(program: ParsedProgram) -> None:
         for name in fn.local_arrays:
             if name in fn.params or name in fn.locals:
                 raise CompileError(
-                    f"{path}:{fn.line}: local array {name!r} conflicts with "
+                    f"{fn.source or path}:"
+                    f"{fn.local_array_lines.get(name, fn.line)}: "
+                    f"local array {name!r} conflicts with "
                     f"a local variable or parameter in function '{fn.name}'"
                 )
 
-    c_symbols: dict[str, tuple[str, str]] = {}
+    variable_sites = {}
+    for reference, line, owner, source in program.variable_references:
+        scope = functions.get(owner)
+        if scope is None or reference not in scope.params:
+            variable_sites.setdefault(reference, (source or path, line))
+    local_sites = {}
+    for reference, line, owner, source in program.local_references:
+        local_sites.setdefault((owner, reference), (source or path, line))
+
+    def variable_site(name):
+        return variable_sites.get(name, (path, None))
+
+    def local_site(fn, name):
+        if name in fn.local_arrays:
+            return fn.source or path, fn.local_array_lines.get(name, fn.line)
+        if name in fn.params:
+            return fn.source or path, fn.line
+        return local_sites.get((fn.name, name), (fn.source or path, fn.line))
+
+    def location(source, line):
+        return f"{source}:{line}" if line is not None else str(source)
+
+    c_symbols = {}
     symbols = (
-        [(name, "variable") for name in variables]
-        + [(name, "function") for name in functions]
-        + [(name, "array") for name in arrays]
+        [(name, "variable", *variable_site(name)) for name in variables]
+        + [
+            (name, "function", fn.source or path, fn.line)
+            for name, fn in functions.items()
+        ]
+        + [
+            (name, "array", *getattr(arrays, "locations", {}).get(name, (path, None)))
+            for name in arrays
+        ]
     )
     for fn in functions.values():
         symbols.extend(
-            (fn.name + "__" + name, "function-local")
+            (fn.name + "__" + name, "function-local", *local_site(fn, name))
             for name in fn.params + sorted(fn.locals) + sorted(fn.local_arrays)
         )
-    for name, kind in sorted(symbols):
+    for name, kind, source, line in sorted(symbols):
+        where = location(source, line)
         generated = c_name(name)
         if generated in RUNTIME_C_NAMES:
             raise CompileError(
-                f"{path}: identifier {name!r} conflicts with a reserved runtime name"
+                f"{where}: identifier {name!r} conflicts with a reserved runtime name"
             )
         previous = c_symbols.get(generated)
         if previous is not None:
-            previous_name, previous_kind = previous
+            previous_name, previous_kind, previous_source, previous_line = previous
             if previous_name != name:
                 raise CompileError(
-                    f"{path}: identifiers {previous_name!r} and {name!r} "
-                    f"both map to C name {generated!r}"
+                    f"{where}: identifiers {previous_name!r} and {name!r} "
+                    f"both map to C name {generated!r}; other declaration at "
+                    f"{location(previous_source, previous_line)}"
                 )
             if previous_kind != kind:
                 raise CompileError(
-                    f"{path}: {kind} {name!r} conflicts with another "
-                    "declaration of the same name"
+                    f"{where}: {kind} {name!r} conflicts with another "
+                    "declaration of the same name at "
+                    f"{location(previous_source, previous_line)}"
                 )
-        c_symbols[generated] = (name, kind)
+        c_symbols[generated] = (name, kind, source, line)

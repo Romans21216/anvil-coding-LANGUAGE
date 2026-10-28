@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-28",
-  "reviewed_implementation_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+  "reviewed_implementation_commit": "148363296d51de59e3b92db3bf768d19ad5d2ee2",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,11 +9,11 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
-  "latest_independently_reviewed_candidate_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+  "latest_verified_commit": "148363296d51de59e3b92db3bf768d19ad5d2ee2",
+  "latest_independently_reviewed_candidate_commit": "148363296d51de59e3b92db3bf768d19ad5d2ee2",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
-  "latest_followup_status_change": "Full include reviewedfbe86:71/100 with125tests;#64/#65 reproduced and now corrected in follow-up pending review.",
+  "last_pushed_reviewed_below_threshold_commit": "148363296d51de59e3b92db3bf768d19ad5d2ee2",
+  "latest_followup_status_change": "Latest independent review: 1483632, 71/100, 131 passing tests; #66 and #58 follow-up awaiting review. Full engine/Forge/OS goal remains active.",
   "latest_evaluation_score": 71,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
@@ -157,7 +157,7 @@
       "tests": [
         "Independent critic verified 69 Python tests, npm extension validation, Python compileall, and git diff --check on exact commit 7c1385c",
         "QA validator accepts a valid zero-point criterion fixture and rejects a mismatched category subtotal fixture",
-        "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37\u2013#43 are resolved",
+        "Independent critic confirmed the one-location/one-rotation grammar matches compiler behavior; issues #37–#43 are resolved",
         "Compiler-refactor candidate: the full suite passes 72 tests; the latest independent specification review separately verified 67 tests on 65c15bf"
       ],
       "missing_or_limitations": "The document specifies only implemented version 1 behavior; unsupported or future language and engine features remain explicitly out of scope.",
@@ -171,7 +171,7 @@
         "Link the specification from the README and language reference/wiki.",
         "Independently review the specification for consistency with implementation."
       ],
-      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37\u2013#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
+      "verification_result": "COMPLETE: independent critic 7c1385c confirmed the formal v1 specification matches compiler behavior, including the one-location/one-rotation modifier constraints. Issues #37–#43 are resolved. It verified 69 tests and QA report arithmetic validation with valid-zero and malformed fixtures. The overall evaluation is 90/100, below 98, due to broader engine scope and architecture limits; QA issue #44 is resolved.",
       "github_issue": "#23",
       "commit": "e17eeac505cf12d70363bf658f598cb6d485a45b"
     },
@@ -311,14 +311,14 @@
       "source_evidence": [
         "runtime/anvil_projection.h: anvil_compute_viewport computes a centered, aspect-preserving destination rectangle",
         "runtime/anvil_runtime.c: WM_PAINT fills letterbox bars and scales the fixed frame into the current client rectangle",
-        "docs/ENGINE.md: fixed 960\u00d7600 rendering and resizable-window presentation behavior documented"
+        "docs/ENGINE.md: fixed 960×600 rendering and resizable-window presentation behavior documented"
       ],
       "tests": [
         "tests/test_runtime.py: native viewport tests pass for original, wide, tall, centered letterbox, and invalid dimensions",
         "python -m unittest discover -s tests -q: 73 passed locally on unreviewed candidate",
         "python -m unittest discover -s tests -p test_runtime.py -v: 3 native runtime tests passed"
       ],
-      "missing_or_limitations": "Internal framebuffer remains fixed at 960\u00d7600. The reviewer did not visually inspect a live resized window. Canonical item #144 is compiler version reporting and remains unverified.",
+      "missing_or_limitations": "Internal framebuffer remains fixed at 960×600. The reviewer did not visually inspect a live resized window. Canonical item #144 is compiler version reporting and remains unverified.",
       "dependencies": [
         "Windows GDI presentation path"
       ],
@@ -846,12 +846,12 @@
     "score": 71,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+    "commit": "148363296d51de59e3b92db3bf768d19ad5d2ee2",
     "categories": {
       "requirements": "11/20",
-      "functionality_reliability": "16/20",
+      "functionality_reliability": "17/20",
       "code_architecture": "13/20",
-      "testing_verification": "17/20",
+      "testing_verification": "16/20",
       "developer_experience_delivery": "14/20"
     },
     "criterion_scores": [
@@ -871,28 +871,28 @@
       2,
       1,
       2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      1,
+      1,
+      2,
+      1,
+      2,
+      1,
+      1,
+      1,
       1,
       2,
       2,
       2,
       2,
       1,
-      1,
-      2,
-      1,
-      2,
-      1,
-      1,
-      1,
-      1,
-      2,
-      2,
       2,
       2,
       1,
-      2,
-      2,
-      2,
       2,
       0,
       2,
@@ -907,29 +907,31 @@
       0
     ],
     "findings": [
-      "All125 tests, native/C include demos and extension0.1.10 package checks independently pass.",
-      "Configuration provenance defect#64 and deep-expression traceback#65 independently reproduced; follow-up fixes pending review.",
-      "Issue#58 historical/current wording corrections independently verified.",
-      "Native/Forge/OS scope remains incomplete;#63 untouched coordinate dispatch gap remains."
-    ]
+      "All 131 tests independently pass on exact 1483632; extension, compileall, QA arithmetic, UTF-8, diff and VSIX parity checks pass.",
+      "Configuration provenance #64 and bounded compiler processing #65 are independently verified fixed.",
+      "Included local-array/parameter conflict still uses entry path (#66); current local fix awaits independent review.",
+      "Stale capability/current-review wording independently found in completion and status documents (#58 reopened); current rewrite awaits review.",
+      "Full native engine, Forge and OS scope remains incomplete; #63 untouched coordinate dispatch coverage gap remains."
+    ],
+    "reviewer": "include_full_review"
   },
-  "current_candidate_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+  "current_candidate_commit": "148363296d51de59e3b92db3bf768d19ad5d2ee2",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+    "commit": "148363296d51de59e3b92db3bf768d19ad5d2ee2",
     "reviewed_score": 71,
-    "previous_reviewed_score": 72,
-    "previous_review_commit": "3270998384367be7b763cc605c0492208a72c988",
+    "previous_reviewed_score": 71,
+    "previous_review_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "125 independently pass on exactedfbe86",
+    "python_unittest": "131 independently pass on exact 1483632",
     "npm_test": "passed",
     "compileall": "passed",
     "qa_report_validator": "71/100 current rubric arithmetic",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "edfbe86 diff passed",
-    "finding": "Includes/dependency selection work; diagnostic#64 and compiler recursion#65 require follow-up."
+    "git_diff_check": "1483632 diff passed",
+    "finding": "All 131 tests independently pass on exact 1483632; extension, compileall, QA arithmetic, UTF-8, diff and VSIX parity checks pass.; Configuration provenance #64 and bounded compiler processing #65 are independently verified fixed.; Included local-array/parameter conflict still uses entry path (#66); current local fix awaits independent review.; Stale capability/current-review wording independently found in completion and status documents (#58 reopened); current rewrite awaits review.; Full native engine, Forge and OS scope remains incomplete; #63 untouched coordinate dispatch coverage gap remains."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -946,12 +948,11 @@
   "latest_independent_candidate_score": 71,
   "latest_independent_candidate_result": "FAIL against98;71/100; configuration provenance and depth failures require verification.",
   "current_unscored_followup": {
-    "feature": "Configuration provenance#64 and compiler expression/statement budgets#65",
-    "status": "All131 tests pass after#64/#65 fixes; targeted29, extension, compileall, QA, UTF-8 and diff checks pass. Fresh full independent review pending.",
-    "reviewed_baseline": "edfbe86252deb5af39504161f6e8571ae917fbb9",
-    "python_tests_passed": 131
+    "feature": "Semantic diagnostic provenance #66 and capability/review metadata #58",
+    "status": "Full local suite: 132 tests passed in 103.460s; subsequent 17-test include run covers one additional symbol-provenance test. Extension, compileall, QA, UTF-8/VSIX parity and diff checks pass. Independent full review pending.",
+    "reviewed_baseline": "148363296d51de59e3b92db3bf768d19ad5d2ee2"
   },
-  "latest_independently_scored_candidate_commit": "edfbe86252deb5af39504161f6e8571ae917fbb9",
+  "latest_independently_scored_candidate_commit": "148363296d51de59e3b92db3bf768d19ad5d2ee2",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1018,7 +1019,7 @@
     ],
     "findings": [
       "Issue #48 is fixed: both JSON status files parse as strict UTF-8, and the prior candidate SHA/encoding mismatch is corrected.",
-      "Mouse input items #391\u2013394 are COMPLETE and verified; native synthetic input regression passes.",
+      "Mouse input items #391–394 are COMPLETE and verified; native synthetic input regression passes.",
       "No code defect was found in the fresh review.",
       "No live mouse-enabled window was visually inspected.",
       "Partial criteria 2, 3, 5, 9, 27, 40, 47, and 50 remain; score 92/100 is six points below the required 98/100."
@@ -1042,5 +1043,5 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Full review71/100 onedfbe86/125tests. Corrections#64/#65 are pending fresh review; engine/Forge/OS goal remains incomplete."
+  "current_candidate_status": "Latest independent review: 1483632, 71/100, 131 passing tests; #66 and #58 follow-up awaiting review. Full engine/Forge/OS goal remains active."
 }
