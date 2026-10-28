@@ -178,11 +178,11 @@
     "python_compile": "compileall passed",
     "qa_report_validator": "72/100 current rubric",
     "git_diff_check": "8668106 diff passed",
-    "native_mouse": "131-test reviewed suite includes mouse cases; untouched coordinate dispatch gap #63 remains.",
-    "native_keyboard": "prior regressions pass",
+    "native_mouse": "Native mouse regressions pass in the latest independently reviewed full suite; explicit test instrumentation remains disclosed and untouched dispatch gap#63 remains.",
+    "native_keyboard": "Keyboard regressions pass in the latest independently reviewed full suite.",
     "native_window": "flicker/resource/allocation-failure regressions pass",
     "strict_json": "both records parse as UTF-8",
-    "native_procedural": "Nine tests pass, including entry values/side effects/stack arguments/arity and procedural references."
+    "native_procedural": "Procedural math/RNG/noise and call-semantics regressions pass in the latest independently reviewed full suite; numeric limits remain documented."
   },
   "pending_documentation_review": null,
   "blocked_items": [
@@ -236,7 +236,6 @@
     54,
     55,
     56,
-    58,
     59,
     60,
     61,

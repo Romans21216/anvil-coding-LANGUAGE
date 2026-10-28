@@ -89,6 +89,8 @@ The evaluator independently verified #74/#75/#76, including direct/included form
 
 Next implementation priorities are semantic ray composition#77 and native project manifests/settings, followed by remaining full native engine/Forge/OS capabilities. A high prototype test count does not prove those systems complete.
 
+A focused record-only check of `adc6e29` confirms the exact source review, all50 scores, categories and146/125.935s evidence match across the main records. It found an ancillary mouse-result field still naming131 tests (#58); that field now refers to the latest reviewed suite without duplicating its count. This is a metadata correction, with no implementation rescore; source score72 remains unchanged.
+
 ## Review history
 
 | Exact snapshot | Score / threshold | Evidence and changes |
