@@ -10,9 +10,9 @@ The `.ANVL` source syntax and engine APIs remain Anvil-owned. Generated EXEs con
 
 An experimental direct backend is available with `python -m compiler.anvil <file.ANVL> --backend native --output <file.exe>`. It emits AMD64 instructions and PE32+ sections itself and imports only the Windows APIs it uses. Its supported subset includes simple functions with up to sixteen numeric parameters, numeric local/global slots, fixed-size global numeric arrays with dynamic checked reads and writes, addition/subtraction/multiplication/division, comparisons, short-circuit `and`/`or`, `if`, `while`, inclusive ascending/descending `for` loops, and console output rounded to six fractional digits (trailing zeroes are removed). Array indices are evaluated once; negative, fractional, and out-of-range indices produce a line-numbered runtime diagnostic and exit code 2. Aggregate direct-native global data is capped at 16 MiB before PE payload allocation; declarations that exceed the limit fail with a source-located compiler diagnostic. Native integration tests exercise successful array reads/writes, index failures, and pre-allocation aggregate-limit rejection. The native backend has been executed on Windows without invoking a C or Rust compiler.
 
-The direct backend now has an initial Windows 2D runtime: `scene 2d`, literal opaque `clear rgba`, top-level numeric initialization, `fn(draw)`, `display rect(...) -rgb(...)`, and optional `fn(update)` with `time()`, `delta()`, `compute()`, `held(key)`, `pressed(key)` and the mouse queries below. Runtime instructions and the PE are emitted by Anvil; USER32/GDI32 functions are imported directly from Windows. No C/Rust source, compiler, linker, or runtime shim is used.
+The direct backend now has an initial Windows 2D runtime: `scene 2d`, literal opaque `clear rgba`, top-level numeric initialization, `fn(draw)`, `display rect(...)`, `display circle(...)`, `display line(...)` with opaque `-rgb(...)`, and optional `fn(update)` with `time()`, `delta()`, `compute()`, `held(key)`, `pressed(key)` and the mouse queries below. Runtime instructions and the PE are emitted by Anvil; USER32/GDI32 functions are imported directly from Windows. No C/Rust source, compiler, linker, or runtime shim is used.
 
-The regular build still defaults to the C backend. The native backend does **not** yet support the full language, other shapes, text, alpha blending, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
+The regular build still defaults to the C backend. The native backend does **not** yet support the full language, text, alpha blending, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
 
 ## Native 2D scene
 
@@ -25,9 +25,26 @@ The window has a 960×640 outer size initially and a resizable client area. Coor
 
 If `fn(update)` exists, it takes no parameters and advances at configured simulation steps (60 Hz by default). A 10 ms Windows timer wakes the event loop; elapsed time is accumulated to determine the number of updates. At most 250 ms of elapsed time is accepted per wake after a stall. `delta()` is 1/fixed_hz and `time()` is elapsed simulation time. `time()` or keyboard/mouse queries in a draw-only scene also enable the clock; a static scene without update/time/input waits for Windows messages without a polling loop. `compute(expression)` is supported in both console and graphical native programs. Other runtime systems remain unsupported.
 
-The clear colour currently requires four literal 0–255 channels and alpha 255. Rectangles accept numeric coordinate/colour expressions, `-rgb(r,g,b)`, or `-rgba(r,g,b,255)`; other opacity values and modifiers produce compiler diagnostics. Unsupported native graphics fail explicitly instead of falling back to the C backend.
+The clear colour currently requires four literal 0–255 channels and alpha 255. Rectangles, circles and lines accept numeric coordinate/colour expressions, `-rgb(r,g,b)`, or `-rgba(r,g,b,255)`; other opacity values and modifiers produce compiler diagnostics. Unsupported native graphics fail explicitly instead of falling back to the C backend.
 
 `tests/test_native_window.py` executes an emitted EXE, inspects actual client pixels for colour, clipped and fractional edges, verifies timer-driven movement and erasure, resizes the window, and closes it with exit code 0. It also checks rejected constructs. These tests require an interactive Windows desktop. Windows painting follows the [BeginPaint/EndPaint lifecycle](https://learn.microsoft.com/en-us/windows/win32/gdi/drawing-in-the-client-area), and scheduling uses [window timers](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-settimer).
+
+## Native circles and lines
+
+`display circle(x,y,radius)` fills integer pixel coordinates satisfying `(px-x)^2 + (py-y)^2 <= radius^2`, including the boundary. Negative radii use their absolute value; a zero radius draws a point when the membership test accepts it. Fractional centers/radii are supported. The Anvil-written kernel derives horizontal spans with square roots, corrects their endpoints against the membership predicate, and clips to client dimensions. Work is bounded by visible rows and clipped span corrections, even for enormous off-screen circles. Binary64 rounding and underflow follow the numeric membership calculation.
+
+`display line(x1,y1,x2,y2[,thickness])` clips the center segment to the client bounds using Liang-Barsky interval clipping, rounds endpoints to nearest integer with ties to even, then uses Bresenham steps with square pixel stamps. To preserve the existing line contract, each stamp has radius `min(client_width, max(0, ceil(thickness / 2)))`: omitted thickness is 1 and produces a 3-pixel-wide stamp. Nonpositive thickness draws single-pixel steps. A segment rejected by centerline clipping draws nothing even when thickness would overlap the viewport. Iteration depends on clipped client dimensions, not the original endpoint distance.
+
+Both primitives evaluate coordinate arguments and then colour arguments once in source order, support the same opaque colour modifiers as rectangles, and preserve statement drawing order. Coordinates and circle radius must be within inclusive +/-2^30; an out-of-range value exits with code 2 and the originating physical source path/line. Line thickness may be any finite number and is capped by client width after conversion to a stamp radius. Non-finite expressions already fail with native numeric diagnostics. These explicit limits prevent unsafe/unbounded conversions; they do not imply full engine parity.
+
+The kernels are ordinary Anvil source in `runtime/native/drawing.ANVL`, compiled by the direct x64 backend on demand. Only requested kernels and the line rounding helper are emitted; rectangle-only and console programs omit them. Each filled row or line stamp currently calls the native rectangle primitive, which owns/deletes its brush. This avoids per-pixel OS calls but is not a claim of optimal rendering performance. Dedicated framebuffer rendering, alpha, text, 3D and measured optimization remain unfinished.
+
+```powershell
+python -m compiler.anvil examples/native_shapes.ANVL --backend native --output build/native_shapes.exe
+./build/native_shapes.exe
+```
+
+`tests/test_native_drawing.py` compares actual client pixels to independent numeric references for fractional/negative/zero/tiny/large circles and clipped/reversed/degenerate/thick lines. It also verifies evaluation order, local/global array inputs, composition, resizing/resource reuse, Unicode included-source range errors, unsupported modifiers and omission of unused kernels. Test interaction targets only each generated window.
 
 ## Native keyboard input
 
@@ -93,7 +110,7 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 1. Machine-code and PE writer primitives; emit a minimal console EXE and verify it runs. **Implemented.**
 2. Arithmetic, checked numeric operations, functions, branches, and loops. **Partially implemented:** checked numeric operations, functions with sixteen arguments, branches and numeric loops work; full language parity remains outstanding.
 3. Global slots and fixed-size global/local arrays with checked indexing. **Implemented within documented bounds:** per-call zeroed heap storage, cleanup and active allocation budget are verified.
-4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, keyboard held/edge input, background clearing, and buffered opaque rectangles work; mouse input is independently verified; remaining shapes and image resources are outstanding.
+4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, keyboard held/edge input, background clearing, and buffered opaque rectangles/circles/lines work; mouse input is independently verified; text, alpha blending and image resources are outstanding.
 5. Camera, 3D primitives, BVH ray tracing, physics, procedural noise, and networking.
 6. Switch the default build to the direct x64/PE backend, port regression coverage, then remove C generation and MSVC-specific compiler invocation.
 

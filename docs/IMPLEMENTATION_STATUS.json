@@ -945,7 +945,11 @@
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 76,
   "latest_independent_candidate_result": "FAIL against 98; 76/100 on ecdf681; ABI/addressing verified; no new finding.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
+    "features": "Native Anvil-written filled-circle and clipped-line kernels; opaque colours, bounded viewport work, source-located coordinate limits and static demand selection.",
+    "local_checks": "168 tests passed in 155.565s; targeted drawing/window/project13 passed; native_shapes CLI build, npm, compileall and diff checks pass. Latest scored source remains ecdf681 at76/100."
+  },
   "latest_independently_scored_candidate_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
   "historical_c_backed_evaluation": {
     "score": 92,

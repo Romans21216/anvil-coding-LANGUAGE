@@ -1,0 +1,135 @@
+# Direct-native drawing kernels. Coordinates are client pixels.
+# Circle membership uses integer pixel coordinates, including the boundary.
+# Width/height are supplied by the owning runtime; no global library state.
+fn(_anvil_native_circle, x, y, radius, red, green, blue, width, height)
+  set local(r) = abs(var(radius))
+  set local(square) = local(r) * local(r)
+  set local(first_y) = max(0, ceil(var(y) - local(r)) - 1)
+  set local(last_y) = min(var(height) - 1, floor(var(y) + local(r)) + 1)
+  for local(py) = local(first_y) to local(last_y)
+    set local(dy) = local(py) - var(y)
+    set local(dy2) = local(dy) * local(dy)
+    set local(half) = sqrt(max(0, local(square) - local(dy2)))
+    set local(left) = min(var(width), max(0, ceil(var(x) - local(half))))
+    set local(right) = max(-1, min(var(width) - 1, floor(var(x) + local(half))))
+    # Correct sqrt/subtraction rounding against the actual membership predicate.
+    while local(left) > 0 and (local(left) - 1 - var(x)) * (local(left) - 1 - var(x)) + local(dy2) <= local(square)
+      sub local(left) 1
+    end
+    while local(right) < var(width) - 1 and (local(right) + 1 - var(x)) * (local(right) + 1 - var(x)) + local(dy2) <= local(square)
+      add local(right) 1
+    end
+    while local(left) <= local(right) and (local(left) - var(x)) * (local(left) - var(x)) + local(dy2) > local(square)
+      add local(left) 1
+    end
+    while local(right) >= local(left) and (local(right) - var(x)) * (local(right) - var(x)) + local(dy2) > local(square)
+      sub local(right) 1
+    end
+    if local(left) <= local(right)
+      display rect(local(left), local(py), local(right) - local(left) + 1, 1) -rgb(var(red), var(green), var(blue))
+    end
+  end
+end
+
+# Round to nearest integer with ties to even, matching the ordinary pixel contract.
+fn(_anvil_native_pixel_round, value)
+  set local(base) = floor(var(value))
+  set local(fraction) = var(value) - local(base)
+  if local(fraction) < 0.5
+    output local(base)
+  end
+  if local(fraction) > 0.5
+    output local(base) + 1
+  end
+  if floor(local(base) / 2) * 2 = local(base)
+    output local(base)
+  end
+  output local(base) + 1
+end
+
+fn(_anvil_native_line, x1, y1, x2, y2, thickness, red, green, blue, width, height)
+  if var(width) <= 0 or var(height) <= 0
+    output 0
+  end
+  set local(dx) = var(x2) - var(x1)
+  set local(dy) = var(y2) - var(y1)
+  set local(enter) = 0
+  set local(exit) = 1
+  # Liang-Barsky clipping. Divide only for a ratio known to be in [0,1],
+  # including tiny nonzero segment differences, so division cannot overflow.
+  for local(edge) = 1 to 4
+    if local(edge) = 1
+      set local(p) = -local(dx)
+      set local(q) = var(x1)
+    end
+    if local(edge) = 2
+      set local(p) = local(dx)
+      set local(q) = var(width) - 1 - var(x1)
+    end
+    if local(edge) = 3
+      set local(p) = -local(dy)
+      set local(q) = var(y1)
+    end
+    if local(edge) = 4
+      set local(p) = local(dy)
+      set local(q) = var(height) - 1 - var(y1)
+    end
+    if local(p) = 0
+      if local(q) < 0
+        output 0
+      end
+    end
+    if local(p) < 0 and local(q) < 0
+      if local(q) < local(p)
+        output 0
+      end
+      set local(enter) = max(local(enter), local(q) / local(p))
+    end
+    if local(p) > 0
+      if local(q) < 0
+        output 0
+      end
+      if local(q) < local(p)
+        set local(exit) = min(local(exit), local(q) / local(p))
+      end
+    end
+    if local(enter) > local(exit)
+      output 0
+    end
+  end
+  set local(start_x) = max(0, min(var(width) - 1, var(x1) + local(dx) * local(enter)))
+  set local(start_y) = max(0, min(var(height) - 1, var(y1) + local(dy) * local(enter)))
+  set local(end_x) = max(0, min(var(width) - 1, var(x1) + local(dx) * local(exit)))
+  set local(end_y) = max(0, min(var(height) - 1, var(y1) + local(dy) * local(exit)))
+  set local(x) = call fn(_anvil_native_pixel_round, local(start_x))
+  set local(y) = call fn(_anvil_native_pixel_round, local(start_y))
+  set local(target_x) = call fn(_anvil_native_pixel_round, local(end_x))
+  set local(target_y) = call fn(_anvil_native_pixel_round, local(end_y))
+  set local(dx) = abs(local(target_x) - local(x))
+  set local(dy) = -abs(local(target_y) - local(y))
+  set local(sx) = -1
+  set local(sy) = -1
+  if local(start_x) < local(end_x)
+    set local(sx) = 1
+  end
+  if local(start_y) < local(end_y)
+    set local(sy) = 1
+  end
+  set local(error) = local(dx) + local(dy)
+  set local(radius) = min(var(width), max(0, ceil(var(thickness) * 0.5)))
+  while 1
+    display rect(local(x) - local(radius), local(y) - local(radius), local(radius) * 2 + 1, local(radius) * 2 + 1) -rgb(var(red), var(green), var(blue))
+    if local(x) = local(target_x) and local(y) = local(target_y)
+      output 0
+    end
+    set local(twice) = local(error) * 2
+    if local(twice) >= local(dy)
+      add local(error) local(dy)
+      add local(x) local(sx)
+    end
+    if local(twice) <= local(dx)
+      add local(error) local(dx)
+      add local(y) local(sy)
+    end
+  end
+end

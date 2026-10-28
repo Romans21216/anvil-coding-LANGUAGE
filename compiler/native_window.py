@@ -7,6 +7,7 @@ imports, not an external language runtime or compiled shim.
 from __future__ import annotations
 
 import struct
+import re
 from typing import TYPE_CHECKING
 
 from compiler.common import CompileError, Node
@@ -59,6 +60,8 @@ class NativeWindow:
         self.owner = owner
         self.code = owner.code
         self.clear = clear
+        from compiler.native_drawing import NativeDrawing
+        self.drawing = NativeDrawing(self)
         self.hdc = owner.reserve_data(b"\0" * 8)
         self.instance = owner.reserve_data(b"\0" * 8)
         self.brush = owner.reserve_data(b"\0" * 8)
@@ -116,6 +119,7 @@ class NativeWindow:
         self.code.conditional_jump(0x84, failure)
 
     def emit(self) -> None:
+        self.drawing.emit_pending()
         self._rectangle()
         self._release_buffer()
         if self.keyboard is not None:
@@ -128,18 +132,26 @@ class NativeWindow:
     def emit_display(self, node: Node, scope: Node | None) -> None:
         raw = node.value.strip()
         location = f"{self.owner.path}:{node.line}"
-        if not raw.startswith("rect("):
-            raise CompileError(f"{location}: native 2D graphics currently supports display rect only")
+        match = re.match(r"(rect|circle|line)\(", raw)
+        if not match:
+            raise CompileError(f"{location}: native 2D graphics currently supports display rect, circle or line only")
+        shape = match[1]
+        start = match.end()
         depth = 1
-        end = 5
+        end = start
         while end < len(raw) and depth:
             depth += (raw[end] == "(") - (raw[end] == ")")
             end += 1
         if depth:
-            raise CompileError(f"{location}: unclosed native rectangle arguments")
-        values = split_args(raw[5:end - 1])
-        if len(values) != 4:
-            raise CompileError(f"{location}: display rect expects x,y,width,height")
+            raise CompileError(f"{location}: unclosed native {shape} arguments")
+        values = split_args(raw[start:end - 1])
+        expected = {"rect": (4,), "circle": (3,), "line": (4, 5)}[shape]
+        if len(values) not in expected:
+            signature = {"rect": "x,y,width,height", "circle": "x,y,radius",
+                         "line": "x1,y1,x2,y2[,thickness]"}[shape]
+            raise CompileError(f"{location}: display {shape} expects {signature}")
+        if shape == "line" and len(values) == 4:
+            values.append("1")
         rest = raw[end:].strip()
         colour = ["255", "255", "255"]
         if rest:
@@ -148,12 +160,15 @@ class NativeWindow:
             elif rest.startswith("-rgba(") and rest.endswith(")"):
                 channels = split_args(rest[6:-1])
                 if len(channels) != 4 or channels[3] != "255":
-                    raise CompileError(f"{location}: native rectangles currently require alpha 255")
+                    raise CompileError(f"{location}: native shapes currently require alpha 255")
                 colour = channels[:3]
             else:
-                raise CompileError(f"{location}: unsupported native rectangle modifier")
+                raise CompileError(f"{location}: unsupported native {shape} modifier")
             if len(colour) != 3:
-                raise CompileError(f"{location}: native rectangle colour expects three channels")
+                raise CompileError(f"{location}: native {shape} colour expects three channels")
+        if shape != "rect":
+            self.drawing.primitive(shape, values + colour, node, scope)
+            return
         self.code.bytes(b"\x48\x83\xec\x60")
         for index, expression in enumerate(values + colour):
             self.owner.emit_expression(expression, node.line, scope)

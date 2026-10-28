@@ -223,7 +223,7 @@ end
             ("scene 3d\nfn(draw)\nend\n", "one scene 2d"),
             ("scene 2d\nfn(draw, x)\nend\n", "fn(draw) with no parameters"),
             ("scene 2d\nfn(update, value)\nend\nfn(draw)\nend\n", "fn(update) cannot have parameters"),
-            ("scene 2d\nfn(draw)\n display circle(0,0,4)\nend\n", "display rect only"),
+            ("scene 2d\nfn(draw)\n display plane(0,0,4,4,5)\nend\n", "display rect, circle or line only"),
             ("scene 2d\nclear rgba(0,0,0,20)\nfn(draw)\nend\n", "alpha 255"),
         ]
         for source, diagnostic in cases:

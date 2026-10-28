@@ -277,6 +277,10 @@
     57
   ],
   "current_candidate_status": "Full review ecdf681: 76/100, 162 tests in 139.160s; native numeric ABI and scalar addressing independently verified; no new finding. Full goal active.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
+    "features": "Native Anvil-written filled-circle and clipped-line kernels; opaque colours, bounded viewport work, source-located coordinate limits and static demand selection.",
+    "local_checks": "168 tests passed in 155.565s; targeted drawing/window/project13 passed; native_shapes CLI build, npm, compileall and diff checks pass. Latest scored source remains ecdf681 at76/100."
+  },
   "open_coordinate_integration_issue": 63
 }

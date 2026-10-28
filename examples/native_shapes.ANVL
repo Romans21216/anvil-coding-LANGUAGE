@@ -1,0 +1,21 @@
+# Direct Anvil machine-code drawing kernels; no C/Rust compiler or shim.
+scene 2d
+clear rgba(11,16,27,255)
+set var(x) = 100
+set var(direction) = 1
+fn(update)
+  add var(x) var(direction) * 120 * delta()
+  if var(x) > 500
+    set var(direction) = -1
+  end
+  if var(x) < 100
+    set var(direction) = 1
+  end
+end
+fn(draw)
+  display rect(40,40,560,300) -rgb(30,45,65)
+  display circle(var(x),170,65.5) -rgb(95,205,185)
+  display circle(440.5,170.25,-48) -rgba(175,110,245,255)
+  display line(-100,280,650,70,2) -rgb(245,205,90)
+  display line(60,310,580,310,0) -rgb(170,190,215)
+end
