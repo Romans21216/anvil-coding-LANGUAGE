@@ -75,7 +75,7 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | | **Code quality and architecture** | **14/20** | |
 | | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **76/100** | Exact commit `2b4e5e8`; FAIL against 98. |
+| | **Total** | **76/100** | Exact commit `2f7cd74`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
@@ -110,3 +110,5 @@ Earlier reports and their complete rubric tables remain available in Git history
 All confirmed findings have detailed reproduction, impact and acceptance criteria in GitHub with `Codex Bugs`; user reports use `Romans21216 - Bugs`. No new confirmed defect in the latest review; #78 is independently resolved. [#63 coordinate integration](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/63) and broader systems in#5–11/#14–15/#24 remain open. Complete backlog only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
 
 Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 categories, exact2b4e5e8 and151/142.480s evidence agree; current native project/settings docs and ancillary fields match. No rescore or implementation change.
+
+Record-only check3fe3e57 found stale total-row source and local-array rollout wording (#58). Those lines are corrected in this follow-up; all main score vectors and158/145.917s evidence passed. Source76 score unchanged.

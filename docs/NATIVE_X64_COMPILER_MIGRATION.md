@@ -90,7 +90,7 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 
 1. Machine-code and PE writer primitives; emit a minimal console EXE and verify it runs. **Implemented.**
 2. Arithmetic, checked numeric operations, functions, branches, and loops. **Partially implemented:** checked numeric operations, functions with sixteen arguments, branches and numeric loops work; full language parity remains outstanding.
-3. Global slots and fixed-size global arrays, including checked indexing. **Partially implemented:** global slots and global arrays now compile directly; function-local heap arrays and their allocation/lifetime rules remain.
+3. Global slots and fixed-size global/local arrays with checked indexing. **Implemented within documented bounds:** per-call zeroed heap storage, cleanup and active allocation budget are verified.
 4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, keyboard held/edge input, background clearing, and buffered opaque rectangles work; mouse input is independently verified; remaining shapes and image resources are outstanding.
 5. Camera, 3D primitives, BVH ray tracing, physics, procedural noise, and networking.
 6. Switch the default build to the direct x64/PE backend, port regression coverage, then remove C generation and MSVC-specific compiler invocation.
