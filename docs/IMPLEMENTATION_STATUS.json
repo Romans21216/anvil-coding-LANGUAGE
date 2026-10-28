@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "120482e85e77c19216a793ab17190dbf1ae025ff",
+  "reviewed_implementation_commit": "2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 424,
@@ -9,12 +9,14 @@
     "COMPLETE": 21,
     "IN PROGRESS": 2
   },
-  "latest_verified_commit": "120482e85e77c19216a793ab17190dbf1ae025ff",
-  "latest_independently_reviewed_candidate_commit": "120482e85e77c19216a793ab17190dbf1ae025ff",
+  "latest_verified_commit": "2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505",
+  "latest_independently_reviewed_candidate_commit": "2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "120482e85e77c19216a793ab17190dbf1ae025ff",
-  "latest_followup_status_change": "Independent review of 120482e scored 58/100. It verified fractional/range formatting, signed minimum, and line-numbered non-finite diagnostics; no new defect was found.",
-  "backlog_list_location": "GitHub issue #23 body and its comments; the full 450-item list is not duplicated in repository files.",
+  "last_pushed_reviewed_below_threshold_commit": "2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505",
+  "latest_followup_status_change": "Independent review of 2b0a7b1 scored 64/100. It verified checked native global arrays, the 16 MiB cap before PE allocation, comment-aware line diagnostics, and all 92 tests; issues #55 and #56 are closed. The goal remains below 98%.",
+  "latest_evaluation_score": 64,
+  "required_evaluation_score": 98,
+  "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
   "audited_items": [
     {
       "number": 46,

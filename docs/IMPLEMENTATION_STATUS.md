@@ -1,10 +1,10 @@
 # Anvil implementation status
 
-The full 450-item list is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23). This compact ledger records evidence only for items already audited or in progress; it does not duplicate the full item list. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
+The master backlog is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23): its original 450-item inventory and the later additions remain there. This compact ledger records evidence only for audited items and does not duplicate the backlog. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27. Latest independent review is exact commit `71ddfec1806f6002b5e1851a57aa9843903c03a2` at 63/100 — FAIL against 98. All 92 tests pass. Issues #49 and #52–#55 are fixed and verified. Issue #56 tracks the remaining source-line diagnostic edge case with an inline comment. Earlier native reviews scored 61/100 on 9eaf1b6, 58/100 on 120482e, 56/100 on ade1ff6, 55/100 on f330d4b, 54/100 on 597867f, and 50/100 on 573cb44.
+Updated 2026-10-27. Latest independent review is exact commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` at 64/100 — FAIL against 98. All 92 tests pass. Issues #49 and #52–#56 are fixed and verified. Earlier native reviews scored 63/100 on 71ddfec, 61/100 on 9eaf1b6, 58/100 on 120482e, 56/100 on ade1ff6, 55/100 on f330d4b, 54/100 on 597867f, and 50/100 on 573cb44.
 
-Unreviewed native follow-up: direct AMD64/PE compilation now supports fixed-size global numeric arrays, dynamic checked reads/writes, source-line bounds errors, and a 16 MiB aggregate data cap checked before PE allocation. The 92-test candidate was scored 63/100; issue #55 is fixed and independently verified. The current follow-up uses Anvil comment stripping to preserve the issue #56 line number for array declarations with trailing comments, and awaits a fresh full review. The native backend still does not support the engine runtime, and C remains the default.
+Latest reviewed native follow-up: direct AMD64/PE compilation supports fixed-size global numeric arrays, dynamic checked reads/writes, source-line bounds errors, and a 16 MiB aggregate data cap checked before PE allocation. The 92-test candidate scored 64/100; issues #55 and #56 are fixed and independently verified. Native mode still does not support the engine runtime, and C remains the default. New Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
 
 ## Status counts
 
@@ -56,7 +56,7 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 
 - `COMPLETE` means the item-specific behavior has source evidence, tests, documentation, and review; preserve any listed limits.
 - `PARTIALLY IMPLEMENTED` means a working subset exists but one or more listed acceptance parts are missing.
-- The counts summarize the 450 entries in issue #23, but unverified entries are not copied into this ledger. `NEEDS VERIFICATION` is a conservative status, not a claim that a feature is absent.
+- These audited status counts summarize the original 450 entries; later backlog additions remain only in issue #23 until individually audited. `NEEDS VERIFICATION` is a conservative status, not a claim that a feature is absent.
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
 
 

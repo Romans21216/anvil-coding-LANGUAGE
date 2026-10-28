@@ -1,7 +1,7 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **63/100 - FAIL** for exact commit `71ddfec1806f6002b5e1851a57aa9843903c03a2` against the user's **98/100** threshold. Categories: requirements 9/20, functionality/reliability 15/20, architecture 12/20, testing 16/20, delivery 11/20.
+**Latest independent evaluation:** **64/100 - FAIL** for exact commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` against the user's **98/100** threshold. Categories: requirements 10/20, functionality/reliability 15/20, architecture 12/20, testing 16/20, delivery 11/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
 
 **Native QA follow-up (reviewed):** the latest review found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. Review of `f330d4b` verified fractional formatting and closed issue #49. Review of `ade1ff6` opened #53 for signed-minimum rejection and #54 for missing non-finite arithmetic diagnostics. Review of `120482e` verified fixes for both, along with #52 range handling; issues #49 and #52–#54 are closed.
@@ -10,9 +10,7 @@
 **Latest review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
 **Current finding:** exact commit `120482e85e77c19216a793ab17190dbf1ae025ff` scored 58/100, below the 98/100 threshold. All 89 tests passed. The reviewer verified fixes for fractional output, large values, signed minimum, and non-finite diagnostics; issues #49 and #52–#54 are closed. Native game-engine migration remains incomplete.
 
-**Current review:** the independent reviewer evaluated exact pushed commit `71ddfec1806f6002b5e1851a57aa9843903c03a2` and scored it 63/100. The 16 MiB aggregate cap was independently verified before PE allocation; issue #55 is fixed. A new diagnostic edge case remains: a trailing accepted `#` comment prevents the cap error from showing the array's source line, tracked in issue #56 (`Codex Bugs`). The C backend remains the default; direct engine-runtime parity remains incomplete.
-
-**Unreviewed follow-up candidate:** native aggregate-limit source lookup now strips Anvil comments before matching array declarations. The limit regression runs with both plain and `#`-commented declarations and checks that the line-3 error occurs before output creation. The current code correction awaits independent verification; 63/100 is still the score of exact commit `71ddfec`.
+**Current review:** the independent reviewer evaluated exact pushed commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` and scored it 64/100. It verified the 16 MiB aggregate cap before PE allocation and the source line on both plain and trailing-comment array declarations; issues #55 and #56 (`Codex Bugs`) are fixed and closed after independent verification. All 92 Python tests, extension checks, compileall, QA arithmetic, status JSON, and diff checks passed. The C backend remains default; native engine/runtime parity remains incomplete.
 
 **Latest reviewed correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
@@ -68,7 +66,7 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 
 ## Latest 50-criterion scoring — direct native commit `9eaf1b6`
 
-Independent reviewer evaluated exact pushed commit `71ddfec1806f6002b5e1851a57aa9843903c03a2`: **63/100 — FAIL** against the active **98/100** threshold. Categories: requirements 9/20, functionality/reliability 15/20, architecture 12/20, testing/verification 16/20, delivery 11/20. All 92 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 status JSON, and diff checks passed. The reviewer built `examples/arrays.ANVL` through the direct backend and verified output `50`; negative, fractional, and out-of-range indices each reported their source line and exited 2. Three maximum-sized arrays were rejected before PE allocation with a line 3 error and no EXE. Issue [#55](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/55) is fixed after this verification. The new trailing-comment source-location edge case is tracked in issue [#56](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/56), labeled `Codex Bugs`.
+Independent reviewer evaluated exact pushed commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505`: **64/100 — FAIL** against the active **98/100** threshold. Categories: requirements 10/20, functionality/reliability 15/20, architecture 12/20, testing/verification 16/20, delivery 11/20. All 92 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 status JSON, and diff checks passed. The reviewer built `examples/arrays.ANVL` through the direct backend and verified output `50`; invalid indices reported their source line and exited 2. Three maximum-sized arrays with a trailing comment were rejected before PE allocation with a line 3 diagnostic and no EXE. Issues [#55](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/55) and [#56](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/56) are fixed and closed after verification.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -79,7 +77,7 @@ Independent reviewer evaluated exact pushed commit `71ddfec1806f6002b5e1851a57aa
 | 5 | No essential feature missing | 0 | Native graphics and game APIs are absent. |
 | 6 | Stated constraints respected | 1 | Native mode avoids C/Rust, but CLI defaults to C. |
 | 7 | Ambiguity resolved logically | 2 | Direct machine code and PE match the user's selected target. |
-| 8 | Behavior matches documentation | 1 | C/MSVC versus limited direct-native wording is corrected; a cap diagnostic can omit its line when the declaration has an accepted trailing comment. |
+| 8 | Behavior matches documentation | 2 | Evaluation docs distinguish full-engine C/MSVC from limited direct-native PE; the cap diagnostic identifies declarations with or without accepted trailing comments. |
 | 9 | Important use cases supported | 1 | Numeric and array programs work; native game workflows do not. |
 | 10 | Usable for intended purpose | 0 | Native mode cannot build the intended full engine. |
 | 11 | Core functionality works | 0 | Native game-engine core is absent. |
@@ -122,17 +120,17 @@ Independent reviewer evaluated exact pushed commit `71ddfec1806f6002b5e1851a57aa
 | 48 | Deliverables organized | 2 | Reviewed commit is pushed and files are organized. |
 | 49 | Limitations disclosed | 2 | Native feature limits are documented. |
 | 50 | Practical for intended scope | 0 | Not yet a complete game-engine deliverable. |
-| | **Requirement fulfillment** | **9/20** | |
+| | **Requirement fulfillment** | **10/20** | |
 | | **Functionality and reliability** | **15/20** | |
 | | **Code quality and architecture** | **12/20** | |
 | | **Testing and verification** | **16/20** | |
 | | **Developer experience and delivery** | **11/20** | |
-| | **Total** | **63/100** | Exact commit `71ddfec`; FAIL against 98. |
+| | **Total** | **64/100** | Exact commit `2b0a7b1`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
-- **Criterion 8 — diagnostic/documentation consistency (1/2):** the build-target wording is corrected, but an accepted inline `#` comment prevents the aggregate-cap error from including its source line. Issue [#56](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/56) tracks the diagnostic fix.
 - **Issue #55 — aggregate native data allocation: FIXED AND INDEPENDENTLY VERIFIED.** The 16 MiB limit is checked before PE payload allocation. Three individually maximum-sized arrays fail with a source-located diagnostic and no output file; issue #55 is closed.
+- **Issue #56 — comment-aware source location: FIXED AND INDEPENDENTLY VERIFIED.** Array declaration matching now strips Anvil comments; the reviewer reproduced the commented cap case and confirmed a line-3 diagnostic, exit code 1, and no EXE. Issue #56 is closed.
 - **Criteria 2–6, 9–13, 28–30, 32–33, 36, 40–47, 50:** the direct backend remains narrow and lacks the full game runtime, graphics, project manifests, engine built-ins and fresh visible extension verification. Continue native runtime parity work, preserve the no-C/no-Rust final target, and expand integration validation.
 
 ## Historical 50-criterion scoring — direct native commit `120482e`
