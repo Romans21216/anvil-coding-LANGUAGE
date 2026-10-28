@@ -169,6 +169,9 @@ class _Expression:
 
     def _emit_builtin(self, name: str) -> None:
         self._expect("(")
+        if name in self.owner._math.ARITY:
+            self.owner._math.emit_builtin(self, name)
+            return
         if name == "compute":
             self._require_number(self.emit())
             self._expect(")")
@@ -227,12 +230,17 @@ class NativeCodegen:
                ("KERNEL32.dll", "WriteFile"),
                ("KERNEL32.dll", "ExitProcess")]
     BUILTIN_NAMES = {"compute", "time", "delta", "held", "pressed",
-                     "mouse_x", "mouse_y", "mouse_held", "mouse_pressed", "mouse_wheel"}
+                     "mouse_x", "mouse_y", "mouse_held", "mouse_pressed", "mouse_wheel",
+                     "abs", "sqrt", "floor", "ceil", "min", "max", "rnd", "noise", "fbm",
+                     "_anvil_native_hash"}
     MAX_DATA_BYTES = 16 * 1024 * 1024
+    MAX_FRAME_BYTES = 4096
 
     def __init__(self, path, functions, top, variables, arrays=None):
         self.path = path
-        self.functions = functions
+        if any(name.startswith("_anvil_native_") for name in functions):
+            raise CompileError(f"{path}: function prefix _anvil_native_ is reserved for the native runtime")
+        self.functions = dict(functions)
         self.top = top
         self.variables = variables
         self.arrays = arrays or {}
@@ -282,6 +290,8 @@ class NativeCodegen:
         self._data_size = max(8, next_offset)
         self._data = bytearray(self._data_size)
         self._window = None
+        from compiler.native_math import NativeMath
+        self._math = NativeMath(self)
 
     def reserve_data(self, payload: bytes) -> int:
         offset = (len(self._data) + 7) & ~7
@@ -302,16 +312,17 @@ class NativeCodegen:
 
     @staticmethod
     def _memory_operand(register: int, base: int, displacement: int) -> bytes:
-        if not -128 <= displacement <= 127:
-            raise CompileError("native stack frame exceeds the first x64 encoder limit")
-        # F2 0F 10/11 mod=01 reg=XMM rm=RBP disp8.
-        return bytes((0xF2, 0x0F, 0x10, 0x45 | (register << 3), displacement & 0xFF))
+        return NativeCodegen._xmm_rbp_operand(0x10, register, displacement)
 
     @staticmethod
     def _store_xmm_operand(register: int, displacement: int) -> bytes:
-        if not -128 <= displacement <= 127:
-            raise CompileError("native stack frame exceeds the first x64 encoder limit")
-        return bytes((0xF2, 0x0F, 0x11, 0x45 | (register << 3), displacement & 0xFF))
+        return NativeCodegen._xmm_rbp_operand(0x11, register, displacement)
+
+    @staticmethod
+    def _xmm_rbp_operand(opcode: int, register: int, displacement: int) -> bytes:
+        if -128 <= displacement <= 127:
+            return bytes((0xF2, 0x0F, opcode, 0x45 | (register << 3), displacement & 0xFF))
+        return bytes((0xF2, 0x0F, opcode, 0x85 | (register << 3))) + struct.pack("<i", displacement)
 
     def load_local(self, name: str, scope: Node | None, line: int) -> None:
         if name.startswith("_temporary_"):
@@ -529,8 +540,8 @@ class NativeCodegen:
                 f"{self.path}:{line}: function {name!r} expects "
                 f"{len(target.params)} argument(s), got {len(raw_args)}"
             )
-        if len(raw_args) > 4:
-            raise CompileError(f"{self.path}:{line}: native x64 backend currently supports at most four parameters")
+        if len(raw_args) > 16:
+            raise CompileError(f"{self.path}:{line}: native x64 backend supports at most sixteen parameters")
         base_depth = self._scratch_depth
         slots = []
         for argument in raw_args:
@@ -538,21 +549,32 @@ class NativeCodegen:
             slot = self.push_temp()
             self.store_local(slot)
             slots.append(slot)
-        shadow = 0x20
-        self.code.bytes(b"\x48\x83\xec" + bytes((shadow,)))
-        for index, slot in enumerate(slots):
+        self.emit_saved_call(name, slots)
+        self._scratch_depth = base_depth
+
+    def emit_saved_call(self, name: str, slots: list[str]) -> None:
+        # First four doubles use XMM0-3; later doubles use Win64 stack slots.
+        shadow = (32 + max(0, len(slots) - 4) * 8 + 15) & ~15
+        self.code.bytes(b"\x48\x81\xec" + struct.pack("<I", shadow))
+        for index in range(4, len(slots)):
+            self.load_local(slots[index], self._scope, 0)
+            self.code.bytes(b"\xf2\x0f\x11\x84\x24" + struct.pack("<i", 32 + (index - 4) * 8))
+        for index, slot in enumerate(slots[:4]):
             displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
             self.code.bytes(self._memory_operand(index, 5, displacement))
         self.code.call(f"function:{name}")
-        self.code.bytes(b"\x48\x83\xc4" + bytes((shadow,)))
-        self._scratch_depth = base_depth
+        self.code.bytes(b"\x48\x81\xc4" + struct.pack("<I", shadow))
 
     def emit_expression(self, raw: str, line: int, scope: Node | None) -> None:
         _Expression(self, line, raw, scope).compile()
 
     def emit_nodes(self, nodes: list[Node], scope: Node | None) -> None:
         for node in nodes:
-            if node.kind == "set":
+            if node.kind == "seed":
+                self.emit_expression(node.value, node.line, scope)
+                self.emit_finite_check(node.line)
+                self._math.seed(node.line)
+            elif node.kind == "set":
                 self.emit_expression(node.value, node.line, scope)
                 self.store_variable(node.name, scope, node.line)
             elif node.kind == "local_set":
@@ -658,6 +680,8 @@ class NativeCodegen:
             self._alloc_slot(local)
         self._scratch_base = len(self._frame_slots) * 8
         self._frame_size = ((self._scratch_base + 128 + 15) // 16) * 16
+        if self._frame_size > self.MAX_FRAME_BYTES:
+            raise CompileError(f"{self.path}:{fn.line}: native function frame exceeds 4096 bytes; split the function into smaller functions")
         self._scratch_depth = 0
         self.code.label(f"function:{name}")
         self.code.bytes(b"\x55\x48\x89\xe5")  # push rbp; mov rbp,rsp
@@ -666,8 +690,11 @@ class NativeCodegen:
             if index < 4:
                 offset = -self._frame_slots[param]
                 self.code.bytes(self._store_xmm_operand(index, offset))
+            elif index < 16:
+                self.code.bytes(self._memory_operand(0, 5, 48 + (index - 4) * 8))
+                self.code.bytes(self._store_xmm_operand(0, -self._frame_slots[param]))
             else:
-                raise CompileError(f"{self.path}:{fn.line}: native backend currently supports at most four parameters")
+                raise CompileError(f"{self.path}:{fn.line}: native backend supports at most sixteen parameters")
         self.emit_nodes(fn.body, fn)
         self.code.bytes(b"\x0f\x57\xc0\xc9\xc3")  # zero return; leave; ret
 
@@ -796,16 +823,22 @@ class NativeCodegen:
         if any(node.kind == "scene" for node in self.top):
             return self._generate_window()
         calls = [node for node in self.top if node.kind == "call"]
-        if any(node.kind != "call" for node in self.top):
-            unsupported = next(node for node in self.top if node.kind != "call")
+        if any(node.kind not in ("call", "seed") for node in self.top):
+            unsupported = next(node for node in self.top if node.kind not in ("call", "seed"))
             raise CompileError(
                 f"{self.path}:{unsupported.line}: top-level configuration is not implemented by the native x64 backend yet"
             )
-        for name, fn in self.functions.items():
+        for name, fn in list(self.functions.items()):
             self._emit_function(name, fn)
+        setup = [node for node in self.top if node.kind == "seed"]
+        if setup:
+            self._emit_function("native:console_setup", Node("function", 1, body=setup))
+        self._math.emit_pending()
         self._emit_print_helper()
         self.code.label("entry")
         self.code.bytes(b"\x48\x83\xec\x28")
+        if setup:
+            self.code.call("function:native:console_setup")
         if calls:
             if len(calls) != 1 or calls[0].name not in self.functions or calls[0].name != "main":
                 raise CompileError(f"{self.path}:{calls[0].line}: direct native entry currently accepts only call fn(main)")
@@ -844,15 +877,16 @@ class NativeCodegen:
                         or any(int(part) > 255 for part in parts) or parts[3] != "255"):
                     raise CompileError(f"{self.path}:{node.line}: native clear requires four literal channels in 0..255 and alpha 255")
                 clear = [int(part) for part in parts]
-            elif node.kind in ("set", "add", "sub", "call"):
+            elif node.kind in ("set", "add", "sub", "call", "seed"):
                 setup.append(node)
             else:
                 raise CompileError(f"{self.path}:{node.line}: native scene setup does not support {node.kind!r}")
         self._window = NativeWindow(self, clear[0] | (clear[1] << 8) | (clear[2] << 16))
-        for name, function in self.functions.items():
+        for name, function in list(self.functions.items()):
             self._emit_function(name, function)
         self.code.label("native:setup")
         self._emit_function("native:setup", Node("function", 1, name="native:setup", body=setup))
+        self._math.emit_pending()
         self._window.emit()
         return self._build(list(self.IMPORTS) + self._window.imports)
 

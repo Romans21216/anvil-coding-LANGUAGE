@@ -1,0 +1,29 @@
+# Native procedural terrain: all runtime code compiles directly from Anvil.
+scene 2d
+clear rgba(11, 16, 27, 255)
+array terrain(64)
+set var(terrain-seed) = 42
+call fn(regenerate)
+
+fn(regenerate)
+  seed(var(terrain-seed))
+  set local(offset) = rnd(-1000, 1000)
+  for local(i) = 0 to 63
+    set array(terrain, local(i)) = 220 + fbm(local(i) / 12 + local(offset), 0.2, 0.3, 5, 2, 0.5) * 240
+  end
+end
+
+fn(update)
+  if pressed(SPACE) or mouse_pressed("left")
+    add var(terrain-seed) 1
+    call fn(regenerate)
+  end
+end
+
+fn(draw)
+  for local(i) = 0 to 63
+    set local(height) = array(terrain, local(i))
+    display rect(local(i) * 14, local(height), 14, max(0, 600 - local(height))) -rgb(60, 145, 110)
+    display rect(local(i) * 14, local(height), 14, 5) -rgb(115, 220, 150)
+  end
+end

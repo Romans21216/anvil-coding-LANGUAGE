@@ -259,8 +259,14 @@
   ],
   "current_candidate_status": "Independently reviewed native mouse implementation, 72/100 below 98. README mismatch corrected in documentation follow-up; no new score claimed.",
   "current_unscored_followup": {
-    "feature": "Documentation correction for evaluator finding #59 and evaluation synchronization",
-    "status": "README/UTF-8 correction and current report/state/count parity independently verified; no runtime changes or rescoring.",
-    "reviewed_baseline": "900106eedc9f3aa09c5d2e909a033903a563c989"
+    "feature": "Direct native math, seeded RNG, gradient noise and fBm; stack parameters and large local offsets",
+    "status": "All 109 Python tests, extension validation, compileall, QA arithmetic, native terrain build, UTF-8 and diff checks pass; independent full review pending.",
+    "source_files": [
+      "compiler/native_math.py",
+      "runtime/native/procedural.ANVL",
+      "tests/test_native_procedural.py"
+    ],
+    "reviewed_baseline": "900106eedc9f3aa09c5d2e909a033903a563c989",
+    "python_tests_passed": 109
   }
 }

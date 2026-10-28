@@ -12,6 +12,8 @@ Historical keyboard milestone (21fc960, 73/100, 99 tests): held/pressed, repeat/
 
 Verified native mouse milestone: all five mouse query built-ins emit direct x64 handlers and state. Independent generated-app tests cover coordinates, three buttons, OS capture, focus/cancel, wheel fractions and draw-only edges. All 102 tests and static/extension checks pass; sample13,312 bytes. README finding #59 is corrected in documentation follow-up; source900106e score remains72/100.
 
+Native procedural candidate awaiting independent review: math primitives, seeded RNG, gradient noise and fBm now compile directly; the reusable procedural routines are Anvil source. Stack argument passing supports up to sixteen numeric parameters, and scalar locals support larger offsets with a 4096-byte frame limit. All 109 tests and static/extension/build/UTF-8 checks pass; independent scoring is pending. The last completed score above remains the mouse review.
+
 ## Status counts
 
 - COMPLETE: 21

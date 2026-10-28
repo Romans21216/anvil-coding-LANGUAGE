@@ -8,11 +8,11 @@ The `.ANVL` source syntax and engine APIs remain Anvil-owned. Generated EXEs con
 
 ## Current state
 
-An experimental direct backend is available with `python -m compiler.anvil <file.ANVL> --backend native --output <file.exe>`. It emits AMD64 instructions and PE32+ sections itself and imports only the Windows APIs it uses. Its supported subset includes simple functions with up to four numeric parameters, numeric local/global slots, fixed-size global numeric arrays with dynamic checked reads and writes, addition/subtraction/multiplication/division, comparisons, short-circuit `and`/`or`, `if`, `while`, inclusive ascending/descending `for` loops, and console output rounded to six fractional digits (trailing zeroes are removed). Array indices are evaluated once; negative, fractional, and out-of-range indices produce a line-numbered runtime diagnostic and exit code 2. Aggregate direct-native global data is capped at 16 MiB before PE payload allocation; declarations that exceed the limit fail with a source-located compiler diagnostic. Native integration tests exercise successful array reads/writes, index failures, and pre-allocation aggregate-limit rejection. The native backend has been executed on Windows without invoking a C or Rust compiler.
+An experimental direct backend is available with `python -m compiler.anvil <file.ANVL> --backend native --output <file.exe>`. It emits AMD64 instructions and PE32+ sections itself and imports only the Windows APIs it uses. Its supported subset includes simple functions with up to sixteen numeric parameters, numeric local/global slots, fixed-size global numeric arrays with dynamic checked reads and writes, addition/subtraction/multiplication/division, comparisons, short-circuit `and`/`or`, `if`, `while`, inclusive ascending/descending `for` loops, and console output rounded to six fractional digits (trailing zeroes are removed). Array indices are evaluated once; negative, fractional, and out-of-range indices produce a line-numbered runtime diagnostic and exit code 2. Aggregate direct-native global data is capped at 16 MiB before PE payload allocation; declarations that exceed the limit fail with a source-located compiler diagnostic. Native integration tests exercise successful array reads/writes, index failures, and pre-allocation aggregate-limit rejection. The native backend has been executed on Windows without invoking a C or Rust compiler.
 
 The direct backend now has an initial Windows 2D runtime: `scene 2d`, literal opaque `clear rgba`, top-level numeric initialization, `fn(draw)`, `display rect(...) -rgb(...)`, and optional `fn(update)` with `time()`, `delta()`, `compute()`, `held(key)`, `pressed(key)` and the mouse queries below. Runtime instructions and the PE are emitted by Anvil; USER32/GDI32 functions are imported directly from Windows. No C/Rust source, compiler, linker, or runtime shim is used.
 
-The regular build still defaults to the C backend. The native backend does **not** yet support function-local arrays, the full language, project manifests, other shapes, text, alpha blending, 3D, assets, audio, physics, noise, or networking. Full no-C engine parity remains unfinished.
+The regular build still defaults to the C backend. The native backend does **not** yet support function-local arrays, the full language, project manifests, other shapes, text, alpha blending, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
 
 ## Native 2D scene
 
@@ -49,6 +49,20 @@ Mouse state, handlers and the additional system imports are emitted only when a 
 
 The native2D example supports left drag, wheel movement, right-click pause, middle-click reset, a pointer marker and the existing keyboard controls. The mouse implementation is independently verified on 900106e. The README contradiction found in that review is corrected in a documentation follow-up (#59); no new score is claimed.
 
+## Native math and procedural runtime
+
+The direct backend implements `abs(x)`, `sqrt(x)`, `floor(x)`, `ceil(x)`, `min(a,b)`, `max(a,b)`, `rnd(a,b)`, `noise(x,y,z)` and `fbm(x,y,z,octaves,lacunarity,gain)`. Arguments evaluate once in source order. `sqrt` of a negative value and non-finite arithmetic report a numeric error and exit with code 2. Floor/ceil support all finite binary64 values, including magnitudes too large for signed integer conversion. Native `sin`/`cos` remain unsupported.
+
+`seed(value)` works at top level and in functions. It truncates a nonnegative finite value below 2^64 to an unsigned seed. Zero selects the fixed default seed. `rnd(a,b)` swaps reversed bounds, rounds the lower bound upward and upper bound downward, and returns an inclusive integer using xorshift64* with the same generator/mapping as the existing runtime. If the rounded upper bound is at or below the lower bound, it returns the lower bound without advancing the generator. Bounds must be within ±(2^53−1), the exact binary64 integer range; invalid ranges terminate with a diagnostic rather than invoking an undefined integer conversion. This generator is deterministic and not cryptographic; modulo mapping has a small statistical bias for spans that do not divide 2^64.
+
+`noise` uses deterministic three-dimensional gradient noise with quintic interpolation and a fixed 32-bit hash, matching the existing C runtime on valid coordinates. It is independent of `seed`. Coordinates must be at least −2147483648 and below 2147483647, so the two lattice corners fit signed 32-bit integers. Invalid coordinates exit with a diagnostic. `fbm` combines up to sixteen noise octaves, truncating/clamping the octave count to 0..16, starting amplitude at 0.5 and normalizing by accumulated amplitude. Zero octaves or zero normalization returns zero. Every sampled octave obeys noise bounds; intermediate non-finite arithmetic fails in a controlled way. Diagnostics inside the Anvil procedural library refer to its runtime operations rather than implying an unsupported input succeeded.
+
+Gradient selection, fade, interpolation, noise and fBm are written in [Anvil runtime source](../runtime/native/procedural.ANVL). Only requested routines and their dependencies are compiled into the PE. Numeric primitives, integer hash and RNG state transitions use Anvil-owned machine-code emission. This is a built-in runtime library, not the requested general `include`/plugin system. A program using only `sqrt` does not bundle the noise library. The native function prefix `_anvil_native_` is reserved and the private hash intrinsic cannot be called by user code.
+
+Calls pass the first four numeric arguments in XMM0–3 and later arguments in aligned Win64 stack slots. Up to sixteen arguments are supported within the existing sixteen-temporary expression budget. Scalar locals and compiler temporaries now support disp32 offsets. Each function frame is limited to 4096 bytes with a compiler diagnostic above that limit; unbounded recursion and native local arrays remain unsupported. The frame limit avoids silently permitting large unprobed Win64 allocations while broader stack-budget work is pending.
+
+Build `examples/native_procedural.ANVL` with `--backend native` for generated terrain. Space or left click regenerates it from a new seed. The candidate has generated-PE tests for reference noise/fBm values, RNG sequence/reseeding, math domains, nested argument side effects, sixteen-argument calls, large local offsets, library selection, and graphical use. Independent evaluation is pending; the last completed score below applies to the previous mouse implementation.
+
 ## Troubleshooting the direct backend
 
 | Symptom | Action |
@@ -59,6 +73,8 @@ The native2D example supports left drag, wheel movement, right-click pause, midd
 | Native data exceeds 16 MiB | Reduce global array/storage requirements; runtime metadata also uses native program data. |
 | Output EXE cannot be overwritten | Close the running generated window, then rebuild. |
 | GUI test cannot read window pixels | Run it in an interactive Windows x64 desktop; it samples a visible test window and closes that process afterward. |
+| Native seed/random/noise range error | Use the numeric ranges above; reduce fBm coordinates/lacunarity if later octaves exceed the lattice range. |
+| Native function frame exceeds 4096 bytes | Split large scalar-local functions into smaller functions; native local arrays and general stack budgets are still pending. |
 | Older native sample flickers | Rebuild with the buffered-presentation fix for issue #57. The regression checks visible pixels during slow drawing and verifies that the old unbuffered implementation fails that check. |
 
 ## Architecture

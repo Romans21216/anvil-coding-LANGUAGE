@@ -1,0 +1,102 @@
+# Anvil procedural runtime, compiled by the direct backend on demand.
+# Internal names are reserved. No generated C/Rust or runtime shim.
+fn(_anvil_native_fade, t)
+  output var(t) * var(t) * var(t) * (var(t) * (var(t) * 6 - 15) + 10)
+end
+fn(_anvil_native_lerp, a, b, t)
+  output var(a) + var(t) * (var(b) - var(a))
+end
+fn(_anvil_native_gradient, hash, x, y, z)
+  if var(hash) = 0
+    output var(x) + var(y)
+  end
+  if var(hash) = 1
+    output -var(x) + var(y)
+  end
+  if var(hash) = 2
+    output var(x) - var(y)
+  end
+  if var(hash) = 3
+    output -var(x) - var(y)
+  end
+  if var(hash) = 4
+    output var(x) + var(z)
+  end
+  if var(hash) = 5
+    output -var(x) + var(z)
+  end
+  if var(hash) = 6
+    output var(x) - var(z)
+  end
+  if var(hash) = 7
+    output -var(x) - var(z)
+  end
+  if var(hash) = 8
+    output var(y) + var(z)
+  end
+  if var(hash) = 9
+    output -var(y) + var(z)
+  end
+  if var(hash) = 10
+    output var(y) - var(z)
+  end
+  if var(hash) = 11
+    output -var(y) - var(z)
+  end
+  if var(hash) = 12
+    output var(x) + var(y)
+  end
+  if var(hash) = 13
+    output -var(x) + var(y)
+  end
+  if var(hash) = 14
+    output -var(y) + var(z)
+  end
+  output -var(y) - var(z)
+end
+fn(_anvil_native_noise, x, y, z)
+  set local(ix) = floor(var(x))
+  set local(iy) = floor(var(y))
+  set local(iz) = floor(var(z))
+  set local(xf) = var(x) - local(ix)
+  set local(yf) = var(y) - local(iy)
+  set local(zf) = var(z) - local(iz)
+  set local(u) = call fn(_anvil_native_fade, local(xf))
+  set local(v) = call fn(_anvil_native_fade, local(yf))
+  set local(w) = call fn(_anvil_native_fade, local(zf))
+  set local(c000) = call fn(_anvil_native_gradient, _anvil_native_hash(local(ix) + 0, local(iy) + 0, local(iz) + 0), local(xf) - 0, local(yf) - 0, local(zf) - 0)
+  set local(c001) = call fn(_anvil_native_gradient, _anvil_native_hash(local(ix) + 0, local(iy) + 0, local(iz) + 1), local(xf) - 0, local(yf) - 0, local(zf) - 1)
+  set local(c010) = call fn(_anvil_native_gradient, _anvil_native_hash(local(ix) + 0, local(iy) + 1, local(iz) + 0), local(xf) - 0, local(yf) - 1, local(zf) - 0)
+  set local(c011) = call fn(_anvil_native_gradient, _anvil_native_hash(local(ix) + 0, local(iy) + 1, local(iz) + 1), local(xf) - 0, local(yf) - 1, local(zf) - 1)
+  set local(c100) = call fn(_anvil_native_gradient, _anvil_native_hash(local(ix) + 1, local(iy) + 0, local(iz) + 0), local(xf) - 1, local(yf) - 0, local(zf) - 0)
+  set local(c101) = call fn(_anvil_native_gradient, _anvil_native_hash(local(ix) + 1, local(iy) + 0, local(iz) + 1), local(xf) - 1, local(yf) - 0, local(zf) - 1)
+  set local(c110) = call fn(_anvil_native_gradient, _anvil_native_hash(local(ix) + 1, local(iy) + 1, local(iz) + 0), local(xf) - 1, local(yf) - 1, local(zf) - 0)
+  set local(c111) = call fn(_anvil_native_gradient, _anvil_native_hash(local(ix) + 1, local(iy) + 1, local(iz) + 1), local(xf) - 1, local(yf) - 1, local(zf) - 1)
+  set local(x00) = call fn(_anvil_native_lerp, local(c000), local(c100), local(u))
+  set local(x01) = call fn(_anvil_native_lerp, local(c001), local(c101), local(u))
+  set local(x10) = call fn(_anvil_native_lerp, local(c010), local(c110), local(u))
+  set local(x11) = call fn(_anvil_native_lerp, local(c011), local(c111), local(u))
+  set local(y0) = call fn(_anvil_native_lerp, local(x00), local(x10), local(v))
+  set local(y1) = call fn(_anvil_native_lerp, local(x01), local(x11), local(v))
+  output call fn(_anvil_native_lerp, local(y0), local(y1), local(w)) * 0.7
+end
+fn(_anvil_native_fbm, x, y, z, octaves, lacunarity, gain)
+  set local(count) = min(16, max(0, floor(var(octaves))))
+  set local(sum) = 0
+  set local(amplitude) = 0.5
+  set local(norm) = 0
+  set local(i) = 0
+  while local(i) < local(count)
+    add local(sum) noise(var(x), var(y), var(z)) * local(amplitude)
+    add local(norm) local(amplitude)
+    set var(x) = var(x) * var(lacunarity)
+    set var(y) = var(y) * var(lacunarity)
+    set var(z) = var(z) * var(lacunarity)
+    set local(amplitude) = local(amplitude) * var(gain)
+    add local(i) 1
+  end
+  if local(norm) != 0
+    output local(sum) / local(norm)
+  end
+  output 0
+end
