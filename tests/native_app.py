@@ -13,8 +13,9 @@ from compiler.parser import parse
 
 
 class NativeApp:
-    def __init__(self, source):
+    def __init__(self, source, *, instrument=None):
         self.source = source
+        self.instrument = instrument
         self.process = None
         self.process_handle = None
         self.hwnd = None
@@ -46,6 +47,8 @@ class NativeApp:
             functions, top, variables, arrays = parse(path, self.source)
             generator = NativeCodegen(path, functions, top, variables, arrays)
             self.image = generator.generate()
+            if self.instrument is not None:
+                self.image = self.instrument(generator)
             self.offsets = generator._data_offsets
             pe = struct.unpack_from("<I", self.image, 0x3C)[0]
             section_count = struct.unpack_from("<H", self.image, pe + 6)[0]

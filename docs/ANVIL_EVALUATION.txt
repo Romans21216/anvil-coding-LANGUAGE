@@ -3,7 +3,7 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 
 Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: independent full 50-criterion review of exact pushed commit 900106eedc9f3aa09c5d2e909a033903a563c989.
+Basis: independent full 50-criterion review of exact pushed commit 7b528d539cab96c0e1fa2693984d51f8340aaafb.
 
 LATEST INDEPENDENT REVIEW
 -------------------------
@@ -12,15 +12,13 @@ Evaluator: separate final_review agent.
 Categories: requirements 11/20, functionality/reliability 19/20, architecture 13/20, testing/verification 18/20, delivery 11/20.
 Scores in criterion order 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,2,2,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,2,2,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
 
-The native backend now emits mouse_x(), mouse_y(), mouse_held(), mouse_pressed() and mouse_wheel() directly into its Win32 runtime. Client-pixel coordinates follow current window bounds; button presses capture input for drag/release outside the window. Repeats, taps, three buttons, capture/focus/cancel behavior, fractional wheel accumulation and update/draw edge lifetimes pass generated-app tests. Button names require literal strings; general native strings remain unsupported.
+The direct native backend now supports abs/sqrt/floor/ceil/min/max, deterministic seeded integer random numbers, 3D gradient noise and fBm. Procedural routines are written in Anvil and compiled into the PE on demand. Calls support up to sixteen numeric arguments, with scalar locals beyond disp8 offsets and a 4096-byte function-frame ceiling.
 
-The separate reviewer passed all 102 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and implementation diff checks. The sample builds to a 13,312-byte AMD64 PE without C/Rust compilation. No new runtime defect was reproduced. No CUA/manual live editor check resumed; installed extension 0.1.4 is preserved.
+The separate reviewer passed all 109 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and implementation diff checks. The native terrain example builds to a 34,304-byte AMD64 PE without C/Rust compilation. Seven procedural tests compare independent references, numeric domains, argument effects, ABI/local offsets, library selection and generated-window behavior. No procedural runtime defect was reproduced by the critic. No CUA/manual live editor check resumed; extension0.1.4 remains installed.
 
-The score fell one point from the preceding keyboard review because README.md incorrectly listed mouse input as unavailable. Codex Bugs #59 records that exact finding. The README is corrected in the documentation follow-up; this correction has not received a new full score. The score above applies to exact900106e.
+Criterion8 remains partial because the compiler Wiki still claimed four arguments and no arrays/graphics/input. Codex Bugs#60 tracks its correction. After that review, development also reproduced explicit-main argument loss (#61): call fn(main,7) returned0 instead of7. The follow-up lowers entry arguments through the ordinary ABI and adds regression/arity tests; independent verification is pending. The first follow-up111-test run also exposed a mouse-test timing race (#62): queued real pointer messages could replace synthetic coordinates before timer sampling. A test-only atomic probe corrects that race; five repeated mouse suites pass. The final full111-test rerun passes; independent verification is pending. These follow-up findings/fixes do not silently change the exact7b528d5 score.
 
-The example supports Left/Right movement, Space/right-click pause, R/middle-click reset, left-drag positioning, wheel movement and a pointer marker. Native 3D/camera, broader graphics/assets, physics, networking, project/language parity and Forge remain incomplete. C/MSVC is still the broader default backend. The requested final no-C/no-Rust engine has not been delivered.
-
-Previous native review: 21fc960 scored 73/100 with 99 tests and verified keyboard input. Earlier ce5bd2d scored 73/100 with 96 tests and verified the flicker fix (#57). Metadata correction #58 is fixed and verified. The full master backlog remains only in issue23 and its comments.
+Native3D/camera, broader graphics/assets, physics, networking, language/project parity, general include/plugins and Forge remain incomplete. C/MSVC is still the broader default backend. The final no-C/no-Rust engine has not been delivered. Previous mouse900106e score72/100 with102tests and keyboard21fc960 score73/100 with99tests are historical. The full master backlog remains only in issue23/comments.
 
 SUMMARY
 -------

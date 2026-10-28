@@ -14,6 +14,27 @@ def point(x, y):
     return (x & 0xFFFF) | ((y & 0xFFFF) << 16)
 
 
+def atomic_coordinate_probe(generator):
+    """Instrument only the test PE: dispatch a message and sample its state
+    synchronously, before unrelated posted mouse messages can replace it.
+    The production mouse handler and query code are executed unchanged.
+    """
+    code = generator.code
+    window = generator._window
+    code.labels["test:original_window_proc"] = code.labels["native:window_proc"]
+    code.labels["native:window_proc"] = len(code.code)
+    code.bytes(b"\x81\xfa\x01\x80\x00\x00")
+    code.conditional_jump(0x85, "test:original_window_proc")
+    window.frame(0x28)
+    code.mov_reg(2, 8)  # requested message in test WPARAM
+    code.mov_imm(8, 0)
+    code.call("test:original_window_proc")
+    code.call("function:probe")
+    code.mov_imm(0, 0)
+    window.return_frame(0x28)
+    return generator._build(list(generator.IMPORTS) + window.imports)
+
+
 @unittest.skipUnless(sys.platform == "win32", "native Win32 mouse runtime")
 class NativeMouseTests(unittest.TestCase):
     def capture(self, app):
@@ -39,10 +60,12 @@ set var(same-frame) = 0
 set var(wheel-total) = 0
 set var(wheel-repeat) = 0
 set var(ticks) = 0
-fn(update)
-  add var(ticks) 1
+fn(probe)
   set var(x) = mouse_x()
   set var(y) = mouse_y()
+end
+fn(update)
+  add var(ticks) 1
   set var(left) = mouse_held("left")
   set var(right) = mouse_held("RIGHT")
   set var(middle) = mouse_held("middle")
@@ -66,16 +89,16 @@ fn(draw)
   display rect(10,10,30,30)
 end
 '''
-        with NativeApp(source) as app:
+        with NativeApp(source, instrument=atomic_coordinate_probe) as app:
             app.wait(lambda: app.read("ticks") >= 2)
-            app.send(0x200, 0, point(123, 234))
+            app.send(0x8001, 0x200, point(123, 234))
             app.wait(lambda: app.read("x") == 123 and app.read("y") == 234)
             for x, y in ((-1, 50), (50, -2), (30000, 10), (10, 30000)):
-                app.send(0x200, 0, point(x, y))
+                app.send(0x8001, 0x200, point(x, y))
                 app.wait(lambda: app.read("x") == -1 and app.read("y") == -1)
-            app.send(0x200, 0, point(5, 6))
+            app.send(0x8001, 0x200, point(5, 6))
             app.wait(lambda: app.read("x") == 5)
-            app.send(0x2A3)  # mouse-leave invalidates both coordinates
+            app.send(0x8001, 0x2A3)  # mouse-leave invalidates both coordinates
             app.wait(lambda: app.read("x") == -1 and app.read("y") == -1)
             for down, up, name in ((0x201, 0x202, "left"),
                                     (0x204, 0x205, "right"),
@@ -116,18 +139,12 @@ end
             # A client resize changes the coordinate bounds immediately.
             app.user.MoveWindow.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_int,
                                            ctypes.c_int, ctypes.c_int, wintypes.BOOL]
-            # Keep the physical pointer inside so a real WM_MOUSELEAVE does not
-            # supersede the synthetic client-coordinate message under test.
-            cursor = wintypes.POINT()
-            app.user.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
-            self.assertTrue(app.user.GetCursorPos(ctypes.byref(cursor)))
-            self.assertTrue(app.user.MoveWindow(app.hwnd, cursor.x - 120, cursor.y - 120,
-                                               300, 250, True))
+            self.assertTrue(app.user.MoveWindow(app.hwnd, 80, 80, 300, 250, True))
             tick = app.read("ticks")
             app.wait(lambda: app.read("ticks") >= tick + 3)
-            app.send(0x200, 0, point(400, 20))
+            app.send(0x8001, 0x200, point(400, 20))
             app.wait(lambda: app.read("x") == -1)
-            app.send(0x200, 0, point(100, 100))
+            app.send(0x8001, 0x200, point(100, 100))
             app.wait(lambda: app.read("x") == app.read("y") == 100)
         self.assertEqual(app.result[0], 0, app.result)
 

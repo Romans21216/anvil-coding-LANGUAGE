@@ -199,8 +199,33 @@ end
             self.assertTrue(-1 < value < 1)
         self.assertEqual(app.result[0], 0, app.result)
 
+    def test_explicit_main_arguments_use_normal_call_abi_and_side_effects(self):
+        self.assertEqual(self.run_source('fn(main, value)\n output var(value)\nend\ncall fn(main, 7)\n'), '7\n')
+        source = '''seed(42)
+fn(next, value)
+  add var(calls) 1
+  output var(value) + var(calls)
+end
+fn(main, a, b, c, d, e, f)
+  output var(a) + var(b)*10 + var(e)*100 + var(f)*1000
+end
+call fn(main, call fn(next, 0), call fn(next, 0), 3, 4, call fn(next, 0), rnd(7,7))
+'''
+        self.assertEqual(self.run_source(source), '7321\n')
+        result = self.run_source('fn(main, value)\n output var(value)\nend\ncall fn(main, noise(0.1,0.2,0.3))\n')
+        self.assertAlmostEqual(float(result), reference_noise(.1, .2, .3), delta=1e-6)
+
 
 class NativeProceduralCompileTests(unittest.TestCase):
+    def test_entry_argument_arity_is_validated(self):
+        for source in ('fn(main, value)\n output var(value)\nend\ncall fn(main)\n',
+                       'fn(main)\n output 1\nend\ncall fn(main, 7)\n',
+                       'fn(main, value)\n output var(value)\nend\n'):
+            path = pathlib.Path('entry.ANVL')
+            functions, top, variables, arrays = parse(path, source)
+            with self.subTest(source=source), self.assertRaisesRegex(CompileError, r'entry.ANVL:.*(expects|cannot have parameters)'):
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+
     def test_runtime_routines_are_demand_loaded_and_private(self):
         for expression, present in [('sqrt(4)', False), ('noise(0,0,0)', True)]:
             source = f'fn(main)\n output {expression}\nend\n'

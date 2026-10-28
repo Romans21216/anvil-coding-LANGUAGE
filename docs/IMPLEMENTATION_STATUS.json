@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-27",
-  "reviewed_implementation_commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
+  "reviewed_implementation_commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,11 +9,11 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
-  "latest_independently_reviewed_candidate_commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
+  "latest_verified_commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
+  "latest_independently_reviewed_candidate_commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
-  "latest_followup_status_change": "Native mouse reviewed on 900106e at 72/100 with 102 tests; README mismatch #59 corrected in docs follow-up.",
+  "last_pushed_reviewed_below_threshold_commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
+  "latest_followup_status_change": "Procedural runtime7b528d5 reviewed72/100 with109tests; Wiki#60 and entry bug#61 corrected in follow-up pending review.",
   "latest_evaluation_score": 72,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
@@ -846,7 +846,7 @@
     "score": 72,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
+    "commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
     "categories": {
       "requirements": "11/20",
       "functionality_reliability": "19/20",
@@ -907,30 +907,30 @@
       0
     ],
     "findings": [
-      "Native mouse position, three buttons, wheel, capture and focus/cancel semantics independently verified.",
-      "All 102 tests and static/extension checks pass; no new runtime defect reproduced.",
-      "README incorrectly listed native mouse input as unavailable (#59); corrected in documentation follow-up, not rescored.",
-      "Full native engine/Forge scope and C-default migration remain incomplete.",
-      "No CUA/manual live editor check resumed; installed extension remains 0.1.4 by user preference."
+      "Native math, seeded RNG, noise/fBm and demand-loaded Anvil runtime independently verified.",
+      "All 109 tests and static/extension checks pass; reviewer reproduced no procedural runtime defect.",
+      "Compiler Wiki mismatch (#60) found by critic; corrected in follow-up.",
+      "Development subsequently reproduced explicit-main argument loss (#61); follow-up fix pending review.",
+      "Full engine/Forge/default no-C migration remain incomplete."
     ]
   },
-  "current_candidate_commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
-  "status_counts_validated_on": "900106eedc9f3aa09c5d2e909a033903a563c989",
+  "current_candidate_commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
+  "status_counts_validated_on": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
+    "commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
     "reviewed_score": 72,
-    "previous_reviewed_score": 73,
-    "previous_review_commit": "21fc960b04c2df317f3e0b3580987526f14d63e2",
+    "previous_reviewed_score": 72,
+    "previous_review_commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "102 passed independently on exact 900106e",
+    "python_unittest": "109 passed independently on exact7b528d5",
     "npm_test": "passed",
     "compileall": "passed",
     "qa_report_validator": "72/100 synchronized rubric arithmetic; full 50 criteria",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "900106e implementation diff passed",
-    "finding": "Native mouse verified; README mismatch #59 corrected in docs follow-up; full scope incomplete."
+    "git_diff_check": "7b528d5 implementation diff passed",
+    "finding": "Procedural runtime verified; Wiki#60 and subsequent development-found entry bug#61 corrected in follow-up pending review."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -945,19 +945,14 @@
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 72,
-  "latest_independent_candidate_result": "FAIL against 98; native mouse verified, README mismatch #59, full engine/Forge incomplete.",
+  "latest_independent_candidate_result": "FAIL against98; procedural runtime verified; Wiki#60 and subsequent entry bug#61 tracked.",
   "current_unscored_followup": {
-    "feature": "Direct native math, seeded RNG, gradient noise and fBm; stack parameters and large local offsets",
-    "status": "All 109 Python tests, extension validation, compileall, QA arithmetic, native terrain build, UTF-8 and diff checks pass; independent full review pending.",
-    "source_files": [
-      "compiler/native_math.py",
-      "runtime/native/procedural.ANVL",
-      "tests/test_native_procedural.py"
-    ],
-    "reviewed_baseline": "900106eedc9f3aa09c5d2e909a033903a563c989",
-    "python_tests_passed": 109
+    "feature": "Entry argument fix#61, Wiki correction#60 and mouse test race#62",
+    "status": "All111 Python tests pass after correcting mouse test race#62; five repeated mouse suites, extension/compileall/QA/UTF-8/diff checks also pass. Independent review of#60/#61/#62 follow-up pending.",
+    "reviewed_baseline": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
+    "python_tests_passed": 111
   },
-  "latest_independently_scored_candidate_commit": "900106eedc9f3aa09c5d2e909a033903a563c989",
+  "latest_independently_scored_candidate_commit": "7b528d539cab96c0e1fa2693984d51f8340aaafb",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1048,5 +1043,5 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Independently reviewed native mouse implementation, 72/100 below 98. README mismatch corrected in documentation follow-up; no new score claimed."
+  "current_candidate_status": "Reviewed procedural runtime7b528d5 at72/100 with109tests. Entry-argument bug discovered afterward; follow-up fix pending independent review."
 }

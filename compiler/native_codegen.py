@@ -833,6 +833,15 @@ class NativeCodegen:
         setup = [node for node in self.top if node.kind == "seed"]
         if setup:
             self._emit_function("native:console_setup", Node("function", 1, body=setup))
+        if calls:
+            if len(calls) != 1 or calls[0].name not in self.functions or calls[0].name != "main":
+                raise CompileError(f"{self.path}:{calls[0].line}: direct native entry currently accepts only call fn(main)")
+            arguments = (", " + calls[0].value) if calls[0].value.strip() else ""
+            expression = f"call fn(main{arguments})"
+            self._emit_function("native:entry_main", Node(
+                "function", calls[0].line, name="native:entry_main",
+                body=[Node("output", calls[0].line, value=expression)],
+            ))
         self._math.emit_pending()
         self._emit_print_helper()
         self.code.label("entry")
@@ -840,9 +849,7 @@ class NativeCodegen:
         if setup:
             self.code.call("function:native:console_setup")
         if calls:
-            if len(calls) != 1 or calls[0].name not in self.functions or calls[0].name != "main":
-                raise CompileError(f"{self.path}:{calls[0].line}: direct native entry currently accepts only call fn(main)")
-            self.code.call("function:main")
+            self.code.call("function:native:entry_main")
         elif "main" in self.functions:
             if self.functions["main"].params:
                 raise CompileError(f"{self.path}:{self.functions['main'].line}: main cannot have parameters")

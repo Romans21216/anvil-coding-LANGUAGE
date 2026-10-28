@@ -2,7 +2,7 @@
 
 The master backlog is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23): its original 450-item inventory and the later additions remain there. This compact ledger records evidence only for audited items and does not duplicate the backlog. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27. Latest independent review is exact commit `900106eedc9f3aa09c5d2e909a033903a563c989` at 72/100 — FAIL against 98. All 102 tests pass. Native mouse is verified; evaluator README mismatch #59 is corrected in a documentation follow-up without rescoring. Previous keyboard review21fc960 scored73/100 with99tests.
+Updated 2026-10-27. Latest independent review is exact `7b528d539cab96c0e1fa2693984d51f8340aaafb`,72/100—FAIL against98; all109tests pass. Math/RNG/noise/fBm verified. Wiki#60 and subsequently discovered explicit-main bug#61 are corrected in a follow-up pending review.
 
 Latest reviewed native follow-up: direct AMD64/PE compilation supports numeric programs, checked global arrays and an initial Win32 2D runtime with fixed updates, buffered presentation and keyboard and mouse input. C remains default pending broader parity. Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
 
@@ -12,7 +12,7 @@ Historical keyboard milestone (21fc960, 73/100, 99 tests): held/pressed, repeat/
 
 Verified native mouse milestone: all five mouse query built-ins emit direct x64 handlers and state. Independent generated-app tests cover coordinates, three buttons, OS capture, focus/cancel, wheel fractions and draw-only edges. All 102 tests and static/extension checks pass; sample13,312 bytes. README finding #59 is corrected in documentation follow-up; source900106e score remains72/100.
 
-Native procedural candidate awaiting independent review: math primitives, seeded RNG, gradient noise and fBm now compile directly; the reusable procedural routines are Anvil source. Stack argument passing supports up to sixteen numeric parameters, and scalar locals support larger offsets with a 4096-byte frame limit. All 109 tests and static/extension/build/UTF-8 checks pass; independent scoring is pending. The last completed score above remains the mouse review.
+Verified procedural milestone: basic math, seeded RNG, gradient noise and fBm compile directly, with reusable routines written in Anvil. Seven independent tests cover references, domains, stack parameters, larger local offsets and graphics integration. The full109-test suite passes; entry/Wiki corrections are the current unreviewed follow-up.
 
 ## Status counts
 
@@ -68,4 +68,4 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
 
 
-Historical issue #48 is resolved; its C-backed c102604 snapshot scored92/100. Current native900106e scores72/100 with102tests, below98. Issue #58 record parity was previously corrected; #59 addresses the README mouse contradiction.
+Historical issue#48 is resolved; current procedural7b528d5 scores72/100 with109tests. Entry/Wiki follow-up#60/#61 remains pending independent review. All scores are tied to exact source snapshots.
