@@ -1,12 +1,14 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 Assessment date:2026-10-28
-Exact independent source:2f7cd743ba37101c87a0daa5d1c9c017d9ab5dc2
+Exact independent source:ecdf68109fd5932d8ae572a8f16446194e93b935
 Evaluator:project_full_review
 Score:76/100 — FAIL against98.
 Categories12/18/14/17/15.
 Scores 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-158tests independently passed145.917s; npm0.1.11/VSIX, compileall, QA arithmetic, UTF8 and diff pass. #78 independently resolved with64 malformed-entry cases and positive Unicode/spaced-entry execution. No new confirmed finding. Native local arrays are independently verified: per-call zeroed storage, cleanup/bounds,8192elements/function and16MiB active storage budget; exact-boundary/reuse/ABI/GUI/Unicode failure probes pass. The first planned batch also remains verified: #58 records, #77 composition, native project/title/rate settings, validation and no-C-fallback behavior. Installed0.1.4 preserved. #63 integration and full engine/Forge/OS/rich types/backends/benchmarks remain incomplete.
+162 tests independently passed in 139.160s; npm 0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. No new confirmed defect. Native numeric ABI transport and scalar addressing now use shared helpers, verified by 2048 executed addressing combinations, 0-16 argument calls and an independent callee checking stack/register positions, shadow space and alignment. Extra nested-call/200-local/8192-element-array probe returns 1063.25; 512 disp32 endpoint combinations checked for encoding only. Arrays, projects/settings and #77/#78 regressions pass. Broader parsing/IR duplication, runtime/platform encoding and systems ABI remain architecture deductions. Installed 0.1.4 preserved; #63 and full engine/Forge/OS/rich types/backends/benchmarks remain incomplete. Existing issues #5-11/#14-15/#24/#63 cover remaining gaps. Evaluator re-read #23 and its 41 comments after the full suite. Goal remains active.
+
+Previous independent source 2f7cd74: 76/100, 158 tests in 145.917s, native local arrays verified. Current ABI batch improves foundations without resolving the remaining full-scope deductions.
 
 SUMMARY
 -------

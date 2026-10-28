@@ -23,3 +23,5 @@ The full engine goal remains active. A green subset test suite or historical pro
 Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
 
 Native local arrays are independently verified with allocation/lifetime regressions; exact review evidence is in QA_REPORT.md. Full engine/Forge/OS scope remains incomplete.
+
+Numeric ABI follow-up: independently reviewed `ecdf68109fd5932d8ae572a8f16446194e93b935` remains 76/100, with 162 tests passing in 139.160s. Shared argument transport/addressing is verified; general typed lowering, systems ABI, object linking and native engine parity remain incomplete.

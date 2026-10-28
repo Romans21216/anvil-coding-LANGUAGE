@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-10-28
-**Latest independent evaluation:** **76/100 - FAIL** on exact `2f7cd743ba37101c87a0daa5d1c9c017d9ab5dc2`.
+**Latest independent evaluation:** **76/100 - FAIL** on exact `ecdf68109fd5932d8ae572a8f16446194e93b935`.
 **Current passing threshold:** 98/100. Historical 90-point passes do not pass the current requirement.
 **Evaluator:** separate `project_full_review` agent, full 50-criterion review.
 
@@ -9,14 +9,14 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 
 ## Independent verification for this snapshot
 
-- `python -m unittest discover -s tests -q`: **158 passed**, 145.917 seconds.
+- `python -m unittest discover -s tests -q`: **162 passed**, 139.160 seconds.
 - Extension 0.1.11 grammar validation and VSIX CRC/source parity passed. Language ID `anvil`, extensions `.ANVL`/`.anvl`, grammar `vscode-extension/syntaxes/anvil.tmLanguage.json`. Installed 0.1.4 remains per preference; newer visible tokens are unverified.
 - Python compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
 - Adversarial probes combine 128 statement blocks with 63 grouped/unary/user-call/abs levels; accepted inputs pass. Over-budget mixed expressions return controlled diagnostics. #64 configuration locations and #65 uncontrolled compiler recursion are verified fixed.
 - Source includes and native function selection were verified in the preceding `edfbe86` review: native demo 3,072 bytes, native and C/MSVC demos print 20. The full regression suite includes those execution paths.
 - Direct-backend window/input tests target only their generated windows. Coordinate coverage uses explicit test instrumentation; untouched OS coordinate dispatch remains unverified (#63). No CUA or fresh manual editor/sample inspection occurred. A later audit found the legacy C mouse harness called SetCursorPos during full suites; prior blanket no-global-input claims were too broad. #71 records this and removes that behavior in the current follow-up.
 
-## Latest 50-criterion scoring — `2f7cd74`
+## Latest 50-criterion scoring — `ecdf681`
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -50,14 +50,14 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 28 | No unfinished placeholders | 1 | Input handlers are real; native graphics still restricts scenes and opaque rectangle coverage (open). |
 | 29 | Configuration understandable | 2 | Backend/TOML/include/title and1–240Hz settings are organized and documented. |
 | 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
-| 31 | Automated tests provided | 2 | 158 tests and extension0.1.11 validation independently pass. |
+| 31 | Automated tests provided | 2 | 162 tests and extension0.1.11 validation independently pass. |
 | 32 | Core tests covered | 2 | Numeric/differential/include/runtime and compiled semantic ray-order regressions cover implemented core. |
 | 33 | Failure scenarios tested | 2 | Invalid mouse arguments/keys and bitmap allocation-failure injection are covered. |
 | 34 | Edge cases explicitly tested | 2 | Taps, repeats, simultaneous buttons, actual OS capture, wheel accumulation and draw-only behavior are tested. |
 | 35 | Integration behavior tested | 1 | Coordinate test uses an explicit test-only WndProc wrapper; untouched OS-dispatch coverage is incomplete (#63, open). |
 | 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
-| 37 | Builds and compilation pass | 2 | 158 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
-| 38 | Results recorded accurately | 2 | Exact2f7cd74/76/158 evidence agrees across records; historical input-test limitations disclosed. |
+| 37 | Builds and compilation pass | 2 | 162 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
+| 38 | Results recorded accurately | 2 | Exact ecdf681 / 76 / 162 evidence agrees across records; historical input-test limitations disclosed. |
 | 39 | Regression checks performed | 2 | Full suite and prior slow-draw/failure/resource regressions pass. |
 | 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
 | 41 | Installation instructions accurate | 2 | Python/native and Python/MSVC routes match independently exercised builds; extension installation documented. |
@@ -75,22 +75,23 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | | **Code quality and architecture** | **14/20** | |
 | | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **76/100** | Exact commit `2f7cd74`; FAIL against 98. |
+| | **Total** | **76/100** | Exact commit `ecdf681`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
 - **#78 RESOLVED:** All64 independent control-character entry cases pass on both backends; diagnostics name the manifest and no traceback/artifact leaks. No new confirmed finding.
 - **Scope (2–6/9–10/13/28/40/50):** Complete native engine, actual DXR/Embree, rich types, Forge/OS outputs and measured efficiency remain absent. Deliver full issue23 scope with executable acceptance evidence before default migration/completion.
-- **Architecture (22/23/25/27/30):** Raw opcode/ABI duplication and semantic/frame/runtime coupling increase maintenance risk. Consolidate instruction/ABI helpers and validated lowering/storage interfaces.
+- **Architecture (22/23/25/27/30):** Numeric transport/addressing duplication is reduced. Raw opcodes remain across runtime/platform emitters, and expressions.py/native_codegen.py duplicate expression parsing/precedence. Add validated shared lowering/IR and broader systems ABI/interfaces; existing #11/#23 compiler items track these gaps.
 - **Integration (35):** Instrumented/synchronized coordinate samples do not prove untouched OS pointer dispatch (#63). Gather independent integration evidence within input constraints.
 - **Setup/editor (42/46/47):** Full project/engine/Forge/OS setup cannot be reproduced; newer installed-editor visuals remain unverified (#24). Implement missing workflows and respect installed0.1.4 preference.
 
-The full2f7cd74 review independently verifies native local arrays: zeroing/shadowing, recursive isolation, all return cleanup, exact16MiB boundary, repeated reuse, 16-parameter/201-local disp32 frames, GUI callbacks and included Unicode source allocation/release diagnostics.158tests passed145.917s; no new confirmed finding. The score remains76 because broader full-scope/architecture/integration/tooling deductions remain open. Next: instruction/ABI interfaces and native rendering parity. Installed0.1.4 preserved; #63 remains unverified.
+The full ecdf681 review independently verifies shared numeric ABI transport and scalar addressing. All 162 tests passed in 139.160s, including 2048 executed addressing combinations and independent callee checks. An extra executable probe combines a live outer temporary, 15 nested side-effect arguments, 200 locals and an 8192-element heap array, returning 1063.25. Another 512 signed-disp32 endpoint encodings were checked without executing invalid addresses. No new defect was confirmed. Score remains 76 because broader parsing/IR duplication, platform/runtime encoding, systems ABI and full-scope gaps remain. Next: validated lowering/IR and native rendering parity. Installed 0.1.4 preserved; #63 remains unverified. The evaluator re-read issue #23 and its 41 comments after the suite.
 
 ## Review history
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
+| `2f7cd743ba37101c87a0daa5d1c9c017d9ab5dc2` |76 /98 FAIL|158 tests in 145.917s; native local arrays independently verified; no new finding.|
 | `2b4e5e8d84bb0695af92eadd3740a4a84a6410dd` |76 /98 FAIL|151tests142.480s; #78 verified; no new finding.|
 | `1570abdd429683759f31066f04e5982ec10de386` |73 /98 FAIL|150tests152.822s; #77/projects verified; #78 found.|
 | `86681061c3e6d564b315dd571be4958202ac295d` |72 /98 FAIL|146tests125.935s; #74–76 verified; #77 found.|
