@@ -3,27 +3,22 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 
 Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: latest completed independent 50-criterion review of exact pushed commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505`, with the full Python suite, extension validation, compile checks, array-EXE execution, and failure-path verification rerun by the reviewer.
+Basis: independent full 50-criterion review of exact pushed commit fc37b1fbb8824822a99789ee0f4c1954d9cbc438.
 
-LATEST INDEPENDENT REVIEW AND CURRENT CANDIDATE
------------------------------------------------
-The latest independent review evaluated exact commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` and scored **64/100 — FAIL** against the user's active 98/100 threshold (requirements 10/20, functionality 15/20, architecture 12/20, testing 16/20, delivery 11/20). The reviewer ran 92 Python tests, extension tests, compileall, QA arithmetic, UTF-8 JSON parsing, diff check, a native arrays example (output 50), invalid-index EXEs, and commented oversized-array rejection before PE allocation. It verified issues #55 and #56: the 16 MiB cap rejects oversized data before allocation, and trailing comments no longer hide the source line. Both `Codex Bugs` issues are closed. Previous direct-native scores were 63/100 for `71ddfec`, 61/100 for `9eaf1b6`, 58/100 for `120482e`, 56/100 for `ade1ff6`, 55/100 for `f330d4b`, 54/100 for `597867f`, and 50/100 for `573cb44`; the earlier C-backed score was 92/100 for `c102604`. Rust output is not a target. Direct x64 machine-code PE is the intended end state; the C backend remains default until native runtime parity is reached.
+LATEST INDEPENDENT REVIEW
+-------------------------
+Score: 71/100 — FAIL against 98/100.
+Evaluator: separate final_review agent.
+Categories: requirements 12/20, functionality/reliability 18/20, architecture 13/20, testing/verification 17/20, delivery 11/20.
+Scores in criterion order 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,2,2,2,2,2,2,1,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,2,1,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
 
-### Latest review: direct native arrays (`2b0a7b1`)
+The native backend now emits a real Win32 2D runtime, with opaque rectangles, top-level initialization, fixed 60 Hz update callbacks, draw callbacks, time(), delta() and compute(). The reviewer passed all 95 tests, extension validation, compileall, QA arithmetic, strict JSON and diff checks. A native functions sample printed 13. Client-pixel integration covers geometry, animation, resize and shutdown. The full criterion evidence, deductions and recommended fixes are in docs/QA_REPORT.md.
 
-Independent evaluator: separate `final_review` agent. Exact commit: `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505`. Score **64/100 (64%) — FAIL**; required pass threshold **98%**. Categories: A requirements 10/20, B functionality/reliability 15/20, C architecture 12/20, D testing/verification 16/20, E delivery 11/20.
+The user observed flicker in the native sample. The reviewer confirmed that the code clears and draws directly onto the visible window HDC without an offscreen buffer. This matches the report; completed live visual reproduction was not claimed because Computer Use was stopped by physical Escape. The user-reported issue is #57 (Romans21216 - Bugs). Buffered rendering/presentation is the priority fix and remains unverified.
 
-Criterion score vector (criteria 1–50): 2,1,0,1,0,1,2,2,1,0, 0,1,1,2,2,2,2,1,2,2, 2,1,1,2,1,2,1,0,1,1, 2,1,2,2,2,1,2,2,2,0, 1,1,1,2,0,1,1,2,2,0.
+Earlier exact native scores: 64/100 on 2b0a7b1, 63/100 on 71ddfec, 61/100 on 9eaf1b6, 58/100 on 120482e. Issues #55 and #56 are independently verified and closed. Current score remains below 98; full native engine parity and the new Forge requirements are incomplete. The C backend remains default.
 
-The reviewer found that the direct global-array implementation correctly handles reads/writes, dynamic index single-evaluation, zero-initialized data, checked negative/fractional/out-of-range errors, and the 16 MiB aggregate data limit. The cap rejects oversized declarations before PE allocation. Source-line lookup strips Anvil comments, so trailing `#` no longer hides the line number. Issues [#55](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/55) and [#56](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/56) are fixed and closed. The evaluation text distinguishes the full-engine C/MSVC default from limited direct-native PE compilation.
-
-Reviewer verification: `python -m unittest discover -s tests -q` — 92 passed; `npm test --prefix vscode-extension` — passed; compileall, QA arithmetic, strict UTF-8 JSON parsing, and `git diff --check` — passed. `examples/arrays.ANVL` built with `--backend native` and printed 50. Invalid indices produced line-numbered errors and exit code 2. Three maximum-sized arrays with a trailing comment were rejected before PE allocation with a line 3 diagnostic, exit code 1, and no EXE. Full per-criterion evidence appears in `docs/QA_REPORT.md`.
-
-Remaining high-impact work: implement the direct native engine/runtime and graphics APIs; support the remaining language and project workflows; make the direct backend the default only when parity is achieved; improve native codegen structure/troubleshooting; preserve extension verification. The user added Forge artifact, media, target, package/include, and measured optimization work to items 451–457 in issue #23. Overall goal remains incomplete at 64/100.
-
-### Unscored follow-up candidate
-
-The current unreviewed candidate adds Anvil-emitted Win32 window, message, paint and shutdown code; opaque rectangle rendering; top-level numeric initialization; fixed 60 Hz fn(update); fn(draw); and compute()/time()/delta(). A native integration test checks actual colours, fractional/clipped rectangle edges, timer-driven movement and erasure, resize painting, and clean exit. All 95 Python tests, extension validation, and compileall pass. The CLI native_2d example builds and was visually inspected. This evidence is not a new independent score. Native 3D, input, assets, other primitives, alpha blending, physics, networking, remaining language features, and the newly recorded Forge format/target requirements are unfinished.
+Unreviewed issue #57 fix: the current candidate composes frames in a reusable offscreen bitmap/DC and presents once with BitBlt. It recreates the bitmap on resize and releases GDI resources on shutdown/backbuffer error. The visible-pixel regression passes with the fix and fails against the reviewed unbuffered runtime, proving the test detects the reported intermediate frame exposure. Repeated-resize resource counts and simulated allocation failure pass. All 96 Python tests and the extension/static validation checks pass. Independent verification remains pending.
 
 SUMMARY
 -------

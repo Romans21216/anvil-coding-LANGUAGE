@@ -21,7 +21,7 @@ python -m compiler.anvil examples/native_2d.ANVL --backend native --output build
 ./build/native_2d.exe
 ```
 
-The window has a 960×640 outer size initially and a resizable client area. Coordinates are client pixels; rectangles clip to that area, with floor/ceil edges matching the existing rectangle contract. The background and `fn(draw)` repaint on exposure, resize, and simulation updates. Each rectangle uses a Windows brush that is deleted after drawing. Closing the window ends the message loop and releases the background brush. There is no interpolation or double buffering in this first backend.
+The window has a 960×640 outer size initially and a resizable client area. Coordinates are client pixels; rectangles clip to that area, with floor/ceil edges matching the existing rectangle contract. The background and `fn(draw)` compose into a persistent compatible bitmap/DC on exposure, resize, and simulation updates; one BitBlt copies the completed frame to the visible paint DC. The bitmap is replaced only when the client dimensions change. Empty/minimized clients skip allocation/presentation. Background erasure is handled by the composed frame. Each rectangle brush is deleted after drawing, and shutdown restores the stock bitmap before deleting the owned bitmap/DC. Allocation/presentation errors pair EndPaint and release resources before reporting a controlled error. Interpolation remains absent.
 
 If `fn(update)` exists, it takes no parameters and advances at fixed 1/60-second simulation steps. A 10 ms Windows timer wakes the event loop; elapsed time is accumulated to determine the number of updates. At most 250 ms of elapsed time is accepted per wake after a stall. `delta()` is 1/60 and `time()` is elapsed simulation time. `time()` in a draw-only scene also enables the clock; a static scene without update/time waits for Windows messages without a polling loop. `compute(expression)` is supported in both console and graphical native programs. Built-ins for input and all other runtime systems remain unsupported.
 
@@ -39,6 +39,7 @@ The clear colour currently requires four literal 0–255 channels and alpha 255.
 | Native data exceeds 16 MiB | Reduce global array/storage requirements; runtime metadata also uses native program data. |
 | Output EXE cannot be overwritten | Close the running generated window, then rebuild. |
 | GUI test cannot read window pixels | Run it in an interactive Windows x64 desktop; it samples a visible test window and closes that process afterward. |
+| Older native sample flickers | Rebuild with the buffered-presentation fix for issue #57. The regression checks visible pixels during slow drawing and verifies that the old unbuffered implementation fails that check. |
 
 ## Architecture
 
@@ -67,4 +68,4 @@ The clear colour currently requires four literal 0–255 channels and alpha 255.
 - Native regression tests cover code generation, PE metadata/fixups, execution, resource lifetime, and engine behavior.
 - Documentation and evaluation reports distinguish implemented native features from migration work still in progress.
 
-The latest completed independent review evaluated `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` at 64/100, below 98. The new window-runtime candidate awaits a fresh review; its implementation evidence does not change that score. Full engine migration and the Forge format/target work remain unfinished. See `docs/ANVIL_EVALUATION.txt`.
+The latest completed independent review evaluated `fc37b1fbb8824822a99789ee0f4c1954d9cbc438` at 71/100, below 98. It found the unbuffered flicker path. The buffered-presentation fix awaits a fresh review; its implementation evidence does not change that score. Full engine migration and the Forge format/target work remain unfinished. See `docs/ANVIL_EVALUATION.txt`.

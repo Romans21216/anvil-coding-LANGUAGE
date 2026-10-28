@@ -17,6 +17,14 @@ if TYPE_CHECKING:
 
 
 class NativeWindow:
+    FRAME = 0x128
+    PAINT = 0x60
+    RECT = 0xB0
+    HWND = 0xC0
+    PAINT_DC = 0xC8
+    WIDTH = 0xD0
+    HEIGHT = 0xD8
+    OLD_BITMAP = 0xE0
     CLOCK_IMPORTS = [
         ("KERNEL32.dll", "GetTickCount64"),
         ("USER32.dll", "SetTimer"),
@@ -40,6 +48,11 @@ class NativeWindow:
         ("USER32.dll", "LoadCursorW"),
         ("GDI32.dll", "CreateSolidBrush"),
         ("GDI32.dll", "DeleteObject"),
+        ("GDI32.dll", "CreateCompatibleDC"),
+        ("GDI32.dll", "CreateCompatibleBitmap"),
+        ("GDI32.dll", "SelectObject"),
+        ("GDI32.dll", "DeleteDC"),
+        ("GDI32.dll", "BitBlt"),
     ]
 
     def __init__(self, owner: NativeCodegen, clear: int):
@@ -57,6 +70,12 @@ class NativeWindow:
         self.accumulator = owner.reserve_data(b"\0" * 8)
         self.simulation_time = owner.reserve_data(b"\0" * 8)
         self.clock_requested = False
+        self.back_dc = owner.reserve_data(b"\0" * 8)
+        self.back_bitmap = owner.reserve_data(b"\0" * 8)
+        self.stock_bitmap = owner.reserve_data(b"\0" * 8)
+        self.pending_bitmap = owner.reserve_data(b"\0" * 8)
+        self.back_width = owner.reserve_data(b"\0" * 8)
+        self.back_height = owner.reserve_data(b"\0" * 8)
 
     @property
     def clock_enabled(self) -> bool:
@@ -82,6 +101,7 @@ class NativeWindow:
 
     def emit(self) -> None:
         self._rectangle()
+        self._release_buffer()
         self._window_proc()
         self._entry()
 
@@ -125,58 +145,197 @@ class NativeWindow:
     def _window_proc(self) -> None:
         c = self.code
         c.label("native:window_proc")
-        self.frame(0xC8)
-        c.stack_int(1, 0xA0, store=True)  # HWND survives paint API calls
+        self.frame(self.FRAME)
+        c.stack_int(1, self.HWND, store=True)
+        c.mov_imm(0, 0)
+        c.stack_int(0, self.PAINT_DC, store=True)
         paint = self.owner.label("paint")
         destroy = self.owner.label("destroy")
         timer = self.owner.label("timer")
+        erase = self.owner.label("erase")
         failure = self.owner.label("paint_failure")
+        finish = self.owner.label("paint_finish")
         c.bytes(b"\x81\xfa\x0f\x00\x00\x00")  # WM_PAINT
         c.conditional_jump(0x84, paint)
         c.bytes(b"\x81\xfa\x02\x00\x00\x00")  # WM_DESTROY
         c.conditional_jump(0x84, destroy)
+        c.bytes(b"\x81\xfa\x14\x00\x00\x00")  # WM_ERASEBKGND
+        c.conditional_jump(0x84, erase)
         if self.clock_enabled:
             c.bytes(b"\x81\xfa\x13\x01\x00\x00")  # WM_TIMER
             c.conditional_jump(0x84, timer)
         self.call("DefWindowProcW")  # original four Win64 argument registers
-        self.return_frame(0xC8)
+        self.return_frame(self.FRAME)
+        c.label(erase)
+        c.mov_imm(0, 1)  # full background is composed offscreen during WM_PAINT
+        self.return_frame(self.FRAME)
         c.label(destroy)
         if self.clock_enabled:
             c.mov_imm(2, 1)
             self.call("KillTimer")
+        c.call("native:release_buffer")
         c.mov_imm(1, 0)
         self.call("PostQuitMessage")
         c.mov_imm(0, 0)
-        self.return_frame(0xC8)
+        self.return_frame(self.FRAME)
         c.label(paint)
-        c.stack_int(2, 0x40, address=True)  # PAINTSTRUCT (72 bytes)
+        c.stack_int(2, self.PAINT, address=True)
         self.call("BeginPaint")
         self.require_rax(failure)
-        c.rip_int(0, self.hdc, store=True)
-        c.stack_int(1, 0xA0)
-        c.stack_int(2, 0x90, address=True)  # client RECT
+        c.stack_int(0, self.PAINT_DC, store=True)
+        c.stack_int(1, self.HWND)
+        c.stack_int(2, self.RECT, address=True)
         self.call("GetClientRect")
         self.require_rax(failure)
+        for source, target in ((self.RECT + 8, self.WIDTH),
+                               (self.RECT + 12, self.HEIGHT)):
+            c.stack_int(0, source)
+            c.bytes(b"\x89\xc0\x85\xc0")  # client dimensions are signed int32
+            c.conditional_jump(0x8E, finish)  # minimized/empty client
+            c.stack_int(0, target, store=True)
+        self._prepare_buffer(failure)
         c.rip_int(1, self.hdc)
-        c.stack_int(2, 0x90, address=True)
+        c.stack_int(2, self.RECT, address=True)
         c.rip_int(8, self.brush)
         self.call("FillRect")
         self.require_rax(failure)
         c.call("function:draw")
-        c.stack_int(1, 0xA0)
-        c.stack_int(2, 0x40, address=True)
+        c.stack_int(1, self.PAINT_DC)
+        c.mov_imm(2, 0)
+        c.mov_imm(8, 0)
+        c.stack_int(9, self.WIDTH)
+        c.stack_int(0, self.HEIGHT)
+        c.stack_int(0, 32, store=True)
+        c.rip_int(0, self.back_dc)
+        c.stack_int(0, 40, store=True)
+        c.mov_imm(0, 0)
+        c.stack_int(0, 48, store=True)
+        c.stack_int(0, 56, store=True)
+        c.mov_imm(0, 0x00CC0020)  # SRCCOPY: one completed frame presentation
+        c.stack_int(0, 64, store=True)
+        self.call("BitBlt")
+        self.require_rax(failure)
+        c.label(finish)
+        c.mov_imm(0, 0)
+        c.rip_int(0, self.hdc, store=True)
+        c.stack_int(0, self.PAINT_DC, store=True)
+        c.stack_int(1, self.HWND)
+        c.stack_int(2, self.PAINT, address=True)
         self.call("EndPaint")
         self.require_rax(failure)
         c.mov_imm(0, 0)
         c.rip_int(0, self.hdc, store=True)
-        self.return_frame(0xC8)
+        self.return_frame(self.FRAME)
         if self.clock_enabled:
             c.label(timer)
             self._timer(failure)
             c.mov_imm(0, 0)
-            self.return_frame(0xC8)
+            self.return_frame(self.FRAME)
         c.label(failure)
+        no_paint = self.owner.label("failure_without_paint")
+        c.stack_int(0, self.PAINT_DC)
+        c.bytes(b"\x48\x85\xc0")
+        c.conditional_jump(0x84, no_paint)
+        c.stack_int(1, self.HWND)
+        c.stack_int(2, self.PAINT, address=True)
+        self.call("EndPaint")
+        c.label(no_paint)
+        c.call("native:release_buffer")
         self.owner.emit_runtime_error("Anvil native painting error\n")
+
+    def _prepare_buffer(self, failure: str) -> None:
+        c = self.code
+        exists = self.owner.label("buffer_dc_exists")
+        resize = self.owner.label("resize_buffer")
+        ready = self.owner.label("buffer_ready")
+        delete_old = self.owner.label("delete_old_bitmap")
+        dimensions = self.owner.label("save_buffer_dimensions")
+        c.rip_int(0, self.back_dc)
+        c.bytes(b"\x48\x85\xc0")
+        c.conditional_jump(0x85, exists)
+        c.stack_int(1, self.PAINT_DC)
+        self.call("CreateCompatibleDC")
+        self.require_rax(failure)
+        c.rip_int(0, self.back_dc, store=True)
+        c.label(exists)
+        for local, data in ((self.WIDTH, self.back_width),
+                            (self.HEIGHT, self.back_height)):
+            c.stack_int(0, local)
+            c.rip_int(2, data)
+            c.bytes(b"\x48\x39\xd0")
+            c.conditional_jump(0x85, resize)
+        c.jump(ready)
+        c.label(resize)
+        c.stack_int(1, self.PAINT_DC)  # use colour display DC, not monochrome memory DC
+        c.stack_int(2, self.WIDTH)
+        c.stack_int(8, self.HEIGHT)
+        self.call("CreateCompatibleBitmap")
+        self.require_rax(failure)
+        c.rip_int(0, self.pending_bitmap, store=True)
+        c.rip_int(1, self.back_dc)
+        c.mov_reg(2, 0)
+        self.call("SelectObject")
+        self.require_rax(failure)
+        c.bytes(b"\x48\x83\xf8\xff")
+        c.conditional_jump(0x84, failure)
+        c.stack_int(0, self.OLD_BITMAP, store=True)
+        c.rip_int(0, self.pending_bitmap)
+        c.rip_int(0, self.back_bitmap, store=True)
+        c.mov_imm(0, 0)
+        c.rip_int(0, self.pending_bitmap, store=True)
+        c.rip_int(0, self.stock_bitmap)
+        c.bytes(b"\x48\x85\xc0")
+        c.conditional_jump(0x85, delete_old)
+        c.stack_int(0, self.OLD_BITMAP)
+        c.rip_int(0, self.stock_bitmap, store=True)
+        c.jump(dimensions)
+        c.label(delete_old)
+        c.stack_int(1, self.OLD_BITMAP)
+        self.call("DeleteObject")
+        self.require_rax(failure)
+        c.label(dimensions)
+        for local, data in ((self.WIDTH, self.back_width),
+                            (self.HEIGHT, self.back_height)):
+            c.stack_int(0, local)
+            c.rip_int(0, data, store=True)
+        c.label(ready)
+        c.rip_int(0, self.back_dc)
+        c.rip_int(0, self.hdc, store=True)
+
+    def _release_buffer(self) -> None:
+        c = self.code
+        c.label("native:release_buffer")
+        self.frame(0x28)
+        no_pending = self.owner.label("no_pending_bitmap")
+        no_dc = self.owner.label("no_buffer_dc")
+        no_stock = self.owner.label("no_stock_bitmap")
+        no_bitmap = self.owner.label("no_buffer_bitmap")
+        c.rip_int(1, self.pending_bitmap)
+        c.bytes(b"\x48\x85\xc9")
+        c.conditional_jump(0x84, no_pending)
+        self.call("DeleteObject")
+        c.label(no_pending)
+        c.rip_int(1, self.back_dc)
+        c.bytes(b"\x48\x85\xc9")
+        c.conditional_jump(0x84, no_dc)
+        c.rip_int(2, self.stock_bitmap)
+        c.bytes(b"\x48\x85\xd2")
+        c.conditional_jump(0x84, no_stock)
+        self.call("SelectObject")  # deselect owned bitmap before deleting it
+        c.label(no_stock)
+        c.rip_int(1, self.back_bitmap)
+        c.bytes(b"\x48\x85\xc9")
+        c.conditional_jump(0x84, no_bitmap)
+        self.call("DeleteObject")
+        c.label(no_bitmap)
+        c.rip_int(1, self.back_dc)
+        self.call("DeleteDC")
+        c.label(no_dc)
+        c.mov_imm(0, 0)
+        for data in (self.hdc, self.back_dc, self.back_bitmap, self.pending_bitmap,
+                     self.stock_bitmap, self.back_width, self.back_height):
+            c.rip_int(0, data, store=True)
+        self.return_frame(0x28)
 
     def _double_xmm1(self, value: float) -> None:
         self.code.mov_imm(0, struct.unpack("<Q", struct.pack("<d", value))[0])
@@ -213,7 +372,7 @@ class NativeWindow:
             c.call("function:update")
         c.jump(loop)
         c.label(done)
-        c.stack_int(1, 0xA0)
+        c.stack_int(1, self.HWND)
         c.mov_imm(2, 0)
         c.mov_imm(8, 0)
         self.call("InvalidateRect")

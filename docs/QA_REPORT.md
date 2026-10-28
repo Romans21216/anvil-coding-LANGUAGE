@@ -1,7 +1,7 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **64/100 - FAIL** for exact commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` against the user's **98/100** threshold. Categories: requirements 10/20, functionality/reliability 15/20, architecture 12/20, testing 16/20, delivery 11/20.
+**Latest independent evaluation:** **71/100 - FAIL** for exact commit `fc37b1fbb8824822a99789ee0f4c1954d9cbc438` against **98/100**. Categories: requirements 12/20, functionality/reliability 18/20, architecture 13/20, testing 17/20, delivery 11/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
 
 **Native QA follow-up (reviewed):** the latest review found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. Review of `f330d4b` verified fractional formatting and closed issue #49. Review of `ade1ff6` opened #53 for signed-minimum rejection and #54 for missing non-finite arithmetic diagnostics. Review of `120482e` verified fixes for both, along with #52 range handling; issues #49 and #52–#54 are closed.
@@ -10,9 +10,9 @@
 **Latest review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
 **Current finding:** exact commit `120482e85e77c19216a793ab17190dbf1ae025ff` scored 58/100, below the 98/100 threshold. All 89 tests passed. The reviewer verified fixes for fractional output, large values, signed minimum, and non-finite diagnostics; issues #49 and #52–#54 are closed. Native game-engine migration remains incomplete.
 
-**Current review:** the independent reviewer evaluated exact pushed commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` and scored it 64/100. It verified the 16 MiB aggregate cap before PE allocation and the source line on both plain and trailing-comment array declarations; issues #55 and #56 (`Codex Bugs`) are fixed and closed after independent verification. All 92 Python tests, extension checks, compileall, QA arithmetic, status JSON, and diff checks passed. The C backend remains default; native engine/runtime parity remains incomplete.
+**Current review:** independent review of `fc37b1fbb8824822a99789ee0f4c1954d9cbc438` scored 71/100. All 95 tests and static/extension checks passed. Native 2D is real and tested; the user reports flicker and source inspection confirms unbuffered visible painting. User issue #57 remains open. Full native engine parity and Forge scope remain incomplete.
 
-**Unreviewed native-window candidate:** the current implementation adds direct x64/PE Win32 windows, paint/resize/close handling, opaque rectangles, top-level numeric setup, optional fixed 60 Hz updates, and compute()/time()/delta(). Actual client-pixel tests verify colour, fractional/clipped edges, timer-driven movement and erasure, resized background, and exit code 0. All 95 Python tests, extension validation and compileall pass; the CLI sample `examples/native_2d.ANVL` builds directly and was visually inspected. This candidate awaits independent evaluation; the latest score remains 64/100 for `2b0a7b1`.
+**Unreviewed fix:** issue #57 now has persistent offscreen bitmap/DC composition and one completed-frame presentation per paint. A regression samples visible pixels while drawing is deliberately delayed; it passes with buffering and fails against fc37b1f with “partially drawn frame became visible”. Repeated-resize GDI counts and a simulated bitmap-allocation failure also pass. All 96 Python tests, extension validation, compileall, QA arithmetic, JSON and diff checks pass. The code correction awaits independent verification.
 
 **Latest reviewed correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
@@ -66,74 +66,74 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 
 **91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 19/20; testing and verification 18/20; developer experience and delivery 18/20. The exact reviewed commit was `bc4db99368b3af2953e49adc4e4cbd8f5706bb4e`. The critic reran 73 Python tests, 3 native runtime tests, extension validation, compileall, the QA validator, and diff check. It verified the viewport geometry helper and inspected the WM_PAINT path, but did not visually launch a resized window. The audited ledgers contain 21 rows and total 450. Criterion 38 scores 1 because the prior ledger labeled dynamic window resizing as #144; canonical issue #23 comment 6451810775 defines it as #172. Issue #46 tracks the correction. Criterion 22 remains 2 after formatting; criterion 23 remains 2 for phase separation. Criterion 27 remains 1 for Windows/MSVC and C-only backend. Criterion 47 remains 1 because newer extension tokens are not visually verified. The 98-point threshold remains unmet; issues #12 and #45 are closed.
 
-## Latest 50-criterion scoring — direct native commit `9eaf1b6`
+## Latest 50-criterion scoring — direct native commit `fc37b1f`
 
-Independent reviewer evaluated exact pushed commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505`: **64/100 — FAIL** against the active **98/100** threshold. Categories: requirements 10/20, functionality/reliability 15/20, architecture 12/20, testing/verification 16/20, delivery 11/20. All 92 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 status JSON, and diff checks passed. The reviewer built `examples/arrays.ANVL` through the direct backend and verified output `50`; invalid indices reported their source line and exited 2. Three maximum-sized arrays with a trailing comment were rejected before PE allocation with a line 3 diagnostic and no EXE. Issues [#55](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/55) and [#56](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/56) are fixed and closed after verification.
+Independent reviewer evaluated exact pushed commit `fc37b1fbb8824822a99789ee0f4c1954d9cbc438`: **71/100 — FAIL** against **98/100**. All 95 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and diff checks pass. The native functions sample prints 13; client-pixel tests verify native paint, updates, resize and exit. The reviewer confirmed an unbuffered paint path consistent with the user's flicker report (#57); visual inspection was interrupted by physical Escape and was not completed.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
-| 1 | Explicit requirements identified | 2 | Direct x64/PE and no-C/no-Rust target is documented. |
-| 2 | Implicit requirements addressed | 1 | Native runtime port is recognized but incomplete. |
-| 3 | Functionality matches intended goal | 0 | Native compiler still produces only a numeric console subset, not the engine. |
-| 4 | Required deliverables present | 1 | Compiler, tests and docs exist; native engine parity is missing. |
-| 5 | No essential feature missing | 0 | Native graphics and game APIs are absent. |
-| 6 | Stated constraints respected | 1 | Native mode avoids C/Rust, but CLI defaults to C. |
-| 7 | Ambiguity resolved logically | 2 | Direct machine code and PE match the user's selected target. |
-| 8 | Behavior matches documentation | 2 | Evaluation docs distinguish full-engine C/MSVC from limited direct-native PE; the cap diagnostic identifies declarations with or without accepted trailing comments. |
-| 9 | Important use cases supported | 1 | Numeric and array programs work; native game workflows do not. |
-| 10 | Usable for intended purpose | 0 | Native mode cannot build the intended full engine. |
-| 11 | Core functionality works | 0 | Native game-engine core is absent. |
-| 12 | Secondary functionality works | 1 | C engine features work; native backend now includes global arrays. |
-| 13 | Primary workflows functional | 1 | Supported source-to-EXE flow works; native manifests and engine APIs do not. |
-| 14 | Inputs validated | 2 | Negative, fractional and out-of-bounds array indices are rejected at runtime. |
-| 15 | Errors handled gracefully | 2 | Array and numeric failures report source lines and exit with code 2. |
-| 16 | Edge cases covered | 2 | Successful array access, single evaluation and invalid indices have tests. |
-| 17 | Invalid inputs controlled | 2 | A 16 MiB aggregate direct-native data cap rejects oversize input before PE payload allocation. |
-| 18 | Stable across repeated operations | 1 | Normal cases pass; aggregate-array stress and resource limits were unverified. |
-| 19 | No known critical defects | 2 | Tested output and array error paths pass; no critical tested-path defect was reproduced. |
-| 20 | Components integrate | 2 | Parsing, codegen, PE writing and execution work end-to-end for arrays. |
-| 21 | Logical project structure | 2 | Compiler phases and PE writer are separated into modules. |
-| 22 | Readable and consistently formatted | 1 | Raw opcode bytes make native codegen difficult to maintain. |
-| 23 | Clear module responsibilities | 1 | There is no typed IR; lowering, layout and instruction emission are combined. |
-| 24 | Consistent descriptive naming | 2 | Names are generally descriptive. |
-| 25 | Duplication minimized | 1 | Machine-code and storage logic remain ad hoc. |
-| 26 | Dependencies appropriate | 2 | Native mode uses no third-party compiler/runtime dependency. |
-| 27 | Supports future extensions | 1 | Labels/fixups are a base, but typed IR and native runtime interfaces are absent. |
-| 28 | No unfinished placeholders | 0 | Built-in dispatch is empty and engine built-ins are rejected natively. |
-| 29 | Configuration understandable | 1 | Backend choice exists, but C remains default and configuration is limited. |
-| 30 | Conventions followed | 1 | PE and ABI code is tested on samples but lacks broad systematic validation. |
-| 31 | Automated tests provided | 2 | The project has a substantial automated suite. |
-| 32 | Core tests covered | 1 | Native tests cover language subset and arrays, not the full engine. |
-| 33 | Failure scenarios tested | 2 | Bounds errors and oversized aggregate rejection before PE allocation have regression tests. |
-| 34 | Edge cases explicitly tested | 2 | Array tests cover negative, fractional, out-of-range and single-evaluation behavior. |
-| 35 | Integration behavior tested | 2 | Native EXEs run for array read/write and failure paths. |
-| 36 | Documented test commands work | 1 | Documented test and extension commands are reproducible; full native setup is incomplete. |
-| 37 | Builds and compilation pass | 2 | Reviewer reran 91 tests and all listed static validation. |
-| 38 | Results recorded accurately | 2 | Candidate and latest reviewed SHA are recorded; the stale evaluation sentence is identified for correction. |
-| 39 | Regression checks performed | 2 | Array regression tests pass with the full suite. |
-| 40 | Verified against original goal | 0 | Full compiler, runtime and engine objective remains incomplete. |
-| 41 | Installation instructions accurate | 1 | Windows setup is documented; complete native-engine setup is absent. |
-| 42 | Setup reproducible | 1 | Limited native compilation is reproducible, but full engine setup is not. |
-| 43 | Usage understandable | 1 | Current examples cover only limited native features. |
-| 44 | Design decisions documented | 2 | Migration plan explains native architecture and current limits. |
-| 45 | Troubleshooting available | 0 | Native troubleshooting guidance is incomplete. |
-| 46 | Opens in intended environment | 1 | CLI works; native project/editor/runtime integration is absent. |
-| 47 | Editor integration works | 1 | Extension tests pass; no fresh visible editor check was performed. |
-| 48 | Deliverables organized | 2 | Reviewed commit is pushed and files are organized. |
-| 49 | Limitations disclosed | 2 | Native feature limits are documented. |
-| 50 | Practical for intended scope | 0 | Not yet a complete game-engine deliverable. |
-| | **Requirement fulfillment** | **10/20** | |
-| | **Functionality and reliability** | **15/20** | |
-| | **Code quality and architecture** | **12/20** | |
-| | **Testing and verification** | **16/20** | |
+| 1 | Explicit requirements identified | 2 | Language/compiler/runtime and direct target are identified. |
+| 2 | Implicit requirements addressed | 1 | Engine breadth remains incomplete; implement remaining runtime systems (open, issue #23). |
+| 3 | Functionality matches intended goal | 1 | Initial native 2D scene works; complete the requested engine coverage (open). |
+| 4 | Required deliverables present | 1 | Compiler, extension, tests and docs exist; native engine parity is missing (open). |
+| 5 | No essential feature missing | 0 | GPU rendering, broader engine systems and Forge requirements remain absent (open). |
+| 6 | Stated constraints respected | 1 | Native avoids C/Rust, but C is default; port remaining APIs before switching (open). |
+| 7 | Ambiguity resolved logically | 2 | Direct machine-code/PE target follows user selection. |
+| 8 | Behavior matches documentation | 2 | Docs distinguish the limited native backend and broader C/MSVC path. |
+| 9 | Important use cases supported | 1 | Animated rectangles work; native 3D/input/assets/physics/networking remain unavailable (open). |
+| 10 | Usable for intended purpose | 1 | Usable for a small native demo; complete engine workflows remain unavailable (open). |
+| 11 | Core functionality works | 1 | Window, paint, resize, updates and close are pixel-tested; full engine core is incomplete (open). |
+| 12 | Secondary functionality works | 2 | Time, delta, compute and fixed updates work. |
+| 13 | Primary workflows functional | 2 | Native source builds directly to PE; functions sample prints 13. |
+| 14 | Inputs validated | 2 | Unsupported graphics/configuration/alpha inputs receive diagnostics. |
+| 15 | Errors handled gracefully | 2 | Compiler/runtime failures have controlled diagnostics. |
+| 16 | Edge cases covered | 2 | Tests exercise fractional/clipped edges, resize, updates and shutdown. |
+| 17 | Invalid inputs controlled | 2 | Unsupported native configurations fail instead of silently changing backend. |
+| 18 | Stable across repeated operations | 2 | All 95 tests pass, including repeated native window updates. |
+| 19 | No known critical defects | 1 | User-reported flicker matches visible-HDC painting; fix buffered presentation (open, #57). |
+| 20 | Components integrate | 2 | Parser, codegen, PE and runtime integrate for supported scenes. |
+| 21 | Logical project structure | 2 | Compiler, encoder, native runtime, examples and tests are separated. |
+| 22 | Readable and consistently formatted | 1 | Raw x64 bytes are hard to maintain; add instruction abstractions and formatting (open). |
+| 23 | Clear module responsibilities | 1 | Runtime and instruction emission remain coupled; introduce typed lowering/runtime boundaries (open). |
+| 24 | Consistent descriptive naming | 2 | Names are consistent and descriptive. |
+| 25 | Duplication minimized | 1 | ABI/instruction patterns repeat; consolidate encoder helpers (open). |
+| 26 | Dependencies appropriate | 2 | Direct backend imports Windows APIs without a C/Rust shim. |
+| 27 | Supports future extensions | 1 | Labels/fixups provide a base; complete runtime and backend interfaces (open). |
+| 28 | No unfinished placeholders | 1 | Real renderer supports one scene/opaque rectangles; implement broader primitives and systems (open). |
+| 29 | Configuration understandable | 1 | Backend choice documented; add native manifests and complete default migration (open). |
+| 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
+| 31 | Automated tests provided | 2 | Native compiler/runtime automated tests exist. |
+| 32 | Core tests covered | 2 | Core native pixels, updates, resize and close are integration-tested. |
+| 33 | Failure scenarios tested | 2 | Invalid native configurations are covered. |
+| 34 | Edge cases explicitly tested | 2 | Fractional/clipped geometry and timing cases are tested. |
+| 35 | Integration behavior tested | 2 | Generated PE is launched and actual client pixels sampled. |
+| 36 | Documented test commands work | 1 | Test commands work; complete native engine setup remains unavailable (open). |
+| 37 | Builds and compilation pass | 2 | 95 Python tests, native samples and static checks pass. |
+| 38 | Results recorded accurately | 2 | Exact reviewed SHA and pending candidate status are recorded. |
+| 39 | Regression checks performed | 2 | Full regressions, extension, compile, QA, JSON and diff checks pass. |
+| 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
+| 41 | Installation instructions accurate | 1 | Subset installation is documented; complete native engine installation is missing (open). |
+| 42 | Setup reproducible | 1 | Subset setup is reproducible; full engine setup is missing (open). |
+| 43 | Usage understandable | 1 | Sample is understandable; broader native workflows remain absent (open). |
+| 44 | Design decisions documented | 2 | Migration design and limits are documented. |
+| 45 | Troubleshooting available | 0 | Observed flicker lacks a sufficient remedy; implement and document buffered presentation (#57). |
+| 46 | Opens in intended environment | 1 | CLI/editor automation works; complete native project/editor/runtime workflow (open). |
+| 47 | Editor integration works | 1 | Grammar checks pass; current installed package is 0.1.4, fresh visual check absent (open). |
+| 48 | Deliverables organized | 2 | Deliverables are organized and pushed. |
+| 49 | Limitations disclosed | 2 | Native limitations are disclosed. |
+| 50 | Practical for intended scope | 0 | Full game-engine/Forge scope remains incomplete (open). |
+| | **Requirement fulfillment** | **12/20** | |
+| | **Functionality and reliability** | **18/20** | |
+| | **Code quality and architecture** | **13/20** | |
+| | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **11/20** | |
-| | **Total** | **64/100** | Exact commit `2b0a7b1`; FAIL against 98. |
+| | **Total** | **71/100** | Exact commit `fc37b1f`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
-- **Issue #55 — aggregate native data allocation: FIXED AND INDEPENDENTLY VERIFIED.** The 16 MiB limit is checked before PE payload allocation. Three individually maximum-sized arrays fail with a source-located diagnostic and no output file; issue #55 is closed.
-- **Issue #56 — comment-aware source location: FIXED AND INDEPENDENTLY VERIFIED.** Array declaration matching now strips Anvil comments; the reviewer reproduced the commented cap case and confirmed a line-3 diagnostic, exit code 1, and no EXE. Issue #56 is closed.
-- **Criteria 2–6, 9–13, 28–30, 32–33, 36, 40–47, 50:** the direct backend remains narrow and lacks the full game runtime, graphics, project manifests, engine built-ins and fresh visible extension verification. Continue native runtime parity work, preserve the no-C/no-Rust final target, and expand integration validation.
+- **User issue #57 — flicker: OPEN.** Visible painting clears the window and submits rectangles individually. Intermediate frames can be seen. Implement an offscreen framebuffer and one presentation copy; verify animation, resizing, cleanup and failure paths.
+- **Native product scope: OPEN.** The runtime has opaque rectangles, fixed updates and a window. Remaining native graphics/input/assets/physics/networking/language/project features and Forge requirements prevent full-engine use. Continue the master issue #23 backlog.
+- **Architecture and delivery: OPEN.** Reduce raw-opcode/ABI duplication, complete target/project interfaces and troubleshooting, and verify current editor integration.
 
 ## Historical 50-criterion scoring — direct native commit `120482e`
 
