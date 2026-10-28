@@ -1,24 +1,26 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 ====================================
 
-Assessment date: 2026-10-27
+Assessment date: 2026-10-28
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: independent full 50-criterion review of exact pushed commit 7b528d539cab96c0e1fa2693984d51f8340aaafb.
+Basis: independent full 50-criterion review of exact pushed commit 3270998384367be7b763cc605c0492208a72c988.
 
 LATEST INDEPENDENT REVIEW
 -------------------------
 Score: 72/100 — FAIL against 98/100.
 Evaluator: separate final_review agent.
-Categories: requirements 11/20, functionality/reliability 19/20, architecture 13/20, testing/verification 18/20, delivery 11/20.
-Scores in criterion order 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,2,2,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,2,2,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
+Categories: requirements 12/20, functionality/reliability 19/20, architecture 13/20, testing/verification 17/20, delivery 11/20.
+Scores in criterion order 1–50: 2,1,1,1,0,1,2,2,1,1 / 1,2,2,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,1,1 / 2,2,2,2,1,2,2,2,2,0 / 1,1,1,2,0,1,1,2,2,0
 
-The direct native backend now supports abs/sqrt/floor/ceil/min/max, deterministic seeded integer random numbers, 3D gradient noise and fBm. Procedural routines are written in Anvil and compiled into the PE on demand. Calls support up to sixteen numeric arguments, with scalar locals beyond disp8 offsets and a 4096-byte function-frame ceiling.
+The direct backend includes buffered 2D rectangles, keyboard/mouse input, basic math, deterministic seeded RNG, gradient noise and fBm. Procedural routines are Anvil source compiled on demand. Numeric calls support sixteen parameters, stack arguments, larger scalar-local offsets and a 4096-byte frame limit. The reviewer verified that explicit console main arguments now preserve values, evaluation side effects, stack parameters and library dependencies; missing/extra arguments receive diagnostics.
 
-The separate reviewer passed all 109 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and implementation diff checks. The native terrain example builds to a 34,304-byte AMD64 PE without C/Rust compilation. Seven procedural tests compare independent references, numeric domains, argument effects, ABI/local offsets, library selection and generated-window behavior. No procedural runtime defect was reproduced by the critic. No CUA/manual live editor check resumed; extension0.1.4 remains installed.
+All111 tests passed independently, along with five repeated mouse suites (15tests), focused mouse/procedural tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON and diff checks. The terrain example builds to a34,304-byte AMD64 PE without C/Rust compilation. No new runtime defect was reproduced. No CUA/manual editor or terrain-window inspection is claimed; extension0.1.4 remains installed per preference.
 
-Criterion8 remains partial because the compiler Wiki still claimed four arguments and no arrays/graphics/input. Codex Bugs#60 tracks its correction. After that review, development also reproduced explicit-main argument loss (#61): call fn(main,7) returned0 instead of7. The follow-up lowers entry arguments through the ordinary ABI and adds regression/arity tests; independent verification is pending. The first follow-up111-test run also exposed a mouse-test timing race (#62): queued real pointer messages could replace synthetic coordinates before timer sampling. A test-only atomic probe corrects that race; five repeated mouse suites pass. The final full111-test rerun passes; independent verification is pending. These follow-up findings/fixes do not silently change the exact7b528d5 score.
+Issues#60 (stale Wiki),#61 (discarded explicit-main arguments) and#62 (mouse test timing race) are independently verified fixed. Criterion8 returns to2/2. Criterion35 is now1/2: the coordinate test uses an explicit test-only WndProc wrapper to dispatch the requested message and sample production queries atomically. This avoids unrelated queued pointer events replacing the test state. It exercises unchanged production handler/query code but does not prove untouched end-to-end OS coordinate dispatch. Issue#63 records that remaining evidence gap; other tests retain actual capture/button/focus/wheel integration. The score therefore stays72/100.
 
-Native3D/camera, broader graphics/assets, physics, networking, language/project parity, general include/plugins and Forge remain incomplete. C/MSVC is still the broader default backend. The final no-C/no-Rust engine has not been delivered. Previous mouse900106e score72/100 with102tests and keyboard21fc960 score73/100 with99tests are historical. The full master backlog remains only in issue23/comments.
+The earlier7b528d5 review scored72/100 with109tests. Development then found#61 and a111-test run exposed#62; the final corrected111-test run and independent rerun pass. The previous mouse900106e review was72/100 with102tests. These snapshots remain historical.
+
+Native3D/camera, broader graphics/assets, physics, networking, language/project parity, general include/plugins, Forge and OS targets remain unfinished. C/MSVC remains the broader default backend. The new40-section OS specification is retained only as parent items458–497 in issue23/comments, alongside the original450-item inventory and Forge additions. The final no-C/no-Rust engine and freestanding OS toolchain have not been delivered.
 
 SUMMARY
 -------

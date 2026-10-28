@@ -1,7 +1,7 @@
 # Anvil QA Report
 
-**Review date:** 2026-10-27
-**Latest independent evaluation:** **72/100 - FAIL** for exact commit `7b528d539cab96c0e1fa2693984d51f8340aaafb` against **98/100**. Categories: requirements 11/20, functionality 19/20, architecture 13/20, testing 18/20, delivery 11/20.
+**Review date:** 2026-10-28
+**Latest independent evaluation:** **72/100 - FAIL** for exact `3270998384367be7b763cc605c0492208a72c988` against **98/100**. Categories: requirements12/20, functionality19/20, architecture13/20, testing17/20, delivery11/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
 
 **Historical native QA fixture repair:** the review of573cb44 found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. Review of `f330d4b` verified fractional formatting and closed issue #49. Review of `ade1ff6` opened #53 for signed-minimum rejection and #54 for missing non-finite arithmetic diagnostics. Review of `120482e` verified fixes for both, along with #52 range handling; issues #49 and #52–#54 are closed.
@@ -10,7 +10,7 @@
 **Historical C-backed review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
 **Historical native finding:** exact commit `120482e85e77c19216a793ab17190dbf1ae025ff` scored 58/100, below the 98/100 threshold. All 89 tests passed. The reviewer verified fixes for fractional output, large values, signed minimum, and non-finite diagnostics; issues #49 and #52–#54 are closed. Native game-engine migration remains incomplete.
 
-**Current review:** independent review of exact7b528d5 verified math/RNG/noise/fBm and109tests; terrain sample34,304bytes. Wiki#60 kept criterion8 partial. Development then reproduced entry argument loss#61; its follow-up fix is pending review.
+**Current review:** exact3270998 passed111tests and independently verified#60 Wiki,#61 entry arguments and#62 mouse-test timing corrections. Coordinate test instrumentation leaves untouched OS-dispatch coverage partial (#63). Native terrain34,304bytes; no new runtime defect reproduced.
 
 **Verified flicker fix:** a persistent offscreen bitmap/DC composes each frame and one BitBlt presents it. Independent testing covers visible pixels during slow drawing, resize GDI counts, and injected bitmap-allocation failure. No new runtime defect was reproduced. No CUA was resumed after the prior physical-Escape stop.
 
@@ -32,7 +32,7 @@ This is not a production engine. Current physics supports up to 128 2D circle an
 
 | Check | Result |
 |---|---|
-| `python -m unittest discover -s tests -q` | PASS — 109 tests independently rerun on exact native review candidate `7b528d5` |
+| `python -m unittest discover -s tests -q` | PASS — 111 tests independently rerun on exact native review candidate `3270998` |
 | Canonical item #172 resize suite | PASS — all 74 suite tests passed on exact review candidate `eec0608` |
 | Canonical item #185 near-plane clipping regression | PASS — native MSVC tests cover extreme finite segments, triangles, and sphere near caps on exact review candidate `eec0608` |
 | `python -m unittest discover -s tests -p test_runtime.py -v` | PASS — 4 native runtime tests, including resize, clipping, and aspect-preserving viewport cases |
@@ -81,18 +81,18 @@ Independent reviewer evaluated exact pushed commit `21fc960b04c2df317f3e0b358098
 | 5 | No essential feature missing | 0 | GPU rendering, broader engine systems and Forge requirements remain absent (open). |
 | 6 | Stated constraints respected | 1 | Native avoids C/Rust, but C is default; port remaining APIs before switching (open). |
 | 7 | Ambiguity resolved logically | 2 | Direct machine-code/PE target follows user selection. |
-| 8 | Behavior matches documentation | 1 | Compiler Wiki at7b528d5 incorrectly claims four parameters and no arrays/graphics/input (#60). Correction pending verification. |
+| 8 | Behavior matches documentation | 2 | README/Wiki/migration guide match the verified native subset;#60 is fixed. |
 | 9 | Important use cases supported | 1 | Interactive 2D input works; native 3D/assets/physics/networking remain missing (open). |
 | 10 | Usable for intended purpose | 1 | Usable for a small native demo; complete engine workflows remain unavailable (open). |
 | 11 | Core functionality works | 1 | Buffered windows, fixed updates and keyboard state work; complete native engine core remains partial (open). |
 | 12 | Secondary functionality works | 2 | Mouse position, buttons, wheel, capture, focus/cancel and keyboard regressions pass generated-app tests. |
 | 13 | Primary workflows functional | 2 | Interactive sample compiles directly to PE and accepts keyboard/mouse input. |
-| 14 | Inputs validated | 2 | Literal mouse button names and native arity are validated; numeric key checks remain covered. |
+| 14 | Inputs validated | 2 | Entry arguments use ordinary validated lowering; math/RNG/noise domains and button/key inputs are checked. |
 | 15 | Errors handled gracefully | 2 | Invalid native arity/features diagnose; buffered allocation-failure cleanup remains covered. |
 | 16 | Edge cases covered | 2 | Tests cover signed/outside mouse coordinates, resize, capture, taps, wheel fractions, focus and draw-only scenes. |
 | 17 | Invalid inputs controlled | 2 | Invalid/out-of-range numeric key queries safely return false, including1e300 and256. |
-| 18 | Stable across repeated operations | 2 | All 109 tests pass, including mouse sequences, slow drawing and resize resources. |
-| 19 | No known critical defects | 2 | The critic reproduced no new procedural runtime defect; development later found entry argument loss#61, fixed in unreviewed follow-up. |
+| 18 | Stable across repeated operations | 2 | All111tests and five repeated mouse suites pass, including input/capture and rendering/resource regressions. |
+| 19 | No known critical defects | 2 | Entry loss#61 fixed and independently verified; no new runtime defect reproduced. |
 | 20 | Components integrate | 2 | Keyboard/mouse share window dispatch and focus clearing; emitted PE consumes Win32 input. |
 | 21 | Logical project structure | 2 | Input emitter, window emitter, encoder, examples, tests and docs are separated. |
 | 22 | Readable and consistently formatted | 1 | Raw x64 bytes are hard to maintain; add instruction abstractions and formatting (open). |
@@ -108,10 +108,10 @@ Independent reviewer evaluated exact pushed commit `21fc960b04c2df317f3e0b358098
 | 32 | Core tests covered | 2 | Generated-app globals are inspected after window-local messages. |
 | 33 | Failure scenarios tested | 2 | Invalid mouse arguments/keys and bitmap allocation-failure injection are covered. |
 | 34 | Edge cases explicitly tested | 2 | Taps, repeats, simultaneous buttons, actual OS capture, wheel accumulation and draw-only behavior are tested. |
-| 35 | Integration behavior tested | 2 | Generated PE is launched and actual client pixels sampled. |
+| 35 | Integration behavior tested | 1 | Coordinate test uses an explicit test-only WndProc wrapper; untouched OS-dispatch coverage is incomplete (#63, open). |
 | 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
-| 37 | Builds and compilation pass | 2 | All 109 tests and static checks pass; native sample builds to 34,304 bytes. |
-| 38 | Results recorded accurately | 2 | Current records agree on reviewed7b528d5,72/100 and109tests; subsequent entry/Wiki fixes are explicitly pending. |
+| 37 | Builds and compilation pass | 2 | All111tests and static/extension checks pass; native terrain builds to34,304bytes. |
+| 38 | Results recorded accurately | 2 | Reports/state agree on exact3270998,72/100 and111tests; prior reviews and failed test run are explicitly historical. |
 | 39 | Regression checks performed | 2 | Full suite and prior slow-draw/failure/resource regressions pass. |
 | 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
 | 41 | Installation instructions accurate | 1 | Subset installation is documented; complete native engine installation is missing (open). |
@@ -124,22 +124,23 @@ Independent reviewer evaluated exact pushed commit `21fc960b04c2df317f3e0b358098
 | 48 | Deliverables organized | 2 | Deliverables are organized and pushed. |
 | 49 | Limitations disclosed | 2 | Native limitations are disclosed. |
 | 50 | Practical for intended scope | 0 | Full game-engine/Forge scope remains incomplete (open). |
-| | **Requirement fulfillment** | **11/20** | |
+| | **Requirement fulfillment** | **12/20** | |
 | | **Functionality and reliability** | **19/20** | |
 | | **Code quality and architecture** | **13/20** | |
-| | **Testing and verification** | **18/20** | |
+| | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **11/20** | |
-| | **Total** | **72/100** | Exact commit `7b528d5`; FAIL against 98. |
+| | **Total** | **72/100** | Exact commit `3270998`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
 - **Native mouse milestone: VERIFIED.** Client coordinates, all three buttons, repeats/taps, OS capture/release, focus/cancel, fractional wheel and draw-only consumption pass independent generated-app tests. Full score72/100 remains below98.
 - **Native product scope: OPEN.** Native 3D/camera, other shapes, assets, physics, networking, project manifests, broader language parity and Forge requirements remain unfinished. C/MSVC remains the broader default path; the final no-C/no-Rust architecture is not yet achieved.
 - **Architecture and delivery: OPEN.** Reduce raw opcode/ABI duplication and encoding/platform coupling; complete runtime/platform/project interfaces, troubleshooting and editor verification.
-- **Defects:** #57 flicker and #58 metadata parity remain fixed. #59 records the README native-mouse contradiction, corrected in documentation follow-up; no new runtime defect was reproduced. The full backlog remains only in issue23/comments.
+- **Defects:**#60 Wiki,#61 entry arguments and#62 test race are independently verified fixed. #63 records remaining untouched coordinate OS-dispatch coverage. No new runtime defect reproduced.
 
 
-- **Procedural milestone: VERIFIED.** Independent math/RNG/noise/fBm references, numeric domains, sixteen-argument ABI and larger local offsets pass. #60 Wiki and subsequently discovered #61 entry correction are pending follow-up review.
+- **Procedural milestone: VERIFIED.** Math/RNG/noise/fBm, sixteen-argument ABI and larger local offsets pass; full111-test suite and entry/capture corrections independently pass. Broader engine/Forge/OS scope remains open.
+
 
 ## Historical 50-criterion scoring — direct native commit `120482e`
 

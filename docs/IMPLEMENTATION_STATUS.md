@@ -2,7 +2,7 @@
 
 The master backlog is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23): its original 450-item inventory and the later additions remain there. This compact ledger records evidence only for audited items and does not duplicate the backlog. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated 2026-10-27. Latest independent review is exact `7b528d539cab96c0e1fa2693984d51f8340aaafb`,72/100—FAIL against98; all109tests pass. Math/RNG/noise/fBm verified. Wiki#60 and subsequently discovered explicit-main bug#61 are corrected in a follow-up pending review.
+Updated2026-10-28. Latest full independent review: exact `3270998384367be7b763cc605c0492208a72c988`,72/100—FAIL against98;111tests pass. Corrections#60/#61/#62 verified. Coordinate integration gap#63 remains. New OS parent items458–497 are only in issue23/comments.
 
 Latest reviewed native follow-up: direct AMD64/PE compilation supports numeric programs, checked global arrays and an initial Win32 2D runtime with fixed updates, buffered presentation and keyboard and mouse input. C remains default pending broader parity. Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
 
@@ -10,9 +10,9 @@ Verified flicker fix: persistent offscreen bitmap/DC resources compose each fram
 
 Historical keyboard milestone (21fc960, 73/100, 99 tests): held/pressed, repeat/focus/system-key handling, numeric key bounds and edge lifetimes were independently verified. Those regressions still pass in the current 102-test suite.
 
-Verified native mouse milestone: all five mouse query built-ins emit direct x64 handlers and state. Independent generated-app tests cover coordinates, three buttons, OS capture, focus/cancel, wheel fractions and draw-only edges. All 102 tests and static/extension checks pass; sample13,312 bytes. README finding #59 is corrected in documentation follow-up; source900106e score remains72/100.
+Historical verified mouse milestone900106e:72/100 with102tests. Pointer/buttons/wheel/capture functionality remains verified; current coordinate coverage explicitly uses test instrumentation (#63).
 
-Verified procedural milestone: basic math, seeded RNG, gradient noise and fBm compile directly, with reusable routines written in Anvil. Seven independent tests cover references, domains, stack parameters, larger local offsets and graphics integration. The full109-test suite passes; entry/Wiki corrections are the current unreviewed follow-up.
+Verified procedural milestone: basic math/RNG/noise/fBm, Anvil-written runtime helpers, sixteen-argument calls and larger locals pass. Current111-test review also verifies explicit-main values/side effects/arity and test race correction; no pending runtime candidate is claimed.
 
 ## Status counts
 
@@ -68,4 +68,4 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
 
 
-Historical issue#48 is resolved; current procedural7b528d5 scores72/100 with109tests. Entry/Wiki follow-up#60/#61 remains pending independent review. All scores are tied to exact source snapshots.
+Historical issue#48 is resolved. Current3270998 scores72/100 with111tests;#60/#61/#62 independently verified fixed;#63 remains open. All scores identify exact snapshots.

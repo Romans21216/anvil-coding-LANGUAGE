@@ -61,7 +61,7 @@ Gradient selection, fade, interpolation, noise and fBm are written in [Anvil run
 
 Calls pass the first four numeric arguments in XMM0–3 and later arguments in aligned Win64 stack slots. Up to sixteen arguments are supported within the existing sixteen-temporary expression budget. Scalar locals and compiler temporaries now support disp32 offsets. Each function frame is limited to 4096 bytes with a compiler diagnostic above that limit; unbounded recursion and native local arrays remain unsupported. The frame limit avoids silently permitting large unprobed Win64 allocations while broader stack-budget work is pending.
 
-Build `examples/native_procedural.ANVL` with `--backend native` for generated terrain. Space or left click regenerates it from a new seed. The candidate has generated-PE tests for reference noise/fBm values, RNG sequence/reseeding, math domains, nested argument side effects, sixteen-argument calls, large local offsets, library selection, and graphical use. Independent review of7b528d5 passed109tests and scored72/100; the subsequent explicit-main/Wiki follow-up is pending review.
+Build `examples/native_procedural.ANVL` with `--backend native` for generated terrain. Space or left click regenerates it from a new seed. Generated-PE tests cover reference noise/fBm values, RNG sequence/reseeding, math domains, nested argument side effects, sixteen-argument calls, large local offsets, library selection, and graphical use. Independent review of3270998 passed111tests and scored72/100; explicit-main/Wiki/test-race corrections are verified, while untouched coordinate OS-dispatch coverage remains partial (#63).
 
 ## Troubleshooting the direct backend
 
@@ -104,4 +104,4 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 - Native regression tests cover code generation, PE metadata/fixups, execution, resource lifetime, and engine behavior.
 - Documentation and evaluation reports distinguish implemented native features from migration work still in progress.
 
-The latest completed independent review evaluated `7b528d539cab96c0e1fa2693984d51f8340aaafb` at72/100, below98. All109tests passed; no procedural runtime defect was reproduced by the critic. Wiki#60 and subsequently discovered entry-argument bug#61 are corrected in a follow-up pending independent verification. Full engine/Forge migration remains incomplete.
+The latest completed independent review evaluated `3270998384367be7b763cc605c0492208a72c988` at72/100, below98. All111tests and five repeated mouse suites passed;#60/#61/#62 corrections verified. No new runtime defect was reproduced. Coordinate instrumentation coverage remains partial (#63); full engine/Forge/OS migration remains unfinished.
