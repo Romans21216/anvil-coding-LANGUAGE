@@ -91,9 +91,14 @@ class _Expression:
             self._emit_builtin(value)
             left = _Value("number", value)
         elif kind == "array":
-            raise CompileError(
-                f"{self.owner.path}:{self.line}: native fixed-array code generation is not available yet"
-            )
+            contents = value[value.index("array(") + 6:-1]
+            parts = split_args(contents)
+            if len(parts) != 2:
+                raise CompileError(
+                    f"{self.owner.path}:{self.line}: array access expects array(name, index)"
+                )
+            self.owner.emit_array_read(parts[0], parts[1], self.line, self.scope)
+            left = _Value("number", "array")
         elif kind == "string":
             raise CompileError(
                 f"{self.owner.path}:{self.line}: string expressions are not available in the native numeric backend"
@@ -202,7 +207,12 @@ class NativeCodegen:
         self._data_offsets = {
             name: index * 8 for index, name in enumerate(sorted(variables))
         }
-        self._data_size = max(8, len(self._data_offsets) * 8)
+        next_offset = len(self._data_offsets) * 8
+        self._array_offsets: dict[str, int] = {}
+        for name in sorted(self.arrays):
+            self._array_offsets[name] = next_offset
+            next_offset += self.arrays[name] * 8
+        self._data_size = max(8, next_offset)
 
     def label(self, stem: str) -> str:
         self._label_counter += 1
@@ -264,6 +274,95 @@ class NativeCodegen:
         if offset is None:
             raise CompileError(f"{self.path}:{line}: unknown global variable {name!r}")
         self.code.rip_store_data(0, offset)
+
+    def _emit_array_index(
+        self, name: str, raw_index: str, line: int, scope: Node | None
+    ) -> str:
+        """Evaluate a global array index once, validate it, and save its int64 slot."""
+        if scope is not None and name in scope.local_arrays:
+            raise CompileError(
+                f"{self.path}:{line}: native local arrays are not implemented yet"
+            )
+        size = self.arrays.get(name)
+        offset = self._array_offsets.get(name)
+        if size is None or offset is None:
+            raise CompileError(f"{self.path}:{line}: unknown array {name!r}")
+        self.emit_expression(raw_index, line, scope)
+        self.emit_finite_check(line)
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")  # cvttsd2si rax,xmm0
+        self.code.bytes(b"\xf2\x48\x0f\x2a\xc8\x66\x0f\x2e\xc1")
+        failure = self.label("array_index_error")
+        done = self.label("array_index_valid")
+        self.code.conditional_jump(0x8A, failure)  # jp: not integral/unordered
+        self.code.conditional_jump(0x85, failure)  # jne: not integral
+        self.code.bytes(b"\x48\x85\xc0")  # test rax,rax
+        self.code.conditional_jump(0x88, failure)  # js: negative
+        self.code.bytes(b"\x48\x3d" + struct.pack("<I", size))
+        self.code.conditional_jump(0x83, failure)  # jae: index >= size
+        slot = self.push_temp()
+        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+        self._store_rax_rbp(displacement)
+        self.code.jump(done)
+        self.code.label(failure)
+        self.emit_runtime_error(f"Anvil array index error at line {line}\n")
+        self.code.label(done)
+        return slot
+
+    def emit_array_read(
+        self, name: str, raw_index: str, line: int, scope: Node | None
+    ) -> None:
+        slot = self._emit_array_index(name, raw_index, line, scope)
+        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+        self._load_rax_rbp(displacement)
+        self.code.rip_lea_data(2, self._array_offsets[name])  # lea rdx,[array]
+        self.code.bytes(b"\xf2\x0f\x10\x04\xc2")  # movsd xmm0,[rdx+rax*8]
+        self.pop_temp()
+
+    def emit_array_write(
+        self,
+        name: str,
+        raw_index: str,
+        raw_value: str,
+        line: int,
+        scope: Node | None,
+    ) -> None:
+        slot = self._emit_array_index(name, raw_index, line, scope)
+        self.emit_expression(raw_value, line, scope)
+        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+        self._load_rax_rbp(displacement)
+        self.code.rip_lea_data(2, self._array_offsets[name])
+        self.code.bytes(b"\xf2\x0f\x11\x04\xc2")  # movsd [rdx+rax*8],xmm0
+        self.pop_temp()
+
+    def emit_runtime_error(self, message_text: str) -> None:
+        """Write a short UTF-8/ASCII diagnostic and terminate with status 2."""
+        message = message_text.encode("ascii")
+        for offset in range(0, len(message), 8):
+            chunk = message[offset:offset + 8].ljust(8, b"\0")
+            self.code.bytes(b"\x48\xb8" + chunk)
+            self.code.bytes(b"\x48\x89\x44\x24" + bytes((0x30 + offset,)))
+        self.code.bytes(b"\xb9\xf5\xff\xff\xff")  # STD_OUTPUT_HANDLE
+        self.code.rip_call_import("GetStdHandle")
+        self.code.bytes(b"\x48\x89\xc1\x48\x8d\x54\x24\x30")
+        self.code.bytes(b"\x41\xb8" + struct.pack("<I", len(message)))
+        self.code.bytes(b"\x4c\x8d\x4c\x24\x28")
+        self.code.bytes(b"\x48\xc7\x44\x24\x20\x00\x00\x00\x00")
+        self.code.rip_call_import("WriteFile")
+        self.code.bytes(b"\xb9\x02\x00\x00\x00")
+        self.code.rip_call_import("ExitProcess")
+        self.code.bytes(b"\xcc")
+
+    def _store_rax_rbp(self, displacement: int) -> None:
+        if -128 <= displacement <= 127:
+            self.code.bytes(b"\x48\x89\x45" + bytes((displacement & 0xFF,)))
+        else:
+            self.code.bytes(b"\x48\x89\x85" + struct.pack("<i", displacement))
+
+    def _load_rax_rbp(self, displacement: int) -> None:
+        if -128 <= displacement <= 127:
+            self.code.bytes(b"\x48\x8b\x45" + bytes((displacement & 0xFF,)))
+        else:
+            self.code.bytes(b"\x48\x8b\x85" + struct.pack("<i", displacement))
 
     def push_temp(self) -> str:
         self._scratch_depth += 1
@@ -381,6 +480,10 @@ class NativeCodegen:
             elif node.kind == "local_set":
                 self.emit_expression(node.value, node.line, scope)
                 self.store_local(node.name)
+            elif node.kind == "array_set":
+                self.emit_array_write(
+                    node.name, node.params[0], node.value, node.line, scope
+                )
             elif node.kind in ("add", "sub", "local_add", "local_sub"):
                 name = node.name
                 self.load_variable(name, scope, node.line)
@@ -610,8 +713,6 @@ class NativeCodegen:
         self.code.bytes(b"\xcc")
 
     def generate(self) -> bytes:
-        if self.arrays:
-            raise CompileError(f"{self.path}: global arrays are not implemented in the direct x64 backend yet")
         calls = [node for node in self.top if node.kind == "call"]
         if any(node.kind != "call" for node in self.top):
             unsupported = next(node for node in self.top if node.kind != "call")

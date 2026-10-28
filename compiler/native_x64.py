@@ -64,6 +64,14 @@ class X64Code:
         self.fixups.append((len(self.code), f"data:{data_offset}"))
         self.code.extend(b"\0\0\0\0")
 
+    def rip_lea_data(self, destination: int, data_offset: int) -> None:
+        """Load a .data address into an integer register using RIP-relative LEA."""
+        if not 0 <= destination <= 7:
+            raise ValueError("x64 destination register must be in the low register set")
+        self.code.extend((0x48, 0x8D, 0x05 | (destination << 3)))
+        self.fixups.append((len(self.code), f"data:{data_offset}"))
+        self.code.extend(b"\0\0\0\0")
+
     def finish(self, import_rvas: dict[str, int], text_rva: int = SECTION_ALIGNMENT) -> bytes:
         result = bytearray(self.code)
         for offset, target in self.fixups:

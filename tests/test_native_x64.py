@@ -136,6 +136,48 @@ call fn(main)
 """
         self.assertEqual(self._run_source(source), "1\n")
 
+    def test_native_backend_supports_checked_global_array_reads_and_writes(self):
+        source = """\
+array values(4)
+fn(next-index)
+  add var(calls) 1
+  output 2
+end
+fn(main)
+  set var(calls) = 0
+  set array(values, call fn(next-index)) = 17
+  set array(values, 3) = array(values, 2) + 4
+  output array(values, 2) + array(values, 3) + var(calls)
+end
+call fn(main)
+"""
+        self.assertEqual(self._run_source(source), "39\n")
+
+    def test_native_backend_reports_global_array_bounds_errors(self):
+        for index in ("-1", "2", "0.5"):
+            with self.subTest(index=index), tempfile.TemporaryDirectory() as temp:
+                path = pathlib.Path(temp) / "array-bounds.ANVL"
+                source = (
+                    "array values(2)\n"
+                    "fn(main)\n"
+                    f"  output array(values, {index})\n"
+                    "end\n"
+                    "call fn(main)\n"
+                )
+                path.write_text(source, encoding="utf-8")
+                functions, top, variables, arrays = parse(path, source)
+                executable = pathlib.Path(temp) / "array-bounds.exe"
+                executable.write_bytes(
+                    NativeCodegen(path, functions, top, variables, arrays).generate()
+                )
+                result = subprocess.run(
+                    [str(executable)], capture_output=True, text=True, timeout=5
+                )
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(
+                result.stdout, "Anvil array index error at line 3\n"
+            )
+
     def test_native_cli_builds_exe_without_generated_source(self):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(__file__).resolve().parents[1]

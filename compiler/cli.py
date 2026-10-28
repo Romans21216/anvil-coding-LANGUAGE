@@ -19,7 +19,7 @@ from compiler.parser import parse
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=(
-            "Compile Anvil source or project to C, then link a native executable."
+            "Compile Anvil source or a project to a native executable with the selected backend."
         )
     )
     ap.add_argument(

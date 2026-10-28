@@ -8,9 +8,9 @@ The `.ANVL` source syntax and engine APIs remain Anvil-owned. Generated EXEs con
 
 ## Current state
 
-An experimental direct backend is available with `python -m compiler.anvil <file.ANVL> --backend native --output <file.exe>`. It emits AMD64 instructions and PE32+ sections itself and imports only the Windows APIs it uses. It currently compiles a narrow numeric subset: simple functions with up to four numeric parameters, numeric local/global slots, addition/subtraction/multiplication/division, comparisons, short-circuit `and`/`or`, `if`, `while`, inclusive ascending/descending `for` loops, and console output rounded to six fractional digits (trailing zeroes are removed). Independent review of commit `f330d4b` verified the six-place output formatting and closed issue #49; issue #52 tracks the remaining large-value range defect. The native backend has been executed on Windows with language samples, without invoking a C or Rust compiler.
+An experimental direct backend is available with `python -m compiler.anvil <file.ANVL> --backend native --output <file.exe>`. It emits AMD64 instructions and PE32+ sections itself and imports only the Windows APIs it uses. Its supported subset includes simple functions with up to four numeric parameters, numeric local/global slots, fixed-size global numeric arrays with dynamic checked reads and writes, addition/subtraction/multiplication/division, comparisons, short-circuit `and`/`or`, `if`, `while`, inclusive ascending/descending `for` loops, and console output rounded to six fractional digits (trailing zeroes are removed). Array indices are evaluated once; negative, fractional, and out-of-range indices produce a line-numbered runtime diagnostic and exit code 2. Two native integration tests exercise successful array reads/writes and those failure paths. The native backend has been executed on Windows without invoking a C or Rust compiler.
 
-The regular build still defaults to the existing C backend. The native backend does **not** yet support the full language, project manifests, arrays, engine APIs, or graphics/audio/input/networking runtime. In particular, its executable is not yet a game-engine runtime. The current C path remains until native behavior reaches parity; no claim should say the full no-C requirement is complete.
+The regular build still defaults to the existing C backend. The native backend does **not** yet support function-local arrays, the full language, project manifests, engine APIs, or graphics/audio/input/networking runtime. In particular, its executable is not yet a game-engine runtime. The current C path remains until native behavior reaches parity; no claim should say the full no-C requirement is complete.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ The regular build still defaults to the existing C backend. The native backend d
 
 1. Machine-code and PE writer primitives; emit a minimal console EXE and verify it runs. **Implemented.**
 2. Arithmetic, checked numeric operations, functions, branches, and loops. **Partially implemented:** arithmetic, simple function calls, `if`, and `while` work; complete numeric diagnostics and language parity remain outstanding.
-3. Globals, fixed arrays, function-local heap arrays, and their bounds/allocation rules.
+3. Global slots and fixed-size global arrays, including checked indexing. **Partially implemented:** global slots and global arrays now compile directly; function-local heap arrays and their allocation/lifetime rules remain.
 4. Native input, window lifecycle, 2D drawing, and image resources.
 5. Camera, 3D primitives, BVH ray tracing, physics, procedural noise, and networking.
 6. Switch the default build to the direct x64/PE backend, port regression coverage, then remove C generation and MSVC-specific compiler invocation.
