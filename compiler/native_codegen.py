@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from compiler.common import CompileError, Node
 from compiler.expressions import ExpressionParser, split_args
+from compiler.lexer import strip_comment
 from compiler.native_x64 import Pe32Plus, X64Code
 
 
@@ -226,7 +227,7 @@ class NativeCodegen:
                     (
                         number
                         for number, text in enumerate(source_lines, 1)
-                        if declaration.fullmatch(text.strip())
+                        if declaration.fullmatch(strip_comment(text).strip())
                     ),
                     None,
                 )
