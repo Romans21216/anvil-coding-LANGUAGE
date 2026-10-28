@@ -10,7 +10,35 @@ The `.ANVL` source syntax and engine APIs remain Anvil-owned. Generated EXEs con
 
 An experimental direct backend is available with `python -m compiler.anvil <file.ANVL> --backend native --output <file.exe>`. It emits AMD64 instructions and PE32+ sections itself and imports only the Windows APIs it uses. Its supported subset includes simple functions with up to four numeric parameters, numeric local/global slots, fixed-size global numeric arrays with dynamic checked reads and writes, addition/subtraction/multiplication/division, comparisons, short-circuit `and`/`or`, `if`, `while`, inclusive ascending/descending `for` loops, and console output rounded to six fractional digits (trailing zeroes are removed). Array indices are evaluated once; negative, fractional, and out-of-range indices produce a line-numbered runtime diagnostic and exit code 2. Aggregate direct-native global data is capped at 16 MiB before PE payload allocation; declarations that exceed the limit fail with a source-located compiler diagnostic. Native integration tests exercise successful array reads/writes, index failures, and pre-allocation aggregate-limit rejection. The native backend has been executed on Windows without invoking a C or Rust compiler.
 
-The regular build still defaults to the existing C backend. The native backend does **not** yet support function-local arrays, the full language, project manifests, engine APIs, or graphics/audio/input/networking runtime. In particular, its executable is not yet a game-engine runtime. The current C path remains until native behavior reaches parity; no claim should say the full no-C requirement is complete.
+The direct backend now has an initial Windows 2D runtime: `scene 2d`, literal opaque `clear rgba`, top-level numeric initialization, `fn(draw)`, `display rect(...) -rgb(...)`, and optional `fn(update)` with `time()`, `delta()`, and `compute()`. Runtime instructions and the PE are emitted by Anvil; USER32/GDI32 functions are imported directly from Windows. No C/Rust source, compiler, linker, or runtime shim is used.
+
+The regular build still defaults to the C backend. The native backend does **not** yet support function-local arrays, the full language, project manifests, other shapes, text, alpha blending, 3D, assets, audio, input, physics, noise, or networking. Full no-C engine parity remains unfinished.
+
+## Native 2D scene
+
+```powershell
+python -m compiler.anvil examples/native_2d.ANVL --backend native --output build/native_2d.exe
+./build/native_2d.exe
+```
+
+The window has a 960×640 outer size initially and a resizable client area. Coordinates are client pixels; rectangles clip to that area, with floor/ceil edges matching the existing rectangle contract. The background and `fn(draw)` repaint on exposure, resize, and simulation updates. Each rectangle uses a Windows brush that is deleted after drawing. Closing the window ends the message loop and releases the background brush. There is no interpolation or double buffering in this first backend.
+
+If `fn(update)` exists, it takes no parameters and advances at fixed 1/60-second simulation steps. A 10 ms Windows timer wakes the event loop; elapsed time is accumulated to determine the number of updates. At most 250 ms of elapsed time is accepted per wake after a stall. `delta()` is 1/60 and `time()` is elapsed simulation time. `time()` in a draw-only scene also enables the clock; a static scene without update/time waits for Windows messages without a polling loop. `compute(expression)` is supported in both console and graphical native programs. Built-ins for input and all other runtime systems remain unsupported.
+
+The clear colour currently requires four literal 0–255 channels and alpha 255. Rectangles accept numeric coordinate/colour expressions, `-rgb(r,g,b)`, or `-rgba(r,g,b,255)`; other opacity values and modifiers produce compiler diagnostics. Unsupported native graphics fail explicitly instead of falling back to the C backend.
+
+`tests/test_native_window.py` executes an emitted EXE, inspects actual client pixels for colour, clipped and fractional edges, verifies timer-driven movement and erasure, resizes the window, and closes it with exit code 0. It also checks rejected constructs. These tests require an interactive Windows desktop. Windows painting follows the [BeginPaint/EndPaint lifecycle](https://learn.microsoft.com/en-us/windows/win32/gdi/drawing-in-the-client-area), and scheduling uses [window timers](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-settimer).
+
+## Troubleshooting the direct backend
+
+| Symptom | Action |
+|---|---|
+| C compiler is requested | Select `--backend native`; the current default is still C. |
+| Unsupported native shape, opacity, or built-in | Use the documented native subset and check the source-line compiler diagnostic. Unsupported features do not silently use another backend. |
+| `native scene 2d requires fn(draw)` | Define `fn(draw)` with no parameters. An optional `fn(update)` also takes no parameters. |
+| Native data exceeds 16 MiB | Reduce global array/storage requirements; runtime metadata also uses native program data. |
+| Output EXE cannot be overwritten | Close the running generated window, then rebuild. |
+| GUI test cannot read window pixels | Run it in an interactive Windows x64 desktop; it samples a visible test window and closes that process afterward. |
 
 ## Architecture
 
@@ -26,7 +54,7 @@ The regular build still defaults to the existing C backend. The native backend d
 1. Machine-code and PE writer primitives; emit a minimal console EXE and verify it runs. **Implemented.**
 2. Arithmetic, checked numeric operations, functions, branches, and loops. **Partially implemented:** arithmetic, simple function calls, `if`, and `while` work; complete numeric diagnostics and language parity remain outstanding.
 3. Global slots and fixed-size global arrays, including checked indexing. **Partially implemented:** global slots and global arrays now compile directly; function-local heap arrays and their allocation/lifetime rules remain.
-4. Native input, window lifecycle, 2D drawing, and image resources.
+4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, background clearing, and opaque rectangles work; remaining shapes, input and image resources are outstanding.
 5. Camera, 3D primitives, BVH ray tracing, physics, procedural noise, and networking.
 6. Switch the default build to the direct x64/PE backend, port regression coverage, then remove C generation and MSVC-specific compiler invocation.
 
@@ -39,4 +67,4 @@ The regular build still defaults to the existing C backend. The native backend d
 - Native regression tests cover code generation, PE metadata/fixups, execution, resource lifetime, and engine behavior.
 - Documentation and evaluation reports distinguish implemented native features from migration work still in progress.
 
-The direct-native candidate `120482e85e77c19216a793ab17190dbf1ae025ff` was independently scored 58/100, below the required 98/100. All 89 tests passed. Issues #49 and #52–#54 are fixed and closed after independent verification, covering fractional output, range errors, the signed minimum, and line-numbered non-finite diagnostics. The native engine runtime is incomplete, and the C backend remains the default pending feature parity; Rust output is not a target. See `docs/ANVIL_EVALUATION.txt`.
+The latest completed independent review evaluated `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` at 64/100, below 98. The new window-runtime candidate awaits a fresh review; its implementation evidence does not change that score. Full engine migration and the Forge format/target work remain unfinished. See `docs/ANVIL_EVALUATION.txt`.

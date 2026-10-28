@@ -90,7 +90,7 @@ class _Expression:
         elif kind == "call":
             self._emit_user_call(value)
             left = _Value("number", "call")
-        elif kind == "word" and value in self.owner.builtin_names:
+        elif kind == "word" and value in self.owner.BUILTIN_NAMES:
             self._emit_builtin(value)
             left = _Value("number", value)
         elif kind == "array":
@@ -169,9 +169,19 @@ class _Expression:
         self.owner.emit_call(name, raw_args, self.scope, self.line)
 
     def _emit_builtin(self, name: str) -> None:
-        raise CompileError(
-            f"{self.owner.path}:{self.line}: built-in {name} is not available in the direct x64 backend yet"
-        )
+        self._expect("(")
+        if name == "compute":
+            self._require_number(self.emit())
+            self._expect(")")
+            return
+        self._expect(")")
+        if self.owner._window is None:
+            raise CompileError(f"{self.owner.path}:{self.line}: {name}() requires native scene 2d")
+        if name == "delta":
+            self.owner.emit_float(1.0 / 60.0)
+        else:
+            self.owner._window.clock_requested = True
+            self.owner.code.rip_load_data(0, self.owner._window.simulation_time)
 
     def _peek_expected(self, value: str) -> bool:
         return self._peek(value)
@@ -192,7 +202,7 @@ class NativeCodegen:
     IMPORTS = [("KERNEL32.dll", "GetStdHandle"),
                ("KERNEL32.dll", "WriteFile"),
                ("KERNEL32.dll", "ExitProcess")]
-    BUILTIN_NAMES: set[str] = set()
+    BUILTIN_NAMES = {"compute", "time", "delta"}
     MAX_DATA_BYTES = 16 * 1024 * 1024
 
     def __init__(self, path, functions, top, variables, arrays=None):
@@ -245,6 +255,17 @@ class NativeCodegen:
                 f"the limit is {self.MAX_DATA_BYTES} bytes"
             )
         self._data_size = max(8, next_offset)
+        self._data = bytearray(self._data_size)
+        self._window = None
+
+    def reserve_data(self, payload: bytes) -> int:
+        offset = (len(self._data) + 7) & ~7
+        end = offset + len(payload)
+        if end > self.MAX_DATA_BYTES:
+            raise CompileError(f"{self.path}: native program data exceeds the 16 MiB limit")
+        self._data.extend(b"\0" * (offset - len(self._data)))
+        self._data.extend(payload)
+        return offset
 
     def label(self, stem: str) -> str:
         self._label_counter += 1
@@ -516,6 +537,8 @@ class NativeCodegen:
                 self.emit_array_write(
                     node.name, node.params[0], node.value, node.line, scope
                 )
+            elif node.kind == "display" and self._window is not None:
+                self._window.emit_display(node, scope)
             elif node.kind in ("add", "sub", "local_add", "local_sub"):
                 name = node.name
                 self.load_variable(name, scope, node.line)
@@ -745,6 +768,8 @@ class NativeCodegen:
         self.code.bytes(b"\xcc")
 
     def generate(self) -> bytes:
+        if any(node.kind == "scene" for node in self.top):
+            return self._generate_window()
         calls = [node for node in self.top if node.kind == "call"]
         if any(node.kind != "call" for node in self.top):
             unsupported = next(node for node in self.top if node.kind != "call")
@@ -770,10 +795,46 @@ class NativeCodegen:
         self.code.bytes(b"\x31\xc9")
         self.code.rip_call_import("ExitProcess")
         self.code.bytes(b"\xcc")
-        imports = list(self.IMPORTS)
+        return self._build(list(self.IMPORTS))
+
+    def _generate_window(self) -> bytes:
+        from compiler.native_window import NativeWindow
+
+        scenes = [node for node in self.top if node.kind == "scene"]
+        if len(scenes) != 1 or scenes[0].value != "2d":
+            raise CompileError(f"{self.path}:{scenes[0].line}: native graphics currently requires one scene 2d declaration")
+        draw = self.functions.get("draw")
+        if draw is None or draw.params:
+            raise CompileError(f"{self.path}: native scene 2d requires fn(draw) with no parameters")
+        if "update" in self.functions and self.functions["update"].params:
+            raise CompileError(f"{self.path}:{self.functions['update'].line}: native fn(update) cannot have parameters")
+        clear = [11, 16, 27, 255]
+        setup = []
+        for node in self.top:
+            if node.kind == "scene":
+                continue
+            if node.kind == "clear":
+                parts = split_args(node.value[1:-1])
+                if (len(parts) != 4 or any(not re.fullmatch(r"[0-9]{1,3}", part) for part in parts)
+                        or any(int(part) > 255 for part in parts) or parts[3] != "255"):
+                    raise CompileError(f"{self.path}:{node.line}: native clear requires four literal channels in 0..255 and alpha 255")
+                clear = [int(part) for part in parts]
+            elif node.kind in ("set", "add", "sub", "call"):
+                setup.append(node)
+            else:
+                raise CompileError(f"{self.path}:{node.line}: native scene setup does not support {node.kind!r}")
+        self._window = NativeWindow(self, clear[0] | (clear[1] << 8) | (clear[2] << 16))
+        for name, function in self.functions.items():
+            self._emit_function(name, function)
+        self.code.label("native:setup")
+        self._emit_function("native:setup", Node("function", 1, name="native:setup", body=setup))
+        self._window.emit()
+        return self._build(list(self.IMPORTS) + self._window.imports)
+
+    def _build(self, imports: list[tuple[str, str]]) -> bytes:
         pe = Pe32Plus(bytes(self.code.code), imports)
         targets = pe.fixup_targets(len(self.code.code))
         text = self.code.finish(targets)
         return Pe32Plus(text, imports).build(
-            entry_offset=self.code.labels["entry"], data=b"\0" * self._data_size
+            entry_offset=self.code.labels["entry"], data=bytes(self._data)
         )

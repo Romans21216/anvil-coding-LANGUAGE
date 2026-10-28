@@ -1,0 +1,20 @@
+# First graphical scene compiled directly by Anvil's x64/PE backend.
+scene 2d
+clear rgba(11, 16, 27, 255)
+set var(panel-x) = 40
+set var(offset) = 0
+
+fn(update)
+  add var(offset) compute(80 * delta())
+  if var(offset) > 440
+    set var(offset) = 0
+  end
+end
+
+fn(draw)
+  display rect(var(panel-x), 40, 500, 260) -rgb(35, 60, 90)
+  display rect(var(panel-x) + 24, 64, 180, 180) -rgb(88, 164, 255)
+  display rect(var(panel-x) + 228, 64, 248, 72) -rgb(172, 106, 255)
+  display rect(var(panel-x) + 228, 160, 248, 84) -rgb(93, 223, 199)
+  display rect(var(panel-x) + var(offset), 276, 30, 8) -rgb(255, 210, 90)
+end

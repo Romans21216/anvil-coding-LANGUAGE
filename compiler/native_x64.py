@@ -66,11 +66,49 @@ class X64Code:
 
     def rip_lea_data(self, destination: int, data_offset: int) -> None:
         """Load a .data address into an integer register using RIP-relative LEA."""
-        if not 0 <= destination <= 7:
-            raise ValueError("x64 destination register must be in the low register set")
-        self.code.extend((0x48, 0x8D, 0x05 | (destination << 3)))
+        self._register(destination)
+        self.code.extend((0x48 | (4 if destination >= 8 else 0), 0x8D,
+                          0x05 | ((destination & 7) << 3)))
         self.fixups.append((len(self.code), f"data:{data_offset}"))
         self.code.extend(b"\0\0\0\0")
+
+    @staticmethod
+    def _register(register: int) -> None:
+        if not 0 <= register <= 15:
+            raise ValueError("x64 register number must be from 0 to 15")
+
+    def mov_imm(self, destination: int, value: int) -> None:
+        self._register(destination)
+        self.bytes(bytes((0x48 | (destination >> 3), 0xB8 + (destination & 7)))
+                   + struct.pack("<Q", value & 0xFFFFFFFFFFFFFFFF))
+
+    def mov_reg(self, destination: int, source: int) -> None:
+        self._register(destination)
+        self._register(source)
+        self.bytes(bytes((0x48 | ((source >> 3) << 2) | (destination >> 3),
+                          0x89, 0xC0 | ((source & 7) << 3) | (destination & 7))))
+
+    def rip_int(self, register: int, data_offset: int, *, store: bool = False) -> None:
+        self._register(register)
+        self.bytes(bytes((0x48 | ((register >> 3) << 2), 0x89 if store else 0x8B,
+                          0x05 | ((register & 7) << 3))))
+        self.fixups.append((len(self.code), f"data:{data_offset}"))
+        self.bytes(b"\0\0\0\0")
+
+    def stack_int(self, register: int, offset: int, *, store: bool = False,
+                  address: bool = False) -> None:
+        self._register(register)
+        opcode = 0x8D if address else (0x89 if store else 0x8B)
+        self.bytes(bytes((0x48 | ((register >> 3) << 2), opcode,
+                          0x84 | ((register & 7) << 3), 0x24))
+                   + struct.pack("<i", offset))
+
+    def rip_lea_label(self, destination: int, label: str) -> None:
+        self._register(destination)
+        self.bytes(bytes((0x48 | ((destination >> 3) << 2), 0x8D,
+                          0x05 | ((destination & 7) << 3))))
+        self.fixups.append((len(self.code), f"label:{label}"))
+        self.bytes(b"\0\0\0\0")
 
     def finish(self, import_rvas: dict[str, int], text_rva: int = SECTION_ALIGNMENT) -> bytes:
         result = bytearray(self.code)

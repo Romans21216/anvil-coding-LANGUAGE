@@ -4,7 +4,9 @@ The master backlog is maintained only in the body and comments of GitHub issue [
 
 Updated 2026-10-27. Latest independent review is exact commit `2b0a7b113cd7eb9d4b6a4e82bb4faae7aa59b505` at 64/100 — FAIL against 98. All 92 tests pass. Issues #49 and #52–#56 are fixed and verified. Earlier native reviews scored 63/100 on 71ddfec, 61/100 on 9eaf1b6, 58/100 on 120482e, 56/100 on ade1ff6, 55/100 on f330d4b, 54/100 on 597867f, and 50/100 on 573cb44.
 
-Latest reviewed native follow-up: direct AMD64/PE compilation supports fixed-size global numeric arrays, dynamic checked reads/writes, source-line bounds errors, and a 16 MiB aggregate data cap checked before PE allocation. The 92-test candidate scored 64/100; issues #55 and #56 are fixed and independently verified. Native mode still does not support the engine runtime, and C remains the default. New Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
+Latest reviewed native follow-up: direct AMD64/PE compilation supports fixed-size global numeric arrays, dynamic checked reads/writes, source-line bounds errors, and a 16 MiB aggregate data cap checked before PE allocation. The 92-test candidate scored 64/100; issues #55 and #56 are fixed and independently verified. That reviewed revision lacked the native engine runtime; the new unreviewed candidate below starts its 2D implementation. C remains the default. New Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
+
+Unreviewed native runtime candidate: `compiler/native_window.py` emits Win32 window/paint/close code, opaque rectangles, fixed 60 Hz update callbacks, and clock built-ins directly as x64 instructions. `examples/native_2d.ANVL` builds and opens an animated scene. All 95 tests pass, including actual client-pixel, update, resize, and shutdown checks. Full native engine parity remains incomplete; C remains the default and this candidate awaits a fresh independent review.
 
 ## Status counts
 
