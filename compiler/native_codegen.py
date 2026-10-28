@@ -15,6 +15,13 @@ from compiler.native_x64 import Pe32Plus, X64Code
 
 
 @dataclass(frozen=True)
+class _TemporarySlot:
+    """Private scratch identity, distinct from every source identifier."""
+
+    index: int
+
+
+@dataclass(frozen=True)
 class _Value:
     kind: str
     text: str
@@ -337,22 +344,18 @@ class NativeCodegen:
             return bytes((0xF2, 0x0F, opcode, 0x45 | (register << 3), displacement & 0xFF))
         return bytes((0xF2, 0x0F, opcode, 0x85 | (register << 3))) + struct.pack("<i", displacement)
 
-    def load_local(self, name: str, scope: Node | None, line: int) -> None:
-        if name.startswith("_temporary_"):
-            index = int(name.rsplit("_", 1)[1])
-            displacement = -(self._scratch_base + index * 8)
+    def load_local(self, name: str | _TemporarySlot, scope: Node | None, line: int) -> None:
+        if isinstance(name, _TemporarySlot):
+            displacement = self._temporary_offset(name)
         elif scope is None or name not in self._frame_slots:
             raise CompileError(f"{self.path}:{line}: unknown local variable {name!r}")
         else:
             displacement = -self._frame_slots[name]
         self.code.bytes(self._memory_operand(0, 5, displacement))
 
-    def store_local(self, name: str) -> None:
-        if name.startswith("_temporary_"):
-            index = int(name.rsplit("_", 1)[1])
-            if index > 16:
-                raise CompileError(f"{self.path}: native expression needs more than 16 temporary slots")
-            offset = -(self._scratch_base + index * 8)
+    def store_local(self, name: str | _TemporarySlot) -> None:
+        if isinstance(name, _TemporarySlot):
+            offset = self._temporary_offset(name)
         elif name in self._frame_slots:
             offset = -self._frame_slots[name]
         else:
@@ -379,7 +382,7 @@ class NativeCodegen:
 
     def _emit_array_index(
         self, name: str, raw_index: str, line: int, scope: Node | None
-    ) -> str:
+    ) -> _TemporarySlot:
         """Evaluate a global array index once, validate it, and save its int64 slot."""
         if scope is not None and name in scope.local_arrays:
             raise CompileError(
@@ -402,7 +405,7 @@ class NativeCodegen:
         self.code.bytes(b"\x48\x3d" + struct.pack("<I", size))
         self.code.conditional_jump(0x83, failure)  # jae: index >= size
         slot = self.push_temp()
-        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+        displacement = self._temporary_offset(slot)
         self._store_rax_rbp(displacement)
         self.code.jump(done)
         self.code.label(failure)
@@ -414,7 +417,7 @@ class NativeCodegen:
         self, name: str, raw_index: str, line: int, scope: Node | None
     ) -> None:
         slot = self._emit_array_index(name, raw_index, line, scope)
-        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+        displacement = self._temporary_offset(slot)
         self._load_rax_rbp(displacement)
         self.code.rip_lea_data(2, self._array_offsets[name])  # lea rdx,[array]
         self.code.bytes(b"\xf2\x0f\x10\x04\xc2")  # movsd xmm0,[rdx+rax*8]
@@ -430,7 +433,7 @@ class NativeCodegen:
     ) -> None:
         slot = self._emit_array_index(name, raw_index, line, scope)
         self.emit_expression(raw_value, line, scope)
-        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+        displacement = self._temporary_offset(slot)
         self._load_rax_rbp(displacement)
         self.code.rip_lea_data(2, self._array_offsets[name])
         self.code.bytes(b"\xf2\x0f\x11\x04\xc2")  # movsd [rdx+rax*8],xmm0
@@ -466,11 +469,14 @@ class NativeCodegen:
         else:
             self.code.bytes(b"\x48\x8b\x85" + struct.pack("<i", displacement))
 
-    def push_temp(self) -> str:
+    def _temporary_offset(self, slot: _TemporarySlot) -> int:
+        return -(self._scratch_base + slot.index * 8)
+
+    def push_temp(self) -> _TemporarySlot:
         self._scratch_depth += 1
         if self._scratch_depth > 16:
             raise CompileError(f"{self.path}: native expression needs more than 16 temporary slots")
-        return f"_temporary_{self._scratch_depth}"
+        return _TemporarySlot(self._scratch_depth)
 
     def pop_temp(self) -> None:
         self._scratch_depth -= 1
@@ -479,10 +485,9 @@ class NativeCodegen:
         if name not in self._frame_slots:
             self._frame_slots[name] = (len(self._frame_slots) + 1) * 8
 
-    def emit_binary(self, operator: str, left_slot: str | None = None, line: int = 0) -> None:
+    def emit_binary(self, operator: str, left_slot: _TemporarySlot | None = None, line: int = 0) -> None:
         if left_slot is not None:
-            temp_index = int(left_slot.rsplit("_", 1)[1])
-            displacement = -(self._scratch_base + temp_index * 8)
+            displacement = self._temporary_offset(left_slot)
             # movapd xmm1, xmm0; load the saved left operand into xmm0.
             self.code.bytes(b"\x66\x0f\x28\xc8")
             self.code.bytes(self._memory_operand(0, 5, displacement))
@@ -559,7 +564,7 @@ class NativeCodegen:
             self.load_local(slots[index], self._scope, 0)
             self.code.bytes(b"\xf2\x0f\x11\x84\x24" + struct.pack("<i", 32 + (index - 4) * 8))
         for index, slot in enumerate(slots[:4]):
-            displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+            displacement = self._temporary_offset(slot)
             self.code.bytes(self._memory_operand(index, 5, displacement))
         self.code.call(f"function:{name}")
         self.code.bytes(b"\x48\x81\xc4" + struct.pack("<I", shadow))
@@ -658,13 +663,13 @@ class NativeCodegen:
                 self.code.conditional_jump(0x84, end)  # a zero step performs no iterations
                 self.code.conditional_jump(0x87, positive)  # step > 0
                 self.load_local(node.name, scope, node.line)
-                self.code.bytes(self._memory_operand(1, 5, -(self._scratch_base + int(end_slot.rsplit("_", 1)[1]) * 8)))
+                self.code.bytes(self._memory_operand(1, 5, self._temporary_offset(end_slot)))
                 self.code.bytes(b"\x66\x0f\x2e\xc1")
                 self.code.conditional_jump(0x82, end)  # current < end for negative step
                 self.code.jump(body)
                 self.code.label(positive)
                 self.load_local(node.name, scope, node.line)
-                self.code.bytes(self._memory_operand(1, 5, -(self._scratch_base + int(end_slot.rsplit("_", 1)[1]) * 8)))
+                self.code.bytes(self._memory_operand(1, 5, self._temporary_offset(end_slot)))
                 self.code.bytes(b"\x66\x0f\x2e\xc1")
                 self.code.conditional_jump(0x87, end)  # current > end for positive step
                 self.code.label(body)

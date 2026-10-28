@@ -149,7 +149,7 @@ class NativeMath:
         parser._expect(")")
 
         def load(index, register):
-            offset = -(owner._scratch_base + int(slots[index].rsplit("_", 1)[1]) * 8)
+            offset = owner._temporary_offset(slots[index])
             c.bytes(owner._memory_operand(register, 5, offset))
 
         if name in ("noise", "fbm"):

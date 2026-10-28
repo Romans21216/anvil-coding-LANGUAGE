@@ -2,9 +2,9 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated 2026-10-28. Latest full independent review: `5e80af327d1cedf9aafdc6af11a196702a866da5`, **68/100 — FAIL against 98/100**, with133 passing tests. Categories11/14/14/15/14. The complete rubric/evidence is in [QA_REPORT.md](QA_REPORT.md).
+Updated2026-10-28. Latest full independent review: `be0d591a82578d397ee1bfb88c31fe99f4749637`, **68/100 — FAIL against98/100**, with136 passing tests. Categories11/12/14/16/15. Complete rubric/evidence: [QA_REPORT.md](QA_REPORT.md).
 
-The review verified semantic physical provenance #66, then found native namespace alias #67, missing runtime reservations #68, editor indentation #69 and remaining stale compiler/migration prose #58. Current corrections await validation and independent review. #63 remains an untouched OS coordinate-dispatch coverage gap. Historical reviews retain their exact snapshots in the evaluation records.
+That review verified #58/#67–71 corrections and found valid-identifier scratch collisions #72 and quoted-reference discovery #73. Current corrections await validation and independent review. #63 untouched coordinate dispatch and the full native engine/Forge/OS scope remain unfinished. Earlier reviews retain their exact snapshots in the evaluation records.
 
 Direct AMD64/PE output supports numeric functions, checked global arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language and project support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 

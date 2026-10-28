@@ -1,19 +1,17 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 ====================================
 Assessment date: 2026-10-28
-Exact independently reviewed snapshot: 5e80af327d1cedf9aafdc6af11a196702a866da5
+Exact independently reviewed snapshot: be0d591a82578d397ee1bfb88c31fe99f4749637
 Evaluator: separate semantic_full_review agent; full 50-criterion rubric.
 Score: 68/100 — FAIL against 98/100.
-Categories: requirements 11/20; functionality 14/20; architecture 14/20; testing 15/20; delivery 14/20.
-Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,2,1,1,1,2,2,2,1,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,1,2,0 / 2,1,1,2,2,1,1,2,2,0
+Categories: requirements 11/20; functionality 12/20; architecture 14/20; testing 16/20; delivery 15/20.
+Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,1,1,1,1,2,1,2,1,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-133 tests independently passed in98.487s; npm, compileall, QA arithmetic, UTF8JSON, diff and VSIX0.1.10 parity passed. Eight extra CLI probes independently verify #66 semantic physical provenance fixed.
+136 tests independently passed in117.892s; npm0.1.11, compileall, QA arithmetic, UTF8JSON, diff and VSIX parity pass. #58 and#67–71 are independently verified fixed, including all63 runtime reservations and16-parameter/local-zero behavior. #71 removes legacy cursor movement; prior blanket no-global-input claims were inaccurate and are corrected. The current synthetic coordinate fixtures preserve their integration limitation (#63).
 
-New findings: #67 native global/local names alias, silently printing4 instead of9; #68 five unreserved runtime names cause generated-C build errors; #69 indentation rejects actual if/while/for headers; #58 compiler/migration guides remain stale. A development follow-up also reproduced #70 scalar locals retaining old stack values when assignments are skipped (77 instead of specified70). Local namespace/zero-initialization corrections and differential/configuration tests are in progress and await independent review. #63 untouched OS coordinate dispatch remains unverified.
+New findings: #72 accepted `_temporary_` identifiers alias internal scratch slots, silently returning wrong values or leaking ValueError; #73 quoted var/local-like text is falsely treated as references. Local typed-temporary and lexical-mask corrections pass139 tests in126.156s and47 targeted tests; compileall, QA arithmetic, strictUTF8/review-vector parity and diff checks pass. Independent review is pending. The full score remains tied tobe0d591. Source extension0.1.11 is packaged/tested; installed0.1.4 preserved, with no fresh visible verification.
 
-Local source includes and native function selection are implemented. Native/C include demos print 20; the direct native example is 3,072 bytes. Include graph limits, once/order semantics, cross-file recursion and UTF-8 runtime diagnostics are tested. Source extension 0.1.10 is packaged/tested; installed 0.1.4 is preserved. No CUA or fresh manual editor inspection occurred. A later audit found legacy C mouse tests moved the desktop pointer; prior blanket no-global-input claims were inaccurate. #71 corrects that fixture and its draw/update timing race after a136-test run failed coordinates. Three repeated C mouse runs and final136-test suite passed in116.325s; npm0.1.11, compileall, QA, UTF8/VSIX parity and diff checks pass. Fresh independent review is pending.
-
-Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previous1483632 review:71/100 with131tests. New adversarial evidence exposes additional correctness/tooling defects; the lower score remains tied to the exact snapshot.
+Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previous5e80af3 review:68/100 with133tests. Corrected documentation/test records gain credit while newly exposed correctness defects offset it, leaving68/100.
 
 SUMMARY
 -------

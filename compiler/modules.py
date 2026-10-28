@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 from compiler.common import ArrayDeclarations, CompileError, ParsedProgram
+from compiler.lexer import mask_strings
 
 MAX_INCLUDE_FILES = 256
 MAX_INCLUDE_DEPTH = 64
@@ -107,7 +108,7 @@ def called_functions(nodes):
         if node.kind == "call":
             result.add(node.name)
         for text in [node.value] + node.params:
-            unquoted = re.sub(r'"(?:\\.|[^"\\])*"', '""', text)
+            unquoted = mask_strings(text)
             result.update(re.findall(r'\bcall\s+fn\(\s*([A-Za-z_][\w-]*)', unquoted))
         pending.extend(node.body)
         pending.extend(node.otherwise)

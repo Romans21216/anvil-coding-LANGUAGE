@@ -15,7 +15,7 @@ from compiler.common import (
     ParsedProgram,
 )
 from compiler.expressions import split_args
-from compiler.lexer import split_keyword, strip_comment, validate_port
+from compiler.lexer import mask_strings, split_keyword, strip_comment, validate_port
 from compiler.semantics import validate_program
 
 
@@ -73,7 +73,8 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             include_name(raw_name, path, line_no)
             top.append(Node("include", line_no, value=raw_name, source=path))
             continue
-        for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", line):
+        reference_text = mask_strings(line)
+        for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", reference_text):
             variable_references.append(
                 (
                     reference.group(1),
@@ -82,7 +83,7 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     path,
                 )
             )
-        for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", line):
+        for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", reference_text):
             local_references.append(
                 (
                     reference.group(1),

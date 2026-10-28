@@ -24,6 +24,10 @@ class NativeConformanceTests(unittest.TestCase):
             ("zero-on-repeat", "fn(touch, flag)\n if var(flag)\n  set local(x) = 7\n end\n output local(x)\nend\nfn(main)\n output call fn(touch, 1) * 10 + call fn(touch, 0)\nend\n", "70"),
             ("loop-zero-and-parameter", "fn(touch, n)\n while var(n) < 0\n  set local(x) = 9\n end\n output local(x) + var(n)\nend\nfn(main)\n output call fn(touch, 13)\nend\n", "13"),
             ("recursive-zero", "fn(touch, n)\n if var(n) > 0\n  set local(x) = 7\n  output call fn(touch, var(n) - 1) + local(x)\n end\n output local(x)\nend\nfn(main)\n output call fn(touch, 3)\nend\n", "21"),
+            ("temporary-local", "fn(main)\n set local(_temporary_1) = 5\n output 1 + local(_temporary_1)\nend\n", "6"),
+            ("temporary-parameters", "fn(value, _temporary_1, _temporary_value)\n output max(var(_temporary_1),var(_temporary_value)) + sqrt(var(_temporary_1) * var(_temporary_1))\nend\nfn(main)\n output call fn(value,7,3)\nend\n", "14"),
+            ("temporary-loop-array", "array values(3)\nfn(main)\n set local(_temporary_1) = 5\n for local(_temporary_value) = 0 to 2\n  set array(values,local(_temporary_value)) = local(_temporary_1) + local(_temporary_value)\n end\n add local(_temporary_1) array(values,2)\n output local(_temporary_1) + array(values,1)\nend\n", "18"),
+            ("temporary-looking-budget", "fn(value, _temporary_17)\n output var(_temporary_17) + 1\nend\nfn(main)\n output call fn(value,41)\nend\n", "42"),
         ]
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)

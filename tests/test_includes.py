@@ -163,6 +163,36 @@ class IncludeTests(IncludeFixture):
                         self.assertIn('reserved runtime name', result.stderr)
                         self.assertNotIn('Traceback', result.stderr)
 
+    def test_quoted_reference_text_and_escapes_remain_literals(self):
+        literals = ['var(ghost)', 'local(ghost)', 'call fn(ghost)',
+                    'quote "var(ghost)" \\ local(ghost) # literal']
+        for literal in literals:
+            source = ('scene 2d\nfn(draw)\n set var(realglobal) = 3\n'
+                      ' set local(reallocal) = 4\n display text(' + json.dumps(literal)
+                      + ') -l(var(realglobal),local(reallocal))\nend\n')
+            with self.subTest(literal=literal):
+                path, program = self.load(source)
+                self.assertEqual(program[2], {'realglobal'})
+                self.assertEqual(program[0]['draw'].locals, {'reallocal'})
+                emit_c(path, *program)
+
+    def test_real_references_outside_literals_still_report_library_line(self):
+        for reference in ('var(missing)', 'local(missing)'):
+            library = self.write('literal.ANVL', 'fn(draw)\n display text("var(ghost) local(ghost)") -l(' + reference + ',0)\nend\n')
+            with self.subTest(reference=reference), self.assertRaises(CompileError) as error:
+                self.load('include "literal.ANVL"\nfn(main)\n output 0\nend\n')
+            self.assertIn(str(library) + ':2:', str(error.exception))
+            self.assertIn("'missing'", str(error.exception))
+            self.assertNotIn("'ghost'", str(error.exception))
+
+    def test_reference_like_image_path_in_unused_native_library(self):
+        self.write('literal.ANVL', 'fn(image-helper)\n output image_load("var(ghost)-local(ghost).bmp")\nend\n')
+        path, program = self.load('include "literal.ANVL"\nfn(main)\n output 7\nend\n')
+        emit_c(path, *program)
+        generator = NativeCodegen(path, *program)
+        generator.generate()
+        self.assertNotIn('function:image-helper', generator.code.labels)
+
     def test_graph_limits_and_invalid_utf8_are_controlled(self):
         self.write('one.ANVL', 'include "two.ANVL"\n')
         self.write('two.ANVL', 'fn(main)\n output 1\nend\n')
