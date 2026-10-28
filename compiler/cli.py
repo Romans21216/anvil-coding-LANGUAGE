@@ -51,10 +51,6 @@ def main() -> int:
         fixed_hz = 60
         project_name = "Anvil Game"
         if args.source.suffix.lower() == ".anvlproj":
-            if args.backend == "native":
-                raise CompileError(
-                    "--backend native does not support .ANVLproj manifests yet; compile the entry .ANVL file directly"
-                )
             manifest_text = args.source.read_text(encoding="utf-8")
             manifest = tomllib.loads(manifest_text)
             unknown_keys = set(manifest) - {"name", "entry", "engine"}
@@ -115,7 +111,8 @@ def main() -> int:
                     "--emit-c, --generated-c, --cc, and --release apply only to --backend c"
                 )
             executable = NativeCodegen(
-                source_path, funcs, top, variables, arrays
+                source_path, funcs, top, variables, arrays, fixed_hz=fixed_hz,
+                title=project_name if include_root is not None else "Anvil Native 2D"
             ).generate()
             out = args.output or source_path.with_suffix(".exe")
             out.parent.mkdir(parents=True, exist_ok=True)

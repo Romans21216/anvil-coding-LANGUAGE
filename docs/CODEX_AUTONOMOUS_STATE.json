@@ -5,7 +5,7 @@
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
   "current_active_item": null,
-  "current_active_item_status": "Next: semantic ray-flush classification#77 and native project manifests/settings; full goal remains active.",
+  "current_active_item_status": "Native ray/project batch implemented, full validation and independent review pending; full goal active.",
   "current_candidate_commit": "86681061c3e6d564b315dd571be4958202ac295d",
   "latest_verified_commit": "86681061c3e6d564b315dd571be4958202ac295d",
   "last_pushed_reviewed_below_threshold_commit": "86681061c3e6d564b315dd571be4958202ac295d",
@@ -236,6 +236,7 @@
     54,
     55,
     56,
+    58,
     59,
     60,
     61,
@@ -276,6 +277,11 @@
     57
   ],
   "current_candidate_status": "Full independent review8668106:72/100,146 tests; #74–76 verified fixed; #77 remains open. Native project workflow and full engine/Forge/OS goal remain active.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "feature": "Structured ray composition#77 and native project/title/fixed-rate settings",
+    "status": "Local full150 tests passed200.762s; focused ray/project tests, npm0.1.11, compileall, QA72 arithmetic and diff checks pass. Native example project builds withoutC/Rust. Fresh full independent review pending.",
+    "reviewed_baseline": "86681061c3e6d564b315dd571be4958202ac295d",
+    "python_tests_passed": 150
+  },
   "open_coordinate_integration_issue": 63
 }

@@ -76,14 +76,14 @@ def rgb_style(
     return color, raw
 
 
-def emit_display(
+def _lower_display(
     path: pathlib.Path,
     node: Node,
     ind: str,
     functions: dict[str, Node],
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
-) -> str:
+) -> tuple[str, str]:
     raw = node.value.strip()
     color, raw = rgb_style(raw, path, node.line, functions, scope, arrays)
     rot = ["0", "0", "0"]
@@ -125,7 +125,7 @@ def emit_display(
             )
             separator = "" if prefix.endswith((" ", "\t")) else " "
             fmt = prefix + separator + '%.0f"'
-            return (
+            return shape, (
                 f"{ind}anvil_text_number({', '.join(loc)}, {fmt}, {value}, "
                 f"{', '.join(color)});"
             )
@@ -136,23 +136,28 @@ def emit_display(
     ]
     tail = ", ".join(color)
     if shape == "cube" and len(values) == 4:
-        return f"{ind}anvil_cube({', '.join(values)}, {', '.join(rot)}, {tail});"
+        return shape, f"{ind}anvil_cube({', '.join(values)}, {', '.join(rot)}, {tail});"
     if shape == "sphere" and len(values) == 4:
-        return f"{ind}anvil_sphere({', '.join(values)}, {tail});"
+        return shape, f"{ind}anvil_sphere({', '.join(values)}, {tail});"
     if shape == "ray_sphere" and len(values) == 4:
-        return f"{ind}anvil_trace_sphere({', '.join(values)}, {tail});"
+        return shape, f"{ind}anvil_trace_sphere({', '.join(values)}, {tail});"
     if shape == "plane" and len(values) == 5:
-        return f"{ind}anvil_plane({', '.join(values)}, {tail});"
+        return shape, f"{ind}anvil_plane({', '.join(values)}, {tail});"
     if shape == "rect" and len(values) == 4:
-        return f"{ind}anvil_rect({', '.join(values)}, {tail});"
+        return shape, f"{ind}anvil_rect({', '.join(values)}, {tail});"
     if shape == "circle" and len(values) == 3:
-        return f"{ind}anvil_circle({', '.join(values)}, {tail});"
+        return shape, f"{ind}anvil_circle({', '.join(values)}, {tail});"
     if shape == "line" and len(values) in (4, 5):
         thick = values[4] if len(values) == 5 else "1.0"
-        return f"{ind}anvil_line({', '.join(values[:4])}, {tail}, {thick});"
+        return shape, f"{ind}anvil_line({', '.join(values[:4])}, {tail}, {thick});"
     if shape == "text" and loc and len(values) == 1:
-        return f"{ind}anvil_text({', '.join(loc)}, {values[0]}, {tail});"
+        return shape, f"{ind}anvil_text({', '.join(loc)}, {values[0]}, {tail});"
     raise CompileError(f"{path}:{node.line}: invalid arguments for display {shape}")
+
+def emit_display(path, node, ind, functions, scope=None, arrays=None) -> str:
+    """Compatibility API: return the generated statement only."""
+    return _lower_display(path, node, ind, functions, scope, arrays)[1]
+
 
 
 def emit_nodes(
@@ -324,8 +329,8 @@ def emit_nodes(
                 raise CompileError(f"{path}:{n.line}: clear rgba expects 4 values")
             out.append(f"{indent}anvil_clear({', '.join(lower(n, x) for x in args)});")
         elif n.kind == "display":
-            statement = emit_display(path, n, indent, functions, scope, arrays)
-            if "anvil_trace_sphere(" not in statement:
+            shape, statement = _lower_display(path, n, indent, functions, scope, arrays)
+            if shape != "ray_sphere":
                 out.append(f"{indent}anvil_trace_finish();")
             out.append(statement)
         elif n.kind == "seed":

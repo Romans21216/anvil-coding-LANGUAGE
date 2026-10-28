@@ -110,3 +110,35 @@ int main(void) { anvil_draw(); return 0; }
         expected.append('2,3|8,3,7,255|nested expressions')
         expected.append('rect:17,0,10,10')
         self.assertEqual(result.stdout.splitlines(), expected)
+
+    @unittest.skipUnless(sys.platform == 'win32', 'compiled call-order probe')
+    def test_ray_flush_uses_shape_identity(self):
+        compiler = find_compiler(None)
+        if not compiler:
+            self.skipTest('MSVC required')
+        for literal in ('normal', 'anvil_trace_sphere(', 'escaped "anvil_trace_sphere("'):
+            source = ('scene 3d\nfn(anvil_trace_sphere)\n output 0\nend\nfn(draw)\n'
+                      ' display ray_sphere(0,0,3,1)\n display ray_sphere(1,0,3,1)\n'
+                      ' display text(' + json.dumps(literal) + ') -l(0,0)\n'
+                      ' display rect(call fn(anvil_trace_sphere),0,1,1)\nend\n')
+            with self.subTest(literal=literal), tempfile.TemporaryDirectory() as temp:
+                root = pathlib.Path(temp)
+                (root/'program.c').write_text(self.generate(source), encoding='utf-8')
+                harness = root/'order.c'
+                harness.write_text("""#define main generated_main
+#define anvil_trace_sphere capture_sphere
+#define anvil_trace_finish capture_finish
+#define anvil_text capture_text
+#define anvil_rect capture_rect
+#include "program.c"
+#undef main
+void capture_sphere(double x,double y,double z,double radius,int r,int g,int b,int a){putchar('S');}
+void capture_finish(void){putchar('F');}
+void capture_text(double x,double y,const char *text,int r,int g,int b,int a){putchar('T');}
+void capture_rect(double x,double y,double w,double h,int r,int g,int b,int a){putchar('R');}
+int main(void){anvil_draw();capture_finish();return 0;}
+""", encoding='utf-8')
+                output=root/'order.exe'
+                build_c(compiler[1],harness,output,release=True)
+                result=subprocess.run([str(output)],capture_output=True,text=True,timeout=5)
+                self.assertEqual((result.returncode,result.stdout),(0,'SSFTFRF'))

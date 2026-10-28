@@ -18,7 +18,7 @@ python -m compiler.anvil examples/include_demo.ANVL --backend native --output bu
 
 An include path is a quoted JSON-style string, relative to the including file. Use forward slashes for portable paths. The extension must be `.ANVL` (case-insensitive); absolute paths, drive-relative paths and control characters are rejected. Includes are permitted only at top level. No network access or package download occurs.
 
-For a direct source build, all resolved includes must stay inside the entry file's directory tree. For a C-backed `.ANVLproj` build, they may use the manifest's whole project tree, including sibling libraries of a nested entry. Resolving a symlink or `..` outside that root is rejected. Native project manifests remain unsupported.
+For a direct source build, all resolved includes must stay inside the entry file's directory tree. For a C-backed `.ANVLproj` build, they may use the manifest's whole project tree, including sibling libraries of a nested entry. Resolving a symlink or `..` outside that root is rejected. Native project manifests use the same project-root include boundary.
 
 The compiler resolves each canonical file once. Repeated and diamond includes therefore neither duplicate definitions nor rerun initializers. Top-level statements are expanded depth-first at the include's position; their existing backend restrictions still apply. Native console programs currently accept top-level seed configuration and an explicit main call; native graphical setup supports numeric initialization and helper calls. Included library initialization is ordinary Anvil code, not an automatic plugin loader.
 
@@ -39,3 +39,5 @@ The follow-up for issue #65 bounds expression delimiter nesting and recursive ex
 A missing file or boundary error reports the include site; duplicate definitions name both declarations. A syntax/expression/configuration error should name the original physical file and line. Use an `.ANVLproj` project root for C builds whose entry lives below sibling library directories; direct source builds use the entry directory as the boundary. Package downloads, version solving and external plugin binaries are not performed.
 
 Configuration provenance and depth guards (#64/#65) were independently verified on 1483632. Exact current evaluation evidence is maintained in [QA_REPORT.md](QA_REPORT.md). Semantic declaration diagnostics (#66) were independently verified on5e80af3.
+
+Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.

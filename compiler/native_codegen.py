@@ -221,7 +221,7 @@ class _Expression:
         if self.owner._window is None:
             raise CompileError(f"{self.owner.path}:{self.line}: {name}() requires native scene 2d")
         if name == "delta":
-            self.owner.emit_float(1.0 / 60.0)
+            self.owner.emit_float(1.0 / (self.owner.fixed_hz if self.owner._window is not None else 60))
         else:
             self.owner._window.clock_requested = True
             self.owner.code.rip_load_data(0, self.owner._window.simulation_time)
@@ -252,8 +252,14 @@ class NativeCodegen:
     MAX_DATA_BYTES = 16 * 1024 * 1024
     MAX_FRAME_BYTES = 4096
 
-    def __init__(self, path, functions, top, variables, arrays=None):
+    def __init__(self, path, functions, top, variables, arrays=None, *, fixed_hz=60, title="Anvil Native 2D"):
         self.path = path
+        if isinstance(fixed_hz, bool) or not isinstance(fixed_hz, int) or not 1 <= fixed_hz <= 240:
+            raise CompileError(f"{path}: fixed_hz must be an integer from 1 to 240")
+        if not isinstance(title, str) or not title.strip() or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in title):
+            raise CompileError(f"{path}: title must be a non-empty Unicode string without control characters")
+        self.fixed_hz = fixed_hz
+        self.title = title
         if any(name.startswith("_anvil_native_") for name in functions):
             raise CompileError(f"{path}: function prefix _anvil_native_ is reserved for the native runtime")
         self.functions = dict(functions)

@@ -70,3 +70,5 @@ Performance evidence: Not available
 CURRENT PRIORITIES
 ------------------
 Fix semantic ray flush classification#77 and add native project/title/fixed-rate settings. Continue full native language/runtime parity, 3D/assets/audio/physics/networking, actual selectable ray backends, rich types and Forge/OS outputs. Measure resource use before claiming hyper-efficiency. Keep full reviews, all50 criteria and detailed GitHub findings synchronized. The goal remains active below98/100.
+
+Current unscored implementation batch: internal display lowering now carries validated shape identity for ray flushing while emit_display keeps its string-return API. Native .ANVLproj builds now carry project-root include boundaries, Unicode title and1–240Hz graphical settings; direct source and console defaults remain. Focused compiled order/project/clock tests pass; Local full150 tests passed200.762s; focused tests, npm, compileall, QA arithmetic and diff checks pass. Independent review pending. The latest independent72/100 score still applies to8668106. #58 ancillary metadata was independently rechecked and closed.

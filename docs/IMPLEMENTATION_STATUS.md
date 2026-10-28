@@ -62,3 +62,5 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 - `PARTIALLY IMPLEMENTED` means a working subset exists but one or more listed acceptance parts are missing.
 - These audited status counts summarize the original 450 entries; later backlog additions remain only in issue #23 until individually audited. `NEEDS VERIFICATION` is a conservative status, not a claim that a feature is absent.
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
+
+Unscored follow-up: semantic ray-flush classification and native project/title/update-rate settings are implemented locally with focused tests; independent review pending. #77 remains open until verified. #58 ancillary records passed independent recheck.

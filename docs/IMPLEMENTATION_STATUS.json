@@ -945,8 +945,13 @@
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 72,
-  "latest_independent_candidate_result": "FAIL against98;71/100; configuration provenance and depth failures require verification.",
-  "current_unscored_followup": null,
+  "latest_independent_candidate_result": "FAIL against98;72/100 on8668106; ray composition#77 remains open.",
+  "current_unscored_followup": {
+    "feature": "Structured ray composition#77 and native project/title/fixed-rate settings",
+    "status": "Local full150 tests passed200.762s; focused ray/project tests, npm0.1.11, compileall, QA72 arithmetic and diff checks pass. Native example project builds withoutC/Rust. Fresh full independent review pending.",
+    "reviewed_baseline": "86681061c3e6d564b315dd571be4958202ac295d",
+    "python_tests_passed": 150
+  },
   "latest_independently_scored_candidate_commit": "86681061c3e6d564b315dd571be4958202ac295d",
   "historical_c_backed_evaluation": {
     "score": 92,

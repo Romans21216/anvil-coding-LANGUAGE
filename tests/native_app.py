@@ -13,7 +13,8 @@ from compiler.parser import parse
 
 
 class NativeApp:
-    def __init__(self, source, *, instrument=None, source_path=None):
+    def __init__(self, source, *, instrument=None, source_path=None, generator_options=None):
+        self.generator_options = generator_options or {}
         self.source = source
         self.instrument = instrument
         self.source_path = source_path
@@ -46,7 +47,7 @@ class NativeApp:
             path = self.source_path or pathlib.Path(self.temp.name) / "input.ANVL"
             path.write_text(self.source, encoding="utf-8")
             functions, top, variables, arrays = parse(path, self.source)
-            generator = NativeCodegen(path, functions, top, variables, arrays)
+            generator = NativeCodegen(path, functions, top, variables, arrays, **self.generator_options)
             self.image = generator.generate()
             if self.instrument is not None:
                 self.image = self.instrument(generator)

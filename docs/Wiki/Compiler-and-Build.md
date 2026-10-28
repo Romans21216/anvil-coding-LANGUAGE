@@ -16,7 +16,7 @@ python compiler/anvil.py examples/functions.ANVL --backend native --output build
 
 The native subset includes numeric functions with up to sixteen parameters, checked global numeric arrays, arithmetic except remainder, comparisons, short-circuit `and`/`or`, branches, `while`/inclusive `for` loops, scalar locals/globals, and six-fractional-digit console output. Explicit `call fn(main, ...)` entry arguments use the ordinary call ABI; implicit `main` takes no arguments. Native 2D supports buffered opaque rectangles, fixed updates, keyboard input and client-pixel mouse queries. Math includes abs/sqrt/floor/ceil/min/max, deterministic seeded integer random numbers, 3D gradient noise and fBm, with an Anvil-written procedural library compiled directly into the EXE. See the migration guide for numeric ranges, stack-frame/temporary limits and exact behavior.
 
-Native 3D/camera, broader graphics/assets, audio, physics, networking, trigonometry, project manifests, package registries/binary plugins and Forge targets remain unsupported. These broader workflows are still incomplete in the requested final no-C/no-Rust architecture; the C backend remains the default prototype.
+Native 3D/camera, broader graphics/assets, audio, physics, networking, trigonometry, package registries/binary plugins and Forge targets remain unsupported. These broader workflows are still incomplete in the requested final no-C/no-Rust architecture; the C backend remains the default prototype.
 
 ## Direct source build
 
@@ -42,3 +42,5 @@ python compiler/anvil.py examples/functions.ANVL --emit-c build/functions.c
 
 
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](../INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
+
+Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
