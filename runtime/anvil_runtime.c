@@ -314,13 +314,33 @@ void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
 
 void anvil_circle(double x, double y, double radius, int r, int g, int b,
                   int a) {
-  int rr = (int)ceil(fabs(radius)), cx = (int)lrint(x), cy = (int)lrint(y);
+  if (!anvil_pixels || a <= 0 || !isfinite(x) || !isfinite(y) ||
+      !isfinite(radius))
+    return;
+  radius = fabs(radius);
+  /* Clip floating-point bounds before any integer conversion. In particular,
+     enormous off-screen circles must not scan radius-sized bounding squares.
+     The extra pixel makes these bounds conservative at rounded/tiny tangencies. */
+  double left = floor(x - radius) - 1.0;
+  double right = ceil(x + radius) + 1.0;
+  double top = floor(y - radius) - 1.0;
+  double bottom = ceil(y + radius) + 1.0;
+  if (right < 0.0 || bottom < 0.0 || left >= ANVIL_WIDTH ||
+      top >= ANVIL_HEIGHT)
+    return;
+  int minx = (int)fmax(0.0, left);
+  int maxx = (int)fmin(ANVIL_WIDTH - 1.0, right);
+  int miny = (int)fmax(0.0, top);
+  int maxy = (int)fmin(ANVIL_HEIGHT - 1.0, bottom);
   uint32_t c = anvil_color(r, g, b);
-  double r2 = radius * radius;
-  for (int py = cy - rr; py <= cy + rr; ++py)
-    for (int px = cx - rr; px <= cx + rr; ++px) {
+  /* Preserve the existing squared-distance predicate in its safe domain.
+     Hypot avoids overflowing squares for extreme finite C-API arguments. */
+  int squared = fmax(radius, fmax(fabs(x), fabs(y))) <= 1.0e150;
+  double r2 = squared ? radius * radius : 0.0;
+  for (int py = miny; py <= maxy; ++py)
+    for (int px = minx; px <= maxx; ++px) {
       double dx = px - x, dy = py - y;
-      if (dx * dx + dy * dy <= r2)
+      if (squared ? dx * dx + dy * dy <= r2 : hypot(dx, dy) <= radius)
         anvil_pixel(px, py, c, a);
     }
 }

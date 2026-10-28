@@ -278,6 +278,10 @@
     57
   ],
   "current_candidate_status": "Full review f11240c: 73/100, 168 tests in 176.154s; native circles/lines independently verified; pre-existing default C-circle stall confirmed as #79. Full goal active.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
+    "features": "Fix #79: viewport-clipped C circle traversal, finite validation before conversion, stable extreme-distance predicate; native circle/line kernels retained.",
+    "local_checks": "22-case production-framebuffer regression passed, including offscreen/visible huge circles, ordinary membership, opacity and guards. Latest scored source f11240c remains73/100 until correction review."
+  },
   "open_coordinate_integration_issue": 63
 }
