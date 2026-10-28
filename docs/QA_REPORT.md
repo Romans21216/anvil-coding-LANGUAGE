@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-10-28
-**Latest independent evaluation:** **69/100 - FAIL** on exact `c8b01e70dccfe777b490f5eec2d469b6e1c50800`.
+**Latest independent evaluation:** **72/100 - FAIL** on exact `86681061c3e6d564b315dd571be4958202ac295d`.
 **Current passing threshold:** 98/100. Historical 90-point passes do not pass the current requirement.
 **Evaluator:** separate `semantic_full_review` agent, full 50-criterion review.
 
@@ -9,37 +9,37 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 
 ## Independent verification for this snapshot
 
-- `python -m unittest discover -s tests -q`: **139 passed**, 124.267 seconds.
+- `python -m unittest discover -s tests -q`: **146 passed**, 125.935 seconds.
 - Extension 0.1.11 grammar validation and VSIX CRC/source parity passed. Language ID `anvil`, extensions `.ANVL`/`.anvl`, grammar `vscode-extension/syntaxes/anvil.tmLanguage.json`. Installed 0.1.4 remains per preference; newer visible tokens are unverified.
 - Python compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
 - Adversarial probes combine 128 statement blocks with 63 grouped/unary/user-call/abs levels; accepted inputs pass. Over-budget mixed expressions return controlled diagnostics. #64 configuration locations and #65 uncontrolled compiler recursion are verified fixed.
 - Source includes and native function selection were verified in the preceding `edfbe86` review: native demo 3,072 bytes, native and C/MSVC demos print 20. The full regression suite includes those execution paths.
 - Direct-backend window/input tests target only their generated windows. Coordinate coverage uses explicit test instrumentation; untouched OS coordinate dispatch remains unverified (#63). No CUA or fresh manual editor/sample inspection occurred. A later audit found the legacy C mouse harness called SetCursorPos during full suites; prior blanket no-global-input claims were too broad. #71 records this and removes that behavior in the current follow-up.
 
-## Latest 50-criterion scoring — `c8b01e7`
+## Latest 50-criterion scoring — `8668106`
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
 | 1 | Explicit requirements identified | 2 | Language/compiler/runtime and direct target are identified. |
 | 2 | Implicit requirements addressed | 1 | Runtime/input support is growing; most engine/Forge breadth remains unavailable (open). |
-| 3 | Functionality matches intended goal | 1 | Language/native subset works; complete engine absent and valid user function/text inputs still fail (#74/#75).
+| 3 | Functionality matches intended goal | 1 | Custom language/native subset works; full engine absent and drawing composition still depends on literal contents (#77).
 | 4 | Required deliverables present | 1 | Compiler, extension, tests and docs exist; native engine parity is missing (open). |
 | 5 | No essential feature missing | 0 | GPU rendering, broader engine systems and Forge requirements remain absent (open). |
 | 6 | Stated constraints respected | 1 | Native avoids C/Rust, but C is default; port remaining APIs before switching (open). |
 | 7 | Ambiguity resolved logically | 2 | Direct machine-code/PE target follows user selection. |
-| 8 | Behavior matches documentation | 1 | Current guides corrected; accepted function names and quoted display-literal semantics still fail (#74/#75).
+| 8 | Behavior matches documentation | 1 | Capabilities accurate, but ordinary draw-order composition is violated by generated-text ray classification (#77).
 | 9 | Important use cases supported | 1 | Interactive 2D input works; native 3D/assets/physics/networking remain missing (open). |
 | 10 | Usable for intended purpose | 1 | Usable for a small native demo; complete engine workflows remain unavailable (open). |
-| 11 | Core functionality works | 1 | Numeric/namespace/local/scratch regressions pass; full engine core partial and formatter-like user names fail (#74).
-| 12 | Secondary functionality works | 1 | Exercised primitives pass; quoted display modifiers silently change text/color (#75).
+| 11 | Core functionality works | 1 | Numeric/namespace/local/scratch/formatter cases pass; complete native engine core remains partial.
+| 12 | Secondary functionality works | 1 | Most primitives pass; ray/HUD composition depends on literal contents (#77).
 | 13 | Primary workflows functional | 1 | Hosted subset builds work; Forge/plugin/assembly/UEFI/kernel primary workflows are absent (open). |
-| 14 | Inputs validated | 1 | Bounds/reservations/depth/includes work; valid formatter-like function names collide with internal labels (#74).
-| 15 | Errors handled gracefully | 1 | Private formatter label collision leaks Python ValueError (#74).
+| 14 | Inputs validated | 2 | Exercised domains, bounds, names, reservations, includes, nesting and malformed suffixes receive expected validation.
+| 15 | Errors handled gracefully | 2 | Earlier formatter/scratch tracebacks fixed; current negative tests and related probes produce controlled errors.
 | 16 | Edge cases covered | 2 | Tests cover signed/outside mouse coordinates, resize, capture, taps, wheel fractions, focus and draw-only scenes. |
-| 17 | Invalid inputs controlled | 1 | Accepted user function name can cause uncontrolled native compilation failure (#74).
+| 17 | Invalid inputs controlled | 2 | No uncontrolled compiler failure reproduced after current identity fixes; negative regressions pass.
 | 18 | Stable across repeated operations | 2 | Repeated calls/resources/input/includes and new per-call initialization regressions pass.
 | 19 | No known critical defects | 2 | No critical runtime corruption or numeric miscompilation reproduced; remaining confirmed compile/display defects are P2.
-| 20 | Components integrate | 1 | Storage, includes and scratch objects integrate; private/user labels and display-string lowering still disagree (#74/#75).
+| 20 | Components integrate | 1 | Storage/includes/ordinary drawing integrate; generated-text classification still breaks ray/HUD ordering (#77).
 | 21 | Logical project structure | 2 | Input emitter, window emitter, encoder, examples, tests and docs are separated. |
 | 22 | Readable and consistently formatted | 1 | Raw x64 bytes are hard to maintain; add instruction abstractions and formatting (open). |
 | 23 | Clear module responsibilities | 1 | Input has its own module; instruction encoding/state/platform behavior remain coupled (open). |
@@ -50,13 +50,13 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 28 | No unfinished placeholders | 1 | Input handlers are real; native graphics still restricts scenes and opaque rectangle coverage (open). |
 | 29 | Configuration understandable | 2 | Backend selection, TOML keys, source boundaries and limits are understandable; unsupported native manifests explicitly reject.
 | 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
-| 31 | Automated tests provided | 2 | 139 Python tests and extension0.1.11 validation independently pass.
-| 32 | Core tests covered | 1 | Differential tests improve coverage; private formatter labels and quoted display modifiers remain uncovered (#74/#75).
+| 31 | Automated tests provided | 2 | 146 Python tests and extension0.1.11 validation independently pass.
+| 32 | Core tests covered | 1 | Numeric/differential/display coverage grows; generated-source-dependent ray flush order escaped tests (#77).
 | 33 | Failure scenarios tested | 2 | Invalid mouse arguments/keys and bitmap allocation-failure injection are covered. |
 | 34 | Edge cases explicitly tested | 2 | Taps, repeats, simultaneous buttons, actual OS capture, wheel accumulation and draw-only behavior are tested. |
 | 35 | Integration behavior tested | 1 | Coordinate test uses an explicit test-only WndProc wrapper; untouched OS-dispatch coverage is incomplete (#63, open). |
 | 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
-| 37 | Builds and compilation pass | 2 | 139tests, native/C examples, compileall, grammar/VSIX, UTF8 and diff checks pass; extra valid-input failures separately tracked.
+| 37 | Builds and compilation pass | 2 | 146tests, C/native probes, compileall, grammar/VSIX, UTF8 and diff checks pass.
 | 38 | Results recorded accurately | 2 | Exact baseline and unscored follow-up separated; prior cursor-movement claim and failed development run disclosed.
 | 39 | Regression checks performed | 2 | Full suite and prior slow-draw/failure/resource regressions pass. |
 | 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
@@ -71,28 +71,29 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 49 | Limitations disclosed | 2 | Native limitations are disclosed. |
 | 50 | Practical for intended scope | 0 | Full game-engine/Forge scope remains incomplete (open). |
 | | **Requirement fulfillment** | **11/20** | |
-| | **Functionality and reliability** | **13/20** | |
+| | **Functionality and reliability** | **16/20** | |
 | | **Code quality and architecture** | **14/20** | |
 | | **Testing and verification** | **16/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **69/100** | Exact commit `c8b01e7`; FAIL against 98. |
+| | **Total** | **72/100** | Exact commit `8668106`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
-- **#74 — private runtime labels (3/8/11/14/15/17/20/32):** A valid `anvil_print_number` function shares the formatter label and leaks duplicate-label ValueError; C prints7. Put internal helpers in a private runtime label namespace and verify direct/included calls without rejecting source names. Current correction awaits independent review.
-- **#75 — quoted display modifiers (3/8/12/20/32):** Modifier regexes remove quoted text and change color or reject valid strings. Scan outside strings at top-level suffix boundaries with balanced expression delimiters, preserving original literal spans and duplicate/first-color contracts. New generated-C and compiled call-boundary tests pass; correction awaits full review.
-- **Development follow-up #76:** Display argument expressions omit the global array context, rejecting a declared `array(values,0)` as unknown. Pass the full scope/array context consistently. New C emission/execution probes pass; this development finding was discovered after the scored review and awaits independent verification.
+- **#77 — semantic ray flush classification (3/8/12/20/32):** Searching generated C for `anvil_trace_sphere(` misclassifies literal text. A compiled probe captures Sphere→Text→finalFinish instead of Sphere→Finish→Text→finalFinish; overlapping rays can overwrite HUD text. Carry parsed shape/structured lowering metadata into flush selection, then verify literal/escaped text, other draws and real batching through actual emitted call order. Open; no fix or score is claimed yet.
 - **Scope (2–6/9–10/13/28/40/50):** Complete native engine, actual DXR/Embree, rich types, Forge/OS outputs and measured efficiency remain absent. Deliver full issue23 scope with executable acceptance evidence before default migration/completion.
 - **Architecture (22/23/25/27/30):** Raw opcode/ABI duplication and semantic/frame/runtime coupling increase maintenance risk. Consolidate instruction/ABI helpers and validated lowering/storage interfaces.
 - **Integration (35):** Instrumented/synchronized coordinate samples do not prove untouched OS pointer dispatch (#63). Gather independent integration evidence within input constraints.
 - **Setup/editor (42/46/47):** Full project/engine/Forge/OS setup cannot be reproduced; newer installed-editor visuals remain unverified (#24). Implement missing workflows and respect installed0.1.4 preference.
 
-The evaluator independently verified #72/#73, including additional temporary-like identifiers, escaped strings and actual outside-string references. Earlier #58/#67–71 remain verified. Native/C include demos both print20; samples are3072B/241664B and do not prove efficiency. Current tests retain the disclosed coordinate limitation (#63), and no CUA/global input/editor installation is claimed for this snapshot. Current #74–76 corrections pass145 local tests in127.910s; subsequent seven display tests include one added suffix-position regression. Compileall, QA69 arithmetic, UTF8/vector parity and diff checks pass. A fresh full146-test independent review is pending; no new score is claimed.
+The evaluator independently verified #74/#75/#76, including direct/included formatter names, literal-safe suffix parsing and an extra local-array shape/color capture17,17. Earlier corrections remain verified. Current tests retain the disclosed coordinate limitation (#63), and no CUA/global input/editor installation is claimed for this snapshot. This follow-up synchronizes the exact reviewed score and evidence; it changes no implementation.
+
+Next implementation priorities are semantic ray composition#77 and native project manifests/settings, followed by remaining full native engine/Forge/OS capabilities. A high prototype test count does not prove those systems complete.
 
 ## Review history
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
+| `c8b01e70dccfe777b490f5eec2d469b6e1c50800` | 69 / 98 — FAIL | 139tests; #72/#73 verified; #74/#75 found. Categories11/13/14/16/15. |
 | `be0d591a82578d397ee1bfb88c31fe99f4749637` | 68 / 98 — FAIL | 136tests; #58/#67–71 verified; #72/#73 found. Categories11/12/14/16/15. |
 | `5e80af327d1cedf9aafdc6af11a196702a866da5` | 68 / 98 — FAIL | 133tests; #66 verified, #67–69 found and #58 remained. Categories11/14/14/15/14. |
 | `148363296d51de59e3b92db3bf768d19ad5d2ee2` | 71 / 98 — FAIL | 131 tests; #64/#65 verified; residual #66 and stale #58 found. Categories11/17/13/16/14. |
@@ -105,4 +106,4 @@ Earlier reports and their complete rubric tables remain available in Git history
 
 ## Bug tracking
 
-All confirmed findings have detailed reproduction, impact and acceptance criteria in GitHub with `Codex Bugs`; user reports use `Romans21216 - Bugs`. Current compiler findings: [#74 runtime labels](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/74), [#75 literal modifiers](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/75), [#76 display arrays](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/76). [#63 coordinate integration](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/63) and broader systems in#5–11/#14–15/#24 remain open. Complete backlog only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
+All confirmed findings have detailed reproduction, impact and acceptance criteria in GitHub with `Codex Bugs`; user reports use `Romans21216 - Bugs`. Current confirmed compiler/runtime finding: [#77 ray flush classification](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/77). [#63 coordinate integration](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/63) and broader systems in#5–11/#14–15/#24 remain open. Complete backlog only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).

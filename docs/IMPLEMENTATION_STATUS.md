@@ -2,9 +2,9 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated2026-10-28. Latest full independent review: `c8b01e70dccfe777b490f5eec2d469b6e1c50800`, **69/100 — FAIL against98/100**, with139 passing tests. Categories11/13/14/16/15. Full rubric: [QA_REPORT.md](QA_REPORT.md).
+Updated2026-10-28. Latest full independent review: `86681061c3e6d564b315dd571be4958202ac295d`, **72/100 — FAIL against98/100**, with146 passing tests. Categories11/16/14/16/15. Full rubric: [QA_REPORT.md](QA_REPORT.md).
 
-That review verified #72/#73 corrections and found runtime label collision#74 and quoted display modifier#75. Development also found missing array context in display lowering#76. Current corrections await validation and independent review. #63 untouched coordinate dispatch and full native engine/Forge/OS scope remain unfinished. Earlier reviews keep their exact snapshots in evaluation records.
+That review verified #74–76 and found literal-dependent ray flush classification#77. #77 is open; no correction is claimed yet. #63 untouched coordinate dispatch and full native engine/Forge/OS scope remain unfinished. Next: semantic ray composition and native project manifests/settings. Earlier reviews retain exact snapshots in evaluation records.
 
 Direct AMD64/PE output supports numeric functions, checked global arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language and project support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 

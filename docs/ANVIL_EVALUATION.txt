@@ -1,17 +1,17 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 ====================================
 Assessment date: 2026-10-28
-Exact independently reviewed snapshot: c8b01e70dccfe777b490f5eec2d469b6e1c50800
+Exact independently reviewed snapshot: 86681061c3e6d564b315dd571be4958202ac295d
 Evaluator: separate semantic_full_review agent; full 50-criterion rubric.
-Score: 69/100 — FAIL against 98/100.
-Categories: requirements 11/20; functionality 13/20; architecture 14/20; testing 16/20; delivery 15/20.
-Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,1,1,1,1,2,1,2,2,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Score: 72/100 — FAIL against 98/100.
+Categories: requirements 11/20; functionality 16/20; architecture 14/20; testing 16/20; delivery 15/20.
+Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,1,1,2,2,2,2,2,2,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-139 tests independently passed in124.267s; npm0.1.11, compileall, QA arithmetic, UTF8JSON, diff and VSIX parity pass. #72 private scratch identities and#73 quoted reference discovery are independently verified fixed. Native/C include demos print20; sample artifact sizes3072B/241664B are not benchmarks. Source extension0.1.11 is packaged/tested; installed0.1.4 preserved with no fresh visible verification.
+146 tests independently passed in125.935s; npm0.1.11, compileall, QA arithmetic, UTF8JSON, diff and VSIX parity pass. #74 private formatter labels, #75 literal-safe drawing suffixes and#76 complete array expression context are verified fixed. An extra local-array shape/color capture prints17,17. Installed0.1.4 is preserved; source/package0.1.11 has automated verification with no fresh visible-editor claim.
 
-New findings: #74 a valid user function shares the native formatter label and leaks ValueError; #75 drawing modifiers inside quoted text change its contents/color or cause rejection. Development additionally reproduced#76 declared global arrays unavailable in drawing arguments. Local private-label and lexical display-lowering corrections pass focused C emission/execution tests; 145 local tests pass127.910s; subsequent seven display tests include one new suffix-position check, all pass. Static/QA/UTF8/vector/diff checks pass; fresh independent full146-test review pending. No score is claimed for those changes. #63 coordinate integration remains unverified. Earlier legacy cursor-movement claims were corrected under#71; current tests use no global input injection.
+New confirmed#77: ray flush selection searches generated C, so text containing anvil_trace_sphere( omits the flush before text. Actual compiled call order changes and rays may overwrite the HUD. Correct classification using parsed shape/structured lowering, then add call-order regressions. No fix or score is claimed for this open finding. #63 untouched coordinate dispatch remains unverified; current tests use no global input injection. This report update changes no implementation.
 
-Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previousbe0d591 review:68/100 with136tests. Storage reliability gains move the score to69, while complete scope and new compile/display defects remain.
+Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previousc8b01e7 review:69/100 with139tests. Input validation/error handling gains raise the score to72; full scope and the new rendering-order defect remain.
 
 SUMMARY
 -------
@@ -69,4 +69,4 @@ Performance evidence: Not available
 
 CURRENT PRIORITIES
 ------------------
-Verify semantic diagnostic and metadata corrections, then continue native runtime/language/project parity and whole-engine requirements. Expand assets/audio/graphics/physics/networking, structured types and Forge/OS targets with real execution evidence. Benchmark compiler and runtime resource use before claiming hyper-efficiency. Keep every critic result and issue #23 synchronized.
+Fix semantic ray flush classification#77 and add native project/title/fixed-rate settings. Continue full native language/runtime parity, 3D/assets/audio/physics/networking, actual selectable ray backends, rich types and Forge/OS outputs. Measure resource use before claiming hyper-efficiency. Keep full reviews, all50 criteria and detailed GitHub findings synchronized. The goal remains active below98/100.
