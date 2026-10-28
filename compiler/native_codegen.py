@@ -12,6 +12,7 @@ from compiler.common import CompileError, KEY_CODES, Node
 from compiler.expressions import ExpressionParser, MAX_EXPRESSION_DEPTH, split_args
 from compiler.lexer import strip_comment
 from compiler.native_x64 import Pe32Plus, X64Code
+from compiler.native_abi import Win64NumericABI
 
 
 @dataclass(frozen=True)
@@ -338,20 +339,6 @@ class NativeCodegen:
         self.code.bytes(b"\x48\xb8" + struct.pack("<Q", struct.unpack("<Q", struct.pack("<d", value))[0]))
         self.code.bytes(b"\x66\x48\x0f\x6e\xc0")  # movq xmm0, rax
 
-    @staticmethod
-    def _memory_operand(register: int, base: int, displacement: int) -> bytes:
-        return NativeCodegen._xmm_rbp_operand(0x10, register, displacement)
-
-    @staticmethod
-    def _store_xmm_operand(register: int, displacement: int) -> bytes:
-        return NativeCodegen._xmm_rbp_operand(0x11, register, displacement)
-
-    @staticmethod
-    def _xmm_rbp_operand(opcode: int, register: int, displacement: int) -> bytes:
-        if -128 <= displacement <= 127:
-            return bytes((0xF2, 0x0F, opcode, 0x45 | (register << 3), displacement & 0xFF))
-        return bytes((0xF2, 0x0F, opcode, 0x85 | (register << 3))) + struct.pack("<i", displacement)
-
     def load_local(self, name: str | _TemporarySlot, scope: Node | None, line: int) -> None:
         if isinstance(name, _TemporarySlot):
             displacement = self._temporary_offset(name)
@@ -359,7 +346,7 @@ class NativeCodegen:
             raise CompileError(f"{self.path}:{line}: unknown local variable {name!r}")
         else:
             displacement = -self._frame_slots[name]
-        self.code.bytes(self._memory_operand(0, 5, displacement))
+        self.code.scalar_memory(0, 5, displacement)
 
     def store_local(self, name: str | _TemporarySlot) -> None:
         if isinstance(name, _TemporarySlot):
@@ -368,7 +355,7 @@ class NativeCodegen:
             offset = -self._frame_slots[name]
         else:
             raise CompileError(f"native compiler internal error: local slot {name!r} missing")
-        self.code.bytes(self._store_xmm_operand(0, offset))
+        self.code.scalar_memory(0, 5, offset, store=True)
 
     def load_variable(self, name: str, scope: Node | None, line: int) -> None:
         if scope is not None and name in scope.params:
@@ -501,7 +488,7 @@ class NativeCodegen:
             displacement = self._temporary_offset(left_slot)
             # movapd xmm1, xmm0; load the saved left operand into xmm0.
             self.code.bytes(b"\x66\x0f\x28\xc8")
-            self.code.bytes(self._memory_operand(0, 5, displacement))
+            self.code.scalar_memory(0, 5, displacement)
         opcodes = {
             "+": b"\xf2\x0f\x58\xc1",
             "-": b"\xf2\x0f\x5c\xc1",
@@ -567,18 +554,9 @@ class NativeCodegen:
         self.emit_saved_call(name, slots)
         self._scratch_depth = base_depth
 
-    def emit_saved_call(self, name: str, slots: list[str]) -> None:
-        # First four doubles use XMM0-3; later doubles use Win64 stack slots.
-        shadow = (32 + max(0, len(slots) - 4) * 8 + 15) & ~15
-        self.code.bytes(b"\x48\x81\xec" + struct.pack("<I", shadow))
-        for index in range(4, len(slots)):
-            self.load_local(slots[index], self._scope, 0)
-            self.code.bytes(b"\xf2\x0f\x11\x84\x24" + struct.pack("<i", 32 + (index - 4) * 8))
-        for index, slot in enumerate(slots[:4]):
-            displacement = self._temporary_offset(slot)
-            self.code.bytes(self._memory_operand(index, 5, displacement))
-        self.code.call(f"function:{name}")
-        self.code.bytes(b"\x48\x81\xc4" + struct.pack("<I", shadow))
+    def emit_saved_call(self, name: str, slots: list[_TemporarySlot]) -> None:
+        Win64NumericABI(self.code).call(
+            f"function:{name}", [self._temporary_offset(slot) for slot in slots])
 
     def emit_expression(self, raw: str, line: int, scope: Node | None) -> None:
         _Expression(self, line, raw, scope).compile()
@@ -677,13 +655,13 @@ class NativeCodegen:
                 self.code.conditional_jump(0x84, end)  # a zero step performs no iterations
                 self.code.conditional_jump(0x87, positive)  # step > 0
                 self.load_local(node.name, scope, node.line)
-                self.code.bytes(self._memory_operand(1, 5, self._temporary_offset(end_slot)))
+                self.code.scalar_memory(1, 5, self._temporary_offset(end_slot))
                 self.code.bytes(b"\x66\x0f\x2e\xc1")
                 self.code.conditional_jump(0x82, end)  # current < end for negative step
                 self.code.jump(body)
                 self.code.label(positive)
                 self.load_local(node.name, scope, node.line)
-                self.code.bytes(self._memory_operand(1, 5, self._temporary_offset(end_slot)))
+                self.code.scalar_memory(1, 5, self._temporary_offset(end_slot))
                 self.code.bytes(b"\x66\x0f\x2e\xc1")
                 self.code.conditional_jump(0x87, end)  # current > end for positive step
                 self.code.label(body)
@@ -727,15 +705,10 @@ class NativeCodegen:
         self.code.label(f"function:{name}")
         self.code.bytes(b"\x55\x48\x89\xe5")  # push rbp; mov rbp,rsp
         self.code.bytes(b"\x48\x81\xec" + struct.pack("<I", self._frame_size))
-        for index, param in enumerate(fn.params):
-            if index < 4:
-                offset = -self._frame_slots[param]
-                self.code.bytes(self._store_xmm_operand(index, offset))
-            elif index < 16:
-                self.code.bytes(self._memory_operand(0, 5, 48 + (index - 4) * 8))
-                self.code.bytes(self._store_xmm_operand(0, -self._frame_slots[param]))
-            else:
-                raise CompileError(f"{self.path}:{fn.line}: native backend supports at most sixteen parameters")
+        if len(fn.params) > Win64NumericABI.MAX_ARGUMENTS:
+            raise CompileError(f"{self.path}:{fn.line}: native backend supports at most sixteen parameters")
+        Win64NumericABI(self.code).save_parameters(
+            [-self._frame_slots[param] for param in fn.params])
         if fn.locals:
             # Parameters are saved before XMM0 is used to initialize local state.
             self.code.bytes(b"\x66\x0f\xef\xc0")  # pxor xmm0,xmm0

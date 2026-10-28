@@ -63,7 +63,7 @@ class NativeArrays:
             self.owner.code.bytes(b'\xc9\xc3')
             return
         o, c = self.owner, self.owner.code
-        c.bytes(o._store_xmm_operand(0, self.result))
+        c.scalar_memory(0, 5, self.result, store=True)
         c.bytes(b'\x48\x83\xec\x30')
         c.rip_call_import('GetProcessHeap')
         c.mov_reg(1, 0)
@@ -78,5 +78,5 @@ class NativeArrays:
         c.rip_int(0, self.active)
         c.bytes(b'\x48\x2d' + struct.pack('<I', self.total))
         c.rip_int(0, self.active, store=True)
-        c.bytes(o._memory_operand(0, 5, self.result))
+        c.scalar_memory(0, 5, self.result)
         c.bytes(b'\xc9\xc3')

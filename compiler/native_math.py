@@ -150,7 +150,7 @@ class NativeMath:
 
         def load(index, register):
             offset = owner._temporary_offset(slots[index])
-            c.bytes(owner._memory_operand(register, 5, offset))
+            c.scalar_memory(register, 5, offset)
 
         if name in ("noise", "fbm"):
             if name == "noise":

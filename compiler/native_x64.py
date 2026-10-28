@@ -110,6 +110,26 @@ class X64Code:
                           0x89 if store else 0x8B,
                           0x85 | ((register & 7) << 3))) + struct.pack("<i", offset))
 
+    def scalar_memory(self, register: int, base: int, displacement: int,
+                      *, store: bool = False) -> None:
+        """MOVSD between an XMM register and [base + signed displacement].
+
+        Always encode a displacement, including zero, so RBP/R13 cannot
+        accidentally select RIP-relative addressing. RSP/R12 require a SIB.
+        """
+        self._register(register)
+        self._register(base)
+        if not -(1 << 31) <= displacement < (1 << 31):
+            raise ValueError("x64 memory displacement must fit signed 32 bits")
+        short = -128 <= displacement <= 127
+        prefix = bytes((0x40 | ((register >> 3) << 2) | (base >> 3),))
+        self.bytes(b"\xf2" + (prefix if prefix != b"\x40" else b"")
+                   + bytes((0x0F, 0x11 if store else 0x10,
+                            (0x40 if short else 0x80) | ((register & 7) << 3) | (base & 7))))
+        if base & 7 == 4:
+            self.bytes(b"\x24")
+        self.bytes(struct.pack("<b" if short else "<i", displacement))
+
     def rip_lea_label(self, destination: int, label: str) -> None:
         self._register(destination)
         self.bytes(bytes((0x48 | ((destination >> 3) << 2), 0x8D,
