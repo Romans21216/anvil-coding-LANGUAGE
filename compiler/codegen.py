@@ -16,6 +16,41 @@ from compiler.common import (
     variable_code,
 )
 from compiler.expressions import expr, split_args
+from compiler.lexer import mask_strings
+
+
+def _take_display_modifiers(raw, names, path, line):
+    """Extract only top-level suffixes; retain original literal/expression spans."""
+    masked = mask_strings(raw)
+    found, spans = [], []
+    depth = index = 0
+    while index < len(masked):
+        char = masked[index]
+        if depth == 0 and char == "-" and index > 0 and masked[index - 1].isspace():
+            match = re.match(r"-(rgb|rgba|rotate|l)\(", masked[index:])
+            if match and match.group(1) in names:
+                argument_start = index + match.end()
+                end, nested = argument_start, 1
+                while end < len(masked) and nested:
+                    nested += (masked[end] == "(") - (masked[end] == ")")
+                    end += 1
+                if nested:
+                    raise CompileError(f"{path}:{line}: unclosed -{match.group(1)} display modifier")
+                found.append((match.group(1), raw[argument_start:end - 1]))
+                spans.append((index, end))
+                index = end
+                continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        index += 1
+    remaining, previous = [], 0
+    for start, end in spans:
+        remaining.append(raw[previous:start])
+        previous = end
+    remaining.append(raw[previous:])
+    return found, "".join(remaining)
 
 
 def rgb_style(
@@ -27,17 +62,17 @@ def rgb_style(
     arrays: dict[str, int] | None = None,
 ) -> tuple[list[str], str]:
     color = ["255", "255", "255", "255"]
-    m = re.search(r"-rgba?\(([^)]*)\)", raw)
-    if m:
-        vals = split_args(m.group(1))
+    modifiers, raw = _take_display_modifiers(raw, {"rgb", "rgba"}, path, line)
+    if modifiers:
+        vals = split_args(modifiers[0][1])
         if len(vals) not in (3, 4):
             raise CompileError(f"{path}:{line}: -rgb/-rgba expects 3 or 4 values")
         color = [
-            expr(path, line, v, functions, scope=scope, arrays=arrays) for v in vals
+            expr(path, line, value, functions, scope=scope, arrays=arrays)
+            for value in vals
         ]
         if len(color) == 3:
             color.append("255")
-    raw = re.sub(r"\s+-rgba?\([^)]*\)", "", raw)
     return color, raw
 
 
@@ -52,25 +87,25 @@ def emit_display(
     raw = node.value.strip()
     color, raw = rgb_style(raw, path, node.line, functions, scope, arrays)
     rot = ["0", "0", "0"]
-    rm = re.search(r"-rotate\(((?:[^()]|\([^()]*\))*)\)", raw)
-    if rm:
-        rot = [
-            expr(path, node.line, v, functions, scope=scope, arrays=arrays)
-            for v in split_args(rm.group(1))
-        ]
-        if len(rot) != 3:
-            raise CompileError(f"{path}:{node.line}: -rotate expects x,y,z")
-        raw = raw.replace(rm.group(0), "")
     loc = None
-    lm = re.search(r"-l\(((?:[^()]|\([^()]*\))*)\)", raw)
-    if lm:
-        loc = [
-            expr(path, node.line, v, functions, scope=scope, arrays=arrays)
-            for v in split_args(lm.group(1))
+    modifiers, raw = _take_display_modifiers(raw, {"rotate", "l"}, path, node.line)
+    seen = set()
+    for name, arguments in modifiers:
+        if name in seen:
+            raise CompileError(f"{path}:{node.line}: malformed display command: repeated -{name} modifier")
+        seen.add(name)
+        values = [
+            expr(path, node.line, value, functions, scope=scope, arrays=arrays)
+            for value in split_args(arguments)
         ]
-        if len(loc) != 2:
-            raise CompileError(f"{path}:{node.line}: -l expects x,y")
-        raw = raw.replace(lm.group(0), "")
+        if name == "rotate":
+            if len(values) != 3:
+                raise CompileError(f"{path}:{node.line}: -rotate expects x,y,z")
+            rot = values
+        else:
+            if len(values) != 2:
+                raise CompileError(f"{path}:{node.line}: -l expects x,y")
+            loc = values
     call = re.fullmatch(
         r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?",
         raw.strip(),
@@ -95,7 +130,10 @@ def emit_display(
                 f"{', '.join(color)});"
             )
     expected = "string" if shape == "text" else "number"
-    values = [expr(path, node.line, item, functions, expected, scope) for item in args]
+    values = [
+        expr(path, node.line, item, functions, expected, scope=scope, arrays=arrays)
+        for item in args
+    ]
     tail = ", ".join(color)
     if shape == "cube" and len(values) == 4:
         return f"{ind}anvil_cube({', '.join(values)}, {', '.join(rot)}, {tail});"

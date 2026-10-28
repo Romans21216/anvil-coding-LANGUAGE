@@ -733,7 +733,7 @@ class NativeCodegen:
 
     def _emit_print_helper(self) -> None:
         """Write a signed number with up to six fractional digits via Kernel32."""
-        self.code.label("function:anvil_print_number")
+        self.code.label("runtime:print_number")
         self.code.bytes(b"\x48\x83\xec\x58")  # shadow space and aligned locals
         self.code.bytes(b"\x66\x48\x0f\x7e\xc0")  # movq rax,xmm0
         self.code.bytes(b"\x48\xc1\xe8\x3f\x41\x89\xc3")  # sign bit -> r11d
@@ -890,7 +890,7 @@ class NativeCodegen:
             self.code.call("function:main")
         else:
             raise CompileError(f"{self.path}: native executable needs fn(main)")
-        self.code.call("function:anvil_print_number")
+        self.code.call("runtime:print_number")
         self.code.bytes(b"\x31\xc9")
         self.code.rip_call_import("ExitProcess")
         self.code.bytes(b"\xcc")

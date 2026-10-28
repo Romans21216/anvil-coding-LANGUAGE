@@ -1,17 +1,17 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 ====================================
 Assessment date: 2026-10-28
-Exact independently reviewed snapshot: be0d591a82578d397ee1bfb88c31fe99f4749637
+Exact independently reviewed snapshot: c8b01e70dccfe777b490f5eec2d469b6e1c50800
 Evaluator: separate semantic_full_review agent; full 50-criterion rubric.
-Score: 68/100 — FAIL against 98/100.
-Categories: requirements 11/20; functionality 12/20; architecture 14/20; testing 16/20; delivery 15/20.
-Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,1,1,1,1,2,1,2,1,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Score: 69/100 — FAIL against 98/100.
+Categories: requirements 11/20; functionality 13/20; architecture 14/20; testing 16/20; delivery 15/20.
+Scores 1–50: 2,1,1,1,0,1,2,1,1,1 / 1,1,1,1,1,2,1,2,2,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-136 tests independently passed in117.892s; npm0.1.11, compileall, QA arithmetic, UTF8JSON, diff and VSIX parity pass. #58 and#67–71 are independently verified fixed, including all63 runtime reservations and16-parameter/local-zero behavior. #71 removes legacy cursor movement; prior blanket no-global-input claims were inaccurate and are corrected. The current synthetic coordinate fixtures preserve their integration limitation (#63).
+139 tests independently passed in124.267s; npm0.1.11, compileall, QA arithmetic, UTF8JSON, diff and VSIX parity pass. #72 private scratch identities and#73 quoted reference discovery are independently verified fixed. Native/C include demos print20; sample artifact sizes3072B/241664B are not benchmarks. Source extension0.1.11 is packaged/tested; installed0.1.4 preserved with no fresh visible verification.
 
-New findings: #72 accepted `_temporary_` identifiers alias internal scratch slots, silently returning wrong values or leaking ValueError; #73 quoted var/local-like text is falsely treated as references. Local typed-temporary and lexical-mask corrections pass139 tests in126.156s and47 targeted tests; compileall, QA arithmetic, strictUTF8/review-vector parity and diff checks pass. Independent review is pending. The full score remains tied tobe0d591. Source extension0.1.11 is packaged/tested; installed0.1.4 preserved, with no fresh visible verification.
+New findings: #74 a valid user function shares the native formatter label and leaks ValueError; #75 drawing modifiers inside quoted text change its contents/color or cause rejection. Development additionally reproduced#76 declared global arrays unavailable in drawing arguments. Local private-label and lexical display-lowering corrections pass focused C emission/execution tests; 145 local tests pass127.910s; subsequent seven display tests include one new suffix-position check, all pass. Static/QA/UTF8/vector/diff checks pass; fresh independent full146-test review pending. No score is claimed for those changes. #63 coordinate integration remains unverified. Earlier legacy cursor-movement claims were corrected under#71; current tests use no global input injection.
 
-Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previous5e80af3 review:68/100 with133tests. Corrected documentation/test records gain credit while newly exposed correctness defects offset it, leaving68/100.
+Full native engine/default migration, actual DXR/Embree, rich types, Forge and OS targets remain incomplete. Original 450 items, Forge 451–457 and OS 458–497 exist only in issue #23/comments. Full criterion explanations and review history are in docs/QA_REPORT.md. Previousbe0d591 review:68/100 with136tests. Storage reliability gains move the score to69, while complete scope and new compile/display defects remain.
 
 SUMMARY
 -------

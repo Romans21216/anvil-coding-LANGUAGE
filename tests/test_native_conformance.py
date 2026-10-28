@@ -28,10 +28,13 @@ class NativeConformanceTests(unittest.TestCase):
             ("temporary-parameters", "fn(value, _temporary_1, _temporary_value)\n output max(var(_temporary_1),var(_temporary_value)) + sqrt(var(_temporary_1) * var(_temporary_1))\nend\nfn(main)\n output call fn(value,7,3)\nend\n", "14"),
             ("temporary-loop-array", "array values(3)\nfn(main)\n set local(_temporary_1) = 5\n for local(_temporary_value) = 0 to 2\n  set array(values,local(_temporary_value)) = local(_temporary_1) + local(_temporary_value)\n end\n add local(_temporary_1) array(values,2)\n output local(_temporary_1) + array(values,1)\nend\n", "18"),
             ("temporary-looking-budget", "fn(value, _temporary_17)\n output var(_temporary_17) + 1\nend\nfn(main)\n output call fn(value,41)\nend\n", "42"),
+            ("runtime-label-direct", "fn(anvil_print_number)\n output 7\nend\nfn(main)\n output call fn(anvil_print_number)\nend\n", "7"),
+            ("runtime-label-included", 'include "formatter.ANVL"\nfn(main)\n output call fn(anvil_print_number)\nend\n', "7"),
         ]
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             (root / "library.ANVL").write_text("fn(modify)\n set local(value) = 3\n add var(value) 2\n output local(value)\nend\n", encoding="utf-8")
+            (root / "formatter.ANVL").write_text("fn(anvil_print_number)\n output 7\nend\n", encoding="utf-8")
             for name, source, expected in cases:
                 entry = root / (name + ".ANVL")
                 entry.write_text(source, encoding="utf-8")

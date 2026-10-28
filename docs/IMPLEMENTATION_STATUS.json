@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-28",
-  "reviewed_implementation_commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
+  "reviewed_implementation_commit": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,12 +9,12 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
-  "latest_independently_reviewed_candidate_commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
+  "latest_verified_commit": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
+  "latest_independently_reviewed_candidate_commit": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
-  "latest_followup_status_change": "Full independent reviewbe0d591:68/100,136 tests; #58/#67–71 verified fixed; #72/#73 local corrections await validation/review. Full goal active.",
-  "latest_evaluation_score": 68,
+  "last_pushed_reviewed_below_threshold_commit": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
+  "latest_followup_status_change": "Full independent reviewc8b01e7:69/100,139 tests; #72/#73 verified fixed; #74/#75 and development#76 corrections await validation/review. Full goal active.",
+  "latest_evaluation_score": 69,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
   "audited_items": [
@@ -843,13 +843,13 @@
     }
   ],
   "latest_evaluation": {
-    "score": 68,
+    "score": 69,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
+    "commit": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
     "categories": {
       "requirements": "11/20",
-      "functionality_reliability": "12/20",
+      "functionality_reliability": "13/20",
       "code_architecture": "14/20",
       "testing_verification": "16/20",
       "developer_experience_delivery": "15/20"
@@ -873,7 +873,7 @@
       2,
       1,
       2,
-      1,
+      2,
       1,
       2,
       1,
@@ -907,30 +907,30 @@
       0
     ],
     "findings": [
-      "All136 tests independently pass in117.892s; extension0.1.11, UTF8JSON/VSIX parity, compileall, QA arithmetic and diff checks pass.",
-      "#58 and#67–71 independently verified fixed; all63 public runtime names reserved;16-parameter/local-zero differential probe passes.",
-      "#72 valid temporary-like identifiers silently miscompile or leak ValueError; #73 quoted reference-like strings are treated as code.",
-      "#63 untouched coordinate dispatch remains unverified; full native engine/Forge/OS and efficiency goals remain incomplete."
+      "139 tests independently pass in124.267s; npm0.1.11, compileall, QA arithmetic, UTF8JSON, VSIX parity and diff pass.",
+      "#72 typed scratch identities and#73 quoted reference discovery independently verified fixed; native/C include demos print20.",
+      "#74 valid user function collides with private formatter label and leaks ValueError; #75 display modifier scanning changes quoted text/color.",
+      "Full native engine/Forge/OS/efficiency goal incomplete; #63 untouched OS coordinate dispatch remains unverified."
     ],
     "reviewer": "semantic_full_review"
   },
-  "current_candidate_commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
+  "current_candidate_commit": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
-    "reviewed_score": 68,
-    "previous_reviewed_score": 71,
-    "previous_review_commit": "5e80af327d1cedf9aafdc6af11a196702a866da5",
+    "commit": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
+    "reviewed_score": 69,
+    "previous_reviewed_score": 68,
+    "previous_review_commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "136 independently pass in117.892s on exactbe0d591",
+    "python_unittest": "139 independently pass in124.267s on exactc8b01e7",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "71/100 current rubric arithmetic",
+    "qa_report_validator": "69/100 current rubric",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "be0d591 diff passed",
-    "finding": "All136 tests independently pass in117.892s; extension0.1.11, UTF8JSON/VSIX parity, compileall, QA arithmetic and diff checks pass.; #58 and#67–71 independently verified fixed; all63 public runtime names reserved;16-parameter/local-zero differential probe passes.; #72 valid temporary-like identifiers silently miscompile or leak ValueError; #73 quoted reference-like strings are treated as code.; #63 untouched coordinate dispatch remains unverified; full native engine/Forge/OS and efficiency goals remain incomplete."
+    "git_diff_check": "c8b01e7 diff passed",
+    "finding": "139 tests independently pass in124.267s; npm0.1.11, compileall, QA arithmetic, UTF8JSON, VSIX parity and diff pass.; #72 typed scratch identities and#73 quoted reference discovery independently verified fixed; native/C include demos print20.; #74 valid user function collides with private formatter label and leaks ValueError; #75 display modifier scanning changes quoted text/color.; Full native engine/Forge/OS/efficiency goal incomplete; #63 untouched OS coordinate dispatch remains unverified."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -944,15 +944,15 @@
     "IN PROGRESS": 4
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
-  "latest_independent_candidate_score": 68,
+  "latest_independent_candidate_score": 69,
   "latest_independent_candidate_result": "FAIL against98;71/100; configuration provenance and depth failures require verification.",
   "current_unscored_followup": {
-    "feature": "Typed private native temporary identities #72 and lexical string-aware references #73",
-    "status": "Full local139-test suite passed in126.156s; targeted47 tests, compileall, QA arithmetic, strictUTF8/review-vector parity and diff checks pass. Extension/package unchanged from independently verified0.1.11. Fresh full independent review pending.",
-    "reviewed_baseline": "be0d591a82578d397ee1bfb88c31fe99f4749637",
-    "python_tests_passed": 139
+    "feature": "Private native runtime labels #74, lexical display modifiers #75, complete array context in display arguments #76",
+    "status": "Full local145-test suite passed in127.910s; subsequent seven display tests include one added suffix-position regression, all pass. Native/C direct/included formatter calls and compiled C literal/array call-boundary probes pass. Compileall, QA69 arithmetic, UTF8/vector parity and diff checks pass. Fresh independent full146-test review pending.",
+    "reviewed_baseline": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
+    "python_tests_passed": 145
   },
-  "latest_independently_scored_candidate_commit": "be0d591a82578d397ee1bfb88c31fe99f4749637",
+  "latest_independently_scored_candidate_commit": "c8b01e70dccfe777b490f5eec2d469b6e1c50800",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1043,5 +1043,5 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Full independent reviewbe0d591:68/100,136 tests; #58/#67–71 verified fixed; #72/#73 local corrections await validation/review. Full goal active."
+  "current_candidate_status": "Full independent reviewc8b01e7:69/100,139 tests; #72/#73 verified fixed; #74/#75 and development#76 corrections await validation/review. Full goal active."
 }
