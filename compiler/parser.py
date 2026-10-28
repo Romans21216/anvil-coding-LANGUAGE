@@ -7,6 +7,7 @@ import re
 
 from compiler.common import (
     LANGUAGE_VERSION,
+    ArrayDeclarations,
     MAX_ARRAY_SIZE,
     MAX_LOCAL_ARRAY_ELEMENTS,
     CompileError,
@@ -22,9 +23,9 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
     functions: dict[str, Node] = {}
     top: list[Node] = []
     variables: set[str] = set()
-    arrays: dict[str, int] = {}
-    variable_references: list[tuple[str, int, str | None]] = []
-    local_references: list[tuple[str, int, str | None]] = []
+    arrays = ArrayDeclarations()
+    variable_references: list[tuple[str, int, str | None, pathlib.Path]] = []
+    local_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
     version_declared = False
     source_code_seen = False
@@ -64,12 +65,21 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
         current_function = next(
             (frame[2] for frame in reversed(stack) if frame[1] == "function"), None
         )
+        if re.match(r"include\b", line):
+            if len(stack) != 1:
+                raise CompileError(f"{path}:{line_no}: include must be at top level")
+            from compiler.modules import include_name
+            raw_name = line[len("include"):].strip()
+            include_name(raw_name, path, line_no)
+            top.append(Node("include", line_no, value=raw_name, source=path))
+            continue
         for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", line):
             variable_references.append(
                 (
                     reference.group(1),
                     line_no,
                     current_function.name if current_function else None,
+                    path,
                 )
             )
         for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", line):
@@ -78,6 +88,7 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     reference.group(1),
                     line_no,
                     current_function.name if current_function else None,
+                    path,
                 )
             )
         array_decl = re.fullmatch(
@@ -109,6 +120,7 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 if name in arrays:
                     raise CompileError(f"{path}:{line_no}: duplicate array '{name}'")
                 arrays[name] = size
+                arrays.locations[name] = (path, line_no)
             else:
                 if name in current_function.local_arrays:
                     raise CompileError(
@@ -330,6 +342,18 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
         raise CompileError(
             f"{path}:{node.line if node else 1}: unclosed {kind}; expected 'end'"
         )
+    def mark_source(nodes):
+        pending = list(nodes)
+        while pending:
+            node = pending.pop()
+            node.source = path
+            pending.extend(node.body)
+            pending.extend(node.otherwise)
+
+    mark_source(top)
+    for function in functions.values():
+        function.source = path
+        mark_source(function.body)
     return ParsedProgram(
         path,
         functions,
@@ -342,9 +366,10 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
 
 
 def parse(
-    path: pathlib.Path, source: str
+    path: pathlib.Path, source: str, *, include_root: pathlib.Path | None = None
 ) -> tuple[dict[str, Node], list[Node], set[str], dict[str, int]]:
     """Parse Anvil syntax, run semantic checks, and preserve the legacy tuple API."""
-    program = parse_syntax(path, source)
+    from compiler.modules import load_program
+    program = load_program(path, source, include_root=include_root)
     validate_program(program)
     return program.functions, program.top, program.variables, program.arrays

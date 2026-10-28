@@ -14,6 +14,8 @@ Historical verified mouse milestone900106e:72/100 with102tests. Pointer/buttons/
 
 Verified procedural milestone: basic math/RNG/noise/fBm, Anvil-written runtime helpers, sixteen-argument calls and larger locals pass. Current111-test review also verifies explicit-main values/side effects/arity and test race correction; no pending runtime candidate is claimed.
 
+Include/dependency candidate awaiting independent review: local recursive source includes now resolve once with original file/line diagnostics; native code generation selects functions and runtime imports from the static call graph. Tests cover graph errors/bounds, duplicate definitions, UTF-8 diagnostics, cross-file calls/recursion and graphical initialization. Extension0.1.10 adds include scopes; installed0.1.4 remains unchanged. All125 tests and static/build/package checks pass; independent scoring is pending; the last completed review above remains unchanged.
+
 ## Status counts
 
 - COMPLETE: 21

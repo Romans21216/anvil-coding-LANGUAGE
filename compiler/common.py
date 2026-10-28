@@ -23,6 +23,15 @@ class Node:
     locals: set[str] = field(default_factory=set)
     local_arrays: dict[str, int] = field(default_factory=dict)
     local_array_lines: dict[str, int] = field(default_factory=dict)
+    source: pathlib.Path | None = None
+
+
+class ArrayDeclarations(dict):
+    """Global array sizes with their original declaration locations."""
+
+    def __init__(self):
+        super().__init__()
+        self.locations: dict[str, tuple[pathlib.Path, int]] = {}
 
 
 @dataclass
@@ -34,8 +43,8 @@ class ParsedProgram:
     top: list[Node]
     variables: set[str]
     arrays: dict[str, int]
-    variable_references: list[tuple[str, int, str | None]]
-    local_references: list[tuple[str, int, str | None]]
+    variable_references: list[tuple[str, int, str | None, pathlib.Path]]
+    local_references: list[tuple[str, int, str | None, pathlib.Path]]
 
 
 class CompileError(Exception):

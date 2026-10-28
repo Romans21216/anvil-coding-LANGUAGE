@@ -1,6 +1,6 @@
 # Anvil Language Support for Visual Studio Code
 
-This extension registers the Anvil language identifier (`anvil`) for `.ANVL` files and provides TextMate syntax colors plus editor pairing, comments, indentation, and folding rules. It highlights function declarations and parameters, calls, global/local variables, fixed-array declarations/indexing, engine commands, ray-tracing backend selection, mouse and keyboard input, image/sprite, ray-tracing, and 2D physics built-ins, operators, and literals. It targets **Visual Studio Code**, not the separate Visual Studio IDE.
+This extension registers the Anvil language identifier (`anvil`) for `.ANVL` files and provides TextMate syntax colors plus editor pairing, comments, indentation, and folding rules. It highlights `include "relative/library.ANVL"` directives, function declarations and parameters, calls, global/local variables, fixed-array declarations/indexing, engine commands, ray-tracing backend selection, mouse and keyboard input, image/sprite, ray-tracing, and 2D physics built-ins, operators, and literals. It targets **Visual Studio Code**, not the separate Visual Studio IDE.
 
 ## Install locally
 

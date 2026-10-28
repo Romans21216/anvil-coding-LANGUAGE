@@ -86,6 +86,10 @@ fn(update)
   add var(wheel-repeat) mouse_wheel()
 end
 fn(draw)
+  # Retain the test probe in the static call graph; the wrapper invokes it.
+  if false
+    call fn(probe)
+  end
   display rect(10,10,30,30)
 end
 '''

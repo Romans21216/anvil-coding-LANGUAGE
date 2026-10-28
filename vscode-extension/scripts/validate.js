@@ -55,6 +55,8 @@ async function main() {
     const scopes = scopesAt(line, needle);
     check(scopes.includes(scope), `'${needle}' expected ${scope}; got ${scopes.join(' ')} in ${line}`);
   }
+  expect('include \"lib/math.ANVL\"', 'include', 'keyword.control.anvil');
+  expect('include \"lib/math.ANVL\"', 'lib/math.ANVL', 'string.quoted.double.anvil');
   expect('fn(update)', 'fn', 'keyword.declaration.function.anvil');
   expect('language version 1', 'language', 'keyword.control.anvil');
   expect('language version 1', 'version', 'keyword.control.anvil');

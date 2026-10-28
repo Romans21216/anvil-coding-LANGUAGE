@@ -264,6 +264,16 @@
     57
   ],
   "current_candidate_status": "Independently reviewed3270998 at72/100 with111 tests; full scope incomplete and coordinate integration gap#63 remains.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "feature": "Local include graphs, original source diagnostics and native function dependency selection",
+    "status": "All125 tests pass, including14 include tests. Native/C include demo prints20; native demo3072bytes. Extension0.1.10 packaged and grammar/zip verified; compileall, QA, UTF-8 and diff checks pass. Independent full review pending.",
+    "source_files": [
+      "compiler/modules.py",
+      "tests/test_includes.py",
+      "docs/INCLUDES.md"
+    ],
+    "reviewed_baseline": "3270998384367be7b763cc605c0492208a72c988",
+    "python_tests_passed": 125
+  },
   "open_coordinate_integration_issue": 63
 }

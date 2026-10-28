@@ -1,0 +1,7 @@
+include "lib/numbers.ANVL"
+include "lib/clamp.ANVL" # Already included by numbers; processed once.
+
+fn(main)
+  output call fn(clamp-value, call fn(scale-value, 7, 3), 0, 20)
+end
+call fn(main)

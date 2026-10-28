@@ -47,6 +47,7 @@ def main() -> int:
     args = ap.parse_args()
     try:
         source_path = args.source
+        include_root = None
         fixed_hz = 60
         project_name = "Anvil Game"
         if args.source.suffix.lower() == ".anvlproj":
@@ -98,6 +99,7 @@ def main() -> int:
                     f"{args.source}: manifest needs a non-empty string 'entry'"
                 )
             project_root = args.source.resolve().parent
+            include_root = project_root
             source_path = (project_root / entry).resolve()
             try:
                 source_path.relative_to(project_root)
@@ -106,7 +108,7 @@ def main() -> int:
                     f"{args.source}: entry must resolve inside the project folder"
                 ) from exc
         source = source_path.read_text(encoding="utf-8")
-        funcs, top, variables, arrays = parse(source_path, source)
+        funcs, top, variables, arrays = parse(source_path, source, include_root=include_root)
         if args.backend == "native":
             if args.emit_c or args.generated_c or args.cc or args.release:
                 raise CompileError(

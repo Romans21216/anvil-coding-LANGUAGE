@@ -85,7 +85,7 @@
       "name": "support.function.engine.anvil"
     },
     "keywords": {
-      "match": "\\b(fn|set|add|sub|local|output|call|if|else|end|repeat|while|for|and|or|not|where|get|to|from|step|all|pressed|held|released)\\b",
+      "match": "\\b(fn|set|add|sub|local|output|call|include|if|else|end|repeat|while|for|and|or|not|where|get|to|from|step|all|pressed|held|released)\\b",
       "name": "keyword.control.anvil"
     },
     "constants": {

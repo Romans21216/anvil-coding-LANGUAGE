@@ -86,7 +86,7 @@ class NativeMath:
         c.rip_int(0, self.random_state(), store=True)
         c.jump(done)
         c.label(failure)
-        self.owner.emit_runtime_error(f"Anvil seed range error at line {line}\n")
+        self.owner.emit_runtime_error(f"Anvil seed range error at line {line} ({self.owner.path})\n")
         c.label(done)
 
     def rnd(self, load, line):
@@ -130,7 +130,7 @@ class NativeMath:
         c.bytes(b"\xf2\x49\x0f\x2a\xc0")  # r8 -> xmm0
         c.jump(done)
         c.label(failure)
-        self.owner.emit_runtime_error(f"Anvil random range error at line {line}\n")
+        self.owner.emit_runtime_error(f"Anvil random range error at line {line} ({self.owner.path})\n")
         c.label(done)
 
     def emit_builtin(self, parser, name):
@@ -168,7 +168,7 @@ class NativeMath:
                 c.label(failure)
                 location = ("in procedural runtime" if parser.scope is not None and
                             parser.scope.name.startswith(self.PREFIX) else f"at line {parser.line}")
-                owner.emit_runtime_error(f"Anvil noise coordinate range error {location}\n")
+                owner.emit_runtime_error(f"Anvil noise coordinate range error {location} ({owner.path})\n")
                 c.label(ready)
             helper = self.require(name)
             # Calls reuse already evaluated slots, including the stack parameters.

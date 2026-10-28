@@ -144,3 +144,5 @@ fixed_hz = 60
 
 Static types, dynamically sized arrays, structures, modules/imports, general asset formats and 3D mesh assets, sprite animation, audio, 3D/polygon physics, save files, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables and arrays, `while`/inclusive numeric `for` loops, fixed-size global numeric arrays, BMP-based 2D sprites, and fixed-step 2D circle/axis-aligned-box physics are supported, but the language and engine remain much smaller than a general-purpose game engine today.
 
+
+Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.

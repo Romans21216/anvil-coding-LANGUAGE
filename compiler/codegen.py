@@ -139,8 +139,10 @@ def emit_nodes(
             arrays,
         )
 
-    source_path = json.dumps(str(path))
+    original_path = path
     for n in nodes:
+        path = n.source or original_path
+        source_path = json.dumps(str(path))
         if n.kind == "set":
             out.append(f"{indent}{variable_code(n.name, scope)} = {lower(n)};")
         elif n.kind == "local_set":
@@ -192,11 +194,11 @@ def emit_nodes(
                 out.append(f"{indent}return {value};")
         elif n.kind == "call":
             if n.name not in functions:
-                raise CompileError(f"{path}:{n.line}: unknown function {n.name!r}")
+                raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
             args = split_args(n.value)
             if len(args) != len(functions[n.name].params):
                 raise CompileError(
-                    f"{path}:{n.line}: function {n.name!r} expects "
+                    f"{n.source or path}:{n.line}: function {n.name!r} expects "
                     f"{len(functions[n.name].params)} argument(s), got {len(args)}"
                 )
             values = [lower(n, arg) for arg in args]
@@ -367,7 +369,7 @@ def emit_c(
     for name, fn in functions.items():
         if name in ("draw", "update") and fn.params:
             raise CompileError(
-                f"{path}:{fn.line}: engine callback '{name}' cannot have parameters"
+                f"{fn.source or path}:{fn.line}: engine callback '{name}' cannot have parameters"
             )
         params = (
             ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
@@ -387,7 +389,7 @@ def emit_c(
         )
         lines.extend(
             f"    double *{c_name(name + '__' + local)} = "
-            f"anvil_local_array_alloc({size}, {json.dumps(str(path))}, "
+            f"anvil_local_array_alloc({size}, {json.dumps(str(fn.source or path))}, "
             f"{fn.local_array_lines[local]});"
             for local, size in sorted(fn.local_arrays.items())
         )
@@ -439,10 +441,10 @@ def emit_c(
         )
     for n in calls:
         if n.name not in functions:
-            raise CompileError(f"{path}:{n.line}: unknown function {n.name!r}")
+            raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
         if len(split_args(n.value)) != len(functions[n.name].params):
             raise CompileError(
-                f"{path}:{n.line}: function {n.name!r} expects "
+                f"{n.source or path}:{n.line}: function {n.name!r} expects "
                 f"{len(functions[n.name].params)} argument(s), "
                 f"got {len(split_args(n.value))}"
             )
@@ -470,7 +472,7 @@ def emit_c(
         )
     elif calls:
         for n in calls:
-            values = [expr(path, n.line, arg, functions) for arg in split_args(n.value)]
+            values = [expr(n.source or path, n.line, arg, functions) for arg in split_args(n.value)]
             call = f"{c_name(n.name)}({', '.join(values)})"
             if n.name == "main":
                 lines.append(f'    printf("%.15g\\n", {call});')

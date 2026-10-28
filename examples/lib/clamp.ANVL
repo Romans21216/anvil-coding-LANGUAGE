@@ -1,0 +1,4 @@
+# Shared numeric helper; this file has no automatic entry point.
+fn(clamp-value, value, minimum, maximum)
+  output min(max(var(value), var(minimum)), var(maximum))
+end

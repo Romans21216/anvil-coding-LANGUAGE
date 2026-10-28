@@ -101,7 +101,7 @@ call fn(main)
                     [str(executable)], capture_output=True, text=True, timeout=5
                 )
             self.assertEqual(result.returncode, 2)
-            self.assertEqual(result.stdout, "Anvil numeric error at line 2\n")
+            self.assertEqual(result.stdout, f"Anvil numeric error at line 2 ({path})\n")
 
     def test_native_backend_compiles_loop_and_boolean_operators(self):
         source = """\
@@ -181,7 +181,7 @@ call fn(main)
                 )
             self.assertEqual(result.returncode, 2)
             self.assertEqual(
-                result.stdout, "Anvil array index error at line 3\n"
+                result.stdout, f"Anvil array index error at line 3 ({path})\n"
             )
 
     def test_native_backend_rejects_aggregate_array_data_before_pe_allocation(self):

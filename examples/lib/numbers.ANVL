@@ -1,0 +1,9 @@
+include "clamp.ANVL"
+fn(scale-value, value, factor)
+  output var(value) * var(factor)
+end
+
+# The native console example never calls this, so it adds no input runtime.
+fn(optional-pointer-x)
+  output mouse_x()
+end

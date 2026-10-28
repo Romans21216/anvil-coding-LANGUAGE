@@ -13,9 +13,10 @@ from compiler.parser import parse
 
 
 class NativeApp:
-    def __init__(self, source, *, instrument=None):
+    def __init__(self, source, *, instrument=None, source_path=None):
         self.source = source
         self.instrument = instrument
+        self.source_path = source_path
         self.process = None
         self.process_handle = None
         self.hwnd = None
@@ -42,7 +43,7 @@ class NativeApp:
                                                  ctypes.POINTER(ctypes.c_size_t)]
         try:
             self.temp = tempfile.TemporaryDirectory()
-            path = pathlib.Path(self.temp.name) / "input.ANVL"
+            path = self.source_path or pathlib.Path(self.temp.name) / "input.ANVL"
             path.write_text(self.source, encoding="utf-8")
             functions, top, variables, arrays = parse(path, self.source)
             generator = NativeCodegen(path, functions, top, variables, arrays)
@@ -58,7 +59,7 @@ class NativeApp:
                         for section in range(first, first + 40 * section_count, 40)
                         if self.image[section:section + 8].rstrip(b"\0") == b".data")
             self.data_address = base + data
-            executable = path.with_suffix(".exe")
+            executable = pathlib.Path(self.temp.name) / "input.exe"
             executable.write_bytes(self.image)
             self.process = subprocess.Popen([str(executable)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self.process_handle = self.kernel.OpenProcess(0x410, False, self.process.pid)

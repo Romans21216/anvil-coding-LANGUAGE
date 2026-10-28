@@ -14,18 +14,18 @@ def validate_program(program: ParsedProgram) -> None:
     if not functions:
         raise CompileError(f"{path}: define at least one fn(name) function")
 
-    for name, line_no, function_name in program.variable_references:
+    for name, line_no, function_name, source in program.variable_references:
         fn = functions.get(function_name) if function_name else None
         if name not in variables and (fn is None or name not in fn.params):
             raise CompileError(
-                f"{path}:{line_no}: unknown variable {name!r}; assign it "
+                f"{source}:{line_no}: unknown variable {name!r}; assign it "
                 f"with set var({name}) first"
             )
-    for name, line_no, function_name in program.local_references:
+    for name, line_no, function_name, source in program.local_references:
         fn = functions.get(function_name) if function_name else None
         if fn is None or name not in fn.locals:
             raise CompileError(
-                f"{path}:{line_no}: unknown local variable {name!r}; "
+                f"{source}:{line_no}: unknown local variable {name!r}; "
                 f"declare it with set local({name}) first"
             )
     for fn in functions.values():

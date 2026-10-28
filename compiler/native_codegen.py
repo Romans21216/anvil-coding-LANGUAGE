@@ -245,6 +245,7 @@ class NativeCodegen:
         self.variables = variables
         self.arrays = arrays or {}
         self.code = X64Code()
+        self._error_messages = {}
         self._label_counter = 0
         self._frame_slots: dict[str, int] = {}
         self._scratch_base = 0
@@ -274,7 +275,9 @@ class NativeCodegen:
                     ),
                     None,
                 )
-                location = f"{self.path}:{line}" if line is not None else str(self.path)
+                declared = getattr(self.arrays, "locations", {}).get(name)
+                location = (f"{declared[0]}:{declared[1]}" if declared else
+                            (f"{self.path}:{line}" if line is not None else str(self.path)))
                 required = next_offset + size * 8
                 raise CompileError(
                     f"{location}: direct native global data needs {required} bytes; "
@@ -393,7 +396,7 @@ class NativeCodegen:
         self._store_rax_rbp(displacement)
         self.code.jump(done)
         self.code.label(failure)
-        self.emit_runtime_error(f"Anvil array index error at line {line}\n")
+        self.emit_runtime_error(f"Anvil array index error at line {line} ({self.path})\n")
         self.code.label(done)
         return slot
 
@@ -424,20 +427,20 @@ class NativeCodegen:
         self.pop_temp()
 
     def emit_runtime_error(self, message_text: str) -> None:
-        """Write a short UTF-8/ASCII diagnostic and terminate with status 2."""
-        message = message_text.encode("ascii")
-        for offset in range(0, len(message), 8):
-            chunk = message[offset:offset + 8].ljust(8, b"\0")
-            self.code.bytes(b"\x48\xb8" + chunk)
-            self.code.bytes(b"\x48\x89\x44\x24" + bytes((0x30 + offset,)))
-        self.code.bytes(b"\xb9\xf5\xff\xff\xff")  # STD_OUTPUT_HANDLE
+        """Write pooled UTF-8 diagnostic data and terminate with status 2."""
+        message = message_text.encode("utf-8")
+        if message not in self._error_messages:
+            self._error_messages[message] = self.reserve_data(message)
+        self.code.mov_imm(1, -11)  # STD_OUTPUT_HANDLE, preserving existing CLI behavior
         self.code.rip_call_import("GetStdHandle")
-        self.code.bytes(b"\x48\x89\xc1\x48\x8d\x54\x24\x30")
-        self.code.bytes(b"\x41\xb8" + struct.pack("<I", len(message)))
-        self.code.bytes(b"\x4c\x8d\x4c\x24\x28")
-        self.code.bytes(b"\x48\xc7\x44\x24\x20\x00\x00\x00\x00")
+        self.code.mov_reg(1, 0)
+        self.code.rip_lea_data(2, self._error_messages[message])
+        self.code.mov_imm(8, len(message))
+        self.code.stack_int(9, 0x28, address=True)
+        self.code.mov_imm(0, 0)
+        self.code.stack_int(0, 0x20, store=True)
         self.code.rip_call_import("WriteFile")
-        self.code.bytes(b"\xb9\x02\x00\x00\x00")
+        self.code.mov_imm(1, 2)
         self.code.rip_call_import("ExitProcess")
         self.code.bytes(b"\xcc")
 
@@ -514,21 +517,7 @@ class NativeCodegen:
         self.code.conditional_jump(0x84, failure)  # je
         self.code.jump(done)
         self.code.label(failure)
-        message = f"Anvil numeric error at line {line}\n".encode("ascii")
-        for offset in range(0, len(message), 8):
-            chunk = message[offset:offset + 8].ljust(8, b"\0")
-            self.code.bytes(b"\x48\xb8" + chunk)
-            self.code.bytes(b"\x48\x89\x44\x24" + bytes((0x30 + offset,)))
-        self.code.bytes(b"\xb9\xf5\xff\xff\xff")  # STD_OUTPUT_HANDLE
-        self.code.rip_call_import("GetStdHandle")
-        self.code.bytes(b"\x48\x89\xc1\x48\x8d\x54\x24\x30")
-        self.code.bytes(b"\x41\xb8" + struct.pack("<I", len(message)))
-        self.code.bytes(b"\x4c\x8d\x4c\x24\x28")
-        self.code.bytes(b"\x48\xc7\x44\x24\x20\x00\x00\x00\x00")
-        self.code.rip_call_import("WriteFile")
-        self.code.bytes(b"\xb9\x02\x00\x00\x00")
-        self.code.rip_call_import("ExitProcess")
-        self.code.bytes(b"\xcc")
+        self.emit_runtime_error(f"Anvil numeric error at line {line} ({self.path})\n")
         self.code.label(done)
 
     def emit_call(self, name: str, raw_args: list[str], scope: Node | None, line: int) -> None:
@@ -569,6 +558,15 @@ class NativeCodegen:
         _Expression(self, line, raw, scope).compile()
 
     def emit_nodes(self, nodes: list[Node], scope: Node | None) -> None:
+        for node in nodes:
+            previous = self.path
+            self.path = node.source or previous
+            try:
+                self._emit_nodes([node], scope)
+            finally:
+                self.path = previous
+
+    def _emit_nodes(self, nodes: list[Node], scope: Node | None) -> None:
         for node in nodes:
             if node.kind == "seed":
                 self.emit_expression(node.value, node.line, scope)
@@ -672,6 +670,14 @@ class NativeCodegen:
                 )
 
     def _emit_function(self, name: str, fn: Node) -> None:
+        previous = self.path
+        self.path = fn.source or previous
+        try:
+            self._emit_function_body(name, fn)
+        finally:
+            self.path = previous
+
+    def _emit_function_body(self, name: str, fn: Node) -> None:
         if fn.local_arrays:
             raise CompileError(f"{self.path}:{fn.line}: native local arrays are not implemented yet")
         self._scope = fn
@@ -828,19 +834,20 @@ class NativeCodegen:
             raise CompileError(
                 f"{self.path}:{unsupported.line}: top-level configuration is not implemented by the native x64 backend yet"
             )
-        for name, fn in list(self.functions.items()):
+        from compiler.modules import reachable_functions
+        for name, fn in reachable_functions(self.functions, self.top, graphical=False):
             self._emit_function(name, fn)
         setup = [node for node in self.top if node.kind == "seed"]
         if setup:
             self._emit_function("native:console_setup", Node("function", 1, body=setup))
         if calls:
             if len(calls) != 1 or calls[0].name not in self.functions or calls[0].name != "main":
-                raise CompileError(f"{self.path}:{calls[0].line}: direct native entry currently accepts only call fn(main)")
+                raise CompileError(f"{calls[0].source or self.path}:{calls[0].line}: direct native entry currently accepts only call fn(main)")
             arguments = (", " + calls[0].value) if calls[0].value.strip() else ""
             expression = f"call fn(main{arguments})"
             self._emit_function("native:entry_main", Node(
-                "function", calls[0].line, name="native:entry_main",
-                body=[Node("output", calls[0].line, value=expression)],
+                "function", calls[0].line, name="native:entry_main", source=calls[0].source,
+                body=[Node("output", calls[0].line, value=expression, source=calls[0].source)],
             ))
         self._math.emit_pending()
         self._emit_print_helper()
@@ -852,7 +859,7 @@ class NativeCodegen:
             self.code.call("function:native:entry_main")
         elif "main" in self.functions:
             if self.functions["main"].params:
-                raise CompileError(f"{self.path}:{self.functions['main'].line}: main cannot have parameters")
+                raise CompileError(f"{self.functions['main'].source or self.path}:{self.functions['main'].line}: main cannot have parameters")
             self.code.call("function:main")
         else:
             raise CompileError(f"{self.path}: native executable needs fn(main)")
@@ -889,7 +896,8 @@ class NativeCodegen:
             else:
                 raise CompileError(f"{self.path}:{node.line}: native scene setup does not support {node.kind!r}")
         self._window = NativeWindow(self, clear[0] | (clear[1] << 8) | (clear[2] << 16))
-        for name, function in list(self.functions.items()):
+        from compiler.modules import reachable_functions
+        for name, function in reachable_functions(self.functions, self.top, graphical=True):
             self._emit_function(name, function)
         self.code.label("native:setup")
         self._emit_function("native:setup", Node("function", 1, name="native:setup", body=setup))
