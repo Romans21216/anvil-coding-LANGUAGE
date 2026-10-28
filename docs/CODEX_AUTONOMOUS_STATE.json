@@ -278,6 +278,11 @@
     57
   ],
   "current_candidate_status": "Full independent review2b4e5e8:76/100,151tests; first planned batch verified; #78closed; full goal remains active.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "feature": "Native per-call local arrays/allocation limits and frame-memory encoder helper",
+    "status": "Full local157 passed168.443s; subsequent seven array tests include an added loop/fractional-return test. Compileall/QA76/diff pass. Fresh full158 independent review pending.",
+    "reviewed_baseline": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
+    "python_tests_passed": 157
+  },
   "open_coordinate_integration_issue": 63
 }

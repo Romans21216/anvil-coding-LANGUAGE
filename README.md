@@ -97,3 +97,5 @@ The `.ANVL` suffix is used here for Anvil source; the name also appears in an un
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](docs/INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
 
 Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
+
+Direct native function-local arrays now use zeroed per-call heap storage with checked indexing, cleanup and an active allocation budget; see [native array semantics](docs/NATIVE_X64_COMPILER_MIGRATION.md#native-local-arrays). Exact review status is recorded in docs/QA_REPORT.md.

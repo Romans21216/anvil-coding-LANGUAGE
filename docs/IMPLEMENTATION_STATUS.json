@@ -945,7 +945,12 @@
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 76,
   "latest_independent_candidate_result": "FAIL against98;76/100 on2b4e5e8; no new confirmed defect; full scope incomplete.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "feature": "Native per-call local arrays/allocation limits and frame-memory encoder helper",
+    "status": "Full local157 passed168.443s; subsequent seven array tests include an added loop/fractional-return test. Compileall/QA76/diff pass. Fresh full158 independent review pending.",
+    "reviewed_baseline": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
+    "python_tests_passed": 157
+  },
   "latest_independently_scored_candidate_commit": "2b4e5e8d84bb0695af92eadd3740a4a84a6410dd",
   "historical_c_backed_evaluation": {
     "score": 92,

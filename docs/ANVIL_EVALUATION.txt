@@ -48,7 +48,7 @@ Language syntax, validation, and C generation: Working prototype
 Functions with parameters, returns, recursion, and locals: Implemented for numeric values
 Numeric `while` and inclusive `for` loops: Implemented and covered by native executable tests
 Fixed-size global numeric arrays: Implemented with zero initialization and checked indexing
-Fixed-size function-local numeric arrays: Implemented in the C backend with zero-initialized per-call heap storage, cleanup on return, and checked indexing; 8,192-element per-function and 16 MiB active-call limits; native sample prints 27
+Fixed-size function-local numeric arrays: Implemented in C and the current native candidate with zero-initialized per-call heap storage, cleanup on return, and checked indexing; 8,192-element per-function and 16 MiB active-call limits; native sample prints 27
 Native Windows executable generation: Existing C/MSVC path plus experimental direct-x64 numeric and initial 2D subset; full native runtime parity is incomplete
 Basic 2D/3D rendering and camera controls: C backend provides these with limits; direct backend currently renders 2D rectangles
 BVH CPU ray-traced spheres: Implemented, limited to 32 per batch
@@ -66,3 +66,5 @@ CURRENT PRIORITIES
 Implement native local arrays/allocation limits and stronger instruction/ABI helpers. Continue native engine parity, actual ray backends, rich types, Forge/OS and benchmarks. Goal remainsactive below98.
 
 Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 categories, exact2b4e5e8 and151/142.480s evidence agree; current native project/settings docs and ancillary fields match. No rescore or implementation change.
+
+Unscored native-local-array batch: per-call zeroed heap block, checked access/local shadowing, all return cleanup,8192elements/function and16MiB active element budget. Direct Windows heap imports only when used; noC/Rust shim.157localtests passed168.443s; subsequent seven array tests include one extra loop/fractional case. Fresh158-test independent review pending; score remains76 on2b4e5e8.

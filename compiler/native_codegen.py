@@ -254,6 +254,8 @@ class NativeCodegen:
 
     def __init__(self, path, functions, top, variables, arrays=None, *, fixed_hz=60, title="Anvil Native 2D"):
         self.path = path
+        from compiler.native_arrays import NativeArrays
+        self._local_arrays = NativeArrays(self)
         if isinstance(fixed_hz, bool) or not isinstance(fixed_hz, int) or not 1 <= fixed_hz <= 240:
             raise CompileError(f"{path}: fixed_hz must be an integer from 1 to 240")
         if not isinstance(title, str) or not title.strip() or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in title):
@@ -390,13 +392,10 @@ class NativeCodegen:
         self, name: str, raw_index: str, line: int, scope: Node | None
     ) -> _TemporarySlot:
         """Evaluate a global array index once, validate it, and save its int64 slot."""
-        if scope is not None and name in scope.local_arrays:
-            raise CompileError(
-                f"{self.path}:{line}: native local arrays are not implemented yet"
-            )
-        size = self.arrays.get(name)
-        offset = self._array_offsets.get(name)
-        if size is None or offset is None:
+        size = scope.local_arrays.get(name) if scope is not None else None
+        if size is None:
+            size = self.arrays.get(name)
+        if size is None:
             raise CompileError(f"{self.path}:{line}: unknown array {name!r}")
         self.emit_expression(raw_index, line, scope)
         self.emit_finite_check(line)
@@ -419,13 +418,19 @@ class NativeCodegen:
         self.code.label(done)
         return slot
 
+    def _emit_array_address(self, name, scope):
+        if scope is not None and name in scope.local_arrays:
+            self._local_arrays.address(name)
+        else:
+            self.code.rip_lea_data(2, self._array_offsets[name])
+
     def emit_array_read(
         self, name: str, raw_index: str, line: int, scope: Node | None
     ) -> None:
         slot = self._emit_array_index(name, raw_index, line, scope)
         displacement = self._temporary_offset(slot)
         self._load_rax_rbp(displacement)
-        self.code.rip_lea_data(2, self._array_offsets[name])  # lea rdx,[array]
+        self._emit_array_address(name, scope)
         self.code.bytes(b"\xf2\x0f\x10\x04\xc2")  # movsd xmm0,[rdx+rax*8]
         self.pop_temp()
 
@@ -441,7 +446,7 @@ class NativeCodegen:
         self.emit_expression(raw_value, line, scope)
         displacement = self._temporary_offset(slot)
         self._load_rax_rbp(displacement)
-        self.code.rip_lea_data(2, self._array_offsets[name])
+        self._emit_array_address(name, scope)
         self.code.bytes(b"\xf2\x0f\x11\x04\xc2")  # movsd [rdx+rax*8],xmm0
         self.pop_temp()
 
@@ -623,7 +628,10 @@ class NativeCodegen:
                     self.store_variable(name, scope, node.line)
             elif node.kind == "output":
                 self.emit_expression(node.value, node.line, scope)
-                self.code.bytes(b"\xc9\xc3")  # leave; ret
+                if self._local_arrays.total:
+                    self.code.jump(self._local_arrays.return_label)
+                else:
+                    self.code.bytes(b"\xc9\xc3")  # leave; ret
             elif node.kind == "if":
                 else_label = self.label("else")
                 end_label = self.label("endif")
@@ -706,13 +714,12 @@ class NativeCodegen:
             self.path = previous
 
     def _emit_function_body(self, name: str, fn: Node) -> None:
-        if fn.local_arrays:
-            raise CompileError(f"{self.path}:{fn.line}: native local arrays are not implemented yet")
         self._scope = fn
         self._frame_slots = {}
         for local in sorted(fn.locals | set(fn.params)):
             self._alloc_slot(local)
-        self._scratch_base = len(self._frame_slots) * 8
+        private_slots = self._local_arrays.plan(fn)
+        self._scratch_base = (len(self._frame_slots) + private_slots) * 8
         self._frame_size = ((self._scratch_base + 128 + 15) // 16) * 16
         if self._frame_size > self.MAX_FRAME_BYTES:
             raise CompileError(f"{self.path}:{fn.line}: native function frame exceeds 4096 bytes; split the function into smaller functions")
@@ -734,8 +741,12 @@ class NativeCodegen:
             self.code.bytes(b"\x66\x0f\xef\xc0")  # pxor xmm0,xmm0
             for local in sorted(fn.locals):
                 self.store_local(local)
+        self._local_arrays.enter(fn)
         self.emit_nodes(fn.body, fn)
-        self.code.bytes(b"\x0f\x57\xc0\xc9\xc3")  # zero return; leave; ret
+        self.code.bytes(b"\x0f\x57\xc0")  # default zero result
+        if self._local_arrays.total:
+            self.code.label(self._local_arrays.return_label)
+        self._local_arrays.leave(fn)
 
     def _emit_print_helper(self) -> None:
         """Write a signed number with up to six fractional digits via Kernel32."""
@@ -939,6 +950,8 @@ class NativeCodegen:
         return self._build(list(self.IMPORTS) + self._window.imports)
 
     def _build(self, imports: list[tuple[str, str]]) -> bytes:
+        if self._local_arrays.active is not None:
+            imports = list(dict.fromkeys(imports + self._local_arrays.IMPORTS))
         pe = Pe32Plus(bytes(self.code.code), imports)
         targets = pe.fixup_targets(len(self.code.code))
         text = self.code.finish(targets)

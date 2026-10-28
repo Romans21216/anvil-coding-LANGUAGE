@@ -12,7 +12,7 @@ An experimental direct backend is available with `python -m compiler.anvil <file
 
 The direct backend now has an initial Windows 2D runtime: `scene 2d`, literal opaque `clear rgba`, top-level numeric initialization, `fn(draw)`, `display rect(...) -rgb(...)`, and optional `fn(update)` with `time()`, `delta()`, `compute()`, `held(key)`, `pressed(key)` and the mouse queries below. Runtime instructions and the PE are emitted by Anvil; USER32/GDI32 functions are imported directly from Windows. No C/Rust source, compiler, linker, or runtime shim is used.
 
-The regular build still defaults to the C backend. The native backend does **not** yet support function-local arrays, the full language, other shapes, text, alpha blending, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
+The regular build still defaults to the C backend. The native backend does **not** yet support the full language, other shapes, text, alpha blending, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
 
 ## Native 2D scene
 
@@ -59,7 +59,7 @@ The direct backend implements `abs(x)`, `sqrt(x)`, `floor(x)`, `ceil(x)`, `min(a
 
 Gradient selection, fade, interpolation, noise and fBm are written in [Anvil runtime source](../runtime/native/procedural.ANVL). Only requested routines and their dependencies are compiled into the PE. Numeric primitives, integer hash and RNG state transitions use Anvil-owned machine-code emission. This is a built-in runtime library. Local source `include` composition is described in [INCLUDES.md](INCLUDES.md); package registries and binary plugins remain unfinished. A program using only `sqrt` does not bundle the noise library. The native function prefix `_anvil_native_` is reserved and the private hash intrinsic cannot be called by user code.
 
-Calls pass the first four numeric arguments in XMM0–3 and later arguments in aligned Win64 stack slots. Up to sixteen arguments are supported within the existing sixteen-temporary expression budget. Scalar locals and compiler temporaries now support disp32 offsets. Each function frame is limited to 4096 bytes with a compiler diagnostic above that limit; unbounded recursion and native local arrays remain unsupported. The frame limit avoids silently permitting large unprobed Win64 allocations while broader stack-budget work is pending.
+Calls pass the first four numeric arguments in XMM0–3 and later arguments in aligned Win64 stack slots. Up to sixteen arguments are supported within the existing sixteen-temporary expression budget. Scalar locals and compiler temporaries now support disp32 offsets. Each function frame is limited to 4096 bytes with a compiler diagnostic above that limit; unbounded recursion remains unsupported. The frame limit avoids silently permitting large unprobed Win64 allocations while broader stack-budget work is pending.
 
 Build `examples/native_procedural.ANVL` with `--backend native` for generated terrain. Space or left click regenerates it from a new seed. Generated-PE tests cover reference noise/fBm values, RNG sequence/reseeding, math domains, nested argument side effects, sixteen-argument calls, large local offsets, library selection, and graphical use. Independent review of3270998 passed111tests and scored72/100; explicit-main/Wiki/test-race corrections are verified, while untouched coordinate OS-dispatch coverage remains partial (#63).
 
@@ -74,7 +74,7 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 | Output EXE cannot be overwritten | Close the running generated window, then rebuild. |
 | GUI test cannot read window pixels | Run it in an interactive Windows x64 desktop; it samples a visible test window and closes that process afterward. |
 | Native seed/random/noise range error | Use the numeric ranges above; reduce fBm coordinates/lacunarity if later octaves exceed the lattice range. |
-| Native function frame exceeds 4096 bytes | Split large scalar-local functions into smaller functions; native local arrays and general stack budgets are still pending. |
+| Native function frame exceeds 4096 bytes | Split large scalar-local functions into smaller functions; local array elements use heap storage; general stack budgets are still pending. |
 | Older native sample flickers | Rebuild with the buffered-presentation fix for issue #57. The regression checks visible pixels during slow drawing and verifies that the old unbuffered implementation fails that check. |
 
 ## Architecture
@@ -109,3 +109,9 @@ Local source includes preserve physical source locations and select reachable na
 Current exact review identifiers, scores, findings and verified fixes are maintained in [QA_REPORT.md](QA_REPORT.md) and [structured state](CODEX_AUTONOMOUS_STATE.json). The full engine/Forge/OS migration remains active. Coordinate integration uses test instrumentation and retains the untouched-dispatch gap #63. Current findings, verified corrections and exact review snapshots are linked from the QA report; this guide records feature contracts rather than live scores.
 
 Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
+
+## Native local arrays
+
+Function-local `array name(size)` declarations now use one zeroed process-heap block per invocation. They shadow global arrays of the same name. Every explicit return and implicit zero return releases the block, preserving the numeric result. Up to8,192 elements per function and16MiB of active element storage across calls are permitted; allocator overhead and scalar stacks are outside that element budget. Budget/allocation/release errors report the function source path/entry line and exit2. Index errors retain the access location. This uses direct Windows HeapAlloc/HeapFree calls, with no C/Rust shim. Unused array functions do not add heap imports. Arrays cannot escape a function or be passed as pointers.
+
+`python -m compiler.anvil examples/local_arrays.ANVL --backend native --output build/local_arrays_native.exe` builds the existing example; it prints27. A new native_arrays module owns allocation/lifetime emission, and a frame-relative integer/pointer encoder helper supports it. This implementation has local regression tests; exact independent evaluation status is recorded in the QA report. The latest full review remains identified in QA_REPORT.md.

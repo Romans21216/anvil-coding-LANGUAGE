@@ -103,6 +103,13 @@ class X64Code:
                           0x84 | ((register & 7) << 3), 0x24))
                    + struct.pack("<i", offset))
 
+    def rbp_int(self, register: int, offset: int, *, store: bool = False) -> None:
+        """Load/store a frame-relative integer or pointer without scratch registers."""
+        self._register(register)
+        self.bytes(bytes((0x48 | ((register >> 3) << 2),
+                          0x89 if store else 0x8B,
+                          0x85 | ((register & 7) << 3))) + struct.pack("<i", offset))
+
     def rip_lea_label(self, destination: int, label: str) -> None:
         self._register(destination)
         self.bytes(bytes((0x48 | ((destination >> 3) << 2), 0x8D,
