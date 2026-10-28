@@ -107,3 +107,5 @@ Earlier reports and their complete rubric tables remain available in Git history
 ## Bug tracking
 
 All confirmed findings have detailed reproduction, impact and acceptance criteria in GitHub with `Codex Bugs`; user reports use `Romans21216 - Bugs`. No new confirmed defect in the latest review; #78 is independently resolved. [#63 coordinate integration](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/63) and broader systems in#5–11/#14–15/#24 remain open. Complete backlog only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
+
+Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 categories, exact2b4e5e8 and151/142.480s evidence agree; current native project/settings docs and ancillary fields match. No rescore or implementation change.

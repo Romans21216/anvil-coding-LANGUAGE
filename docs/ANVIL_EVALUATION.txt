@@ -64,3 +64,5 @@ Performance evidence: Not available
 
 CURRENT PRIORITIES
 Implement native local arrays/allocation limits and stronger instruction/ABI helpers. Continue native engine parity, actual ray backends, rich types, Forge/OS and benchmarks. Goal remainsactive below98.
+
+Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 categories, exact2b4e5e8 and151/142.480s evidence agree; current native project/settings docs and ancillary fields match. No rescore or implementation change.
