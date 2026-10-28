@@ -4,7 +4,7 @@ The full 450-item list is maintained only in the body and comments of GitHub iss
 
 Updated 2026-10-27. Latest independent review is exact commit `120482e85e77c19216a793ab17190dbf1ae025ff` at 58/100 — FAIL against 98. All 89 tests pass. Issues #49 and #52–#54 are fixed and closed after independent verification. Earlier native reviews scored 56/100 on ade1ff6, 55/100 on f330d4b, 54/100 on 597867f, and 50/100 on 573cb44.
 
-Unreviewed native follow-up: direct AMD64/PE compilation now supports fixed-size global numeric arrays, dynamic checked reads/writes, and source-line runtime bounds errors; all 91 tests pass. The last scored candidate remains `120482e` until a fresh full review completes. The native backend still does not support the engine runtime, and C remains the default.
+Unreviewed native follow-up: direct AMD64/PE compilation now supports fixed-size global numeric arrays, dynamic checked reads/writes, source-line bounds errors, and a 16 MiB aggregate data cap checked before PE allocation. The prior 91-test candidate was scored 61/100; a follow-up adds the allocation-limit regression and corrects the evaluation build-target sentence. The follow-up awaits a fresh full review. The native backend still does not support the engine runtime, and C remains the default.
 
 ## Status counts
 

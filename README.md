@@ -5,7 +5,7 @@
 ## What works now
 
 - A Windows C backend for numeric globals, checked fixed-size global and function-local arrays, function-local variables, parameterized and recursive functions with numeric return values, calls, branches, inclusive `for`/`while` loops, input, time, seeded random numbers, gradient noise, and fractal noise.
-- An experimental direct x64/PE32+ backend for numeric functions, checked fixed-size global arrays, arithmetic, comparisons, branches, loops, and console output rounded to six fractional digits. It emits the EXE directly from `.ANVL`; it does not generate or compile C/Rust. It is still a limited subset, not the game-engine backend.
+- An experimental direct x64/PE32+ backend for numeric functions, checked fixed-size global arrays (up to 16 MiB total global data), arithmetic, comparisons, branches, loops, and console output rounded to six fractional digits. It emits the EXE directly from `.ANVL`; it does not generate or compile C/Rust. It is still a limited subset, not the game-engine backend.
 - A small native software renderer for 2D rectangles, circles, lines and text, plus shaded 3D cubes, spheres, and grid planes with a perspective camera and depth buffer.
 - Keyboard camera movement/look, adjustable field of view, and a built-in BVH-accelerated CPU ray-traced sphere with shadows and specular lighting.
 - Keyboard edge/held state, configurable fixed-step updates, deterministic RNG and noise helpers.

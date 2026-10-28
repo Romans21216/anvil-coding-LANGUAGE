@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import pathlib
+import re
 import struct
 from dataclasses import dataclass
 
@@ -190,6 +192,7 @@ class NativeCodegen:
                ("KERNEL32.dll", "WriteFile"),
                ("KERNEL32.dll", "ExitProcess")]
     BUILTIN_NAMES: set[str] = set()
+    MAX_DATA_BYTES = 16 * 1024 * 1024
 
     def __init__(self, path, functions, top, variables, arrays=None):
         self.path = path
@@ -209,9 +212,37 @@ class NativeCodegen:
         }
         next_offset = len(self._data_offsets) * 8
         self._array_offsets: dict[str, int] = {}
+        try:
+            source_lines = pathlib.Path(path).read_text(encoding="utf-8").splitlines()
+        except (OSError, TypeError):
+            source_lines = []
         for name in sorted(self.arrays):
+            size = self.arrays[name]
+            if next_offset + size * 8 > self.MAX_DATA_BYTES:
+                declaration = re.compile(
+                    rf"array\s+{re.escape(name)}\s*\(\s*\d+\s*\)"
+                )
+                line = next(
+                    (
+                        number
+                        for number, text in enumerate(source_lines, 1)
+                        if declaration.fullmatch(text.strip())
+                    ),
+                    None,
+                )
+                location = f"{self.path}:{line}" if line is not None else str(self.path)
+                required = next_offset + size * 8
+                raise CompileError(
+                    f"{location}: direct native global data needs {required} bytes; "
+                    f"the limit is {self.MAX_DATA_BYTES} bytes"
+                )
             self._array_offsets[name] = next_offset
-            next_offset += self.arrays[name] * 8
+            next_offset += size * 8
+        if next_offset > self.MAX_DATA_BYTES:
+            raise CompileError(
+                f"{self.path}: direct native global data needs {next_offset} bytes; "
+                f"the limit is {self.MAX_DATA_BYTES} bytes"
+            )
         self._data_size = max(8, next_offset)
 
     def label(self, stem: str) -> str:

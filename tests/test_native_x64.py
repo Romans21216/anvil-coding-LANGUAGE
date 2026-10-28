@@ -178,6 +178,37 @@ call fn(main)
                 result.stdout, "Anvil array index error at line 3\n"
             )
 
+    def test_native_backend_rejects_aggregate_array_data_before_pe_allocation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(__file__).resolve().parents[1]
+            source = pathlib.Path(temp) / "large-arrays.ANVL"
+            executable = pathlib.Path(temp) / "large-arrays.exe"
+            source.write_text(
+                "array a(1048576)\n"
+                "array b(1048576)\n"
+                "array c(1048576)\n"
+                "fn(main)\n  output 1\nend\ncall fn(main)\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(root / "compiler" / "anvil.py"),
+                    str(source),
+                    "--backend",
+                    "native",
+                    "--output",
+                    str(executable),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"{source}:3: direct native global data needs", result.stderr)
+        self.assertIn("the limit is 16777216 bytes", result.stderr)
+        self.assertFalse(executable.exists())
+
     def test_native_cli_builds_exe_without_generated_source(self):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(__file__).resolve().parents[1]

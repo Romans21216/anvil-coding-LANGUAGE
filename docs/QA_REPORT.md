@@ -1,7 +1,7 @@
 # Anvil QA Report
 
 **Review date:** 2026-10-27
-**Latest independent evaluation:** **58/100 - FAIL** for exact commit `120482e85e77c19216a793ab17190dbf1ae025ff` against the user's **98/100** threshold. Categories: requirements 9/20, functionality/reliability 12/20, architecture 12/20, testing 14/20, delivery 11/20.
+**Latest independent evaluation:** **61/100 - FAIL** for exact commit `9eaf1b62eb6d97a081be7ed8e4a851569ba88b56` against the user's **98/100** threshold. Categories: requirements 9/20, functionality/reliability 14/20, architecture 12/20, testing 15/20, delivery 11/20.
 **Current passing threshold:** 98/100. Historical reviews retain the threshold in force at the time; a previous 90/100 PASS does not pass the current bar.
 
 **Native QA follow-up (reviewed):** the latest review found two `test_qa_report` fixture failures on `573cb44`. The follow-up now scopes rubric fixtures to the current table and changes subtotals dynamically; the focused tests and full 86-test suite pass locally. The fix is committed as `150a042`; a fresh review of `597867f44a5140db27fdce2e4f2339859ef96af8` confirmed the full suite passes and raised the testing subtotal. Review of `f330d4b` verified fractional formatting and closed issue #49. Review of `ade1ff6` opened #53 for signed-minimum rejection and #54 for missing non-finite arithmetic diagnostics. Review of `120482e` verified fixes for both, along with #52 range handling; issues #49 and #52–#54 are closed.
@@ -10,7 +10,7 @@
 **Latest review evidence:** the critic evaluated exact pushed follow-up commit `c10260483eab6b5adaadd261a66a92a9138b9ed8` and scored 92/100 (16/20, 20/20, 19/20, 19/20, 18/20). It reran 77 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 JSON parsing, status parity, and diff check. It verified all 26 audited rows total 450 (424 needing verification, 3 partial, 21 complete, 2 in progress), including items #391–394 complete. Issue #48's invalid-UTF-8/stale-SHA finding is fixed and closed; criterion 38 returned to 2/2. Native mouse integration covers resized viewport mapping, letterbox rejection, left/right/middle button edges and held states, and wheel accumulation/reset. No live mouse-enabled window was visually inspected and no code defect was found. Extension 0.1.4 remains installed per user preference, so newer visible highlighting remains unverified.
 **Current finding:** exact commit `120482e85e77c19216a793ab17190dbf1ae025ff` scored 58/100, below the 98/100 threshold. All 89 tests passed. The reviewer verified fixes for fractional output, large values, signed minimum, and non-finite diagnostics; issues #49 and #52–#54 are closed. Native game-engine migration remains incomplete.
 
-**Unreviewed direct-native candidate:** the working-tree follow-up adds fixed-size global numeric arrays to the direct AMD64/PE backend. Two new executable-level regressions check dynamic array read/write (including single evaluation of a side-effecting index) and line-numbered runtime errors for negative, fractional, and out-of-range indices. All 91 Python tests, VS Code extension validation, and Python compileall pass. This evidence does not change the last independent score; the C backend is still the default and direct engine-runtime parity remains incomplete.
+**Current review:** the independent reviewer evaluated exact pushed commit `9eaf1b62eb6d97a081be7ed8e4a851569ba88b56` and scored it 61/100. This review found missing aggregate native-data limits (issue #55, `Codex Bugs`) and a stale evaluation-document sentence. The follow-up now caps native global data at 16 MiB before PE allocation, tests the source-located rejection path, and corrects the build-target description; it awaits independent verification. The C backend remains the default; direct engine-runtime parity remains incomplete.
 
 **Latest reviewed correction:** code commit `15ac43a8033557859db509ecca2fa8c88a13d7b7` plus synchronized records at `eec0608dd6f252090b50fda1027eba14c6af1292` addresses issue #47 with overflow-stable interpolation, finite-output checks, and viewport clipping before line-rasterizer integer conversion. The test-count record is 74. Independent review restored criteria 34 and 38 to 2/2 and scored the synchronized candidate 92/100. Visual rendering was not inspected.
 
@@ -64,7 +64,76 @@ The active physics capacity is configurable from 1 through the compiled maximum 
 
 **91/100 — FAIL** against the required 98/100. Category totals: requirements 16/20; functionality and reliability 20/20; code quality and architecture 19/20; testing and verification 18/20; developer experience and delivery 18/20. The exact reviewed commit was `bc4db99368b3af2953e49adc4e4cbd8f5706bb4e`. The critic reran 73 Python tests, 3 native runtime tests, extension validation, compileall, the QA validator, and diff check. It verified the viewport geometry helper and inspected the WM_PAINT path, but did not visually launch a resized window. The audited ledgers contain 21 rows and total 450. Criterion 38 scores 1 because the prior ledger labeled dynamic window resizing as #144; canonical issue #23 comment 6451810775 defines it as #172. Issue #46 tracks the correction. Criterion 22 remains 2 after formatting; criterion 23 remains 2 for phase separation. Criterion 27 remains 1 for Windows/MSVC and C-only backend. Criterion 47 remains 1 because newer extension tokens are not visually verified. The 98-point threshold remains unmet; issues #12 and #45 are closed.
 
-## Latest 50-criterion scoring — direct native commit `120482e`
+## Latest 50-criterion scoring — direct native commit `9eaf1b6`
+
+Independent reviewer evaluated exact pushed commit `9eaf1b62eb6d97a081be7ed8e4a851569ba88b56`: **61/100 — FAIL** against the active **98/100** threshold. Categories: requirements 9/20, functionality/reliability 14/20, architecture 12/20, testing/verification 15/20, delivery 11/20. All 91 Python tests, extension validation, compileall, QA arithmetic, strict UTF-8 status JSON, and diff checks passed. The reviewer built `examples/arrays.ANVL` through the direct backend and verified output `50`; negative, fractional, and out-of-range indices each reported their source line and exited 2. A newly found aggregate-array resource-exhaustion risk is tracked in issue [#55](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/55), labeled `Codex Bugs`. A stale sentence in `docs/ANVIL_EVALUATION.txt` was also identified and needs correction.
+
+| # | Criterion | Score | Evidence, deduction, and status |
+|---:|---|:---:|---|
+| 1 | Explicit requirements identified | 2 | Direct x64/PE and no-C/no-Rust target is documented. |
+| 2 | Implicit requirements addressed | 1 | Native runtime port is recognized but incomplete. |
+| 3 | Functionality matches intended goal | 0 | Native compiler still produces only a numeric console subset, not the engine. |
+| 4 | Required deliverables present | 1 | Compiler, tests and docs exist; native engine parity is missing. |
+| 5 | No essential feature missing | 0 | Native graphics and game APIs are absent. |
+| 6 | Stated constraints respected | 1 | Native mode avoids C/Rust, but CLI defaults to C. |
+| 7 | Ambiguity resolved logically | 2 | Direct machine code and PE match the user's selected target. |
+| 8 | Behavior matches documentation | 1 | Evaluation text incorrectly describes MSVC/C as the only verified path. |
+| 9 | Important use cases supported | 1 | Numeric and array programs work; native game workflows do not. |
+| 10 | Usable for intended purpose | 0 | Native mode cannot build the intended full engine. |
+| 11 | Core functionality works | 0 | Native game-engine core is absent. |
+| 12 | Secondary functionality works | 1 | C engine features work; native backend now includes global arrays. |
+| 13 | Primary workflows functional | 1 | Supported source-to-EXE flow works; native manifests and engine APIs do not. |
+| 14 | Inputs validated | 2 | Negative, fractional and out-of-bounds array indices are rejected at runtime. |
+| 15 | Errors handled gracefully | 2 | Array and numeric failures report source lines and exit with code 2. |
+| 16 | Edge cases covered | 2 | Successful array access, single evaluation and invalid indices have tests. |
+| 17 | Invalid inputs controlled | 1 | No total global-array data cap; oversized aggregates can exhaust memory or exceed PE limits. |
+| 18 | Stable across repeated operations | 1 | Normal cases pass; aggregate-array stress and resource limits were unverified. |
+| 19 | No known critical defects | 2 | Tested output and array error paths pass; no critical tested-path defect was reproduced. |
+| 20 | Components integrate | 2 | Parsing, codegen, PE writing and execution work end-to-end for arrays. |
+| 21 | Logical project structure | 2 | Compiler phases and PE writer are separated into modules. |
+| 22 | Readable and consistently formatted | 1 | Raw opcode bytes make native codegen difficult to maintain. |
+| 23 | Clear module responsibilities | 1 | There is no typed IR; lowering, layout and instruction emission are combined. |
+| 24 | Consistent descriptive naming | 2 | Names are generally descriptive. |
+| 25 | Duplication minimized | 1 | Machine-code and storage logic remain ad hoc. |
+| 26 | Dependencies appropriate | 2 | Native mode uses no third-party compiler/runtime dependency. |
+| 27 | Supports future extensions | 1 | Labels/fixups are a base, but typed IR and native runtime interfaces are absent. |
+| 28 | No unfinished placeholders | 0 | Built-in dispatch is empty and engine built-ins are rejected natively. |
+| 29 | Configuration understandable | 1 | Backend choice exists, but C remains default and configuration is limited. |
+| 30 | Conventions followed | 1 | PE and ABI code is tested on samples but lacks broad systematic validation. |
+| 31 | Automated tests provided | 2 | The project has a substantial automated suite. |
+| 32 | Core tests covered | 1 | Native tests cover language subset and arrays, not the full engine. |
+| 33 | Failure scenarios tested | 1 | Bounds and numeric failures are tested; aggregate-memory and malformed-PE cases are not. |
+| 34 | Edge cases explicitly tested | 2 | Array tests cover negative, fractional, out-of-range and single-evaluation behavior. |
+| 35 | Integration behavior tested | 2 | Native EXEs run for array read/write and failure paths. |
+| 36 | Documented test commands work | 1 | Documented test and extension commands are reproducible; full native setup is incomplete. |
+| 37 | Builds and compilation pass | 2 | Reviewer reran 91 tests and all listed static validation. |
+| 38 | Results recorded accurately | 2 | Candidate and latest reviewed SHA are recorded; the stale evaluation sentence is identified for correction. |
+| 39 | Regression checks performed | 2 | Array regression tests pass with the full suite. |
+| 40 | Verified against original goal | 0 | Full compiler, runtime and engine objective remains incomplete. |
+| 41 | Installation instructions accurate | 1 | Windows setup is documented; complete native-engine setup is absent. |
+| 42 | Setup reproducible | 1 | Limited native compilation is reproducible, but full engine setup is not. |
+| 43 | Usage understandable | 1 | Current examples cover only limited native features. |
+| 44 | Design decisions documented | 2 | Migration plan explains native architecture and current limits. |
+| 45 | Troubleshooting available | 0 | Native troubleshooting guidance is incomplete. |
+| 46 | Opens in intended environment | 1 | CLI works; native project/editor/runtime integration is absent. |
+| 47 | Editor integration works | 1 | Extension tests pass; no fresh visible editor check was performed. |
+| 48 | Deliverables organized | 2 | Reviewed commit is pushed and files are organized. |
+| 49 | Limitations disclosed | 2 | Native feature limits are documented. |
+| 50 | Practical for intended scope | 0 | Not yet a complete game-engine deliverable. |
+| | **Requirement fulfillment** | **9/20** | |
+| | **Functionality and reliability** | **14/20** | |
+| | **Code quality and architecture** | **12/20** | |
+| | **Testing and verification** | **15/20** | |
+| | **Developer experience and delivery** | **11/20** | |
+| | **Total** | **61/100** | Exact commit `9eaf1b6`; FAIL against 98. |
+
+### Deduction details and follow-up
+
+- **Criterion 17 — bounded native data allocation (1/2):** each global array is individually limited, but native codegen has no aggregate `.data` cap before allocating the zero-filled payload. Many valid declarations can request excessive memory or overflow PE sizing. Issue [#55](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/55) tracks the fix.
+- **Criterion 8 — documentation consistency (1/2):** `docs/ANVIL_EVALUATION.txt` inaccurately says the verified backend is only MSVC/generated C. It must distinguish the full-engine C default from the tested direct-native subset.
+- **Criteria 2–6, 9–13, 28–30, 32–33, 36, 40–47, 50:** the direct backend remains narrow and lacks the full game runtime, graphics, project manifests, engine built-ins and fresh visible extension verification. Continue native runtime parity work, preserve the no-C/no-Rust final target, and expand integration validation.
+
+## Historical 50-criterion scoring — direct native commit `120482e`
 
 Independent reviewer evaluated exact pushed commit `120482e85e77c19216a793ab17190dbf1ae025ff`: **58/100 — FAIL** against the active **98/100** threshold. All 89 tests passed. Relative to the 56/100 review of `ade1ff6`, criteria 15 and 19 each rose by one point after the signed-minimum and non-finite diagnostic fixes. Issues #49 and #52–#54 are closed. Full explanations are in `docs/ANVIL_EVALUATION.txt`.
 

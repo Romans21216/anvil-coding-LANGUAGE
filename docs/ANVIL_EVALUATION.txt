@@ -3,11 +3,27 @@ ANVIL LANGUAGE AND ENGINE EVALUATION
 
 Assessment date: 2026-10-27
 Project reviewed: Anvil, source files ending in .ANVL
-Basis: latest completed independent full review of exact pushed commit f330d4b19225e46c2f32fcefda8e78d8719ef26f, with compiler/runtime tests, extension validation, and build workflows rerun by the reviewer.
+Basis: latest completed independent 50-criterion review of exact pushed commit `9eaf1b62eb6d97a081be7ed8e4a851569ba88b56`, with the full Python suite, extension validation, compile checks, array-EXE execution, and failure-path verification rerun by the reviewer.
 
 LATEST INDEPENDENT REVIEW AND CURRENT CANDIDATE
 -----------------------------------------------
-The latest independent review evaluated exact commit 120482e85e77c19216a793ab17190dbf1ae025ff and scored 58/100 — FAIL against 98 (requirements 9/20, functionality 12/20, architecture 12/20, testing 14/20, delivery 11/20). All 89 tests passed. The reviewer verified the fractional fix (#49), range guard (#52), signed minimum (#53), and line-numbered non-finite arithmetic error (#54); all four issues are now closed. No new defect was found. Previous direct-native scores were 56/100 for ade1ff6, 55/100 for f330d4b, 54/100 for 597867f, and 50/100 for 573cb44; the earlier C-backed score was 92/100 for c102604. Rust code generation is not a project target; direct x64 machine-code PE output is the selected direction. The legacy C backend is still the default and must be removed after native runtime parity is achieved.
+The latest independent review evaluated exact commit `9eaf1b62eb6d97a081be7ed8e4a851569ba88b56` and scored **61/100 — FAIL** against the user's active 98/100 threshold (requirements 9/20, functionality 14/20, architecture 12/20, testing 15/20, delivery 11/20). The reviewer ran 91 Python tests, extension tests, compileall, QA arithmetic, UTF-8 JSON parsing, diff check, a native arrays example (output 50), and invalid-index EXEs (source-line errors, exit 2). It identified an unbounded aggregate global-array `.data` allocation (tracked in issue #55, labeled `Codex Bugs`) and one stale statement in this file; both are being corrected. Previous direct-native scores were 58/100 for `120482e`, 56/100 for `ade1ff6`, 55/100 for `f330d4b`, 54/100 for `597867f`, and 50/100 for `573cb44`; the earlier C-backed score was 92/100 for `c102604`. Rust output is not a target. Direct x64 machine-code PE is the intended end state; the C backend remains default until native runtime parity is reached.
+
+### Latest review: direct native arrays (`9eaf1b6`)
+
+Independent evaluator: separate `final_review` agent. Exact commit: `9eaf1b62eb6d97a081be7ed8e4a851569ba88b56`. Score **61/100 (61%) — FAIL**; required pass threshold **98%**. Categories: A requirements 9/20, B functionality/reliability 14/20, C architecture 12/20, D testing/verification 15/20, E delivery 11/20.
+
+Criterion score vector (criteria 1–50): 2,1,0,1,0,1,2,1,1,0, 0,1,1,2,2,2,1,1,2,2, 2,1,1,2,1,2,1,0,1,1, 2,1,1,2,2,1,2,2,2,0, 1,1,1,2,0,1,1,2,2,0.
+
+The reviewer found that the direct global-array implementation correctly handles reads/writes, dynamic index single-evaluation, zero-initialized data, and checked negative/fractional/out-of-range errors. The evaluation discrepancy: criteria 14, 16, and 20 improved versus the previous scored candidate; criterion 17 lost a point because multiple individually valid arrays have no aggregate native-data size limit. Criterion 35 improved with end-to-end EXE coverage. The new runtime-allocation risk is issue [#55](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/55), labeled `Codex Bugs`. The review also noted the stale build-target sentence in the older evaluation snapshot; it is corrected below and in the QA report.
+
+Reviewer verification: `python -m unittest discover -s tests -q` — 91 passed; `npm test --prefix vscode-extension` — passed; compileall, QA arithmetic, strict UTF-8 JSON parsing, and `git diff --check` — passed. `examples/arrays.ANVL` built with `--backend native` and printed 50. Indices -1, 4 for a size-4 array, and 0.5 each produced a line-numbered runtime error and exit code 2. Full per-criterion evidence appears in `docs/QA_REPORT.md`.
+
+Remaining high-impact work: independently verify the 16 MiB aggregate `.data` cap; implement the direct native engine/runtime and graphics APIs; support the remaining language and project workflows; make the direct backend the default only when parity is achieved; improve native codegen structure/troubleshooting; preserve extension verification. Overall goal remains incomplete at 61/100.
+
+### Unscored follow-up candidate
+
+After the 61/100 review, the native compiler now rejects aggregate global data above 16 MiB before allocating the PE `.data` payload. The diagnostic points to the array declaration that crosses the limit. `test_native_backend_rejects_aggregate_array_data_before_pe_allocation` compiles three individually legal maximum-size arrays and confirms a source-located failure with no EXE created. The stale build-target sentence is corrected. Focused native tests: 13 passed; full Python suite: 92 passed; extension validation, compileall, QA arithmetic, status JSON, and diff checks pass. Issue #55 remains open until independent verification. This follow-up has no new independent score; 61/100 applies only to `9eaf1b6`.
 
 SUMMARY
 -------
@@ -32,7 +48,7 @@ WHAT ANVIL IS NOT GOOD AT YET
 3. Only one ray-tracing path is implemented: CPU BVH is available. The runtime exposes `ray_backend(name)` and `ray_backend_available(name)`. The selector successfully chooses BVH; hardware-accelerated RTX/DXR and Embree are not implemented and cannot be selected successfully.
 4. The language remains narrow: fixed-size global and function-local numeric arrays are now implemented, but dynamic arrays, user-defined types, modules/imports, static types, and a general string model are not. Function parameters, return values, recursion, function-local numeric state, numeric `while`/`for` loops, and array bounds checks are implemented.
 5. Multiplayer is experimental: the UDP API exchanges a numeric value with one peer. It lacks reliable delivery, authentication, encryption, matchmaking, replication, and robust peer lifecycle handling; it is only appropriate for trusted LAN experiments.
-6. The build target is narrow: the verified backend is Windows/MSVC with generated C. Rust output and a cross-platform runtime are not implemented.
+6. The build target is narrow: full-engine builds currently use Windows/MSVC with generated C; a separate tested direct AMD64/PE backend compiles a limited numeric subset, now including checked global arrays, without generating C/Rust or invoking another compiler. Native engine parity is incomplete, and a cross-platform runtime is not implemented.
 7. Efficiency claims are unproven: there is no benchmark suite comparing compile time or runtime performance. The software renderer and ray tracer are CPU-bound, so “hyper-efficient” is not supported by measurements.
 
 HOW CLOSE IS IT TO A REAL PROGRAMMING LANGUAGE?
@@ -97,8 +113,8 @@ Anvil's strengths are simplicity, inspectable C output, approachable examples, r
 
 
 
-LATEST INDEPENDENT REVIEW — DIRECT NATIVE COMMIT 573CB44
-======================================================
+HISTORICAL INDEPENDENT REVIEW — DIRECT NATIVE COMMIT 120482E
+===========================================================
 Exact reviewed commit: `120482e85e77c19216a793ab17190dbf1ae025ff`
 Evaluator: separate independent review agent; complete 50-criterion review.
 Score: **58/100 — FAIL** against the user's 98/100 threshold. Category subtotals: requirement fulfillment 9/20, functionality and reliability 12/20, code quality and architecture 12/20, testing and verification 14/20, developer experience and delivery 11/20.
