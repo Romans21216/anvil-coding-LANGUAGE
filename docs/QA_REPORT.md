@@ -112,3 +112,5 @@ All confirmed findings have detailed reproduction, impact and acceptance criteri
 Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 categories, exact2b4e5e8 and151/142.480s evidence agree; current native project/settings docs and ancillary fields match. No rescore or implementation change.
 
 Record-only check3fe3e57 found stale total-row source and local-array rollout wording (#58). Those lines are corrected in this follow-up; all main score vectors and158/145.917s evidence passed. Source76 score unchanged.
+
+Focused independent record recheckfbf6143 passes after #58 corrections: total-row source2f7cd74 and native local-array rollout agree with all four50-score vectors,76/100 and158/145.917s evidence. No rescore or implementation change.
