@@ -1,7 +1,10 @@
 # Direct-native drawing kernels. Coordinates are client pixels.
 # Circle membership uses integer pixel coordinates, including the boundary.
 # Width/height are supplied by the owning runtime; no global library state.
-fn(_anvil_native_circle, x, y, radius, red, green, blue, width, height)
+fn(_anvil_native_circle, x, y, radius, red, green, blue, alpha, width, height)
+  if var(alpha) < 1
+    output 0
+  end
   set local(r) = abs(var(radius))
   set local(square) = local(r) * local(r)
   set local(first_y) = max(0, ceil(var(y) - local(r)) - 1)
@@ -26,7 +29,7 @@ fn(_anvil_native_circle, x, y, radius, red, green, blue, width, height)
       sub local(right) 1
     end
     if local(left) <= local(right)
-      display rect(local(left), local(py), local(right) - local(left) + 1, 1) -rgb(var(red), var(green), var(blue))
+      display rect(local(left), local(py), local(right) - local(left) + 1, 1) -rgba(var(red), var(green), var(blue), var(alpha))
     end
   end
 end
@@ -47,8 +50,8 @@ fn(_anvil_native_pixel_round, value)
   output local(base) + 1
 end
 
-fn(_anvil_native_line, x1, y1, x2, y2, thickness, red, green, blue, width, height)
-  if var(width) <= 0 or var(height) <= 0
+fn(_anvil_native_line, x1, y1, x2, y2, thickness, red, green, blue, alpha, width, height)
+  if var(width) <= 0 or var(height) <= 0 or var(alpha) < 1
     output 0
   end
   set local(dx) = var(x2) - var(x1)
@@ -118,7 +121,7 @@ fn(_anvil_native_line, x1, y1, x2, y2, thickness, red, green, blue, width, heigh
   set local(error) = local(dx) + local(dy)
   set local(radius) = min(var(width), max(0, ceil(var(thickness) * 0.5)))
   while 1
-    display rect(local(x) - local(radius), local(y) - local(radius), local(radius) * 2 + 1, local(radius) * 2 + 1) -rgb(var(red), var(green), var(blue))
+    display rect(local(x) - local(radius), local(y) - local(radius), local(radius) * 2 + 1, local(radius) * 2 + 1) -rgba(var(red), var(green), var(blue), var(alpha))
     if local(x) = local(target_x) and local(y) = local(target_y)
       output 0
     end

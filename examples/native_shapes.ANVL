@@ -15,8 +15,10 @@ end
 fn(draw)
   display text("Anvil native shapes \u03bb") -l(40,10) -rgb(220,235,250)
   display rect(40,40,560,300) -rgb(30,45,65)
-  display circle(var(x),170,65.5) -rgb(95,205,185)
-  display circle(440.5,170.25,-48) -rgba(175,110,245,255)
-  display line(-100,280,650,70,2) -rgb(245,205,90)
+  display circle(var(x),170,65.5) -rgba(95,205,185,180)
+  display circle(440.5,170.25,-48) -rgba(175,110,245,200)
+  display line(-100,280,650,70,2) -rgba(245,205,90,160)
+  display rect(80,245,400,45) -rgba(20,30,60,160)
+  display text("Native pixel blending") -l(100,250) -rgb(220,235,250)
   display line(60,310,580,310,0) -rgb(170,190,215)
 end

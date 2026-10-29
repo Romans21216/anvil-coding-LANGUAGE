@@ -171,6 +171,7 @@ class NativeText:
         c.stack_int(0,self.RESULT)
         c.bytes(b"\x85\xc0")
         c.conditional_jump(0x84,failure)
+        w.surface.mark_gdi()
         c.label(done)
         c.bytes(b"\x0f\x57\xc0")
         w.return_frame(self.FRAME)

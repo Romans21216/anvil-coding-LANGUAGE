@@ -50,7 +50,7 @@ class NativeWindow:
         ("GDI32.dll", "CreateSolidBrush"),
         ("GDI32.dll", "DeleteObject"),
         ("GDI32.dll", "CreateCompatibleDC"),
-        ("GDI32.dll", "CreateCompatibleBitmap"),
+
         ("GDI32.dll", "SelectObject"),
         ("GDI32.dll", "DeleteDC"),
         ("GDI32.dll", "BitBlt"),
@@ -63,6 +63,8 @@ class NativeWindow:
         from compiler.native_drawing import NativeDrawing
         self.drawing = NativeDrawing(self)
         self.text = None
+        from compiler.native_surface import NativeSurface
+        self.surface = NativeSurface(self)
         self.hdc = owner.reserve_data(b"\0" * 8)
         self.instance = owner.reserve_data(b"\0" * 8)
         self.brush = owner.reserve_data(b"\0" * 8)
@@ -102,7 +104,7 @@ class NativeWindow:
 
     @property
     def imports(self) -> list[tuple[str, str]]:
-        return (self.IMPORTS + (self.CLOCK_IMPORTS if self.clock_enabled else [])
+        return (self.IMPORTS + self.surface.IMPORTS + (self.CLOCK_IMPORTS if self.clock_enabled else [])
                 + (self.mouse.IMPORTS if self.mouse is not None else [])
                 + (self.text.IMPORTS if self.text is not None else []))
 
@@ -122,7 +124,7 @@ class NativeWindow:
 
     def emit(self) -> None:
         self.drawing.emit_pending()
-        self._rectangle()
+        self.surface.rectangle()
         if self.text is not None:
             self.text.emit()
         self._release_buffer()
@@ -163,19 +165,20 @@ class NativeWindow:
         if shape == "line" and len(values) == 4:
             values.append("1")
         rest = raw[end:].strip()
-        colour = ["255", "255", "255"]
+        colour = ["255", "255", "255", "255"]
         if rest:
             if rest.startswith("-rgb(") and rest.endswith(")"):
                 colour = split_args(rest[5:-1])
+                if len(colour) != 3:
+                    raise CompileError(f"{location}: native {shape} colour expects three channels")
+                colour.append("255")
             elif rest.startswith("-rgba(") and rest.endswith(")"):
                 channels = split_args(rest[6:-1])
-                if len(channels) != 4 or channels[3] != "255":
-                    raise CompileError(f"{location}: native shapes currently require alpha 255")
-                colour = channels[:3]
+                if len(channels) != 4:
+                    raise CompileError(f"{location}: native {shape} rgba expects four channels")
+                colour = channels
             else:
                 raise CompileError(f"{location}: unsupported native {shape} modifier")
-            if len(colour) != 3:
-                raise CompileError(f"{location}: native {shape} colour expects three channels")
         if shape != "rect":
             self.drawing.primitive(shape, values + colour, node, scope)
             return
@@ -256,6 +259,7 @@ class NativeWindow:
         c.rip_int(8, self.brush)
         self.call("FillRect")
         self.require_rax(failure)
+        self.surface.mark_gdi()
         c.call("function:draw")
         if self.keyboard is not None and "update" not in self.owner.functions:
             c.call("native:clear_pressed")
@@ -276,6 +280,7 @@ class NativeWindow:
         c.stack_int(0, 64, store=True)
         self.call("BitBlt")
         self.require_rax(failure)
+        self.surface.mark_gdi()
         c.label(finish)
         c.mov_imm(0, 0)
         c.rip_int(0, self.hdc, store=True)
@@ -339,14 +344,9 @@ class NativeWindow:
             c.conditional_jump(0x85, resize)
         c.jump(ready)
         c.label(resize)
-        c.stack_int(1, self.PAINT_DC)  # use colour display DC, not monochrome memory DC
-        c.stack_int(2, self.WIDTH)
-        c.stack_int(8, self.HEIGHT)
-        self.call("CreateCompatibleBitmap")
-        self.require_rax(failure)
-        c.rip_int(0, self.pending_bitmap, store=True)
+        self.surface.allocate(failure)
         c.rip_int(1, self.back_dc)
-        c.mov_reg(2, 0)
+        c.rip_int(2, self.pending_bitmap)
         self.call("SelectObject")
         self.require_rax(failure)
         c.bytes(b"\x48\x83\xf8\xff")
@@ -354,6 +354,7 @@ class NativeWindow:
         c.stack_int(0, self.OLD_BITMAP, store=True)
         c.rip_int(0, self.pending_bitmap)
         c.rip_int(0, self.back_bitmap, store=True)
+        self.surface.commit()
         c.mov_imm(0, 0)
         c.rip_int(0, self.pending_bitmap, store=True)
         c.rip_int(0, self.stock_bitmap)
@@ -379,6 +380,7 @@ class NativeWindow:
         c = self.code
         c.label("native:release_buffer")
         self.frame(0x28)
+        self.surface.sync()
         no_pending = self.owner.label("no_pending_bitmap")
         no_dc = self.owner.label("no_buffer_dc")
         no_stock = self.owner.label("no_stock_bitmap")
@@ -408,6 +410,7 @@ class NativeWindow:
         for data in (self.hdc, self.back_dc, self.back_bitmap, self.pending_bitmap,
                      self.stock_bitmap, self.back_width, self.back_height):
             c.rip_int(0, data, store=True)
+        self.surface.reset()
         self.return_frame(0x28)
 
     def _double_xmm1(self, value: float) -> None:
@@ -460,54 +463,6 @@ class NativeWindow:
                               (high, b"\xf2\x0f\x5d\xc1")):
             self.code.mov_imm(0, struct.unpack("<Q", struct.pack("<d", value))[0])
             self.code.bytes(b"\x66\x48\x0f\x6e\xc8" + opcode)
-
-    def _rectangle(self) -> None:
-        """RCX points to seven doubles: x,y,width,height,r,g,b."""
-        c = self.code
-        c.label("native:rectangle")
-        self.frame(0x88)
-        done = self.owner.label("rectangle_done")
-        failure = self.owner.label("rectangle_failure")
-        c.rip_int(0, self.hdc)
-        c.bytes(b"\x48\x85\xc0")
-        c.conditional_jump(0x84, done)
-        for index, source in enumerate((0, 8, 0, 8)):
-            c.bytes(b"\xf2\x0f\x10\x41" + bytes((source,)))
-            if index >= 2:
-                c.bytes(b"\xf2\x0f\x58\x41" + bytes((16 if index == 2 else 24,)))
-            self._clamp(-1073741824.0, 1073741824.0)
-            c.bytes(b"\xf2\x48\x0f\x2c\xc0\xf2\x48\x0f\x2a\xc8")
-            c.bytes(b"\x66\x0f\x2e\xc1")  # original versus truncated value
-            rounded = self.owner.label("rectangle_edge")
-            c.conditional_jump(0x83 if index < 2 else 0x86, rounded)
-            c.bytes(b"\x48\xff\xc8" if index < 2 else b"\x48\xff\xc0")
-            c.label(rounded)
-            c.bytes(b"\x89\x44\x24" + bytes((0x40 + index * 4,)))
-        c.bytes(b"\x45\x31\xd2")  # RGB accumulator in R10D
-        for index in range(3):
-            c.bytes(b"\xf2\x0f\x10\x41" + bytes((32 + index * 8,)))
-            self._clamp(0.0, 255.0)
-            c.bytes(b"\xf2\x0f\x2c\xc0")
-            if index:
-                c.bytes(b"\xc1\xe0" + bytes((index * 8,)))
-            c.bytes(b"\x41\x09\xc2")
-        c.mov_reg(1, 10)
-        self.call("CreateSolidBrush")
-        self.require_rax(failure)
-        c.stack_int(0, 0x58, store=True)
-        c.rip_int(1, self.hdc)
-        c.stack_int(2, 0x40, address=True)
-        c.mov_reg(8, 0)
-        self.call("FillRect")
-        # Empty or clipped rectangles may return zero; brush lifetime is always ended.
-        c.stack_int(1, 0x58)
-        self.call("DeleteObject")
-        self.require_rax(failure)
-        c.label(done)
-        c.bytes(b"\x0f\x57\xc0")
-        self.return_frame(0x88)
-        c.label(failure)
-        self.owner.emit_runtime_error("Anvil native rectangle error\n")
 
     def _entry(self) -> None:
         c = self.code

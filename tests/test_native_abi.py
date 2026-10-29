@@ -60,6 +60,53 @@ class NativeABITests(unittest.TestCase):
         targets = Pe32Plus(bytes(c.code), imports).fixup_targets(len(c.code))
         self.run_image(Pe32Plus(c.finish(targets), imports).build(data=bytes(data)))
 
+    def test_integer_memory_all_registers_bases_widths_and_displacements(self):
+        c = X64Code()
+        c.label("entry")
+        c.rip_int(4,0,store=True)
+        sentinel = 0x00007ABC89ABCDEF  # canonical even when exercised as RSP
+        for width in (4,8):
+            for base in range(16):
+                for register in range(16):
+                    for displacement in (-129,-128,0,127,128):
+                        source,destination = 512+displacement,520+displacement
+                        c.mov_imm(0,sentinel)
+                        c.rip_int(0,source,store=True)
+                        c.rip_lea_data(base,512)
+                        c.memory_int(register,base,displacement,width=width)
+                        c.rip_int(register,destination,store=True)
+                        c.rip_int(4,0)  # RSP as value register is restored before calls
+                        c.rip_int(0,destination)
+                        c.mov_imm(1,sentinel if width == 8 else sentinel & 0xFFFFFFFF)
+                        c.bytes(b"\x48\x39\xc8")
+                        c.conditional_jump(0x85,"failure")
+                        c.mov_imm(0,0)
+                        c.rip_int(0,destination,store=True)
+                        c.mov_imm(register,sentinel)
+                        c.rip_lea_data(base,512)
+                        # When value and base coincide, store the actual base value.
+                        c.rip_int(register,8,store=True)
+                        c.memory_int(register,base,displacement+8,store=True,width=width)
+                        c.rip_int(4,0)
+                        c.rip_int(0,destination)
+                        c.rip_int(1,8)
+                        if width == 4:
+                            c.bytes(b"\x89\xc9")
+                        c.bytes(b"\x48\x39\xc8")
+                        c.conditional_jump(0x85,"failure")
+        c.mov_imm(1,0)
+        c.jump("exit")
+        c.label("failure")
+        c.mov_imm(1,2)
+        c.label("exit")
+        c.rip_int(4,0)
+        c.bytes(b"\x48\x83\xec\x28")
+        c.rip_call_import("ExitProcess")
+        c.bytes(b"\xcc")
+        imports = [("KERNEL32.dll","ExitProcess")]
+        targets = Pe32Plus(bytes(c.code),imports).fixup_targets(len(c.code))
+        self.run_image(Pe32Plus(c.finish(targets),imports).build(data=b"\0"*1040))
+
     def test_numeric_calls_zero_through_sixteen_arguments_reentrant_frames(self):
         # Each argument is weighted differently, so swapped stack/register arguments
         # cannot hide behind an unchanged sum. Argument evaluation has side effects.

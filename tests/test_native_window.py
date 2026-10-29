@@ -206,7 +206,7 @@ end
             sections = pe + 24 + struct.unpack_from("<H", image, pe + 20)[0]
             text_raw = struct.unpack_from("<I", image, sections + 20)[0]
             call = next(offset - 2 for offset, target in generator.code.fixups
-                        if target == "iat:CreateCompatibleBitmap")
+                        if target == "iat:CreateDIBSection")
             # Simulate a NULL allocation result at the emitted API call itself.
             image[text_raw + call:text_raw + call + 6] = b"\x31\xc0\x90\x90\x90\x90"
             executable = pathlib.Path(temp) / "failure.exe"

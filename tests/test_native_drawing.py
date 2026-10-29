@@ -207,7 +207,7 @@ end
 
     def test_invalid_shapes_have_source_diagnostics_and_unused_kernel_is_omitted(self):
         for drawing, message in [("circle(0,0)", "expects x,y,radius"),
-                                 ("circle(0,0,1) -rgba(0,0,0,2)", "alpha 255"),
+                                 ("circle(0,0,1) -rgba(0,0,0)", "rgba expects four channels"),
                                  ("circle(0,0,1) -rot(0,0,0)", "unsupported native circle modifier"),
                                  ("line(1,2,3)", "expects x1,y1,x2,y2"),
                                  ("line(1,2,3,4,5,6)", "expects x1,y1,x2,y2")]:

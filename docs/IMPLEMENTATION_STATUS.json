@@ -945,7 +945,11 @@
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 76,
   "latest_independent_candidate_result": "FAIL against98;76/100 on68ff824; native literal text verified; full goal incomplete.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
+    "features": "Native DIB/BGRX framebuffer with transactional resize, GDI/CPU synchronization and bounded private pixel writes; exact SSE2 integer RGBA rectangles/circles/lines, native opaque spans, text interleaving, checked bitmap budget and integer addressing helpers.",
+    "local_checks": "18 targeted surface/ABI/project/mouse/keyboard tests passed22.960s; ABI5 finalsource0.378s. Earlier19 window/drawing/text/ABI regressions passed22.194s. New surface tests cover65536alpha/source pairs, saturation, headless guards/nonvolatiles/extremes, text/shape layers and injected allocation/nullbits/budget/sync failures. CLI sample/npm/compileall/QA/diff pass. Latest scored68ff824 remains76/100 pending fullreview."
+  },
   "latest_independently_scored_candidate_commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
   "historical_c_backed_evaluation": {
     "score": 92,

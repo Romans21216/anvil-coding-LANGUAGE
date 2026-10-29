@@ -117,15 +117,27 @@ class X64Code:
         Always encode a displacement, including zero, so RBP/R13 cannot
         accidentally select RIP-relative addressing. RSP/R12 require a SIB.
         """
+        self._base_memory(bytes((0x0F, 0x11 if store else 0x10)),
+                          register, base, displacement, prefix=b"\xf2")
+
+    def memory_int(self, register: int, base: int, displacement: int = 0,
+                   *, store: bool = False, width: int = 8) -> None:
+        """MOV a 32-bit pixel/integer or 64-bit pointer through base addressing."""
+        if width not in (4, 8):
+            raise ValueError("native integer memory width must be 4 or 8")
+        self._base_memory(bytes((0x89 if store else 0x8B,)), register, base,
+                          displacement, wide=width == 8)
+
+    def _base_memory(self, opcode: bytes, register: int, base: int,
+                     displacement: int, *, prefix: bytes = b"", wide: bool = False) -> None:
         self._register(register)
         self._register(base)
         if not -(1 << 31) <= displacement < (1 << 31):
             raise ValueError("x64 memory displacement must fit signed 32 bits")
         short = -128 <= displacement <= 127
-        prefix = bytes((0x40 | ((register >> 3) << 2) | (base >> 3),))
-        self.bytes(b"\xf2" + (prefix if prefix != b"\x40" else b"")
-                   + bytes((0x0F, 0x11 if store else 0x10,
-                            (0x40 if short else 0x80) | ((register & 7) << 3) | (base & 7))))
+        rex = bytes((0x40 | (8 if wide else 0) | ((register >> 3) << 2) | (base >> 3),))
+        self.bytes(prefix + (rex if rex != b"\x40" else b"") + opcode
+                   + bytes(((0x40 if short else 0x80) | ((register & 7) << 3) | (base & 7),)))
         if base & 7 == 4:
             self.bytes(b"\x24")
         self.bytes(struct.pack("<b" if short else "<i", displacement))
