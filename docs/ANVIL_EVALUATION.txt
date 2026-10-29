@@ -19,6 +19,8 @@ Previous independent source 957ee124402e0ba773971aaee24c48c8b277929a retained in
 Selective source imports: qualified functions, private module helpers/globals/arrays, file-local aliases and canonical module initialization are implemented. Remaining defects/status: #81 and #82 independently VERIFIED FIXED on b76fc02: supplementary UTF-8 metadata compiles/reports correctly, and source cannot name private generated functions/arrays. Prior #79 stays verified fixed. #63 and broader #5–11/#14–15/#24/#23/#80 capability/verification gaps remain open. Confirmed findings retain detailed reproduction, impact and acceptance under Codex Bugs; user reports use Romans21216 - Bugs.
 
 SUMMARY
+
+Focused record-only check at ba78d22 found one stale ancillary extension field in IMPLEMENTATION_STATUS.md: source0.1.11 instead of0.1.12 (#58). Corrected here; all50 scores, categories, exactb76fc02/76/194/281.445 evidence and remaining records passed. No source change or rescore; focused recheck pending.
 -------
 Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The current default compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for numeric programs and an initial RGBA rectangle/circle/line/literal-text 2D runtime. The requested no-C/no-Rust engine remains incomplete.
 

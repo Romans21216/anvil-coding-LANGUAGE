@@ -6,7 +6,7 @@ Updated2026-10-29. Latest independent source `b76fc02a1f6ea9ab24f7af004e8a0981ba
 
 Direct AMD64/PE output supports numeric functions, checked global/local arrays, whole-file/selective source includes with qualified functions, private helper/state identities and static function selection, and an initial buffered Win32 2D RGBA rectangle/circle/line/literal-text runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 
-The source extension package is 0.1.11 and passes grammar/package checks. Installed version 0.1.4 is preserved per user preference; newer tokens have no fresh visible-editor verification.
+The source extension package is 0.1.12 and passes grammar/package checks. Installed version 0.1.4 is preserved per user preference; newer tokens have no fresh visible-editor verification.
 
 ## Status counts
 
