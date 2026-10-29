@@ -34,4 +34,6 @@ Historical independent circle-fix review: `139f9241a7af1c3a137d0f6408fab0bfb5141
 
 Historical independent text review: `68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2`,76/100,175 tests in218.389s. Native literal Unicode text independently verified; no new defect. General strings/numeric HUD/layout and full engine/Forge/OS scope remain incomplete.
 
-Latest independent surface review: `4f5c981bddf2796e56b6bea14d8f575d692b6da5`,76/100,180 tests in286.162s. Native DIB/RGBA shapes independently verified, no new defect. Full engine/Forge/OS scope remains incomplete.
+Historical independent surface review: `4f5c981bddf2796e56b6bea14d8f575d692b6da5`,76/100,180 tests in286.162s. Native DIB/RGBA shapes independently verified, no new defect. Full engine/Forge/OS scope remains incomplete.
+
+Latest independent selective review: `957ee124402e0ba773971aaee24c48c8b277929a`, 71/100, 192 tests in 323.089s. Full independent review of957ee12:71/100 FAIL against98, categories11/15/14/16/15;192 tests passed in323.089s. Selective imports implemented, but #81 supplementary-Unicode C literal encoding and #82 private function/array reference bypass remain open. Full engine/Forge/OS/targets/types/backends/benchmarks/tooling and #63 remain incomplete. Goal stays active.
