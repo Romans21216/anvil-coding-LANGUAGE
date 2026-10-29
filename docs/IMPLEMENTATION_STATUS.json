@@ -1113,5 +1113,12 @@
     "reviewer": "project_full_review"
   },
   "resolved_critic_issue_81": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Shared valid C UTF-8 metadata literals preserve supplementary source filenames and runtime physical locations; both backends and byte-exact payload/title compilation verified.",
-  "resolved_critic_issue_82": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Quote-aware validation of every unbound source identifier reference rejects private calls/array reads/writes before binding; generated references and literals remain valid."
+  "resolved_critic_issue_82": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Quote-aware validation of every unbound source identifier reference rejects private calls/array reads/writes before binding; generated references and literals remain valid.",
+  "latest_record_parity_check": {
+    "commit": "b752f41fd33b038b607dbe81a2a3f840df176627",
+    "result": "PASS",
+    "reviewed_implementation": "b76fc02a1f6ea9ab24f7af004e8a0981ba249252",
+    "score_unchanged": 76,
+    "summary": "Focused independent record-only recheck at b752f41: PASS. All six current records, ancillary fields, all50 scores and both candidate_validation objects agree on reviewed source b76fc02,76/100,categories12/18/14/17/15 and194 tests281.445s. Source extension0.1.12/installed0.1.4 and historical71/192/323.089 evidence are distinguished; follow-ups null. #58 correction verified. No source change, new test run or rescore."
+  }
 }
