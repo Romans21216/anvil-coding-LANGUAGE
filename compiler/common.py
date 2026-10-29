@@ -25,6 +25,7 @@ class Node:
     local_arrays: dict[str, int] = field(default_factory=dict)
     local_array_lines: dict[str, int] = field(default_factory=dict)
     source: pathlib.Path | None = None
+    original_name: str = ""
 
 
 class ArrayDeclarations(dict):
@@ -50,6 +51,18 @@ class ParsedProgram:
 
 class CompileError(Exception):
     pass
+
+
+IDENTIFIER = r"[A-Za-z_][\w-]*"
+FUNCTION_REFERENCE = rf"({IDENTIFIER})(?:\s+-\s+({IDENTIFIER}))?"
+
+
+def function_reference(raw: str, path, line: int) -> tuple[str, str | None]:
+    """A spaced dash qualifies a function; embedded hyphens remain identifiers."""
+    match = re.fullmatch(FUNCTION_REFERENCE, raw.strip())
+    if not match:
+        raise CompileError(f"{path}:{line}: expected a function name or 'name - module'")
+    return match[1], match[2]
 
 
 def c_name(name: str) -> str:

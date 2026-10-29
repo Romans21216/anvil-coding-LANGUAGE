@@ -20,3 +20,5 @@ Run `npm ci` once, then `npm run validate` to validate the JSON manifest, langua
 
 
 Version 0.1.11 corrects indentation and folding for function, if, while, for, else and end statements, including trailing comments. Automated configuration tests exercise real control-flow headers and unrelated text. This package has not been installed or visibly verified; installed 0.1.4 is preserved per user preference.
+
+Version 0.1.12 adds selective imports (`include fn(move) - "lib/player.ANVL" as input`) and qualified calls (`call fn(move - input, 10)`). Automated TextMate token tests cover selectors, source qualifiers, aliases, nested calls and existing hyphenated names. The package is statically verified only; installed 0.1.4 remains unchanged.

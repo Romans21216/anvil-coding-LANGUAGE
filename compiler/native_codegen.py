@@ -263,7 +263,8 @@ class NativeCodegen:
             raise CompileError(f"{path}: title must be a non-empty Unicode string without control characters")
         self.fixed_hz = fixed_hz
         self.title = title
-        if any(name.startswith("_anvil_native_") for name in functions):
+        if any(name.startswith("_anvil_native_") or fn.original_name.startswith("_anvil_native_")
+               for name,fn in functions.items()):
             raise CompileError(f"{path}: function prefix _anvil_native_ is reserved for the native runtime")
         self.functions = dict(functions)
         self.top = top

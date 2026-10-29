@@ -1,0 +1,7 @@
+fn(move, distance)
+  output call fn(scale, var(distance))
+end
+
+fn(scale, value)
+  output var(value) * 2
+end

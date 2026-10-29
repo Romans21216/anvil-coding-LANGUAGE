@@ -94,7 +94,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 The `.ANVL` suffix is used here for Anvil source; the name also appears in an unrelated metadata serialization format, so the suffix is not globally unique.
 
 
-Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](docs/INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
+Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](docs/INCLUDES.md). Selective imports use `include fn(move) - "lib/player.ANVL"`, with `call fn(move - player, 10)` and optional `as alias` for same-basename files. Private helper functions and state stay with their source module. Package registries and separate object linking remain unfinished.
 
 Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
 

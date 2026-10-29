@@ -38,6 +38,7 @@ def build_c(
             compiler,
             "/nologo",
             "/TC",
+            "/utf-8",
             "/I" + str(INCLUDE),
             str(generated),
             str(RUNTIME),

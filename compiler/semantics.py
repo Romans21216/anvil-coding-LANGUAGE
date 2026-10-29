@@ -5,7 +5,7 @@ from __future__ import annotations
 from compiler.common import CompileError, MAX_BLOCK_DEPTH, ParsedProgram, RUNTIME_C_NAMES, c_name
 
 
-def validate_program(program: ParsedProgram) -> None:
+def validate_program(program: ParsedProgram, *, check_symbols: bool = True) -> None:
     """Resolve variable references and validate generated C symbol ownership."""
     path = program.path
     functions = program.functions
@@ -48,6 +48,9 @@ def validate_program(program: ParsedProgram) -> None:
                     f"local array {name!r} conflicts with "
                     f"a local variable or parameter in function '{fn.name}'"
                 )
+
+    if not check_symbols:
+        return  # module source names are checked after compiler-owned binding
 
     variable_sites = {}
     for reference, line, owner, source in program.variable_references:

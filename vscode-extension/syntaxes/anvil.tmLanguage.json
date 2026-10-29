@@ -3,81 +3,206 @@
   "name": "Anvil",
   "scopeName": "source.anvil",
   "patterns": [
-    { "include": "#comments" },
-    { "include": "#strings" },
-    { "include": "#function-definition" },
-    { "include": "#language-version" },
-    { "include": "#array-declaration" },
-    { "include": "#function-call" },
-    { "include": "#variables" },
-    { "include": "#engine-commands" },
-    { "include": "#keywords" },
-    { "include": "#constants" },
-    { "include": "#builtins" },
-    { "include": "#numbers" },
-    { "include": "#operators" },
-    { "include": "#punctuation" }
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#selective-include"
+    },
+    {
+      "include": "#function-definition"
+    },
+    {
+      "include": "#language-version"
+    },
+    {
+      "include": "#array-declaration"
+    },
+    {
+      "include": "#function-call"
+    },
+    {
+      "include": "#variables"
+    },
+    {
+      "include": "#engine-commands"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    }
   ],
   "repository": {
     "language-version": {
       "match": "\\b(language)(\\s+)(version)(\\s+)([0-9]+)\\b",
       "captures": {
-        "1": { "name": "keyword.control.anvil" },
-        "3": { "name": "keyword.control.anvil" },
-        "5": { "name": "constant.numeric.integer.anvil" }
+        "1": {
+          "name": "keyword.control.anvil"
+        },
+        "3": {
+          "name": "keyword.control.anvil"
+        },
+        "5": {
+          "name": "constant.numeric.integer.anvil"
+        }
       }
     },
     "comments": {
-      "patterns": [{ "name": "comment.line.number-sign.anvil", "match": "#.*$" }]
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.anvil",
+          "match": "#.*$"
+        }
+      ]
     },
     "strings": {
       "name": "string.quoted.double.anvil",
       "begin": "\"",
-      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.anvil" } },
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.anvil"
+        }
+      },
       "end": "\"|$",
-      "endCaptures": { "0": { "name": "punctuation.definition.string.end.anvil" } },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.anvil"
+        }
+      },
       "patterns": [
-        { "name": "constant.character.escape.anvil", "match": "\\\\(?:[\\\\\"nt]|u[0-9A-Fa-f]{4})" },
-        { "name": "invalid.illegal.escape.anvil", "match": "\\\\." }
+        {
+          "name": "constant.character.escape.anvil",
+          "match": "\\\\(?:[\\\\\"nt]|u[0-9A-Fa-f]{4})"
+        },
+        {
+          "name": "invalid.illegal.escape.anvil",
+          "match": "\\\\."
+        }
       ]
     },
     "function-definition": {
       "begin": "\\b(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?=\\s*(?:,|\\)))",
       "beginCaptures": {
-        "1": { "name": "keyword.declaration.function.anvil" },
-        "3": { "name": "punctuation.section.function.begin.anvil" },
-        "4": { "name": "entity.name.function.anvil" }
+        "1": {
+          "name": "keyword.declaration.function.anvil"
+        },
+        "3": {
+          "name": "punctuation.section.function.begin.anvil"
+        },
+        "4": {
+          "name": "entity.name.function.anvil"
+        }
       },
       "end": "\\)",
-      "endCaptures": { "0": { "name": "punctuation.section.function.end.anvil" } },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.section.function.end.anvil"
+        }
+      },
       "patterns": [
-        { "name": "variable.parameter.anvil", "match": "[A-Za-z_][A-Za-z0-9_-]*" },
-        { "name": "punctuation.separator.anvil", "match": "," }
+        {
+          "name": "variable.parameter.anvil",
+          "match": "[A-Za-z_][A-Za-z0-9_-]*"
+        },
+        {
+          "name": "punctuation.separator.anvil",
+          "match": ","
+        }
       ]
     },
     "function-call": {
-      "match": "\\b(call)(\\s+)(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?=\\s*(?:,|\\)))",
+      "match": "\\b(call)(\\s+)(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?:\\s+(-)\\s+([A-Za-z_][A-Za-z0-9_-]*))?(?=\\s*(?:,|\\)))",
       "captures": {
-        "1": { "name": "keyword.control.call.anvil" },
-        "3": { "name": "support.type.function.anvil" },
-        "5": { "name": "punctuation.section.function.begin.anvil" },
-        "6": { "name": "variable.function.anvil" }
+        "1": {
+          "name": "keyword.control.call.anvil"
+        },
+        "3": {
+          "name": "support.type.function.anvil"
+        },
+        "5": {
+          "name": "punctuation.section.function.begin.anvil"
+        },
+        "6": {
+          "name": "variable.function.anvil"
+        },
+        "7": {
+          "name": "keyword.operator.anvil"
+        },
+        "8": {
+          "name": "entity.name.namespace.anvil"
+        }
       }
     },
     "array-declaration": {
       "match": "\\b(array)(\\s+)([A-Za-z_][A-Za-z0-9_-]*)(\\s*)(\\()([0-9]+)(\\))",
       "captures": {
-        "1": { "name": "storage.type.array.anvil" },
-        "3": { "name": "variable.other.array.anvil" },
-        "5": { "name": "punctuation.section.group.begin.anvil" },
-        "6": { "name": "constant.numeric.integer.anvil" },
-        "7": { "name": "punctuation.section.group.end.anvil" }
+        "1": {
+          "name": "storage.type.array.anvil"
+        },
+        "3": {
+          "name": "variable.other.array.anvil"
+        },
+        "5": {
+          "name": "punctuation.section.group.begin.anvil"
+        },
+        "6": {
+          "name": "constant.numeric.integer.anvil"
+        },
+        "7": {
+          "name": "punctuation.section.group.end.anvil"
+        }
       }
     },
     "variables": {
       "patterns": [
-        { "match": "\\b(var|local|flag)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))", "captures": { "1": { "name": "support.type.anvil" }, "2": { "name": "punctuation.section.group.begin.anvil" }, "3": { "name": "variable.other.anvil" }, "4": { "name": "punctuation.section.group.end.anvil" } } },
-        { "match": "\\b(world)\\s+(var)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))", "captures": { "1": { "name": "storage.modifier.anvil" }, "2": { "name": "support.type.anvil" }, "4": { "name": "variable.other.anvil" } } }
+        {
+          "match": "\\b(var|local|flag)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))",
+          "captures": {
+            "1": {
+              "name": "support.type.anvil"
+            },
+            "2": {
+              "name": "punctuation.section.group.begin.anvil"
+            },
+            "3": {
+              "name": "variable.other.anvil"
+            },
+            "4": {
+              "name": "punctuation.section.group.end.anvil"
+            }
+          }
+        },
+        {
+          "match": "\\b(world)\\s+(var)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.anvil"
+            },
+            "2": {
+              "name": "support.type.anvil"
+            },
+            "4": {
+              "name": "variable.other.anvil"
+            }
+          }
+        }
       ]
     },
     "engine-commands": {
@@ -85,7 +210,7 @@
       "name": "support.function.engine.anvil"
     },
     "keywords": {
-      "match": "\\b(fn|set|add|sub|local|output|call|include|if|else|end|repeat|while|for|and|or|not|where|get|to|from|step|all|pressed|held|released)\\b",
+      "match": "\\b(fn|set|add|sub|local|output|call|include|as|if|else|end|repeat|while|for|and|or|not|where|get|to|from|step|all|pressed|held|released)\\b",
       "name": "keyword.control.anvil"
     },
     "constants": {
@@ -98,8 +223,14 @@
     },
     "numbers": {
       "patterns": [
-        { "name": "constant.numeric.float.anvil", "match": "\\b[0-9]+\\.[0-9]+(?:[eE][+-]?[0-9]+)?\\b" },
-        { "name": "constant.numeric.integer.anvil", "match": "\\b[0-9]+\\b" }
+        {
+          "name": "constant.numeric.float.anvil",
+          "match": "\\b[0-9]+\\.[0-9]+(?:[eE][+-]?[0-9]+)?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.anvil",
+          "match": "\\b[0-9]+\\b"
+        }
       ]
     },
     "operators": {
@@ -109,7 +240,29 @@
     "punctuation": {
       "match": "[(),{}\\[\\].]",
       "name": "punctuation.separator.anvil"
+    },
+    "selective-include": {
+      "match": "\\b(include)(\\s+)(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\s*\\))(\\s+)(-)(?=\\s+\")",
+      "captures": {
+        "1": {
+          "name": "keyword.control.anvil"
+        },
+        "3": {
+          "name": "support.type.function.anvil"
+        },
+        "5": {
+          "name": "punctuation.section.function.begin.anvil"
+        },
+        "6": {
+          "name": "variable.function.anvil"
+        },
+        "7": {
+          "name": "punctuation.section.function.end.anvil"
+        },
+        "9": {
+          "name": "keyword.operator.anvil"
+        }
+      }
     }
   }
 }
-

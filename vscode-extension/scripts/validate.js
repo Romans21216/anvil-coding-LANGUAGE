@@ -84,6 +84,14 @@ async function main() {
   }
   expect('include \"lib/math.ANVL\"', 'include', 'keyword.control.anvil');
   expect('include \"lib/math.ANVL\"', 'lib/math.ANVL', 'string.quoted.double.anvil');
+  expect('include fn(move) - "lib/player.ANVL" as input', 'move', 'variable.function.anvil');
+  expect('include fn(move) - "lib/player.ANVL" as input', 'fn', 'support.type.function.anvil');
+  expect('include fn(move) - "lib/player.ANVL" as input', 'as', 'keyword.control.anvil');
+  expect('include fn(move) - "lib/player.ANVL" as input', 'lib/player.ANVL', 'string.quoted.double.anvil');
+  check(!scopesAt('include fn(move) - "lib/player.ANVL"', 'move').includes('entity.name.function.anvil'), 'selective import is not a function declaration');
+  expect('output call fn(move-fast - player, 10)', 'move-fast', 'variable.function.anvil');
+  expect('output call fn(move-fast - player, 10)', 'player', 'entity.name.namespace.anvil');
+  expect('call fn(move - input, call fn(value - other))', 'other', 'entity.name.namespace.anvil');
   expect('fn(update)', 'fn', 'keyword.declaration.function.anvil');
   expect('language version 1', 'language', 'keyword.control.anvil');
   expect('language version 1', 'version', 'keyword.control.anvil');

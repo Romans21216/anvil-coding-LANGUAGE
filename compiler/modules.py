@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import re
 
-from compiler.common import ArrayDeclarations, CompileError, ParsedProgram
+from compiler.common import CompileError, IDENTIFIER, FUNCTION_REFERENCE
 from compiler.lexer import mask_strings
 
 MAX_INCLUDE_FILES = 256
@@ -22,81 +22,29 @@ def include_name(raw, path, line):
     if not isinstance(name, str) or not name or any(ord(char) < 32 for char in name):
         raise CompileError(f'{path}:{line}: include expects a quoted relative .ANVL path')
     relative = Path(name)
-    if relative.is_absolute() or relative.drive or relative.suffix.lower() != ".anvl":
+    if relative.is_absolute() or relative.drive or relative.root or relative.suffix.lower() != ".anvl":
         raise CompileError(f'{path}:{line}: include requires a relative .ANVL file')
     return relative
 
 
+def include_spec(raw, path, line):
+    """Return selected function, public alias and the original quoted path."""
+    if not raw.startswith("fn("):
+        include_name(raw, path, line)
+        return "", "", raw
+    match = re.fullmatch(rf'fn\(\s*({IDENTIFIER})\s*\)\s+-\s+("(?:\\.|[^"\\])*")(?:\s+as\s+({IDENTIFIER}))?', raw)
+    if not match:
+        raise CompileError(f'{path}:{line}: expected include fn(name) - "file.ANVL" [as alias]')
+    relative = include_name(match[2], path, line)
+    alias = match[3] or relative.stem
+    if not re.fullmatch(IDENTIFIER, alias):
+        raise CompileError(f"{path}:{line}: filename needs an explicit 'as alias' identifier")
+    return match[1], alias, match[2]
+
+
 def load_program(path, source, *, include_root=None):
-    from compiler.parser import parse_syntax
-
-    path = Path(path)
-    root = Path(include_root).resolve() if include_root is not None else path.resolve().parent
-    result = ParsedProgram(path, {}, [], set(), ArrayDeclarations(), [], [])
-    seen = set()
-    active = []
-    total_bytes = 0
-
-    def visit(unit_path, text, origin=None):
-        nonlocal total_bytes
-        canonical = unit_path.resolve()
-        where = f"{origin.source}:{origin.line}" if origin is not None else str(unit_path)
-        if canonical in active:
-            chain = " -> ".join(str(item) for item in active + [canonical])
-            raise CompileError(f"{where}: include cycle: {chain}")
-        if canonical in seen:
-            return
-        if len(active) >= MAX_INCLUDE_DEPTH:
-            raise CompileError(f"{where}: include nesting exceeds {MAX_INCLUDE_DEPTH} files")
-        if len(seen) >= MAX_INCLUDE_FILES:
-            raise CompileError(f"{where}: include graph exceeds {MAX_INCLUDE_FILES} files")
-        if text is None:
-            try:
-                with canonical.open("rb") as stream:
-                    payload = stream.read(MAX_SOURCE_BYTES - total_bytes + 1)
-                if len(payload) + total_bytes > MAX_SOURCE_BYTES:
-                    raise CompileError(f"{where}: include source exceeds the 4 MiB budget")
-                text = payload.decode("utf-8-sig")
-            except (OSError, UnicodeError) as error:
-                raise CompileError(f"{where}: cannot read include {canonical}: {error}") from error
-            source_bytes = len(payload)
-        else:
-            source_bytes = len(text.encode("utf-8"))
-        total_bytes += source_bytes
-        if total_bytes > MAX_SOURCE_BYTES:
-            raise CompileError(f"{where}: include source exceeds the 4 MiB budget")
-        unit = parse_syntax(unit_path, text)
-        seen.add(canonical)
-        active.append(canonical)
-        for name, function in unit.functions.items():
-            if name in result.functions:
-                previous = result.functions[name]
-                raise CompileError(f"{unit_path}:{function.line}: duplicate function {name!r}; already declared at {previous.source}:{previous.line}")
-            result.functions[name] = function
-        for name, size in unit.arrays.items():
-            if name in result.arrays:
-                previous_path, previous_line = result.arrays.locations[name]
-                raise CompileError(f"{unit_path}:{unit.arrays.locations[name][1]}: duplicate array {name!r}; already declared at {previous_path}:{previous_line}")
-            result.arrays[name] = size
-            result.arrays.locations[name] = unit.arrays.locations[name]
-        result.variables.update(unit.variables)
-        result.variable_references.extend(unit.variable_references)
-        result.local_references.extend(unit.local_references)
-        for node in unit.top:
-            if node.kind == "include":
-                relative = include_name(node.value, unit_path, node.line)
-                target = (canonical.parent / relative).resolve()
-                try:
-                    target.relative_to(root)
-                except ValueError as error:
-                    raise CompileError(f"{unit_path}:{node.line}: include must resolve inside {root}") from error
-                visit(target, None, node)
-            else:
-                result.top.append(node)
-        active.pop()
-
-    visit(path, source)
-    return result
+    from compiler.module_loader import ProgramLoader
+    return ProgramLoader(path, include_root).load(source)
 
 
 def called_functions(nodes):
@@ -109,7 +57,8 @@ def called_functions(nodes):
             result.add(node.name)
         for text in [node.value] + node.params:
             unquoted = mask_strings(text)
-            result.update(re.findall(r'\bcall\s+fn\(\s*([A-Za-z_][\w-]*)', unquoted))
+            for match in re.finditer(rf'\bcall\s+fn\(\s*({FUNCTION_REFERENCE})(?=\s*[,\)])', unquoted):
+                result.add(match[2] + (" - " + match[3] if match[3] else ""))
         pending.extend(node.body)
         pending.extend(node.otherwise)
     return result

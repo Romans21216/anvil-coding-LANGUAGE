@@ -13,6 +13,7 @@ from compiler.common import (
     CompileError,
     Node,
     ParsedProgram,
+    function_reference,
 )
 from compiler.expressions import split_args
 from compiler.lexer import mask_strings, split_keyword, strip_comment, validate_port
@@ -68,10 +69,11 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
         if re.match(r"include\b", line):
             if len(stack) != 1:
                 raise CompileError(f"{path}:{line_no}: include must be at top level")
-            from compiler.modules import include_name
+            from compiler.modules import include_spec
             raw_name = line[len("include"):].strip()
-            include_name(raw_name, path, line_no)
-            top.append(Node("include", line_no, value=raw_name, source=path))
+            selected, alias, filename = include_spec(raw_name, path, line_no)
+            top.append(Node("include", line_no, value=filename, name=selected,
+                            params=[alias] if alias else [], source=path))
             continue
         reference_text = mask_strings(line)
         for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", reference_text):
@@ -301,13 +303,13 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             match = re.fullmatch(r"call\s+fn\((.*)\)", line)
             if match:
                 call_args = split_args(match.group(1))
-                if not call_args or not re.fullmatch(r"[A-Za-z_][\w-]*", call_args[0]):
+                if not call_args:
                     raise CompileError(
                         f"{path}:{line_no}: expected a function name in call"
                     )
-                node = Node(
-                    "call", line_no, value=", ".join(call_args[1:]), name=call_args[0]
-                )
+                name, module = function_reference(call_args[0], path, line_no)
+                node = Node("call", line_no, value=", ".join(call_args[1:]),
+                            name=name + (" - " + module if module else ""))
         if node is None:
             if re.fullmatch(r"scene\s+(?:2d|3d)", line):
                 node = Node("scene", line_no, value=line.split()[1])
