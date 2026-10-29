@@ -28,4 +28,6 @@ Historical numeric ABI review: independently reviewed `ecdf68109fd5932d8ae572a8f
 
 Historical independent drawing review: `f11240c19d708718d8b94bae5f3b3764df435f88`,73/100,168 tests in176.154s. Native circles/lines verified; #79 default C-circle offscreen traversal stall confirmed and open. Full scope remains incomplete.
 
-Latest independent correction review: `b0e02422d6447b5f6f289797e7211a9870aff26d`,73/100,169 tests in203.685s. Original #79 timeout fixed; extreme negative-tangent membership residual remains open. Full goal incomplete.
+Historical independent correction review: `b0e02422d6447b5f6f289797e7211a9870aff26d`,73/100,169 tests in203.685s. Original #79 timeout fixed; extreme negative-tangent membership residual remains open. Full goal incomplete.
+
+Latest independent review: `139f9241a7af1c3a137d0f6408fab0bfb5141662`,76/100,169 tests in165.552s. Both #79 failures verified fixed;110 independent full-frame guard cases pass. Full goal remains incomplete.

@@ -1,7 +1,7 @@
 # Anvil QA report
 
-**Review date:** 2026-10-28
-**Latest independent evaluation:** **73/100 - FAIL** on exact `b0e02422d6447b5f6f289797e7211a9870aff26d`.
+**Review date:** 2026-10-29
+**Latest independent evaluation:** **76/100 - FAIL** on exact `139f9241a7af1c3a137d0f6408fab0bfb5141662`.
 **Current passing threshold:** 98/100. Historical 90-point passes do not pass the current requirement.
 **Evaluator:** separate `project_full_review` agent, full 50-criterion review.
 
@@ -9,14 +9,14 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 
 ## Independent verification for this snapshot
 
-- `python -m unittest discover -s tests -q`: **169 passed**, 203.685 seconds.
+- `python -m unittest discover -s tests -q`: **169 passed**, 165.552 seconds.
 - Extension 0.1.11 grammar validation and VSIX CRC/source parity passed. Language ID `anvil`, extensions `.ANVL`/`.anvl`, grammar `vscode-extension/syntaxes/anvil.tmLanguage.json`. Installed 0.1.4 remains per preference; newer visible tokens are unverified.
 - Python compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
 - Adversarial probes combine 128 statement blocks with 63 grouped/unary/user-call/abs levels; accepted inputs pass. Over-budget mixed expressions return controlled diagnostics. #64 configuration locations and #65 uncontrolled compiler recursion are verified fixed.
 - Source includes and native function selection were verified in the preceding `edfbe86` review: native demo 3,072 bytes, native and C/MSVC demos print 20. The full regression suite includes those execution paths.
 - Direct-backend window/input tests target only their generated windows. Coordinate coverage uses explicit test instrumentation; untouched OS coordinate dispatch remains unverified (#63). No CUA or fresh manual editor/sample inspection occurred. A later audit found the legacy C mouse harness called SetCursorPos during full suites; prior blanket no-global-input claims were too broad. #71 records this and removes that behavior in the current follow-up.
 
-## Latest 50-criterion scoring — `b0e0242`
+## Latest 50-criterion scoring — `139f924`
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -31,11 +31,11 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 9 | Important use cases supported | 1 | Interactive 2D input works; native 3D/assets/physics/networking remain missing (open). |
 | 10 | Usable for intended purpose | 1 | Usable for a small native demo; complete engine workflows remain unavailable (open). |
 | 11 | Core functionality works | 1 | Numeric/namespace/local/scratch/formatter cases pass; complete native engine core remains partial. |
-| 12 | Secondary functionality works | 1 | Original C-circle stall fixed; extreme negative-tangent pixels accepted by the selected predicate are still omitted (#79). Correct conservative candidate coverage. |
+| 12 | Secondary functionality works | 2 | Both #79 failures independently corrected; production-framebuffer and existing resource/drawing checks pass. |
 | 13 | Primary workflows functional | 1 | Hosted subset builds work; Forge/plugin/assembly/UEFI/kernel primary workflows are absent (open). |
 | 14 | Inputs validated | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
 | 15 | Errors handled gracefully | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
-| 16 | Edge cases covered | 1 | 22 C-circle cases pass, but negative huge tangencies expose membership loss (#79). Add symmetric extreme and threshold coverage. |
+| 16 | Edge cases covered | 2 | Symmetric huge tangencies, threshold neighbors and110 independent full-frame guard cases pass; original offscreen timeout remains fixed. |
 | 17 | Invalid inputs controlled | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
 | 18 | Stable across repeated operations | 2 | Repeated maximum arrays, recursive unwind/reuse and GUI callback allocations pass. |
 | 19 | No known critical defects | 2 | No critical corruption or numeric miscompilation reproduced; no new confirmed finding in latest review. |
@@ -51,13 +51,13 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 29 | Configuration understandable | 2 | Backend/TOML/include/title and1–240Hz settings are organized and documented. |
 | 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
 | 31 | Automated tests provided | 2 | 169 tests and extension0.1.11 validation independently pass. |
-| 32 | Core tests covered | 1 | Production-framebuffer oracle tests omit negative huge tangencies. Extend cases and correct bounds (#79). |
+| 32 | Core tests covered | 2 | 44-case production-runtime regression plus110 independent oracle cases cover both #79 failures; existing implemented-core tests pass. |
 | 33 | Failure scenarios tested | 2 | Invalid mouse arguments/keys and bitmap allocation-failure injection are covered. |
 | 34 | Edge cases explicitly tested | 2 | Taps, repeats, simultaneous buttons, actual OS capture, wheel accumulation and draw-only behavior are tested. |
 | 35 | Integration behavior tested | 1 | Coordinate test uses an explicit test-only WndProc wrapper; untouched OS-dispatch coverage is incomplete (#63, open). |
 | 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
 | 37 | Builds and compilation pass | 2 | 169 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
-| 38 | Results recorded accurately | 2 | Exact b0e0242 / 73 / 169 evidence agrees across records; historical input-test limitations disclosed. |
+| 38 | Results recorded accurately | 2 | Exact 139f924 / 76 / 169 evidence agrees across records; historical input-test limitations disclosed. |
 | 39 | Regression checks performed | 2 | Full suite and prior slow-draw/failure/resource regressions pass. |
 | 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
 | 41 | Installation instructions accurate | 2 | Python/native and Python/MSVC routes match independently exercised builds; extension installation documented. |
@@ -71,15 +71,15 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 49 | Limitations disclosed | 2 | Native limitations are disclosed. |
 | 50 | Practical for intended scope | 0 | Full game-engine/Forge scope remains incomplete (open). |
 | | **Requirement fulfillment** | **12/20** | |
-| | **Functionality and reliability** | **16/20** | |
+| | **Functionality and reliability** | **18/20** | |
 | | **Code quality and architecture** | **14/20** | |
-| | **Testing and verification** | **16/20** | |
+| | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **73/100** | Exact commit `b0e0242`; FAIL against 98. |
+| | **Total** | **76/100** | Exact commit `139f924`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
-- **#79 OPEN residual:** Original offscreen timeout is verified fixed (r1e6 completes0.0142s); extreme negative tangencies omit pixels accepted by squared/hypot membership. Use conservative viewport bounds in rounding-ambiguous cases and add symmetric full-frame oracle checks.
+- **#79 VERIFIED FIXED:** Original timeout and negative huge-tangent membership omission are corrected on139f924. 169 tests and110 extra independent full-frame guard cases pass.
 
 - **#78 RESOLVED:** All64 independent control-character entry cases pass on both backends; diagnostics name the manifest and no traceback/artifact leaks. No new confirmed finding.
 - **Scope (2–6/9–10/13/28/40/50):** Complete native engine, actual DXR/Embree, rich types, Forge/OS outputs and measured efficiency remain absent. Deliver full issue23 scope with executable acceptance evidence before default migration/completion.
@@ -87,12 +87,13 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 - **Integration (35):** Instrumented/synchronized coordinate samples do not prove untouched OS pointer dispatch (#63). Gather independent integration evidence within input constraints.
 - **Setup/editor (42/46/47):** Full project/engine/Forge/OS setup cannot be reproduced; newer installed-editor visuals remain unverified (#24). Implement missing workflows and respect installed0.1.4 preference.
 
-The full b0e0242 review passed169 tests in203.685s. Original #79 timeout is fixed: r10 exits0 in0.0824s and offscreen r1e6 exits0 in0.0142s, with before/after printed. However circle(-r,0,r), r=1e150/1e200/DBL_MAX, misses pixel(2,0) despite the selected predicate accepting it. Score stays73; criteria12/16/32 remain partial until candidate bounds are conservative under extreme binary64 rounding and tests cover symmetric tangencies. Native drawing and other regressions pass. Full goal remains incomplete. Installed0.1.4 preserved; #63 remains unverified. Issue23 and44comments re-read after suite.
+The full139f924 review passed169 tests in165.552s. The original live review process was recovered after a usage-limit interruption, without restarting its suite. Both #79 failures are independently verified fixed: r1e6 completes0.009839s, r10 completes0.07585s, and110 extra full-frame guard cases cover extreme negative tangencies, threshold neighbors, both axes and40 deterministic randomized cases. The44-case regression and existing native drawing/ABI/array/project/resource checks pass. Score73->76 restores criteria12/16/32. No new defect confirmed. Full goal remains incomplete; next native text/runtime parity and validated shared lowering. Installed0.1.4 preserved; #63 remains unverified. Issue23 and45comments re-read after suite.
 
 ## Review history
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
+| `b0e02422d6447b5f6f289797e7211a9870aff26d` |73 /98 FAIL|169 tests in203.685s; original #79 hang fixed, residual negative-tangent membership found.|
 | `f11240c19d708718d8b94bae5f3b3764df435f88` |73 /98 FAIL|168 tests in176.154s; native circles/lines verified; original #79 C stall discovered.|
 | `ecdf68109fd5932d8ae572a8f16446194e93b935` |76 /98 FAIL|162 tests in139.160s; numeric ABI/addressing independently verified; no new finding.|
 | `2f7cd743ba37101c87a0daa5d1c9c017d9ab5dc2` |76 /98 FAIL|158 tests in 145.917s; native local arrays independently verified; no new finding.|
@@ -121,5 +122,3 @@ Record-only check3fe3e57 found stale total-row source and local-array rollout wo
 Focused independent record recheckfbf6143 passes after #58 corrections: total-row source2f7cd74 and native local-array rollout agree with all four50-score vectors,76/100 and158/145.917s evidence. No rescore or implementation change.
 
 Focused independent record-only recheck of 91b06cd: PASS. All six current records, all 50 scores and both candidate_validation objects agree on exact source ecdf681, 76/100, categories 12/18/14/17/15 and 162 tests in 139.160s. Historical 2f7cd74/158 evidence remains identified as history. No implementation change or rescore.
-
-Unscored follow-up: #79 extreme membership correction uses full viewport from magnitude2^50, retaining clipped bounds below it. Expanded44-case production-framebuffer oracle passes2.244s including symmetric huge tangencies/corners/threshold cases. Current independently scored b0e0242/73 remains unchanged pending full correction review.

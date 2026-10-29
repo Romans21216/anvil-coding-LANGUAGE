@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-28",
-  "reviewed_implementation_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
+  "reviewed_implementation_commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,12 +9,12 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
-  "latest_independently_reviewed_candidate_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
+  "latest_verified_commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
+  "latest_independently_reviewed_candidate_commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
-  "latest_followup_status_change": "Full review b0e0242:73/100,169 tests in203.685s; original #79 hang fixed, residual extreme negative-tangent membership remains open. Full goal active.",
-  "latest_evaluation_score": 73,
+  "last_pushed_reviewed_below_threshold_commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
+  "latest_followup_status_change": "Full review139f924:76/100,169 tests in165.552s; both #79 failures independently verified fixed. Native circles/lines retained; full goal active.",
+  "latest_evaluation_score": 76,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
   "audited_items": [
@@ -843,15 +843,15 @@
     }
   ],
   "latest_evaluation": {
-    "score": 73,
+    "score": 76,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
+    "commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
     "categories": {
       "requirements": "12/20",
-      "functionality_reliability": "16/20",
+      "functionality_reliability": "18/20",
       "code_architecture": "14/20",
-      "testing_verification": "16/20",
+      "testing_verification": "17/20",
       "developer_experience_delivery": "15/20"
     },
     "criterion_scores": [
@@ -866,9 +866,6 @@
       1,
       1,
       1,
-      1,
-      1,
-      2,
       2,
       1,
       2,
@@ -876,6 +873,9 @@
       2,
       2,
       2,
+      2,
+      2,
+      2,
       1,
       1,
       2,
@@ -886,7 +886,7 @@
       2,
       1,
       2,
-      1,
+      2,
       2,
       2,
       1,
@@ -907,30 +907,29 @@
       0
     ],
     "findings": [
-      "169 tests independently passed in203.685s; npm0.1.11/VSIX, compileall, QA, strict UTF8 JSON and diff checks pass.",
-      "Original #79 unbounded-work reproduction fixed: r10 exits0 in0.0824s; offscreenr1e6 exits0 in0.0142s, both before/after. Bounds/casts safe; 22-case production-framebuffer test passes.",
-      "#79 OPEN residual: circle(-r,0,r) for1e150/1e200/DBL_MAX omits pixel(2,0) although the selected squared/hypot predicate accepts it. Geometric upper bound1 is not conservative under extreme binary64 rounding. Add full-viewport fallback/symmetric extreme regressions.",
-      "Native circle/line/ABI/array/project regressions pass. Full engine/Forge/OS/types/backends/benchmarks/architecture and #63 remain incomplete. Evaluator re-read #23 and44comments; installed0.1.4 preserved."
+      "169 tests independently passed in165.552s; recovered original live review session without restarting after usage-limit interruption. npm0.1.11/VSIX, compileall, QA, strict UTF8 JSON and diff checks pass.",
+      "#79 VERIFIED FIXED: original r1e6 offscreen repro completes0.009839s, r10 completes0.07585s, both exit0/before+after. 110 extra full-frame guard cases pass, including negative huge tangencies, both axes, threshold neighbors and40 deterministic randomized cases;44-case regression passes.",
+      "No new defect confirmed. Native drawing/ABI/array/project/resource tests pass; full native engine/Forge/OS/types/backends/benchmarks/architecture and #63 remain incomplete. Evaluator re-read #23 and45comments; installed0.1.4 preserved."
     ],
     "reviewer": "project_full_review"
   },
-  "current_candidate_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
+  "current_candidate_commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
-    "reviewed_score": 73,
+    "commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
+    "reviewed_score": 76,
     "previous_reviewed_score": 73,
-    "previous_review_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+    "previous_review_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "169 independently passed in203.685s",
+    "python_unittest": "169 independently passed in165.552s",
     "npm_test": "passed",
     "compileall": "passed",
-    "qa_report_validator": "73/100 current rubric",
+    "qa_report_validator": "76/100 current rubric",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "b0e0242 diff passed",
-    "finding": "169 tests independently passed in203.685s; npm0.1.11/VSIX, compileall, QA, strict UTF8 JSON and diff checks pass. Original #79 unbounded-work reproduction fixed: r10 exits0 in0.0824s; offscreenr1e6 exits0 in0.0142s, both before/after. Bounds/casts safe; 22-case production-framebuffer test passes. #79 OPEN residual: circle(-r,0,r) for1e150/1e200/DBL_MAX omits pixel(2,0) although the selected squared/hypot predicate accepts it. Geometric upper bound1 is not conservative under extreme binary64 rounding. Add full-viewport fallback/symmetric extreme regressions. Native circle/line/ABI/array/project regressions pass. Full engine/Forge/OS/types/backends/benchmarks/architecture and #63 remain incomplete. Evaluator re-read #23 and44comments; installed0.1.4 preserved."
+    "git_diff_check": "139f924 diff passed",
+    "finding": "169 tests independently passed in165.552s; recovered original live review session without restarting after usage-limit interruption. npm0.1.11/VSIX, compileall, QA, strict UTF8 JSON and diff checks pass. #79 VERIFIED FIXED: original r1e6 offscreen repro completes0.009839s, r10 completes0.07585s, both exit0/before+after. 110 extra full-frame guard cases pass, including negative huge tangencies, both axes, threshold neighbors and40 deterministic randomized cases;44-case regression passes. No new defect confirmed. Native drawing/ABI/array/project/resource tests pass; full native engine/Forge/OS/types/backends/benchmarks/architecture and #63 remain incomplete. Evaluator re-read #23 and45comments; installed0.1.4 preserved."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -944,14 +943,10 @@
     "IN PROGRESS": 4
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
-  "latest_independent_candidate_score": 73,
-  "latest_independent_candidate_result": "FAIL against98;73/100 on b0e0242; #79 original hang fixed, residual membership open.",
-  "current_unscored_followup": {
-    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
-    "features": "#79 residual correction: fullviewport fallback from max magnitude2^50 preserves selected squared/hypot membership when geometric bounds become ambiguous; ordinary offscreen fast rejection retained.",
-    "local_checks": "44-case production-framebuffer oracle passes2.244s including negative/positive huge x/y tangencies, corner and threshold cases. Latest scored source b0e0242 remains73/100 pending correction review."
-  },
-  "latest_independently_scored_candidate_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
+  "latest_independent_candidate_score": 76,
+  "latest_independent_candidate_result": "FAIL against98;76/100 on139f924; #79 verified fixed; full goal incomplete.",
+  "current_unscored_followup": null,
+  "latest_independently_scored_candidate_commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1042,5 +1037,6 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Full review b0e0242:73/100,169 tests in203.685s; original #79 hang fixed, residual extreme negative-tangent membership remains open. Full goal active."
+  "current_candidate_status": "Full review139f924:76/100,169 tests in165.552s; both #79 failures independently verified fixed. Native circles/lines retained; full goal active.",
+  "resolved_critic_issue_79": "Both unbounded C-circle traversal and extreme negative-tangent membership loss independently verified fixed on139f924;169 tests plus110 extra full-frame guard cases pass."
 }

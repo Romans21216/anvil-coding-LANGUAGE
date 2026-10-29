@@ -1,14 +1,14 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
-Assessment date:2026-10-28
-Exact independent source:b0e02422d6447b5f6f289797e7211a9870aff26d
+Assessment date:2026-10-29
+Exact independent source:139f9241a7af1c3a137d0f6408fab0bfb5141662
 Evaluator:project_full_review
-Score:73/100 — FAIL against98.
-Categories12/16/14/16/15.
-Scores 1-50: 2,1,1,1,0,1,2,2,1,1 / 1,1,1,2,2,1,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Score:76/100 — FAIL against98.
+Categories12/18/14/17/15.
+Scores 1-50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-169 tests independently passed in203.685s; npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. Original #79 C-circle hang is fixed: offscreenr1e6 exits0 in0.0142s versus r10 in0.0824s. However #79 remains open: negative huge tangencies (-r,0,r), r=1e150/1e200/DBL_MAX, omit pixel(2,0) despite their selected membership predicate accepting it. Geometric bounds are insufficient under extreme binary64 rounding. Add conservative viewport fallback and symmetric/threshold oracle cases. Score stays73; criteria12/16/32 remainpartial. Native circles/lines/ABI/arrays/projects pass. Full engine/Forge/OS/types/backends/benchmarks/architecture and #63 remain incomplete; installed0.1.4 preserved. Evaluator re-read #23 and44comments after suite. Full goal active.
+169 tests independently passed in165.552s; original live review process recovered without suite restart after usage-limit interruption. npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. #79 is independently verified fixed: original offscreen r1e6 completes0.009839s and r10 in0.07585s;110 extra full-frame guard cases verify extreme negative tangencies, both axes, threshold neighbors and40 randomized circles. The44-case regression and existing native drawing/ABI/array/project/resource tests pass. Score73->76 restores criteria12/16/32; no new defect confirmed. Full engine/Forge/OS/types/backends/benchmarks/architecture and #63 remain incomplete; installed0.1.4 preserved. Evaluator re-read #23 and45comments after suite. Full goal active; next native text/runtime parity and validated shared lowering.
 
-Previous independent source f11240c:73/100,168 tests in176.154s; native shapes verified and C-circle stall discovered.
+Previous independent source b0e0242:73/100,169 tests in203.685s; original #79 hang fixed but extreme membership residual found, now corrected.
 
 SUMMARY
 -------
@@ -72,5 +72,3 @@ Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 cat
 Focused independent record recheckfbf6143 passes after #58 corrections: total-row source2f7cd74 and native local-array rollout agree with all four50-score vectors,76/100 and158/145.917s evidence. No rescore or implementation change.
 
 Focused independent record-only recheck of 91b06cd: PASS. All six current records, all 50 scores and both candidate_validation objects agree on exact source ecdf681, 76/100, categories 12/18/14/17/15 and 162 tests in 139.160s. Historical 2f7cd74/158 evidence remains identified as history. No implementation change or rescore.
-
-Unscored follow-up: #79 extreme membership correction uses full viewport from magnitude2^50, retaining clipped bounds below it. Expanded44-case production-framebuffer oracle passes2.244s including symmetric huge tangencies/corners/threshold cases. Current independently scored b0e0242/73 remains unchanged pending full correction review.
