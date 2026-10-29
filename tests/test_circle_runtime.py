@@ -33,6 +33,22 @@ int main(void) {
     {0,0,1073741824,128}, {0,0,1e150,255}, {0,0,1e308,128},
     {1e200,0,1e200,255}, {3e200,3e200,1e200,255}, {0,0,DBL_MAX,255},
     {DBL_MAX,DBL_MAX,1,255}, {-DBL_MAX,-DBL_MAX,1,255},
+    {-1e150,0,1e150,255}, {0,-1e150,1e150,128},
+    {-1e200,0,1e200,128}, {0,-1e200,1e200,255},
+    {-DBL_MAX,0,DBL_MAX,255}, {0,-DBL_MAX,DBL_MAX,128},
+    {1e150,0,1e150,255}, {0,1e150,1e150,128},
+    {1e200,0,1e200,128}, {0,1e200,1e200,255},
+    {DBL_MAX,0,DBL_MAX,255}, {0,DBL_MAX,DBL_MAX,128},
+    {-7.071067811865475e199,-7.071067811865475e199,1e200,128},
+    {7.071067811865475e199,-7.071067811865475e199,1e200,255},
+    {-1125899906842623.0,0,1125899906842623.0,255},
+    {0,-1125899906842623.0,1125899906842623.0,128},
+    {-1125899906842624.0,0,1125899906842624.0,128},
+    {0,-1125899906842624.0,1125899906842624.0,255},
+    {-1125899906842625.0,0,1125899906842625.0,255},
+    {0,-1125899906842625.0,1125899906842625.0,128},
+    {-1125899906842623.5,0,1125899906842623.75,128},
+    {0,-1125899906842623.5,1125899906842623.75,255},
     {NAN,0,1,255}, {0,INFINITY,1,255}, {0,0,-INFINITY,255}
   };
   size_t count = (size_t)ANVIL_WIDTH * ANVIL_HEIGHT;
@@ -70,7 +86,8 @@ int main(void) {
   anvil_pixels = NULL;
   anvil_circle(0,0,DBL_MAX,255,255,255,255);
   free(guarded);
-  puts("22 circle cases: clipped completion, pixels, opacity and guards pass");
+  printf("%zu circle cases: clipped completion, pixels, opacity and guards pass\n",
+         sizeof(cases)/sizeof(cases[0]));
   return 0;
 }
 '''
@@ -85,4 +102,4 @@ int main(void) {
                 build_c(compiler[1], harness, executable, release=True)
             result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=8)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("22 circle cases", result.stdout)
+        self.assertIn("44 circle cases", result.stdout)

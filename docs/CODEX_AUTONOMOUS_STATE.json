@@ -279,6 +279,10 @@
     57
   ],
   "current_candidate_status": "Full review b0e0242:73/100,169 tests in203.685s; original #79 hang fixed, residual extreme negative-tangent membership remains open. Full goal active.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
+    "features": "#79 residual correction: fullviewport fallback from max magnitude2^50 preserves selected squared/hypot membership when geometric bounds become ambiguous; ordinary offscreen fast rejection retained.",
+    "local_checks": "44-case production-framebuffer oracle passes2.244s including negative/positive huge x/y tangencies, corner and threshold cases. Latest scored source b0e0242 remains73/100 pending correction review."
+  },
   "open_coordinate_integration_issue": 63
 }

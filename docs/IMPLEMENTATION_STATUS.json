@@ -946,7 +946,11 @@
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 73,
   "latest_independent_candidate_result": "FAIL against98;73/100 on b0e0242; #79 original hang fixed, residual membership open.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
+    "features": "#79 residual correction: fullviewport fallback from max magnitude2^50 preserves selected squared/hypot membership when geometric bounds become ambiguous; ordinary offscreen fast rejection retained.",
+    "local_checks": "44-case production-framebuffer oracle passes2.244s including negative/positive huge x/y tangencies, corner and threshold cases. Latest scored source b0e0242 remains73/100 pending correction review."
+  },
   "latest_independently_scored_candidate_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
   "historical_c_backed_evaluation": {
     "score": 92,
