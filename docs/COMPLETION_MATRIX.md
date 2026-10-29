@@ -30,4 +30,6 @@ Historical independent drawing review: `f11240c19d708718d8b94bae5f3b3764df435f88
 
 Historical independent correction review: `b0e02422d6447b5f6f289797e7211a9870aff26d`,73/100,169 tests in203.685s. Original #79 timeout fixed; extreme negative-tangent membership residual remains open. Full goal incomplete.
 
-Latest independent review: `139f9241a7af1c3a137d0f6408fab0bfb5141662`,76/100,169 tests in165.552s. Both #79 failures verified fixed;110 independent full-frame guard cases pass. Full goal remains incomplete.
+Historical independent circle-fix review: `139f9241a7af1c3a137d0f6408fab0bfb5141662`,76/100,169 tests in165.552s. Both #79 failures verified fixed;110 independent full-frame guard cases pass. Full goal remains incomplete.
+
+Latest independent text review: `68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2`,76/100,175 tests in218.389s. Native literal Unicode text independently verified; no new defect. General strings/numeric HUD/layout and full engine/Forge/OS scope remain incomplete.

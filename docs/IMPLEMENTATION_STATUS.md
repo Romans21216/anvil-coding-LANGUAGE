@@ -2,9 +2,9 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated2026-10-29. Latest independent source `139f9241a7af1c3a137d0f6408fab0bfb5141662`: **76/100 FAIL against98**,169 tests in165.552s; categories12/18/14/17/15. Both #79 failures verified fixed;110 additional full-frame guard cases pass. Next native text/runtime parity and shared lowering. Full scope and #63 remain incomplete.
+Updated2026-10-29. Latest independent source `68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2`: **76/100 FAIL against98**,175 tests in218.389s; categories12/18/14/17/15. Native literal Unicode text independently verified; no new finding. #79 remains verified fixed. Next native framebuffer/alpha and shared lowering. Full scope and #63 remain incomplete.
 
-Direct AMD64/PE output supports numeric functions, checked global/local arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle/circle/line runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
+Direct AMD64/PE output supports numeric functions, checked global/local arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle/circle/line/literal-text runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 
 The source extension package is 0.1.11 and passes grammar/package checks. Installed version 0.1.4 is preserved per user preference; newer tokens have no fresh visible-editor verification.
 
