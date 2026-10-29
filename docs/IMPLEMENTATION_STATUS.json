@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-28",
-  "reviewed_implementation_commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
+  "reviewed_implementation_commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,11 +9,11 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
-  "latest_independently_reviewed_candidate_commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
+  "latest_verified_commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
+  "latest_independently_reviewed_candidate_commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
-  "latest_followup_status_change": "Full review68ff824:76/100,175 tests in218.389s; native literal Unicode text independently verified, no new finding. Full goal active.",
+  "last_pushed_reviewed_below_threshold_commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
+  "latest_followup_status_change": "Full review4f5c981:76/100,180 tests in286.162s; native DIB surface/exact RGBA shapes independently verified, no new finding. Full goal active.",
   "latest_evaluation_score": 76,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
@@ -846,7 +846,7 @@
     "score": 76,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
+    "commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
     "categories": {
       "requirements": "12/20",
       "functionality_reliability": "18/20",
@@ -907,29 +907,29 @@
       0
     ],
     "findings": [
-      "175 tests independently passed in218.389s; original suite session completed without restart. npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass.",
-      "Native literal text verified:25200 extra actual pixels match independent GDI reference (negative fractional positions/clamped colours/black/combining/Arabic/supplementary/quoted contents); exact8192-unit emoji/combining executables exit0. Empty text evaluates5 nested heap-allocating arguments once and bypasses injected font failure.",
-      "Font ownership/cache, DC-state restoration, Unicode include provenance, pool/import selection and shared unchanged suffix parser/C alias independently verified. No new finding. #79 remains verified fixed; #63/full engine/Forge/OS/types/backends/benchmarks/architecture/tooling gaps remain. Evaluator re-read#23 and46comments; installed0.1.4 preserved."
+      "180 tests independently passed in286.162s without suite restart; npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass.",
+      "Native surface/RGBA verified:65536source-alpha pairs/white saturation, layered GDI/CPU text and shapes, overlapping stamps, guarded pointers/nonvolatiles/stack and allocation/nullbits/budget/flush failures. Extra1500 randomized layered rectangles pass every17x13RGB/X byte and guards; extra1596layered pixels and24 nested heap-argument calls pass.",
+      "Fullytransparent probe passes40paints/20 heap-argument calls perdraw with0activeGdiFlush calls; huge transparent primitives skip raster work. DIBlifetime/commit/rollback/clip-before-cast/sync independently inspected. No new finding; #79 staysverifiedfixed. Full native engine/Forge/OS/types/backends/benchmarks/architecture/tooling and #63 remain incomplete; installed0.1.4preserved. Evaluator re-read#23 and48comments."
     ],
     "reviewer": "project_full_review"
   },
-  "current_candidate_commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
+  "current_candidate_commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
+    "commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
     "reviewed_score": 76,
     "previous_reviewed_score": 76,
-    "previous_review_commit": "139f9241a7af1c3a137d0f6408fab0bfb5141662",
+    "previous_review_commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "175 independently passed in218.389s",
+    "python_unittest": "180 independently passed in286.162s",
     "npm_test": "passed",
     "compileall": "passed",
     "qa_report_validator": "76/100 current rubric",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "68ff824 diff passed",
-    "finding": "175 tests independently passed in218.389s; original suite session completed without restart. npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. Native literal text verified:25200 extra actual pixels match independent GDI reference (negative fractional positions/clamped colours/black/combining/Arabic/supplementary/quoted contents); exact8192-unit emoji/combining executables exit0. Empty text evaluates5 nested heap-allocating arguments once and bypasses injected font failure. Font ownership/cache, DC-state restoration, Unicode include provenance, pool/import selection and shared unchanged suffix parser/C alias independently verified. No new finding. #79 remains verified fixed; #63/full engine/Forge/OS/types/backends/benchmarks/architecture/tooling gaps remain. Evaluator re-read#23 and46comments; installed0.1.4 preserved."
+    "git_diff_check": "4f5c981 diff passed",
+    "finding": "180 tests independently passed in286.162s without suite restart; npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. Native surface/RGBA verified:65536source-alpha pairs/white saturation, layered GDI/CPU text and shapes, overlapping stamps, guarded pointers/nonvolatiles/stack and allocation/nullbits/budget/flush failures. Extra1500 randomized layered rectangles pass every17x13RGB/X byte and guards; extra1596layered pixels and24 nested heap-argument calls pass. Fullytransparent probe passes40paints/20 heap-argument calls perdraw with0activeGdiFlush calls; huge transparent primitives skip raster work. DIBlifetime/commit/rollback/clip-before-cast/sync independently inspected. No new finding; #79 staysverifiedfixed. Full native engine/Forge/OS/types/backends/benchmarks/architecture/tooling and #63 remain incomplete; installed0.1.4preserved. Evaluator re-read#23 and48comments."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -944,13 +944,9 @@
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 76,
-  "latest_independent_candidate_result": "FAIL against98;76/100 on68ff824; native literal text verified; full goal incomplete.",
-  "current_unscored_followup": {
-    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
-    "features": "Native DIB/BGRX framebuffer with transactional resize, GDI/CPU synchronization and bounded private pixel writes; exact SSE2 integer RGBA rectangles/circles/lines, native opaque spans, text interleaving, checked bitmap budget and integer addressing helpers.",
-    "local_checks": "18 targeted surface/ABI/project/mouse/keyboard tests passed22.960s; ABI5 finalsource0.378s. Earlier19 window/drawing/text/ABI regressions passed22.194s. New surface tests cover65536alpha/source pairs, saturation, headless guards/nonvolatiles/extremes, text/shape layers and injected allocation/nullbits/budget/sync failures. CLI sample/npm/compileall/QA/diff pass. Latest scored68ff824 remains76/100 pending fullreview."
-  },
-  "latest_independently_scored_candidate_commit": "68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2",
+  "latest_independent_candidate_result": "FAIL against98;76/100 on4f5c981; native surface/RGBA verified; full goal incomplete.",
+  "current_unscored_followup": null,
+  "latest_independently_scored_candidate_commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1041,6 +1037,6 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Full review68ff824:76/100,175 tests in218.389s; native literal Unicode text independently verified, no new finding. Full goal active.",
+  "current_candidate_status": "Full review4f5c981:76/100,180 tests in286.162s; native DIB surface/exact RGBA shapes independently verified, no new finding. Full goal active.",
   "resolved_critic_issue_79": "Both unbounded C-circle traversal and extreme negative-tangent membership loss independently verified fixed on139f924;169 tests plus110 extra full-frame guard cases pass."
 }

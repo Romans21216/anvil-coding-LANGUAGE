@@ -1,25 +1,25 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 Assessment date:2026-10-29
-Exact independent source:68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2
+Exact independent source:4f5c981bddf2796e56b6bea14d8f575d692b6da5
 Evaluator:project_full_review
 Score:76/100 — FAIL against98.
 Categories12/18/14/17/15.
 Scores 1-50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-175 tests independently passed in218.389s without suite restart; npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. Native literal Unicode text is verified:25200 extra actual pixels match independent GDI references, including fractional positions/clamped colours/black/combining/Arabic/supplementary/quoted syntax. Exact8192-unit boundary executables exit0; empty text evaluates5 nested heap-allocating arguments once without font creation under injected failure. Cached font ownership, DC restoration, transparent composition, source provenance, pool/import selection and shared suffix parsing pass. No new defect. #79 remains verified fixed. Score stays76; full engine/Forge/OS/types/backends/benchmarks/architecture/tooling and #63 remain incomplete, installed0.1.4 preserved. Evaluator re-read#23 and46comments. Full goal active; next native framebuffer/alpha and validated shared lowering.
+180 tests independently passed in286.162s without suite restart; npm0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. Native DIB/BGRX framebuffer and exact RGBA rectangle/circle/line blending are verified. Tests cover65536alpha/source pairs, saturation, GDI text/CPU layers, overlapping stamps, clipping, guards, stack/register preservation and allocation/nullbits/budget/sync failures. Extra1500 randomized layered rectangles match all17x13RGB/X bytes and guards;1596layered pixels/24 heap-argument calls pass. Transparent probes run40paints/20 heap-argument calls each with0activeflushes and skip huge primitive raster loops. No new defect. #79 remains verifiedfixed. Score stays76; full engine/Forge/OS/types/backends/benchmarks/architecture/tooling and #63 remain incomplete, installed0.1.4preserved. Evaluator re-read#23 and48comments. Full goal active; next native image resources/camera/3D and validated shared lowering.
 
-Previous independent source139f924:76/100,169 tests in165.552s; both #79 failures verified fixed with110 extra full-frame guard cases.
+Previous independent source68ff824:76/100,175 tests in218.389s; native literal Unicode text verified.
 
 SUMMARY
 -------
-Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The current default compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for numeric programs and an initial rectangle/circle/line/literal-text 2D runtime. The requested no-C/no-Rust engine remains incomplete.
+Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The current default compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for numeric programs and an initial RGBA rectangle/circle/line/literal-text 2D runtime. The requested no-C/no-Rust engine remains incomplete.
 
 The fairest description is a small game scripting language connected to a Windows software-rendering prototype. Its syntax is approachable and it has a working path from source to executable, including parameterized functions and numeric loops, but it is much closer to a learning project than to a complete game engine or mature language ecosystem.
 
 WHAT ANVIL IS GOOD AT
 ---------------------
 1. Readable source: named functions use a small BASIC/Lua-inspired set of commands, expressions, branches, and explicit end markers.
-2. Native compilation: the direct backend emits Windows x64 machine code and PE executables for numeric programs and an initial 2D rectangle/circle/line/literal-text runtime. Broader engine programs currently use the existing generated-C/MSVC path.
+2. Native compilation: the direct backend emits Windows x64 machine code and PE executables for numeric programs and an initial 2D RGBA rectangle/circle/line/literal-text runtime. Broader engine programs currently use the existing generated-C/MSVC path.
 3. Small interactive scenes: the runtime provides 2D drawing, basic 3D primitives, a perspective camera, keyboard controls, a fixed-step update loop, and a way to combine a 2D HUD with 3D content.
 4. Reusable numeric functions and loops: functions support parameters, numeric return values, recursion, and function-local numeric state. Inclusive `for` ranges support ascending or descending steps; `while` loops support condition-controlled repetition.
 5. Procedural math: seeded random values, deterministic gradient/fractal noise, and common math operations are available.
@@ -33,7 +33,7 @@ WHAT ANVIL IS NOT GOOD AT YET
 3. Only one ray-tracing path is implemented: CPU BVH is available. The runtime exposes `ray_backend(name)` and `ray_backend_available(name)`. The selector successfully chooses BVH; hardware-accelerated RTX/DXR and Embree are not implemented and cannot be selected successfully.
 4. The language remains narrow: fixed-size global and function-local numeric arrays are now implemented, but dynamic arrays, user-defined types, namespaced modules, static types, and a general string model are not. Function parameters, return values, recursion, function-local numeric state, numeric `while`/`for` loops, and array bounds checks are implemented.
 5. Multiplayer is experimental: the UDP API exchanges a numeric value with one peer. It lacks reliable delivery, authentication, encryption, matchmaking, replication, and robust peer lifecycle handling; it is only appropriate for trusted LAN experiments.
-6. The build target is narrow: broader engine builds currently use Windows/MSVC with generated C; the direct AMD64/PE backend compiles numeric programs, checked global arrays, and an initial 2D window/rectangle/circle/line/literal-text runtime without generating C/Rust or invoking another compiler. Native engine parity is incomplete, and a cross-platform runtime is not implemented.
+6. The build target is narrow: broader engine builds currently use Windows/MSVC with generated C; the direct AMD64/PE backend compiles numeric programs, checked global arrays, and an initial 2D window/RGBA rectangle/circle/line/literal-text runtime without generating C/Rust or invoking another compiler. Native engine parity is incomplete, and a cross-platform runtime is not implemented.
 7. Efficiency claims are unproven: there is no benchmark suite comparing compile time or runtime performance. The software renderer and ray tracer are CPU-bound, so “hyper-efficient” is not supported by measurements.
 
 HOW CLOSE IS IT TO A REAL PROGRAMMING LANGUAGE?
@@ -52,7 +52,7 @@ Numeric `while` and inclusive `for` loops: Implemented and covered by native exe
 Fixed-size global numeric arrays: Implemented with zero initialization and checked indexing
 Fixed-size function-local numeric arrays: Independently verified in both backends with zero-initialized per-call heap storage, cleanup on return, and checked indexing; 8,192-element per-function and 16 MiB active-call limits; native sample prints 27
 Native Windows executable generation: Existing C/MSVC path plus experimental direct-x64 numeric and initial 2D subset; full native runtime parity is incomplete
-Basic 2D/3D rendering and camera controls: C backend provides these with limits; direct backend currently renders opaque 2D rectangles, circles, clipped lines and literal Unicode text
+Basic 2D/3D rendering and camera controls: C backend provides these with limits; direct backend currently renders RGB/RGBA 2D rectangles, circles, clipped lines and literal Unicode text
 BVH CPU ray-traced spheres: Implemented, limited to 32 per batch
 Ray backend selection and availability built-ins: Implemented and verified; only BVH is available; DXR/Embree unavailable
 BMP-based 2D image resources and sprites: C-backed prototype implemented and exercised; native port remains absent
@@ -74,5 +74,3 @@ Focused independent record recheckfbf6143 passes after #58 corrections: total-ro
 Focused independent record-only recheck of 91b06cd: PASS. All six current records, all 50 scores and both candidate_validation objects agree on exact source ecdf681, 76/100, categories 12/18/14/17/15 and 162 tests in 139.160s. Historical 2f7cd74/158 evidence remains identified as history. No implementation change or rescore.
 
 Focused independent record-only recheck of4b5ac844: PASS. All six records, all50 scores and both candidate_validation objects agree on exactsource68ff824,76/100,categories12/18/14/17/15 and175tests218.389s. Pending follow-ups null; Unicode-text evidence and historical #79 correction agree. No rescore or implementation change.
-
-Unscored follow-up: direct DIB/BGRX framebuffer and exact native RGBA shape blending implemented. 18 targeted tests passed22.960s plus5 final ABI tests0.378s; pixel matrix, white saturation, guarded headless writes/registers, text interleaving and allocation/sync failures covered. Earlier window/drawing/text regressions and CLI/npm/compileall/QA/diff pass. Full review pending; latest68ff824/76/175 evidence remains unchanged.

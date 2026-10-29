@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-10-29
-**Latest independent evaluation:** **76/100 - FAIL** on exact `68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2`.
+**Latest independent evaluation:** **76/100 - FAIL** on exact `4f5c981bddf2796e56b6bea14d8f575d692b6da5`.
 **Current passing threshold:** 98/100. Historical 90-point passes do not pass the current requirement.
 **Evaluator:** separate `project_full_review` agent, full 50-criterion review.
 
@@ -9,14 +9,14 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 
 ## Independent verification for this snapshot
 
-- `python -m unittest discover -s tests -q`: **175 passed**, 218.389 seconds.
+- `python -m unittest discover -s tests -q`: **180 passed**, 286.162 seconds.
 - Extension 0.1.11 grammar validation and VSIX CRC/source parity passed. Language ID `anvil`, extensions `.ANVL`/`.anvl`, grammar `vscode-extension/syntaxes/anvil.tmLanguage.json`. Installed 0.1.4 remains per preference; newer visible tokens are unverified.
 - Python compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
 - Adversarial probes combine 128 statement blocks with 63 grouped/unary/user-call/abs levels; accepted inputs pass. Over-budget mixed expressions return controlled diagnostics. #64 configuration locations and #65 uncontrolled compiler recursion are verified fixed.
 - Source includes and native function selection were verified in the preceding `edfbe86` review: native demo 3,072 bytes, native and C/MSVC demos print 20. The full regression suite includes those execution paths.
 - Direct-backend window/input tests target only their generated windows. Coordinate coverage uses explicit test instrumentation; untouched OS coordinate dispatch remains unverified (#63). No CUA or fresh manual editor/sample inspection occurred. A later audit found the legacy C mouse harness called SetCursorPos during full suites; prior blanket no-global-input claims were too broad. #71 records this and removes that behavior in the current follow-up.
 
-## Latest 50-criterion scoring — `68ff824`
+## Latest 50-criterion scoring — `4f5c981`
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -50,14 +50,14 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | 28 | No unfinished placeholders | 1 | Input handlers are real; native graphics still restricts scenes and opaque rectangle coverage (open). |
 | 29 | Configuration understandable | 2 | Backend/TOML/include/title and1–240Hz settings are organized and documented. |
 | 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
-| 31 | Automated tests provided | 2 | 175 tests and extension0.1.11 validation independently pass. |
+| 31 | Automated tests provided | 2 | 180 tests and extension0.1.11 validation independently pass. |
 | 32 | Core tests covered | 2 | 44-case production-runtime regression plus110 independent oracle cases cover both #79 failures; existing implemented-core tests pass. |
 | 33 | Failure scenarios tested | 2 | Invalid mouse arguments/keys and bitmap allocation-failure injection are covered. |
 | 34 | Edge cases explicitly tested | 2 | Taps, repeats, simultaneous buttons, actual OS capture, wheel accumulation and draw-only behavior are tested. |
 | 35 | Integration behavior tested | 1 | Coordinate test uses an explicit test-only WndProc wrapper; untouched OS-dispatch coverage is incomplete (#63, open). |
 | 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
-| 37 | Builds and compilation pass | 2 | 175 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
-| 38 | Results recorded accurately | 2 | Exact 68ff824 / 76 / 175 evidence agrees across records; historical input-test limitations disclosed. |
+| 37 | Builds and compilation pass | 2 | 180 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
+| 38 | Results recorded accurately | 2 | Exact 4f5c981 / 76 / 180 evidence agrees across records; historical input-test limitations disclosed. |
 | 39 | Regression checks performed | 2 | Full suite and prior slow-draw/failure/resource regressions pass. |
 | 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
 | 41 | Installation instructions accurate | 2 | Python/native and Python/MSVC routes match independently exercised builds; extension installation documented. |
@@ -75,7 +75,7 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 | | **Code quality and architecture** | **14/20** | |
 | | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **76/100** | Exact commit `68ff824`; FAIL against 98. |
+| | **Total** | **76/100** | Exact commit `4f5c981`; FAIL against 98. |
 
 ### Deduction details and follow-up
 
@@ -87,12 +87,13 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 - **Integration (35):** Instrumented/synchronized coordinate samples do not prove untouched OS pointer dispatch (#63). Gather independent integration evidence within input constraints.
 - **Setup/editor (42/46/47):** Full project/engine/Forge/OS setup cannot be reproduced; newer installed-editor visuals remain unverified (#24). Implement missing workflows and respect installed0.1.4 preference.
 
-The full68ff824 review independently passed175 tests in218.389s without restart. Native literal text, transparent composition, font cache/ownership, normal DC restoration and shared quote-aware suffix parsing are verified. Extra25200 actual pixels match independent GDI references; exact8192-unit supplementary/combining executables exit0. Empty text evaluates5 nested heap-allocating arguments exactly once without font creation, verified under injected font failure. No new finding. Score remains76 because full engine/Forge/OS/architecture/tooling gaps remain. #79 stays verified fixed; #63 remains unverified and installed0.1.4 preserved. Issue23 and46comments re-read after suite. Next native framebuffer/alpha and validated shared lowering.
+The full4f5c981 review independently passed180 tests in286.162s without restart. Direct DIB/BGRX surfaces, exact integer RGBA shapes, GDI/CPU ordering, clipped writes, ownership/rollback/budget and register preservation are verified. Extra1500 randomized layered rectangles match every17x13RGB/X byte and guard words; another1596 layered pixels/24 nested heap-argument calls pass. Fullytransparent probes evaluate20 heap-argument calls perdraw across40paints with0activeGdiFlush calls and skip huge primitive raster loops. No new defect. Score remains76 because full engine/Forge/OS/architecture/tooling gaps remain. #79 staysverifiedfixed; #63 remainsunverified, installed0.1.4preserved. Issue23 and48comments re-read after suite. Next native image resources/camera/3D and validated shared lowering.
 
 ## Review history
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
+| `68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2` |76 /98 FAIL|175 tests in218.389s; native literal Unicode text verified; no new finding.|
 | `139f9241a7af1c3a137d0f6408fab0bfb5141662` |76 /98 FAIL|169 tests in165.552s; both #79 failures verified fixed with110 extra full-frame guard cases.|
 | `b0e02422d6447b5f6f289797e7211a9870aff26d` |73 /98 FAIL|169 tests in203.685s; original #79 hang fixed, residual negative-tangent membership found.|
 | `f11240c19d708718d8b94bae5f3b3764df435f88` |73 /98 FAIL|168 tests in176.154s; native circles/lines verified; original #79 C stall discovered.|
@@ -125,5 +126,3 @@ Focused independent record recheckfbf6143 passes after #58 corrections: total-ro
 Focused independent record-only recheck of 91b06cd: PASS. All six current records, all 50 scores and both candidate_validation objects agree on exact source ecdf681, 76/100, categories 12/18/14/17/15 and 162 tests in 139.160s. Historical 2f7cd74/158 evidence remains identified as history. No implementation change or rescore.
 
 Focused independent record-only recheck of4b5ac844: PASS. All six records, all50 scores and both candidate_validation objects agree on exactsource68ff824,76/100,categories12/18/14/17/15 and175tests218.389s. Pending follow-ups null; Unicode-text evidence and historical #79 correction agree. No rescore or implementation change.
-
-Unscored follow-up: direct DIB/BGRX framebuffer and exact native RGBA shape blending implemented. 18 targeted tests passed22.960s plus5 final ABI tests0.378s; pixel matrix, white saturation, guarded headless writes/registers, text interleaving and allocation/sync failures covered. Earlier window/drawing/text regressions and CLI/npm/compileall/QA/diff pass. Full review pending; latest68ff824/76/175 evidence remains unchanged.
