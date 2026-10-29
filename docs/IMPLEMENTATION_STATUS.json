@@ -945,7 +945,16 @@
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 71,
   "latest_independent_candidate_result": "Full independent review of957ee12:71/100 FAIL against98, categories11/15/14/16/15;192 tests passed in323.089s. Selective imports implemented, but #81 supplementary-Unicode C literal encoding and #82 private function/array reference bypass remain open. Full engine/Forge/OS/targets/types/backends/benchmarks/tooling and #63 remain incomplete. Goal stays active.",
-  "current_unscored_followup": null,
+  "current_unscored_followup": {
+    "summary": "Unscored correction follow-up: #81 shared C UTF-8 byte literals replace JSON surrogate escapes for all source-path/project-title metadata; #82 guards all unbound source identifier references before binding. Fourteen selective tests pass locally in21.184s, including supplementary physical paths on both backends, byte-exact C strings/title compilation, and both-backend private call/array rejection. Full independent review pending; scored source957ee12 remains71/100 with192 tests323.089s.",
+    "status": "pending full independent review",
+    "local_targeted_tests": 14,
+    "local_targeted_seconds": 21.184,
+    "issues": [
+      81,
+      82
+    ]
+  },
   "latest_independently_scored_candidate_commit": "957ee124402e0ba773971aaee24c48c8b277929a",
   "historical_c_backed_evaluation": {
     "score": 92,

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import pathlib
 import re
 
@@ -13,6 +12,7 @@ from compiler.common import (
     array_code,
     array_size,
     c_name,
+    c_string_literal,
     variable_code,
 )
 from compiler.expressions import expr, split_args
@@ -152,7 +152,7 @@ def emit_nodes(
     original_path = path
     for n in nodes:
         path = n.source or original_path
-        source_path = json.dumps(str(path))
+        source_path = c_string_literal(str(path))
         if n.kind == "set":
             out.append(f"{indent}{variable_code(n.name, scope)} = {lower(n)};")
         elif n.kind == "local_set":
@@ -399,7 +399,7 @@ def emit_c(
         )
         lines.extend(
             f"    double *{c_name(name + '__' + local)} = "
-            f"anvil_local_array_alloc({size}, {json.dumps(str(fn.source or path))}, "
+            f"anvil_local_array_alloc({size}, {c_string_literal(str(fn.source or path))}, "
             f"{fn.local_array_lines[local]});"
             for local, size in sorted(fn.local_arrays.items())
         )
@@ -478,7 +478,7 @@ def emit_c(
         lines.append(
             f"    anvil_run({c_name('update') if 'update' in functions else 'NULL'}, "
             f"{c_name('draw') if 'draw' in functions else 'NULL'}, "
-            f"{json.dumps(project_name, ensure_ascii=True)});"
+            f"{c_string_literal(project_name)});"
         )
     elif calls:
         for n in calls:

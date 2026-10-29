@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from contextvars import ContextVar
 import math
 import pathlib
@@ -15,6 +14,7 @@ from compiler.common import (
     array_code,
     array_size,
     c_name,
+    c_string_literal,
     variable_code,
 )
 
@@ -268,7 +268,7 @@ class ExpressionParser:
 
     def checked_number(self, code: str) -> str:
         return (
-            f"anvil_check_number(({code}), {json.dumps(str(self.path))}, "
+            f"anvil_check_number(({code}), {c_string_literal(str(self.path))}, "
             f"{self.line})"
         )
 
@@ -332,7 +332,7 @@ class ExpressionParser:
             left = (
                 f"anvil_array_get({array_code(name, self.scope)}, {size}, "
                 f"{index_expr}, "
-                f"{json.dumps(str(self.path))}, {self.line})",
+                f"{c_string_literal(str(self.path))}, {self.line})",
                 "number",
             )
         elif kind == "call":
@@ -420,7 +420,7 @@ class ExpressionParser:
             if operator == "/":
                 left = (
                     f"anvil_divide({left_code}, {right}, "
-                    f"{json.dumps(str(self.path))}, {self.line})",
+                    f"{c_string_literal(str(self.path))}, {self.line})",
                     "number",
                 )
             elif operator == "%":

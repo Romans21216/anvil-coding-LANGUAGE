@@ -222,7 +222,7 @@ end
 
     @unittest.skipUnless(sys.platform=="win32","executes native/C runtime diagnostics")
     def test_qualified_runtime_errors_keep_unicode_library_path(self):
-        library=self.write("lib_λ.ANVL",'fn(value)\n array items(1)\n output array(items,2)\nend\n')
+        library=self.write("lib_λ_проба_日本_🙂.ANVL",'fn(value)\n array items(1)\n output array(items,2)\nend\n')
         path,program=self.program('include fn(value) - '+json.dumps(library.name)+' as labels\nfn(main)\n output call fn(value - labels)\nend\n')
         native=self.root/"error-native.exe"
         native.write_bytes(NativeCodegen(path,*program).generate())
@@ -238,3 +238,47 @@ end
                 diagnostics=result.stdout+result.stderr
                 self.assertIn(str(library).encode("utf-8"),diagnostics)
                 self.assertTrue(b":3:" in diagnostics or b"line 3 " in diagnostics,diagnostics)
+
+    def test_all_source_private_identity_references_are_rejected_before_backend_builds(self):
+        import contextlib
+        import io
+        from compiler.cli import main
+        self.write("lib.ANVL",'array secret(1)\nfn(move)\n output call fn(hidden) + array(secret,0)\nend\nfn(hidden)\n output 73\nend\n')
+        cases=[('fn(main)\n output call fn(_anvil_include_1_f_hidden)\nend\n',3),
+               ('fn(main)\n call fn(_anvil_include_1_f_hidden)\nend\n',3),
+               ('fn(main)\n output call fn(move - lib,call fn(_anvil_include_1_f_hidden))\nend\n',3),
+               ('fn(main)\n output 0\nend\ncall fn(_anvil_include_1_f_hidden)\n',5),
+               ('fn(main)\n set array(_anvil_include_1_a_secret,0) = 42\n output call fn(move - lib)\nend\n',3),
+               ('fn(main)\n output array(_anvil_include_1_a_secret,0)\nend\n',3),
+               ('fn(main)\n output call fn(_anvil-include_1_f_hidden)\nend\n',3)]
+        for body,line in cases:
+            path=self.write("main.ANVL",'include fn(move) - "lib.ANVL"\n'+body)
+            for backend in ('native','c'):
+                output=self.root/(backend+'.exe')
+                with self.subTest(backend=backend,body=body),mock.patch.object(sys,"argv",['anvil',str(path),'--backend',backend,'-o',str(output)]),mock.patch('compiler.cli.find_compiler',side_effect=AssertionError('backend reached')),contextlib.redirect_stderr(io.StringIO()) as errors:
+                    self.assertEqual(main(),1)
+                    self.assertIn(str(path)+f':{line}:',errors.getvalue())
+                    self.assertIn('reserved for include identities',errors.getvalue())
+                    self.assertFalse(output.exists())
+        # Comments and literals never become identifier references.
+        text='call fn(_anvil_include_1_f_hidden) array(_anvil_include_1_a_secret,0)'
+        path,program=self.program('include fn(move) - "lib.ANVL"\n# '+text+'\nscene 2d\nfn(draw)\n display text('+json.dumps(text)+') -l(0,0)\nend\n')
+        NativeCodegen(path,*program).generate()
+        emit_c(path,*program)
+
+    @unittest.skipUnless(sys.platform=="win32","executes C UTF-8 literal payload")
+    def test_c_metadata_literal_encoding_is_byte_exact_and_handles_supplementary_titles(self):
+        from compiler.common import c_string_literal
+        payload='A🙂f0é日本\\"\t\n\0\x01\x7f'
+        source='#include <stdio.h>\n#include <io.h>\n#include <fcntl.h>\nint main(void) { const char value[] = '+c_string_literal(payload)+'; _setmode(_fileno(stdout),_O_BINARY); return fwrite(value,1,sizeof(value)-1,stdout)==sizeof(value)-1 ? 0 : 1; }\n'
+        compiler=find_compiler(None)
+        self.assertIsNotNone(compiler)
+        exe=self.root/'literal.exe'
+        build_c(compiler[1],self.write('literal.c',source),exe,release=True)
+        result=subprocess.run([str(exe)],capture_output=True,timeout=5)
+        self.assertEqual((result.returncode,result.stdout),(0,payload.encode('utf-8')))
+        path,program=self.program('scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n')
+        title='Project🙂日本'
+        generated=emit_c(path,*program,project_name=title)
+        self.assertIn(c_string_literal(title),generated)
+        build_c(compiler[1],self.write('title.c',generated),self.root/'title.exe',release=True)

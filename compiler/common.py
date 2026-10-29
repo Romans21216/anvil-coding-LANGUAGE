@@ -69,6 +69,22 @@ def c_name(name: str) -> str:
     return "anvil_" + re.sub(r"[^A-Za-z0-9_]", "_", name)
 
 
+def c_string_literal(value: str) -> str:
+    """Encode UTF-8 bytes as a C narrow literal, without JSON surrogate escapes.
+
+    Fixed three-digit octal escapes cannot consume a following hex digit.
+    Keep ordinary ASCII readable and independent of the C execution charset.
+    """
+    escapes = {8: r"\b", 9: r"\t", 10: r"\n", 12: r"\f", 13: r"\r",
+               34: r'\"', 92: r"\\"}
+    try:
+        payload = value.encode("utf-8")
+    except UnicodeError as error:
+        raise CompileError("C string requires valid Unicode scalar values") from error
+    return '"' + ''.join(escapes.get(byte, chr(byte) if 32 <= byte < 127
+                                   else f"\\{byte:03o}") for byte in payload) + '"'
+
+
 def variable_code(name: str, scope: Node | None = None) -> str:
     if scope and name in scope.params:
         return c_name(scope.name + "__" + name)

@@ -96,6 +96,17 @@ class ProgramLoader:
         sites += [(name,line) for name,line,_,_ in unit.variable_references]
         for fn in unit.functions.values():
             sites += [(name,fn.line) for name in fn.params+list(fn.locals)+list(fn.local_arrays)]
+        # Validate unbound source references too. Backend-visible private names
+        # must only be introduced by this loader, never accepted from source.
+        # Parsed nodes have comments removed; masking protects quoted literals.
+        pending = list(unit.top)+list(unit.functions.values())
+        while pending:
+            node = pending.pop()
+            for text in [node.name,node.value]+node.params:
+                sites.extend((match[0],node.line)
+                             for match in re.finditer(IDENTIFIER,mask_strings(text)))
+            pending.extend(node.body)
+            pending.extend(node.otherwise)
         for name,line in sites:
             if c_name(name).startswith(c_name(PRIVATE_PREFIX)):
                 raise CompileError(f"{path}:{line}: identifier prefix {PRIVATE_PREFIX} is reserved for include identities")

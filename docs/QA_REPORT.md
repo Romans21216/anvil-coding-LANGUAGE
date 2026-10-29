@@ -112,3 +112,5 @@ Earlier reports and their complete rubric tables remain available in Git history
 ## Bug tracking
 
 #81 remains OPEN: /utf-8 fixes BMP encoding, but supplementary paths emit invalid C surrogate universal escapes. #82 OPEN: source references to compiler-private function/array names bypass selective exports/state isolation. Both have detailed reproduction, impact and acceptance criteria under Codex Bugs. Prior #79 remains verified fixed; #63 and broad #5–11/#14–15/#24 remain open. Complete inventory only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
+
+Current unscored follow-up: Unscored correction follow-up: #81 shared C UTF-8 byte literals replace JSON surrogate escapes for all source-path/project-title metadata; #82 guards all unbound source identifier references before binding. Fourteen selective tests pass locally in21.184s, including supplementary physical paths on both backends, byte-exact C strings/title compilation, and both-backend private call/array rejection. Full independent review pending; scored source957ee12 remains71/100 with192 tests323.089s.
