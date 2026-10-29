@@ -2,7 +2,7 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated2026-10-28. Latest independent source `f11240c19d708718d8b94bae5f3b3764df435f88`: **73/100 FAIL against98**,168 tests in176.154s; categories12/16/14/16/15. Native circles/lines verified; pre-existing C circle stall confirmed as #79. Fix #79 next; full scope and #63 remain open.
+Updated2026-10-28. Latest independent source `b0e02422d6447b5f6f289797e7211a9870aff26d`: **73/100 FAIL against98**,169 tests in203.685s; categories12/16/14/16/15. #79 original C stall fixed; extreme negative-tangent membership residual remains open. Correct #79 next; full scope and #63 remain incomplete.
 
 Direct AMD64/PE output supports numeric functions, checked global/local arrays, local source includes with static function selection, and an initial buffered Win32 2D rectangle/circle/line runtime with fixed updates, keyboard/mouse input and procedural math. The broader C/MSVC runtime remains the default while native parity is developed. Native 3D/assets/physics/networking, complete language support, Forge and OS targets remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [native migration](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 

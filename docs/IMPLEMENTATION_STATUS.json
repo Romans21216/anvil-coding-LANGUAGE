@@ -1,7 +1,7 @@
 {
   "source_of_truth": "GitHub issue #23",
   "generated_at": "2026-10-28",
-  "reviewed_implementation_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+  "reviewed_implementation_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
   "branch": "main",
   "summary": {
     "NEEDS VERIFICATION": 420,
@@ -9,11 +9,11 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
-  "latest_independently_reviewed_candidate_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+  "latest_verified_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
+  "latest_independently_reviewed_candidate_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "last_pushed_reviewed_below_threshold_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
-  "latest_followup_status_change": "Full review f11240c: 73/100, 168 tests in 176.154s; native circles/lines independently verified; pre-existing default C-circle stall confirmed as #79. Full goal active.",
+  "last_pushed_reviewed_below_threshold_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
+  "latest_followup_status_change": "Full review b0e0242:73/100,169 tests in203.685s; original #79 hang fixed, residual extreme negative-tangent membership remains open. Full goal active.",
   "latest_evaluation_score": 73,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
@@ -846,7 +846,7 @@
     "score": 73,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+    "commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
     "categories": {
       "requirements": "12/20",
       "functionality_reliability": "16/20",
@@ -907,30 +907,30 @@
       0
     ],
     "findings": [
-      "168 tests independently passed in 176.154s; npm 0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass.",
-      "Native circles/lines verified: 31920 randomized/extreme circle pixels and 25536 randomized fractional/clipped/thick line pixels match independent references. Kernels are compiled Anvil, viewport bounded, no C/Rust shim.",
-      "#79 OPEN: unchanged default C anvil_circle scans its entire bounding box; a wholly offscreen radius1000000 circle times out at2.024s after before/no after versus radius10 completing0.0604s. Fix viewport clipping/conversion handling and add C regressions.",
-      "Full engine/Forge/OS/types/actual backends/benchmarks and architecture gaps remain; #63 integration remains unverified. Issue23 and43 comments re-read after suite; installed0.1.4 preserved."
+      "169 tests independently passed in203.685s; npm0.1.11/VSIX, compileall, QA, strict UTF8 JSON and diff checks pass.",
+      "Original #79 unbounded-work reproduction fixed: r10 exits0 in0.0824s; offscreenr1e6 exits0 in0.0142s, both before/after. Bounds/casts safe; 22-case production-framebuffer test passes.",
+      "#79 OPEN residual: circle(-r,0,r) for1e150/1e200/DBL_MAX omits pixel(2,0) although the selected squared/hypot predicate accepts it. Geometric upper bound1 is not conservative under extreme binary64 rounding. Add full-viewport fallback/symmetric extreme regressions.",
+      "Native circle/line/ABI/array/project regressions pass. Full engine/Forge/OS/types/backends/benchmarks/architecture and #63 remain incomplete. Evaluator re-read #23 and44comments; installed0.1.4 preserved."
     ],
     "reviewer": "project_full_review"
   },
-  "current_candidate_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+  "current_candidate_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+    "commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
     "reviewed_score": 73,
-    "previous_reviewed_score": 76,
-    "previous_review_commit": "ecdf68109fd5932d8ae572a8f16446194e93b935",
+    "previous_reviewed_score": 73,
+    "previous_review_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "168 independently passed in 176.154s",
+    "python_unittest": "169 independently passed in203.685s",
     "npm_test": "passed",
     "compileall": "passed",
     "qa_report_validator": "73/100 current rubric",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "f11240c diff passed",
-    "finding": "168 tests independently passed in 176.154s; npm 0.1.11/VSIX, compileall, QA arithmetic, strict UTF8 JSON and diff checks pass. Native circles/lines verified: 31920 randomized/extreme circle pixels and 25536 randomized fractional/clipped/thick line pixels match independent references. Kernels are compiled Anvil, viewport bounded, no C/Rust shim. #79 OPEN: unchanged default C anvil_circle scans its entire bounding box; a wholly offscreen radius1000000 circle times out at2.024s after before/no after versus radius10 completing0.0604s. Fix viewport clipping/conversion handling and add C regressions. Full engine/Forge/OS/types/actual backends/benchmarks and architecture gaps remain; #63 integration remains unverified. Issue23 and43 comments re-read after suite; installed0.1.4 preserved."
+    "git_diff_check": "b0e0242 diff passed",
+    "finding": "169 tests independently passed in203.685s; npm0.1.11/VSIX, compileall, QA, strict UTF8 JSON and diff checks pass. Original #79 unbounded-work reproduction fixed: r10 exits0 in0.0824s; offscreenr1e6 exits0 in0.0142s, both before/after. Bounds/casts safe; 22-case production-framebuffer test passes. #79 OPEN residual: circle(-r,0,r) for1e150/1e200/DBL_MAX omits pixel(2,0) although the selected squared/hypot predicate accepts it. Geometric upper bound1 is not conservative under extreme binary64 rounding. Add full-viewport fallback/symmetric extreme regressions. Native circle/line/ABI/array/project regressions pass. Full engine/Forge/OS/types/backends/benchmarks/architecture and #63 remain incomplete. Evaluator re-read #23 and44comments; installed0.1.4 preserved."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -945,13 +945,9 @@
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 73,
-  "latest_independent_candidate_result": "FAIL against98;73/100 on f11240c; new native shapes verified; #79 open.",
-  "current_unscored_followup": {
-    "status": "AWAITING_INDEPENDENT_FULL50_REVIEW",
-    "features": "Fix #79: viewport-clipped C circle traversal, finite validation before conversion, stable extreme-distance predicate; native circle/line kernels retained.",
-    "local_checks": "22-case production-framebuffer regression passed, including offscreen/visible huge circles, ordinary membership, opacity and guards. Latest scored source f11240c remains73/100 until correction review."
-  },
-  "latest_independently_scored_candidate_commit": "f11240c19d708718d8b94bae5f3b3764df435f88",
+  "latest_independent_candidate_result": "FAIL against98;73/100 on b0e0242; #79 original hang fixed, residual membership open.",
+  "current_unscored_followup": null,
+  "latest_independently_scored_candidate_commit": "b0e02422d6447b5f6f289797e7211a9870aff26d",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1042,5 +1038,5 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Full review f11240c: 73/100, 168 tests in 176.154s; native circles/lines independently verified; pre-existing default C-circle stall confirmed as #79. Full goal active."
+  "current_candidate_status": "Full review b0e0242:73/100,169 tests in203.685s; original #79 hang fixed, residual extreme negative-tangent membership remains open. Full goal active."
 }

@@ -26,4 +26,6 @@ Native local arrays are independently verified with allocation/lifetime regressi
 
 Historical numeric ABI review: independently reviewed `ecdf68109fd5932d8ae572a8f16446194e93b935` remains 76/100, with 162 tests passing in 139.160s. Shared argument transport/addressing is verified; general typed lowering, systems ABI, object linking and native engine parity remain incomplete.
 
-Latest independent drawing review: `f11240c19d708718d8b94bae5f3b3764df435f88`,73/100,168 tests in176.154s. Native circles/lines verified; #79 default C-circle offscreen traversal stall confirmed and open. Full scope remains incomplete.
+Historical independent drawing review: `f11240c19d708718d8b94bae5f3b3764df435f88`,73/100,168 tests in176.154s. Native circles/lines verified; #79 default C-circle offscreen traversal stall confirmed and open. Full scope remains incomplete.
+
+Latest independent correction review: `b0e02422d6447b5f6f289797e7211a9870aff26d`,73/100,169 tests in203.685s. Original #79 timeout fixed; extreme negative-tangent membership residual remains open. Full goal incomplete.
