@@ -20,56 +20,56 @@ The full goal remains incomplete: direct no-C/no-Rust engine parity, selectable 
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
-| 1 | Explicit requirements identified | 2 | Language/compiler/runtime and direct target are identified. |
-| 2 | Implicit requirements addressed | 1 | Runtime/input support is growing; most engine/Forge breadth remains unavailable (open). |
-| 3 | Functionality matches intended goal | 1 | Custom language/native subset works; complete engine/Forge/OS functionality remains absent. |
-| 4 | Required deliverables present | 1 | Compiler, extension, tests and docs exist; native engine parity is missing (open). |
-| 5 | No essential feature missing | 0 | GPU rendering, broader engine systems and Forge requirements remain absent (open). |
-| 6 | Stated constraints respected | 1 | Native avoids C/Rust, but C is default; port remaining APIs before switching (open). |
-| 7 | Ambiguity resolved logically | 2 | Direct machine-code/PE target follows user selection. |
-| 8 | Behavior matches documentation | 2 | Semantic ray composition and native project settings match documented supported contracts; #77 independently fixed. |
-| 9 | Important use cases supported | 1 | Interactive 2D input works; native 3D/assets/physics/networking remain missing (open). |
-| 10 | Usable for intended purpose | 1 | Usable for a small native demo; complete engine workflows remain unavailable (open). |
-| 11 | Core functionality works | 1 | Numeric/namespace/local/scratch/formatter cases pass; complete native engine core remains partial. |
-| 12 | Secondary functionality works | 2 | Both #79 failures independently corrected; production-framebuffer and existing resource/drawing checks pass. |
-| 13 | Primary workflows functional | 1 | Hosted subset builds work; Forge/plugin/assembly/UEFI/kernel primary workflows are absent (open). |
-| 14 | Inputs validated | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
-| 15 | Errors handled gracefully | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
-| 16 | Edge cases covered | 2 | Symmetric huge tangencies, threshold neighbors and110 independent full-frame guard cases pass; original offscreen timeout remains fixed. |
-| 17 | Invalid inputs controlled | 2 | #78 independently verified fixed:64 control-entry cases reject cleanly with manifest diagnostics and no artifacts. |
-| 18 | Stable across repeated operations | 2 | Repeated maximum arrays, recursive unwind/reuse and GUI callback allocations pass. |
-| 19 | No known critical defects | 2 | No critical corruption or numeric miscompilation reproduced; no new confirmed finding in latest review. |
-| 20 | Components integrate | 2 | Includes, project settings/native runtime and semantic ray/HUD order integrate in executable tests. |
-| 21 | Logical project structure | 2 | NativeArrays owns allocation/lifetime emission; compiler, window/input and encoder responsibilities are separated. |
-| 22 | Readable and consistently formatted | 1 | Raw x64 bytes are hard to maintain; add instruction abstractions and formatting (open). |
-| 23 | Clear module responsibilities | 1 | Input has its own module; instruction encoding/state/platform behavior remain coupled (open). |
-| 24 | Consistent descriptive naming | 2 | Names are consistent and descriptive. |
-| 25 | Duplication minimized | 1 | ABI/instruction patterns repeat; consolidate encoder helpers (open). |
-| 26 | Dependencies appropriate | 2 | Direct heap/window imports require no C/Rust shim; unused array functions omit heap imports. |
-| 27 | Supports future extensions | 1 | Labels/fixups/demand loading and array module provide a base; complete runtime/target interfaces (open). |
-| 28 | No unfinished placeholders | 1 | Input handlers are real; native graphics still restricts scenes and opaque rectangle coverage (open). |
-| 29 | Configuration understandable | 2 | Backend/TOML/include/title and1–240Hz settings are organized and documented. |
-| 30 | Conventions followed | 1 | Win64/PE is exercised but manual; broaden ABI validation and abstractions (open). |
+| 1 | Explicit requirements identified | 2 | Complete native engine, original450, Forge and OS scope retained in #23. |
+| 2 | Implicit requirements addressed | 1 | Complete resource, portability and runtime workflows missing; implement remaining systems (#6/#11/#23, open). |
+| 3 | Functionality matches intended goal | 1 | Native2D improves; complete engine/Forge/OS functionality absent (#5-11/#23, open). |
+| 4 | Required deliverables present | 1 | Compiler/runtime subset, examples, extension and tests exist; full native engine/systems deliverables absent (#11/#23, open). |
+| 5 | No essential feature missing | 0 | Native3D/assets/audio/physics/networking, actual DXR/Embree, rich types and Forge/OS targets missing (#5-11/#23, open). |
+| 6 | Stated constraints respected | 1 | Native emits direct machine code without C/Rust; broader engine/default still uses C/MSVC. Complete migration (#11, open). |
+| 7 | Ambiguity resolved logically | 2 | BGRX storage, integer blending, overlap rules, synchronization and per-buffer limits explicit. |
+| 8 | Behavior matches documentation | 2 | Surface lifetime, clipping, alpha, transparent paths and GDI ordering match executable evidence. |
+| 9 | Important use cases supported | 1 | Native2D shapes/text/alpha/projects work; major engine and Forge/OS workflows absent (#5-11/#23, open). |
+| 10 | Usable for intended purpose | 1 | Useful prototype; deliver complete engine/systems acceptance applications (#11/#15/#23, open). |
+| 11 | Core functionality works | 1 | Implemented numeric/native2D subset passes; complete native engine core partial (#11, open). |
+| 12 | Secondary functionality works | 2 | Alpha/rendering/text/resources and previous procedural/array regressions pass; #79 remains verified fixed. |
+| 13 | Primary workflows functional | 1 | Source/project builds work; Forge/package/assembly/UEFI/kernel workflows absent (#11/#23, open). |
+| 14 | Inputs validated | 2 | DIB budget, geometry/alpha/colour clipping and prior domain/configuration checks exercised. |
+| 15 | Errors handled gracefully | 2 | Allocation/null-bits/budget/active-flush failures exit2; best-effort teardown disclosed. |
+| 16 | Edge cases covered | 2 | Transparent/fractional/clamped/extreme/reversed bounds, white saturation, interleaving and prior boundaries pass. |
+| 17 | Invalid inputs controlled | 2 | Invalid source/domain/configuration and new injected resource failures remain controlled. |
+| 18 | Stable across repeated operations | 2 | Layered updates, resize/resource reuse and existing repeated input/array/window tests pass. |
+| 19 | No known critical defects | 2 | No corruption, ABI regression, stale pixel pointer or lifetime defect reproduced. |
+| 20 | Components integrate | 2 | CPU pixels integrate with GDI background/text/presentation, Anvil circle/line kernels and buffered lifecycle. |
+| 21 | Logical project structure | 2 | NativeSurface owns DIB metadata, synchronization and pixel kernels; window/text/drawing responsibilities explicit. |
+| 22 | Readable and consistently formatted | 1 | Extensive raw instruction/platform emission remains, including packed SSE2. Expand named helpers (#23, open). |
+| 23 | Clear module responsibilities | 1 | Surface ownership improves separation; native expression parsing/validation/emission remain coupled. Add validated IR (#11/#23, open). |
+| 24 | Consistent descriptive naming | 2 | Pending/committed pointers, GDI flag, bounds and saved-register slots clearly named. |
+| 25 | Duplication minimized | 1 | Integer/scalar addressing now share encoding; expression parser/precedence duplication remains. Share validated lowering (#23, open). |
+| 26 | Dependencies appropriate | 2 | Explicit Windows DIB/GDI imports and Anvil-emitted pixel code; no C/Rust shim. |
+| 27 | Supports future extensions | 1 | Private pixel surface strengthens the base; typed IR/target/linking/platform interfaces incomplete (#11/#23, open). |
+| 28 | No unfinished placeholders | 1 | Surface/blending paths are real; required engine/target breadth remains unsupported (#5-11/#23, open). |
+| 29 | Configuration understandable | 2 | 16Mpixels/64MiB per buffer, transient resize storage, opaque clear/text and RGBA rules documented. |
+| 30 | Conventions followed | 1 | Pixel/nonvolatile/stack/integer-addressing conventions verified; richer systems/foreign/object interfaces absent (#11/#23, open). |
 | 31 | Automated tests provided | 2 | 180 tests and extension0.1.11 validation independently pass. |
-| 32 | Core tests covered | 2 | 44-case production-runtime regression plus110 independent oracle cases cover both #79 failures; existing implemented-core tests pass. |
-| 33 | Failure scenarios tested | 2 | Invalid mouse arguments/keys and bitmap allocation-failure injection are covered. |
-| 34 | Edge cases explicitly tested | 2 | Taps, repeats, simultaneous buttons, actual OS capture, wheel accumulation and draw-only behavior are tested. |
-| 35 | Integration behavior tested | 1 | Coordinate test uses an explicit test-only WndProc wrapper; untouched OS-dispatch coverage is incomplete (#63, open). |
-| 36 | Documented test commands work | 2 | Documented Python and extension validation commands run successfully. |
-| 37 | Builds and compilation pass | 2 | 180 tests include C/native execution; compileall/extension/VSIX/UTF8/diff pass. |
-| 38 | Results recorded accurately | 2 | Exact 4f5c981 / 76 / 180 evidence agrees across records; historical input-test limitations disclosed. |
-| 39 | Regression checks performed | 2 | Full suite and prior slow-draw/failure/resource regressions pass. |
-| 40 | Verified against original goal | 0 | Only a prototype subset is verified; implement and verify full scope (open). |
-| 41 | Installation instructions accurate | 2 | Python/native and Python/MSVC routes match independently exercised builds; extension installation documented. |
-| 42 | Setup reproducible | 1 | Subset setup is reproducible; full engine setup is missing (open). |
-| 43 | Usage understandable | 2 | Corrected compiler/migration guides identify actual support, usage and backend limits. |
-| 44 | Design decisions documented | 2 | Migration design and limits are documented. |
-| 45 | Troubleshooting available | 2 | README, native diagnostic tables and include/depth troubleshooting provide actionable subset guidance. |
-| 46 | Opens in intended environment | 1 | CLI/runtime/static extension validate; full editor workflows and fresh visible verification remain incomplete. |
-| 47 | Editor integration works | 1 | Grammar, corrected indentation/folding and VSIX parity pass; current newer installed-editor behavior remains unverified. |
-| 48 | Deliverables organized | 2 | Deliverables are organized and pushed. |
-| 49 | Limitations disclosed | 2 | Native limitations are disclosed. |
-| 50 | Practical for intended scope | 0 | Full game-engine/Forge scope remains incomplete (open). |
+| 32 | Core tests covered | 2 | Actual PE/C execution,65536 source/alpha pairs, guarded surfaces and previous implemented-core tests pass. |
+| 33 | Failure scenarios tested | 2 | DIB handle/null-bits/budget/flush injection and previous text/allocation/configuration failures exercised. |
+| 34 | Edge cases explicitly tested | 2 | Pixel boundaries, transparent/saturated alpha, repeated stamps, GDI ordering, guards and address matrices tested. |
+| 35 | Integration behavior tested | 1 | GDI/CPU integration passes; untouched OS mouse-coordinate dispatch remains unverified (#63, open). |
+| 36 | Documented test commands work | 2 | Documented unittest/npm/QA commands execute successfully. |
+| 37 | Builds and compilation pass | 2 | 180 tests, actual native/C executables, compileall and package checks pass. |
+| 38 | Results recorded accurately | 2 | Exact4f5c981/76/180 evidence recorded; local checks and previous independent snapshots distinguished. |
+| 39 | Regression checks performed | 2 | Full180-test suite completed on exact source, including previous rendering/text/input/resource regressions. |
+| 40 | Verified against original goal | 0 | Complete engine/Forge/OS acceptance unavailable; implement and verify full scope (#5-11/#14-15/#23, open). |
+| 41 | Installation instructions accurate | 2 | Python/native and MSVC routes match executable checks; extension installation documented. |
+| 42 | Setup reproducible | 1 | Prototype subset reproducible; full engine/Forge/OS setup absent (#11/#23, open). |
+| 43 | Usage understandable | 2 | RGBA syntax, flooring/clamping, repeated overlap behavior and surface limits documented. |
+| 44 | Design decisions documented | 2 | DIB ownership, pending batches, source-over arithmetic, budgets and teardown policy explained. |
+| 45 | Troubleshooting available | 2 | Native/compiler/include guides provide domain limits and actionable diagnostics. |
+| 46 | Opens in intended environment | 1 | CLI/runtime/static extension validate; full editor/project/runtime workflow incomplete (#11/#23, open). |
+| 47 | Editor integration works | 1 | Grammar/config/package pass; newer visible-editor/advanced tooling missing. Preserve installed0.1.4 (#24/#23, open). |
+| 48 | Deliverables organized | 2 | Surface module, kernels, examples, dedicated tests and documentation clearly organized. |
+| 49 | Limitations disclosed | 2 | Text opacity, transparent texture alpha, broader engine/targets and unmeasured optimization disclosed. |
+| 50 | Practical for intended scope | 0 | Full intended engine/Forge/OS product incomplete; deliver remaining systems and acceptance projects (#5-11/#14-15/#23, open). |
 | | **Requirement fulfillment** | **12/20** | |
 | | **Functionality and reliability** | **18/20** | |
 | | **Code quality and architecture** | **14/20** | |
