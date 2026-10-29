@@ -12,7 +12,7 @@ An experimental direct backend is available with `python -m compiler.anvil <file
 
 The direct backend now has an initial Windows 2D runtime: `scene 2d`, literal opaque `clear rgba`, top-level numeric initialization, `fn(draw)`, `display rect(...)`, `display circle(...)`, `display line(...)` with opaque `-rgb(...)`, and optional `fn(update)` with `time()`, `delta()`, `compute()`, `held(key)`, `pressed(key)` and the mouse queries below. Runtime instructions and the PE are emitted by Anvil; USER32/GDI32 functions are imported directly from Windows. No C/Rust source, compiler, linker, or runtime shim is used.
 
-The regular build still defaults to the C backend. The native backend does **not** yet support the full language, text, alpha blending, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
+The regular build still defaults to the C backend. The native backend does **not** yet support the full language, general strings/numeric text formatting, alpha blending, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
 
 ## Native 2D scene
 
@@ -37,7 +37,7 @@ The clear colour currently requires four literal 0–255 channels and alpha 255.
 
 Both primitives evaluate coordinate arguments and then colour arguments once in source order, support the same opaque colour modifiers as rectangles, and preserve statement drawing order. Coordinates and circle radius must be within inclusive +/-2^30; an out-of-range value exits with code 2 and the originating physical source path/line. Line thickness may be any finite number and is capped by client width after conversion to a stamp radius. Non-finite expressions already fail with native numeric diagnostics. These explicit limits prevent unsafe/unbounded conversions; they do not imply full engine parity.
 
-The kernels are ordinary Anvil source in `runtime/native/drawing.ANVL`, compiled by the direct x64 backend on demand. Only requested kernels and the line rounding helper are emitted; rectangle-only and console programs omit them. Each filled row or line stamp currently calls the native rectangle primitive, which owns/deletes its brush. This avoids per-pixel OS calls but is not a claim of optimal rendering performance. Dedicated framebuffer rendering, alpha, text, 3D and measured optimization remain unfinished.
+The kernels are ordinary Anvil source in `runtime/native/drawing.ANVL`, compiled by the direct x64 backend on demand. Only requested kernels and the line rounding helper are emitted; rectangle-only and console programs omit them. Each filled row or line stamp currently calls the native rectangle primitive, which owns/deletes its brush. This avoids per-pixel OS calls but is not a claim of optimal rendering performance. Dedicated framebuffer rendering, alpha, general strings/numeric text formatting, 3D and measured optimization remain unfinished.
 
 ```powershell
 python -m compiler.anvil examples/native_shapes.ANVL --backend native --output build/native_shapes.exe
@@ -45,6 +45,20 @@ python -m compiler.anvil examples/native_shapes.ANVL --backend native --output b
 ```
 
 `tests/test_native_drawing.py` compares actual client pixels to independent numeric references for fractional/negative/zero/tiny/large circles and clipped/reversed/degenerate/thick lines. It also verifies evaluation order, local/global array inputs, composition, resizing/resource reuse, Unicode included-source range errors, unsupported modifiers and omission of unused kernels. Test interaction targets only each generated window.
+
+## Native literal text
+
+```anv
+display text("Anvil native \u03bb") -l(20, 20) -rgb(230, 240, 255)
+```
+
+`display text("literal") -l(x,y)` draws single-line Unicode text into the same buffered frame as shapes. Location and optional `-rgb(r,g,b)` or `-rgba(r,g,b,255)` suffixes can appear in either order. Quoted parentheses, `#`, backslashes and modifier-like text remain literal contents. The shared suffix parser is independent of both backends. Native literals use JSON string escapes (including escaped quotes/backslashes and `\u` Unicode escapes); malformed/unpaired-surrogate literals and control characters produce physical source-line diagnostics. The limit is 8192 UTF-16 code units per literal, including two units for a supplementary character. Repeated identical literals share one data pool entry.
+
+Locations and then colour expressions evaluate once in x,y,r,g,b order. Locations use integer truncation toward zero and must be within inclusive +/-2^30, with a source-located range error/exit2 outside it. Channels clamp to0..255 and truncate. Missing/repeated location/colour suffixes, nonopaque alpha, general string expressions and numeric HUD formatting are explicitly rejected; no C fallback occurs. Empty text evaluates its numeric arguments but allocates no font and draws nothing. Newline/control layout and general strings remain later language/runtime work.
+
+The runtime calls [TextOutW](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-textoutw) with UTF-16 data and an explicit unit count. It creates one cached20-pixel semibold Segoe UI font through [CreateFontW](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createfontw), restores the previous font/colour/background mode after each call and deletes its owned font on clean shutdown. Transparent background drawing preserves earlier shapes. Font mapping/glyph fallback follows Windows; advanced shaping/layout is not implemented. Font or drawing API failure produces a controlled native text error/exit2. Programs without text omit these imports and font data.
+
+`tests/test_native_text.py` compares actual Unicode/quoted-literal pixels to a separately drawn GDI reference, verifies argument order, retained font/resource counts,8192-unit bounds, Unicode include provenance, pool/import selection and injected font/draw failures. A disclosed test-only wrapper queries the actual memory DC before/after the real draw callback to verify font, text colour and background mode restoration. Test interaction remains confined to generated windows.
 
 ## Native keyboard input
 
@@ -110,7 +124,7 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 1. Machine-code and PE writer primitives; emit a minimal console EXE and verify it runs. **Implemented.**
 2. Arithmetic, checked numeric operations, functions, branches, and loops. **Partially implemented:** checked numeric operations, functions with sixteen arguments, branches and numeric loops work; full language parity remains outstanding.
 3. Global slots and fixed-size global/local arrays with checked indexing. **Implemented within documented bounds:** per-call zeroed heap storage, cleanup and active allocation budget are verified.
-4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, keyboard held/edge input, background clearing, and buffered opaque rectangles/circles/lines work; mouse input is independently verified; text, alpha blending and image resources are outstanding.
+4. Native input, window lifecycle, 2D drawing, and image resources. **Partially implemented:** window lifecycle, fixed updates, time/delta, keyboard held/edge input, background clearing, and buffered opaque rectangles/circles/lines and literal Unicode text work; mouse input is independently verified; general strings/numeric text formatting, alpha blending and image resources are outstanding.
 5. Camera, 3D primitives, BVH ray tracing, physics, procedural noise, and networking.
 6. Switch the default build to the direct x64/PE backend, port regression coverage, then remove C generation and MSVC-specific compiler invocation.
 

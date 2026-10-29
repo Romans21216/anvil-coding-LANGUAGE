@@ -122,3 +122,5 @@ Record-only check3fe3e57 found stale total-row source and local-array rollout wo
 Focused independent record recheckfbf6143 passes after #58 corrections: total-row source2f7cd74 and native local-array rollout agree with all four50-score vectors,76/100 and158/145.917s evidence. No rescore or implementation change.
 
 Focused independent record-only recheck of 91b06cd: PASS. All six current records, all 50 scores and both candidate_validation objects agree on exact source ecdf681, 76/100, categories 12/18/14/17/15 and 162 tests in 139.160s. Historical 2f7cd74/158 evidence remains identified as history. No implementation change or rescore.
+
+Unscored follow-up: native literal Unicode text implemented with cached owned font, pooled UTF16, transparent buffered drawing and shared quote-aware suffix parser. 14 targeted text/display regressions passed in23.065s; source includes state telemetry, resource/failure/range/literal-boundary coverage. CLI sample/npm/compileall/QA/diff pass. General strings/numeric HUD formatting remain unsupported; full review pending. Latest139f924/76/169 evidence remains unchanged.

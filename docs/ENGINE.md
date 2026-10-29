@@ -1,9 +1,9 @@
 # Anvil Engine Runtime
 
-The broader engine APIs below describe the C/MSVC-backed Windows runtime. Direct `--backend native` output currently supports a smaller numeric and 2D rectangle/circle/line/input/procedural subset; see [native backend availability](NATIVE_X64_COMPILER_MIGRATION.md).
+The broader engine APIs below describe the C/MSVC-backed Windows runtime. Direct `--backend native` output currently supports a smaller numeric and 2D rectangle/circle/line/literal-text/input/procedural subset; see [native backend availability](NATIVE_X64_COMPILER_MIGRATION.md).
 
 
-This guide describes the broader C/MSVC runtime. The experimental direct x64 backend currently implements buffered opaque 2D rectangles/circles/lines, fixed updates and keyboard/mouse input, with its own documented client-pixel and clock limits. Check [native backend availability](NATIVE_X64_COMPILER_MIGRATION.md) before using the broader APIs below; full runtime parity remains incomplete.
+This guide describes the broader C/MSVC runtime. The experimental direct x64 backend currently implements buffered opaque 2D rectangles/circles/lines, literal Unicode text, fixed updates and keyboard/mouse input, with its own documented client-pixel and clock limits. Check [native backend availability](NATIVE_X64_COMPILER_MIGRATION.md) before using the broader APIs below; full runtime parity remains incomplete.
 
 The initial runtime targets Windows and keeps the engine surface intentionally small. `fn(update)` runs at a fixed simulation rate (60 Hz by default), then the runtime clears its fixed-size 960×600 frame, calls `fn(draw)`, and presents the software-rendered pixels in a native window. The game window can be resized; presentation preserves the 16:10 frame aspect ratio and centers letterboxing when needed, while internal rendering remains 960×600. `.ANVLproj` can set `engine.fixed_hz` from 1 to 240. `delta()` reports the fixed update step; `time()` reports elapsed wall time.
 

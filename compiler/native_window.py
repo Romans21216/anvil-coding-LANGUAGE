@@ -62,6 +62,7 @@ class NativeWindow:
         self.clear = clear
         from compiler.native_drawing import NativeDrawing
         self.drawing = NativeDrawing(self)
+        self.text = None
         self.hdc = owner.reserve_data(b"\0" * 8)
         self.instance = owner.reserve_data(b"\0" * 8)
         self.brush = owner.reserve_data(b"\0" * 8)
@@ -102,7 +103,8 @@ class NativeWindow:
     @property
     def imports(self) -> list[tuple[str, str]]:
         return (self.IMPORTS + (self.CLOCK_IMPORTS if self.clock_enabled else [])
-                + (self.mouse.IMPORTS if self.mouse is not None else []))
+                + (self.mouse.IMPORTS if self.mouse is not None else [])
+                + (self.text.IMPORTS if self.text is not None else []))
 
     def call(self, name: str) -> None:
         self.code.rip_call_import(name)
@@ -121,6 +123,8 @@ class NativeWindow:
     def emit(self) -> None:
         self.drawing.emit_pending()
         self._rectangle()
+        if self.text is not None:
+            self.text.emit()
         self._release_buffer()
         if self.keyboard is not None:
             self.keyboard.emit_helpers()
@@ -132,9 +136,15 @@ class NativeWindow:
     def emit_display(self, node: Node, scope: Node | None) -> None:
         raw = node.value.strip()
         location = f"{self.owner.path}:{node.line}"
+        if raw.startswith("text("):
+            if self.text is None:
+                from compiler.native_text import NativeText
+                self.text = NativeText(self)
+            self.text.display(node, scope)
+            return
         match = re.match(r"(rect|circle|line)\(", raw)
         if not match:
-            raise CompileError(f"{location}: native 2D graphics currently supports display rect, circle or line only")
+            raise CompileError(f"{location}: native 2D graphics currently supports display rect, circle, line or text only")
         shape = match[1]
         start = match.end()
         depth = 1
@@ -567,6 +577,8 @@ class NativeWindow:
         self.call("DispatchMessageW")
         c.jump(loop)
         c.label(close)
+        if self.text is not None:
+            self.text.release(failure)
         c.rip_int(1, self.brush)
         self.call("DeleteObject")
         c.rip_lea_data(1, self.class_name)

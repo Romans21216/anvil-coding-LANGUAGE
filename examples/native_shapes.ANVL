@@ -13,6 +13,7 @@ fn(update)
   end
 end
 fn(draw)
+  display text("Anvil native shapes \u03bb") -l(40,10) -rgb(220,235,250)
   display rect(40,40,560,300) -rgb(30,45,65)
   display circle(var(x),170,65.5) -rgb(95,205,185)
   display circle(440.5,170.25,-48) -rgba(175,110,245,255)
