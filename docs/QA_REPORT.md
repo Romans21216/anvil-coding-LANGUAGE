@@ -129,4 +129,4 @@ Focused independent record-only recheck of4b5ac844: PASS. All six records, all50
 
 Focused independent record-only recheck of f5c1fed8: PASS. All six records, all 50 scores and both candidate_validation objects agree on reviewed source 4f5c981, 76/100, categories 12/18/14/17/15 and 180 tests in 286.162s. Current DIB/RGBA evidence and historical #79 verification are distinguished; pending follow-ups are null. No rescore or implementation change.
 
-Current unscored follow-up: Selective function imports and source-qualified calls are implemented in this unscored follow-up; 11 targeted tests and extension0.1.12 checks passed locally. Full independent review pending. The scored snapshot above remains 4f5c981, 76/100, 180 tests/286.162s.
+Current unscored follow-up: Selective function imports and source-qualified calls are implemented in this unscored follow-up; 12 targeted tests and extension0.1.12 checks passed locally. Full independent review pending. The scored snapshot above remains 4f5c981, 76/100, 180 tests/286.162s.

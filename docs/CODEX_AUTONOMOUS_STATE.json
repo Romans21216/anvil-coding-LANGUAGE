@@ -279,9 +279,9 @@
   ],
   "current_candidate_status": "Full review4f5c981:76/100,180 tests in286.162s; native DIB surface/exact RGBA shapes independently verified, no new finding. Full goal active.",
   "current_unscored_followup": {
-    "summary": "Selective function imports and source-qualified calls are implemented in this unscored follow-up; 11 targeted tests and extension0.1.12 checks passed locally. Full independent review pending. The scored snapshot above remains 4f5c981, 76/100, 180 tests/286.162s.",
+    "summary": "Selective function imports and source-qualified calls are implemented in this unscored follow-up; 12 targeted tests and extension0.1.12 checks passed locally. Full independent review pending. The scored snapshot above remains 4f5c981, 76/100, 180 tests/286.162s.",
     "status": "pending full independent review",
-    "local_targeted_tests": 11,
+    "local_targeted_tests": 12,
     "extension_version": "0.1.12"
   },
   "open_coordinate_integration_issue": 63,

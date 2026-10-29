@@ -946,9 +946,9 @@
   "latest_independent_candidate_score": 76,
   "latest_independent_candidate_result": "FAIL against98;76/100 on4f5c981; native surface/RGBA verified; full goal incomplete.",
   "current_unscored_followup": {
-    "summary": "Selective function imports and source-qualified calls are implemented in this unscored follow-up; 11 targeted tests and extension0.1.12 checks passed locally. Full independent review pending. The scored snapshot above remains 4f5c981, 76/100, 180 tests/286.162s.",
+    "summary": "Selective function imports and source-qualified calls are implemented in this unscored follow-up; 12 targeted tests and extension0.1.12 checks passed locally. Full independent review pending. The scored snapshot above remains 4f5c981, 76/100, 180 tests/286.162s.",
     "status": "pending full independent review",
-    "local_targeted_tests": 11,
+    "local_targeted_tests": 12,
     "extension_version": "0.1.12"
   },
   "latest_independently_scored_candidate_commit": "4f5c981bddf2796e56b6bea14d8f575d692b6da5",
