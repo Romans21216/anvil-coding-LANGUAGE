@@ -1,20 +1,22 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 Assessment date:2026-10-29
-Exact independent source:957ee124402e0ba773971aaee24c48c8b277929a
+Exact independent source:b76fc02a1f6ea9ab24f7af004e8a0981ba249252
 Evaluator:project_full_review
-Score:71/100 — FAIL against98.
-Categories11/15/14/16/15.
-Scores 1-50: 2,1,1,1,0,1,2,1,1,1 / 1,1,1,1,2,2,2,2,2,1 / 2,1,1,2,1,2,1,1,2,1 / 2,1,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Score:76/100 — FAIL against98.
+Categories12/18/14/17/15.
+Scores 1-50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-Full independent review of957ee12:71/100 FAIL against98, categories11/15/14/16/15;192 tests passed in323.089s. Selective imports implemented, but #81 supplementary-Unicode C literal encoding and #82 private function/array reference bypass remain open. Full engine/Forge/OS/targets/types/backends/benchmarks/tooling and #63 remain incomplete. Goal stays active.
+Full independent review of b76fc02:76/100 FAIL against98, categories12/18/14/17/15;194 tests passed in 281.445s. Selective imports, qualified calls, private helpers/state and aliases verified; #81 supplementary C UTF-8 metadata and #82 private source-reference bypass independently fixed. Full native engine/Forge/OS/types/targets/actual ray backends/benchmarks/tooling and #63 remain incomplete. Goal stays active.
 
-192 tests independently passed in323.089s without restart; npm0.1.12/VSIX CRC and source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
-Alias/state/helper isolation, recursion, dependency closure, initialization once, project roots and graph budgets pass provided tests. Extra BMP Cyrillic/Japanese diagnostics pass both backends; supplementary filename succeeds natively but MSVC fails C3850 on JSON surrogate escapes (#81).
-Extra private-helper probe executes73 on both backends; private-array mutation executes42 natively, bypassing exports through generated names (#82). Both findings are filed with Codex Bugs and detailed acceptance criteria. Evaluator re-read #23 body/51comments after suite and #80 separately; installed0.1.4 and #63 gap preserved.
+194 tests independently passed in 281.445s without restart; npm0.1.12/VSIX CRC and source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
+Former #81 supplementary Cyrillic/Japanese/emoji physical source path now compiles on both backends and reports exact raw UTF-8 path/physical line4 with exit2. Shared C byte literals cover all path/allocation/project-title metadata. Byte-exact controls/NUL/DEL/emoji/hex-digit-followers and supplementary-title compilation pass; no C ANSI-window Unicode display claim.
+Additional independent MSVC encoder harness reproduced1164 Unicode scalars as4105 exact UTF-8 bytes, including all ASCII controls/NUL/DEL/quotes/backslashes,1000 randomized scalars and digit-following escapes.
+Former #82 helper calls and private array reads/writes are rejected at original source lines before either backend. All source node identifiers are checked before generated binding, with quoted/comment text unchanged. Alias/private state/helper closure/recursion/init-once/project/limits and preceding runtime regressions pass.
+No new defect confirmed. Full50 review re-read #23 body/52comments after tests and #80 optimization requirements separately. Prior #79 stays verified fixed; installed0.1.4 preserved and untouched coordinate integration gap #63 remains.
 
-Previous independent source 4f5c981bddf2796e56b6bea14d8f575d692b6da5 retained in QA report history.
+Previous independent source 957ee124402e0ba773971aaee24c48c8b277929a retained in QA report history.
 
-Selective source imports: qualified functions, private module helpers/globals/arrays, file-local aliases and canonical module initialization are implemented. Remaining defects/status: #81 remains OPEN: /utf-8 fixes BMP encoding, but supplementary paths emit invalid C surrogate universal escapes. #82 OPEN: source references to compiler-private function/array names bypass selective exports/state isolation. Both have detailed reproduction, impact and acceptance criteria under Codex Bugs. Prior #79 remains verified fixed; #63 and broad #5–11/#14–15/#24 remain open.
+Selective source imports: qualified functions, private module helpers/globals/arrays, file-local aliases and canonical module initialization are implemented. Remaining defects/status: #81 and #82 independently VERIFIED FIXED on b76fc02: supplementary UTF-8 metadata compiles/reports correctly, and source cannot name private generated functions/arrays. Prior #79 stays verified fixed. #63 and broader #5–11/#14–15/#24/#23/#80 capability/verification gaps remain open. Confirmed findings retain detailed reproduction, impact and acceptance under Codex Bugs; user reports use Romans21216 - Bugs.
 
 SUMMARY
 -------
@@ -71,7 +73,7 @@ Cross-platform runtime: Not implemented
 Performance evidence: Not available
 
 CURRENT PRIORITIES
-Fix #81 C UTF-8 literals and #82 all-source private-reference validation, add adversarial regressions, then obtain another full review. Continue native engine parity, actual ray backends, rich types, Forge/OS and benchmarks. Goal remainsactive below98.
+Continue validated shared lowering/IR, native engine assets/camera/3D parity and measured optimization. Full goal remains active below98.
 
 Focused independent record-only check of0b13a46 passed: all50 vectors,76/100 categories, exact2b4e5e8 and151/142.480s evidence agree; current native project/settings docs and ancillary fields match. No rescore or implementation change.
 
@@ -82,5 +84,3 @@ Focused independent record-only recheck of 91b06cd: PASS. All six current record
 Focused independent record-only recheck of4b5ac844: PASS. All six records, all50 scores and both candidate_validation objects agree on exactsource68ff824,76/100,categories12/18/14/17/15 and175tests218.389s. Pending follow-ups null; Unicode-text evidence and historical #79 correction agree. No rescore or implementation change.
 
 Focused independent record-only recheck of f5c1fed8: PASS. All six records, all 50 scores and both candidate_validation objects agree on reviewed source 4f5c981, 76/100, categories 12/18/14/17/15 and 180 tests in 286.162s. Current DIB/RGBA evidence and historical #79 verification are distinguished; pending follow-ups are null. No rescore or implementation change.
-
-Current unscored follow-up: Unscored correction follow-up: #81 shared C UTF-8 byte literals replace JSON surrogate escapes for all source-path/project-title metadata; #82 guards all unbound source identifier references before binding. Fourteen selective tests pass locally in21.184s, including supplementary physical paths on both backends, byte-exact C strings/title compilation, and both-backend private call/array rejection. Full independent review pending; scored source957ee12 remains71/100 with192 tests323.089s.

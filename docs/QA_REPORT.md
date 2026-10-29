@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-10-29
-**Latest independent evaluation:** **71/100 - FAIL** on exact `957ee124402e0ba773971aaee24c48c8b277929a`.
+**Latest independent evaluation:** **76/100 - FAIL** on exact `b76fc02a1f6ea9ab24f7af004e8a0981ba249252`.
 **Current passing threshold:** 98/100. Historical scores do not establish current full-goal completion.
 **Evaluator:** separate `project_full_review` agent, full 50-criterion review.
 
@@ -9,14 +9,16 @@ The full native engine, selectable DXR/Embree, rich systems-language types, Forg
 
 ## Independent verification for this snapshot
 
-- `python -m unittest discover -s tests -q`: **192 passed**, 323.089 seconds, original session without restart.
+- `python -m unittest discover -s tests -q`: **194 passed**, 281.445 seconds, original session without restart.
 - Extension0.1.12 grammar/VSIX CRC and source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed. Installed0.1.4 preserved; newer visible editor tokens remain unverified.
-- 192 tests independently passed in323.089s without restart; npm0.1.12/VSIX CRC and source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
-- Alias/state/helper isolation, recursion, dependency closure, initialization once, project roots and graph budgets pass provided tests. Extra BMP Cyrillic/Japanese diagnostics pass both backends; supplementary filename succeeds natively but MSVC fails C3850 on JSON surrogate escapes (#81).
-- Extra private-helper probe executes73 on both backends; private-array mutation executes42 natively, bypassing exports through generated names (#82). Both findings are filed with Codex Bugs and detailed acceptance criteria. Evaluator re-read #23 body/51comments after suite and #80 separately; installed0.1.4 and #63 gap preserved.
+- 194 tests independently passed in 281.445s without restart; npm0.1.12/VSIX CRC and source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
+- Former #81 supplementary Cyrillic/Japanese/emoji physical source path now compiles on both backends and reports exact raw UTF-8 path/physical line4 with exit2. Shared C byte literals cover all path/allocation/project-title metadata. Byte-exact controls/NUL/DEL/emoji/hex-digit-followers and supplementary-title compilation pass; no C ANSI-window Unicode display claim.
+- Additional independent MSVC encoder harness reproduced1164 Unicode scalars as4105 exact UTF-8 bytes, including all ASCII controls/NUL/DEL/quotes/backslashes,1000 randomized scalars and digit-following escapes.
+- Former #82 helper calls and private array reads/writes are rejected at original source lines before either backend. All source node identifiers are checked before generated binding, with quoted/comment text unchanged. Alias/private state/helper closure/recursion/init-once/project/limits and preceding runtime regressions pass.
+- No new defect confirmed. Full50 review re-read #23 body/52comments after tests and #80 optimization requirements separately. Prior #79 stays verified fixed; installed0.1.4 preserved and untouched coordinate integration gap #63 remains.
 - Test interactions remain window-local; untouched OS coordinate dispatch gap #63 remains disclosed. No fresh CUA/editor verification or installation.
 
-## Latest 50-criterion scoring — `957ee12`
+## Latest 50-criterion scoring — `b76fc02`
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -27,19 +29,19 @@ The full native engine, selectable DXR/Embree, rich systems-language types, Forg
 | 5 | No essential feature missing | 0 | Native3D/assets/audio/physics/networking, actual DXR/Embree, rich types and Forge/OS targets missing (#5-11/#23, open). |
 | 6 | Stated constraints respected | 1 | Native emits direct machine code without C/Rust; broader engine/default still uses C/MSVC. Complete migration (#11, open). |
 | 7 | Ambiguity resolved logically | 2 | Canonical modules, file-local aliases/exports, initializer ordering and whole-file coexistence explicitly defined. |
-| 8 | Behavior matches documentation | 1 | Private helper/state and supplementary-Unicode path guarantees fail in #81/#82. Correct C literals and source-reference validation; open. |
+| 8 | Behavior matches documentation | 2 | Selective imports/privacy, Unicode metadata, initialization and existing runtime behavior match independently exercised contracts; #81/#82 verified fixed. |
 | 9 | Important use cases supported | 1 | Native2D shapes/text/alpha/projects work; major engine and Forge/OS workflows absent (#5-11/#23, open). |
 | 10 | Usable for intended purpose | 1 | Useful prototype; deliver complete engine/systems acceptance applications (#11/#15/#23, open). |
 | 11 | Core functionality works | 1 | Implemented numeric/native2D subset passes; complete native engine core partial (#11, open). |
-| 12 | Secondary functionality works | 1 | BMP Unicode diagnostics improve, but supplementary source paths break C compilation. Fix shared C UTF-8 literals; #81 open. |
+| 12 | Secondary functionality works | 2 | Supplementary UTF-8 path diagnostics now pass both native and C; prior rendering/procedural/array/resource regressions pass. |
 | 13 | Primary workflows functional | 1 | Source/project builds work; Forge/package/assembly/UEFI/kernel workflows absent (#11/#23, open). |
-| 14 | Inputs validated | 1 | Source can reference generated private function/array identities. Validate every source reference before binding; #82 open. |
+| 14 | Inputs validated | 2 | All unbound source references reject compiler-private identities; file/root/arity/budget/domain/configuration inputs exercised. #82 fixed. |
 | 15 | Errors handled gracefully | 2 | Allocation/null-bits/budget/active-flush failures exit2; best-effort teardown disclosed. |
 | 16 | Edge cases covered | 2 | Alias conflicts, nested/recursive imports, expanded limits, initialization and existing runtime boundaries exercised. |
 | 17 | Invalid inputs controlled | 2 | Invalid source/domain/configuration and new injected resource failures remain controlled. |
 | 18 | Stable across repeated operations | 2 | Canonical module state/initializer reuse and previous window/resource/input/array regressions pass. |
 | 19 | No known critical defects | 2 | No corruption, ABI regression, stale pixel pointer or lifetime defect reproduced. |
-| 20 | Components integrate | 1 | Scoped binding allows private-reference bypass; C/native supplementary-path parity incomplete. Correct #81/#82; open. |
+| 20 | Components integrate | 2 | Scoped bindings integrate with both backends, private state/helpers, source diagnostics and native projects; #81/#82 verified fixed. |
 | 21 | Logical project structure | 2 | ProgramLoader separates bounded graph resolution and scoped binding from syntax/backend emission. |
 | 22 | Readable and consistently formatted | 1 | Extensive raw instruction/platform emission remains, including packed SSE2. Expand named helpers (#23, open). |
 | 23 | Clear module responsibilities | 1 | Surface ownership improves separation; native expression parsing/validation/emission remain coupled. Add validated IR (#11/#23, open). |
@@ -50,15 +52,15 @@ The full native engine, selectable DXR/Embree, rich systems-language types, Forg
 | 28 | No unfinished placeholders | 1 | Surface/blending paths are real; required engine/target breadth remains unsupported (#5-11/#23, open). |
 | 29 | Configuration understandable | 2 | Selectors, qualifiers, aliases, root boundaries, graph limits and initialization restrictions documented. |
 | 30 | Conventions followed | 1 | Pixel/nonvolatile/stack/integer-addressing conventions verified; richer systems/foreign/object interfaces absent (#11/#23, open). |
-| 31 | Automated tests provided | 2 | 192 tests and extension0.1.12 grammar/package validation independently pass. |
-| 32 | Core tests covered | 1 | Provided suite misses private-reference forms and supplementary C literal paths. Add #81/#82 regressions; open. |
+| 31 | Automated tests provided | 2 | 194 tests and extension0.1.12 grammar/package validation independently pass. |
+| 32 | Core tests covered | 2 | Implemented subset covered by actual native/C execution, supplementary path/byte-literal checks and private call/array access rejection. |
 | 33 | Failure scenarios tested | 2 | Missing exports/qualifiers, arity, cycles, boundaries and runtime errors explicitly exercised. |
 | 34 | Edge cases explicitly tested | 2 | Same-basename aliases, private helpers/state, recursion, initialization once, quoted syntax and limits tested. |
 | 35 | Integration behavior tested | 1 | GDI/CPU integration passes; untouched OS mouse-coordinate dispatch remains unverified (#63, open). |
 | 36 | Documented test commands work | 2 | Documented unittest/npm/QA commands execute successfully. |
-| 37 | Builds and compilation pass | 2 | 192 provided tests, actual native/C executables, compileall and package checks pass; supplementary path failure is deducted under12. |
-| 38 | Results recorded accurately | 2 | Exact957ee12/71/192/323.089 evidence recorded; earlier independent/local evidence remains distinguished. |
-| 39 | Regression checks performed | 2 | Original192-test suite completed on immutable source without restart, including previous rendering/input/resource regressions. |
+| 37 | Builds and compilation pass | 2 | 194 tests, native/C executables, compileall and extension0.1.12 package checks pass. |
+| 38 | Results recorded accurately | 2 | Exact b76fc02/76/194 evidence recorded; local checks, previous71 review and historical snapshots distinguished. |
+| 39 | Regression checks performed | 2 | Original194-test suite completed on immutable source without restart, including previous rendering/input/resource regressions. |
 | 40 | Verified against original goal | 0 | Complete engine/Forge/OS acceptance unavailable; implement and verify full scope (#5-11/#14-15/#23, open). |
 | 41 | Installation instructions accurate | 2 | Python/native and MSVC routes match executable checks; extension installation documented. |
 | 42 | Setup reproducible | 1 | Prototype subset reproducible; full engine/Forge/OS setup absent (#11/#23, open). |
@@ -68,18 +70,18 @@ The full native engine, selectable DXR/Embree, rich systems-language types, Forg
 | 46 | Opens in intended environment | 1 | CLI/runtime/static extension validate; full editor/project/runtime workflow incomplete (#11/#23, open). |
 | 47 | Editor integration works | 1 | Extension0.1.12 grammar/VSIX pass; newer visible-editor behavior/advanced tooling unverified. Preserve installed0.1.4 (#24/#23). |
 | 48 | Deliverables organized | 2 | Loader, syntax helpers, examples, tests, extension and documentation organized. |
-| 49 | Limitations disclosed | 2 | Package/linking/runtime/optimization gaps disclosed; confirmed #81/#82 are open and tracked. |
+| 49 | Limitations disclosed | 2 | Remaining engine/package/linking/OS/optimization/tooling gaps disclosed; #81/#82 resolved with independent evidence. |
 | 50 | Practical for intended scope | 0 | Full intended engine/Forge/OS product incomplete; deliver remaining systems and acceptance projects (#5-11/#14-15/#23, open). |
-| | **Requirement fulfillment** | **11/20** | |
-| | **Functionality and reliability** | **15/20** | |
+| | **Requirement fulfillment** | **12/20** | |
+| | **Functionality and reliability** | **18/20** | |
 | | **Code quality and architecture** | **14/20** | |
-| | **Testing and verification** | **16/20** | |
+| | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **71/100** | Exact commit `957ee12`; FAIL against98. |
+| | **Total** | **76/100** | Exact commit `b76fc02`; FAIL against98. |
 
 ### Deduction details and follow-up
 
-Full independent review of957ee12:71/100 FAIL against98, categories11/15/14/16/15;192 tests passed in323.089s. Selective imports implemented, but #81 supplementary-Unicode C literal encoding and #82 private function/array reference bypass remain open. Full engine/Forge/OS/targets/types/backends/benchmarks/tooling and #63 remain incomplete. Goal stays active.
+Full independent review of b76fc02:76/100 FAIL against98, categories12/18/14/17/15;194 tests passed in 281.445s. Selective imports, qualified calls, private helpers/state and aliases verified; #81 supplementary C UTF-8 metadata and #82 private source-reference bypass independently fixed. Full native engine/Forge/OS/types/targets/actual ray backends/benchmarks/tooling and #63 remain incomplete. Goal stays active.
 
 Full scope deductions remain covered by #5–11/#14–15/#23/#24 and #63. Missing systems must be implemented and independently exercised; a green subset suite alone does not establish completion.
 
@@ -87,6 +89,7 @@ Full scope deductions remain covered by #5–11/#14–15/#23/#24 and #63. Missin
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
+| `b76fc02a1f6ea9ab24f7af004e8a0981ba249252` |76 /98 FAIL|194 tests in 281.445s; selective imports reviewed. #81/#82 independently verified fixed; no new finding; full goal remains incomplete.|
 | `957ee124402e0ba773971aaee24c48c8b277929a` |71 /98 FAIL|192 tests in 323.089s; selective imports reviewed. #81 residual and #82 private-reference bypass confirmed; both open.|
 | `68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2` |76 /98 FAIL|175 tests in218.389s; native literal Unicode text verified; no new finding.|
 | `139f9241a7af1c3a137d0f6408fab0bfb5141662` |76 /98 FAIL|169 tests in165.552s; both #79 failures verified fixed with110 extra full-frame guard cases.|
@@ -109,8 +112,7 @@ Full scope deductions remain covered by #5–11/#14–15/#23/#24 and #63. Missin
 Earlier reports and their complete rubric tables remain available in Git history. Previous resolved defects include QA arithmetic #44, local-array recursion #21, near-plane overflow #47, native numeric diagnostics #49/#52–54, flicker #57, Wiki #60, entry arguments #61 and fixture race #62. Their resolutions do not close broader capability gaps.
 
 
+
 ## Bug tracking
 
-#81 remains OPEN: /utf-8 fixes BMP encoding, but supplementary paths emit invalid C surrogate universal escapes. #82 OPEN: source references to compiler-private function/array names bypass selective exports/state isolation. Both have detailed reproduction, impact and acceptance criteria under Codex Bugs. Prior #79 remains verified fixed; #63 and broad #5–11/#14–15/#24 remain open. Complete inventory only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
-
-Current unscored follow-up: Unscored correction follow-up: #81 shared C UTF-8 byte literals replace JSON surrogate escapes for all source-path/project-title metadata; #82 guards all unbound source identifier references before binding. Fourteen selective tests pass locally in21.184s, including supplementary physical paths on both backends, byte-exact C strings/title compilation, and both-backend private call/array rejection. Full independent review pending; scored source957ee12 remains71/100 with192 tests323.089s.
+#81 and #82 independently VERIFIED FIXED on b76fc02: supplementary UTF-8 metadata compiles/reports correctly, and source cannot name private generated functions/arrays. Prior #79 stays verified fixed. #63 and broader #5–11/#14–15/#24/#23/#80 capability/verification gaps remain open. Confirmed findings retain detailed reproduction, impact and acceptance under Codex Bugs; user reports use Romans21216 - Bugs. Complete inventory only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
