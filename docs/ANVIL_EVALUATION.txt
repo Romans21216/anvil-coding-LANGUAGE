@@ -1,5 +1,123 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 Assessment date:2026-11-02
+Exact independently reviewed source: base 57101e5e517cbc533b94fa394dc0c9e7d419851f + compiler/test difflib SHA256 3f4b3b491c43b75a502ab76a46e785d6bd0716cc913de964896e268f8a7a63fc + non-test implementation difflib SHA256 17d6c2242467e1f97a964247e258b96962685002bc97682c5687f79b97f328f7 + original eight-path review SHA256 e7fe4e704c5693071deace3724f62dee1b9cb28d29dc8e8dba65f736c8866ee4 + post-record-sync eight-path SHA256 96150fc7c167fce8cc33abf4fade221d76f1a341d9c532444ca093b39ebab363
+Evaluator:final_review (independent full50; six-record parity recheck PASS)
+Score:79/100 — FAIL against98 after criterion38 record synchronization (reviewer's initial score78/100 before sync).
+Categories: requirements13/20; functionality/reliability19/20; architecture15/20; verification17/20; delivery15/20.
+Scores 1-50:
+01. 2/2 — Current #23 requirements and C-first direction were reviewed.
+02. 1/2 — Portability and full resource lifecycle remain incomplete.
+03. 1/2 — Implemented language works; complete engine and Forge/OS scope do not.
+04. 1/2 — Compiler, runtime, docs and extension exist; broad deliverables remain.
+05. 0/2 — Rich types, audio, GPU/DXR/Embree, broad assets/physics/networking, Forge/OS are absent or partial.
+06. 2/2 — Required .ANVL-to-C-to-MSVC-to-EXE path remains intact.
+07. 2/2 — Compatibility and backend boundaries are documented.
+08. 2/2 — Release linker GC and conditional engine/network roots match docs.
+09. 1/2 — Major engine and Forge/OS use cases remain unsupported.
+10. 1/2 — Useful prototype, not the full intended product.
+11. 2/2 — Targeted executable/build probes and paired output probe pass.
+12. 2/2 — Root selection and linker options have focused regressions.
+13. 1/2 — Forge, package, assembly, UEFI and kernel workflows remain absent.
+14. 2/2 — Tested compiler/build inputs are validated.
+15. 2/2 — Helper cleanup and unrelated sentinel-file preservation are tested.
+16. 2/2 — Focused linker/root cases pass.
+17. 2/2 — Invalid and unsupported input handling remains tested.
+18. 2/2 — No repeated-operation issue was found in the changed path.
+19. 2/2 — No new critical defect confirmed; helper collision fix is present.
+20. 2/2 — Compiler, C output, linker settings and tests integrate for this behavior.
+21. 2/2 — Compiler/build responsibilities remain understandable.
+22. 1/2 — Dense and inconsistent formatting remains a maintenance cost.
+23. 1/2 — Parsing, validation and emission remain coupled; validated IR is absent.
+24. 2/2 — Names are generally descriptive.
+25. 1/2 — Textual rewrites and repeated reference handling remain.
+26. 2/2 — Current build dependencies fit the Windows/MSVC target.
+27. 1/2 — Platform abstraction and package/object boundaries remain limited.
+28. 1/2 — Required engine and target breadth remains unfinished.
+29. 2/2 — Current build configuration is understandable.
+30. 2/2 — C/Win32 conventions fit this implementation.
+31. 2/2 — 240 full-suite tests pass on the candidate; reviewer ran 9 focused tests.
+32. 2/2 — Changed linker and code-generation paths have regressions.
+33. 2/2 — Build failure cleanup and root selection have focused coverage.
+34. 2/2 — Release/debug separation and string false-positive cases are tested.
+35. 1/2 — OS mouse-coordinate dispatch integration gap #63 remains open.
+36. 2/2 — QA arithmetic, compileall and diff checks pass.
+37. 2/2 — MSVC release probe succeeded with matching program output.
+38. 2/2 — Independent review initially scored1 while records described the previous candidate; record sync restores2.
+39. 2/2 — Full local suite plus reviewer targeted checks pass.
+40. 0/2 — Complete engine/Forge/OS acceptance remains incomplete.
+41. 2/2 — Current installation instructions remain accurate.
+42. 1/2 — Platform and package setup is still incomplete.
+43. 2/2 — C-first workflow is clear.
+44. 2/2 — Current design boundaries are documented.
+45. 2/2 — Troubleshooting and compiler/build documentation exist.
+46. 1/2 — Full editor, project and runtime workflows remain incomplete.
+47. 1/2 — Extension validation exists; newer visible verification is incomplete and installed0.1.4 stays unchanged.
+48. 2/2 — Files are organized; helper intermediates are isolated and cleaned.
+49. 2/2 — Major limitations are disclosed.
+50. 0/2 — Full engine and Forge/OS objective remains unverified.
+
+Implementation in this batch: release builds enable MSVC function/data COMDAT elimination (/Gy, /Gw, /OPT:REF) and GCC-compatible section GC. Generated console programs no longer root engine fixed-step setup; network cleanup is retained only when reachable Anvil code calls a network API. The runtime remains monolithic; this is link-time pruning, not a feature-package system.
+
+Verification: local full suite240 passed in310.826s on the candidate; independent reviewer ran9 targeted tests, all passing. compileall, QA arithmetic, strict UTF-8 JSON and diff checks pass. Independent paired MSVC probe: both variants print23; 142,848 bytes without synthetic old runtime roots versus143,360 bytes with them, a 512-byte difference in one sample. No broad CPU or efficiency claim. No new confirmed defect. Build helper ownership regression verifies a pre-existing output-adjacent sentinel survives.
+
+Remaining scope: beginner-friendly modular package/dependency system, full language and engine breadth, actual DXR/Embree backends, asset/audio and broader physics/networking, Forge/media formats, assembly/UEFI/OS capabilities and measured performance remain incomplete. #63 and full editor workflow gaps remain. User requirement inventory is maintained only in GitHub issue #23. Installed VS Code0.1.4 remains unchanged. Evaluation comment: https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583971959 (issue has71 comments). Candidate source commit 18ec564a53b79dc7577e804f78bf6a5cebeff7d1 is published to origin/main. Goal active.
+
+Independent 50-criterion review details:
+01. 2/2 — Current #23 requirements and C-first direction were reviewed.
+02. 1/2 — Portability and full resource lifecycle remain incomplete.
+03. 1/2 — Implemented language works; complete engine and Forge/OS scope do not.
+04. 1/2 — Compiler, runtime, docs and extension exist; broad deliverables remain.
+05. 0/2 — Rich types, audio, GPU/DXR/Embree, broad assets/physics/networking, Forge/OS are absent or partial.
+06. 2/2 — Required .ANVL-to-C-to-MSVC-to-EXE path remains intact.
+07. 2/2 — Compatibility and backend boundaries are documented.
+08. 2/2 — Release linker GC and conditional engine/network roots match docs.
+09. 1/2 — Major engine and Forge/OS use cases remain unsupported.
+10. 1/2 — Useful prototype, not the full intended product.
+11. 2/2 — Targeted executable/build probes and paired output probe pass.
+12. 2/2 — Root selection and linker options have focused regressions.
+13. 1/2 — Forge, package, assembly, UEFI and kernel workflows remain absent.
+14. 2/2 — Tested compiler/build inputs are validated.
+15. 2/2 — Helper cleanup and unrelated sentinel-file preservation are tested.
+16. 2/2 — Focused linker/root cases pass.
+17. 2/2 — Invalid and unsupported input handling remains tested.
+18. 2/2 — No repeated-operation issue was found in the changed path.
+19. 2/2 — No new critical defect confirmed; helper collision fix is present.
+20. 2/2 — Compiler, C output, linker settings and tests integrate for this behavior.
+21. 2/2 — Compiler/build responsibilities remain understandable.
+22. 1/2 — Dense and inconsistent formatting remains a maintenance cost.
+23. 1/2 — Parsing, validation and emission remain coupled; validated IR is absent.
+24. 2/2 — Names are generally descriptive.
+25. 1/2 — Textual rewrites and repeated reference handling remain.
+26. 2/2 — Current build dependencies fit the Windows/MSVC target.
+27. 1/2 — Platform abstraction and package/object boundaries remain limited.
+28. 1/2 — Required engine and target breadth remains unfinished.
+29. 2/2 — Current build configuration is understandable.
+30. 2/2 — C/Win32 conventions fit this implementation.
+31. 2/2 — 240 full-suite tests pass on the candidate; reviewer ran 9 focused tests.
+32. 2/2 — Changed linker and code-generation paths have regressions.
+33. 2/2 — Build failure cleanup and root selection have focused coverage.
+34. 2/2 — Release/debug separation and string false-positive cases are tested.
+35. 1/2 — OS mouse-coordinate dispatch integration gap #63 remains open.
+36. 2/2 — QA arithmetic, compileall and diff checks pass.
+37. 2/2 — MSVC release probe succeeded with matching program output.
+38. 2/2 — Independent review initially scored1 while records described the previous candidate; record sync restores2.
+39. 2/2 — Full local suite plus reviewer targeted checks pass.
+40. 0/2 — Complete engine/Forge/OS acceptance remains incomplete.
+41. 2/2 — Current installation instructions remain accurate.
+42. 1/2 — Platform and package setup is still incomplete.
+43. 2/2 — C-first workflow is clear.
+44. 2/2 — Current design boundaries are documented.
+45. 2/2 — Troubleshooting and compiler/build documentation exist.
+46. 1/2 — Full editor, project and runtime workflows remain incomplete.
+47. 1/2 — Extension validation exists; newer visible verification is incomplete and installed0.1.4 stays unchanged.
+48. 2/2 — Files are organized; helper intermediates are isolated and cleaned.
+49. 2/2 — Major limitations are disclosed.
+50. 0/2 — Full engine and Forge/OS objective remains unverified.
+
+Previous review history follows. The appended report below is historical; its score, 233-test evidence, and parity statements refer to the memory-budget candidate and not the current release-pruning candidate.
+
+ANVIL LANGUAGE AND ENGINE EVALUATION
+Assessment date:2026-11-02
 Exact independently reviewed source: base 87e23d6943028222619f9febe0ed970e8d1a7ed7 + source/test difflib SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c + implementation difflib SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac + all changed paths at review SHA256 caa73ca775bfd3ecca4aa1ef57e5c522cf39ae6d89b37d7333249ceedc514615
 Evaluator:final_review (independent full50 review; six-record parity recheck PASS)
 Score:79/100 — FAIL against98 after criterion38 record synchronization.
@@ -26,7 +144,7 @@ SUMMARY
 
 Focused record-only check at ba78d22 found one stale ancillary extension field in IMPLEMENTATION_STATUS.md: source0.1.11 instead of0.1.12 (#58). Corrected here; all50 scores, categories, exactb76fc02/76/194/281.445 evidence and remaining records passed. No source change or rescore; focused recheck passed at b752f41.
 -------
-Anvil is a real, early-stage domain-specific language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The primary compiler translates supported programs to C/MSVC; direct-native remains experimental. The latest C-first review scores this candidate79/100 after criterion38 record synchronization (independent six-record parity recheck PASS), with233 tests passed locally and independently. Project memory budgets now configure per-function array elements and aggregate recursive active-call storage in both backends. Generated C also prunes unreachable functions and unused global scalar/array declarations; runtime subsystems and optional packages are not selectively linked. The beginner-focused modular import design and Anvil-authored OS user layers are documented in issue #23 comments. The independent six-record parity recheck passed without a rescore. Published commit `b4e8a20ee511388123f4982001ac997c6c720e4f` closes issue #90 after independent verification. Evaluation comment: https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339. The wider engine/Forge/OS scope remains incomplete.
+Historical assessment for the prior project-memory-budget candidate: Anvil is an early-stage domain-specific language with its own syntax, parser, diagnostics, compiler, and runtime. That prior review scored79/100 with233 local and independent tests; project memory limits and generated-source dead-code elimination were the main changes. Its six-record parity check and publication at `b4e8a20ee511388123f4982001ac997c6c720e4f` applied only to that earlier candidate. The current release-pruning review and its evidence are recorded at the start of this file.
 
 The fairest description is a small game scripting language connected to a Windows software-rendering prototype. Its syntax is approachable and it has a working path from source to executable, including parameterized functions and numeric loops, but it is much closer to a learning project than to a complete game engine or mature language ecosystem.
 
