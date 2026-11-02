@@ -2,21 +2,19 @@
 
 ## Current reviewed candidate
 
-**Latest independent evaluation:** **79/100 - FAIL** against98 after record sync (raw77; criteria8 and38 restored to2).
+**Latest independent evaluation:** **79/100 — FAIL** against98 after record sync (raw78; criterion38 restored to2).
 
-Base f17498e709094573230c07c22de11278729e9858; source/test SHA256 fa614535072b589b80ce32146d44d91a046461c2fd7d26401f30f7c03f6affc2; runtime/build SHA256 fd0cb05bdc8b14824c6f8ca2bef5feef9f6c39f1bbb69b5f599498aee8919777; README/docs SHA256 adc351995a5ba3fbfe3c927963bbdb423e7366cbfa7fcc8c108cafeac3ae1fe5; all11-path SHA256 7ad64dd97eb0e90f9060fba1c2e0910513d651041ffba8a37ddf0bfa49aa2c70. Post-record-sync all11 hash: f4a8e4d7f5fe99c04cc37fe85bb93e60239f5632f1cee0793d6435498f50d548. Sorted UTF-8 difflib unified diff with three context lines; added physics file has empty base.
+Latest independent full50 review of `de68679f1f05a3a5db7b5eadbf20989e43321a76` against base `2a0f52306363d4bba3e51730148f899f42cc1474`: **78/100 raw, 79/100 after criterion38 record sync; FAIL against98**. Categories after sync:13/20 requirements,19/20 functionality,15/20 architecture,17/20 verification,15/20 delivery. Five-path diff SHA256 `c80724f6849b798a025bdfc8f59d77a211fb1bef18ce144113810740680d15f2` (all changed paths are compiler/runtime-module codegen and tests); implementation-only SHA256 `459ecd965c2f87e0d7f7194bd0dcd073b78620763ef29ef1b0d0f1db47d468a5`. Local full suite253/285.750s; independent full suite253/283.720s; compileall, npm extension validation, QA validator, strict JSON and diff checks pass. No reproducible defect found. Installed VS Code0.1.4 remains unchanged. Issue #23 evaluation comment [issuecomment-6585531493](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6585531493) posted; issue has74 comments. Registry-driven reachable module triggers are implemented. Goal remains active below98; packages/imports, renderer/core separation, full engine, DXR/Embree, Forge/media, OS/UEFI, portability, editor workflows and performance evidence remain incomplete.
 
-Source commit `028cfb2c72284b348a0c1282ba47bd01f69fe346` is published on origin/main; evaluation comment [#6585206519](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6585206519) posted (73 comments). Independent full suite250/255.521s; local full250/247.322s before a test-only literal update; focused authoring/build/module42/50.921s, six physics executable regressions6/13.093s, final literal case passes. Compileall/npm/QA/JSON/diff checks pass. VS Code0.1.4 unchanged. No runtime defect confirmed. Physics and networking are internal separate modules; packages and renderer/core separation remain incomplete.
+### Latest 50-criterion scoring
 
-## Latest 50-criterion scoring
+79/100 — FAIL against98 after record sync (raw78; criterion38 restored to2). Categories13/20,19/20,15/20,17/20,15/20.
 
-79/100 — FAIL against98 after six-record sync (raw77; criteria8 and38 restored to2). Categories13/19/15/17/15.
+Candidate base `2a0f52306363d4bba3e51730148f899f42cc1474`; five-path diff SHA256 `c80724f6849b798a025bdfc8f59d77a211fb1bef18ce144113810740680d15f2`; implementation-only SHA256 `459ecd965c2f87e0d7f7194bd0dcd073b78620763ef29ef1b0d0f1db47d468a5`. Sorted UTF-8 difflib unified diff with three context lines.
 
-Base f17498e709094573230c07c22de11278729e9858; source/test SHA256 fa614535072b589b80ce32146d44d91a046461c2fd7d26401f30f7c03f6affc2; runtime/build SHA256 fd0cb05bdc8b14824c6f8ca2bef5feef9f6c39f1bbb69b5f599498aee8919777; README/docs SHA256 adc351995a5ba3fbfe3c927963bbdb423e7366cbfa7fcc8c108cafeac3ae1fe5; all11 SHA256 7ad64dd97eb0e90f9060fba1c2e0910513d651041ffba8a37ddf0bfa49aa2c70. Post-record-sync all11 hash: f4a8e4d7f5fe99c04cc37fe85bb93e60239f5632f1cee0793d6435498f50d548. Sorted UTF-8 difflib unified diff with 3 context lines; added physics file base is empty.
+The compiler now evaluates runtime-module trigger patterns declared in the registry against reachable generated statements, emits stable module markers, and performs networking cleanup when networking is selected. Regression tests cover combined module selection and linker arguments. This is internal modularity; user-facing package resolution and renderer/core separation remain incomplete.
 
-The compiler selects separate networking and physics translation units only for reachable built-ins. This is internal modularity; package imports and renderer/core separation remain incomplete.
-
-Independent full suite250/255.521s; local full250/247.322s before a test-only literal update. Focused authoring/build/module42/50.921s, six physics executable tests6/13.093s and final literal case passed. Compileall/npm/QA/JSON/diff checks passed. VS Code0.1.4 unchanged.
+Local full suite253/285.750s; independent full suite253/283.720s. Compileall, npm extension validation, QA validator, strict JSON and diff checks pass. VS Code0.1.4 unchanged. Independent reviewer found no reproducible defect.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|---:|---|
@@ -50,14 +48,14 @@ Independent full suite250/255.521s; local full250/247.322s before a test-only li
 | 28 | unfinished scope | 1 | engine/target breadth incomplete |
 | 29 | configuration | 2 | build config clear |
 | 30 | conventions | 2 | C/Win32 fits |
-| 31 | automated tests | 2 | 247 local and 15 independent focused tests |
+| 31 | automated tests | 2 | Local253 and independent253 full-suite tests passed |
 | 32 | core tests | 2 | changed paths covered |
 | 33 | failure tests | 2 | invalid/non-network/UDP covered |
 | 34 | edge tests | 2 | duplicate/text false positives covered |
 | 35 | integration tests | 1 | #63 remains open |
 | 36 | test commands | 2 | QA/npm/compile/JSON/diff checks pass |
 | 37 | builds | 2 | MSVC UDP executable passes |
-| 38 | results recorded | 2 | criterion38 restored by record sync |
+| 38 | results recorded | 2 | Current independent full50 evaluation and exact source identity are synchronized |
 | 39 | regressions | 2 | local and focused regressions pass |
 | 40 | full goal | 0 | full acceptance incomplete |
 | 41 | installation | 2 | instructions match |
@@ -82,6 +80,8 @@ Independent full suite250/255.521s; local full250/247.322s before a test-only li
 Networking is separately compiled only when reachable. User-facing package resolution, other runtime module boundaries, broad engine/language, DXR/Embree, Forge, UEFI/OS, cross-platform, editor and measured performance requirements remain incomplete. Full inventory: GitHub issue #23.
 
 ## Review history
+
+| `de68679f1f05a3a5db7b5eadbf20989e43321a76` |79 /98 FAIL|Registry-driven runtime-module trigger patterns; 253 tests local285.750s and independent283.720s; raw78, criterion38 restored to79; no defect; evaluation comment6585531493.|
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
