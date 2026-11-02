@@ -74,13 +74,15 @@ Historical publication record for the prior project-memory-budget candidate: its
 
 ## Latest independent evaluation — optional image runtime module
 
+Issue #23 evaluation comment: [6588183804](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6588183804).
+
 **Reviewed candidate:** `9d69a44e563373e5085fb30445c29312ec793ed3` (base `513b1d02de3b599070d04324a8d3460300e40241`). **Independent full50 score: 78/100 raw; 79/100 after criterion 38 record synchronization — FAIL against 98.** Categories: requirements 13/20, functionality/reliability 19/20, architecture 15/20, testing/verification 17/20, delivery 15/20. No reproducible defect was found.
 
 - Full binary Git diff SHA256: `0c365af6b748171406d69b554485e8013eb1cc3c9c6f2edb6e1cf8baba614651`
 - All-text sorted unified diff SHA256: `f66d13c0eec7cc08a00281116e8ce7d3e831bb78763502a293067516d219e654`
 - Compiler/runtime/tests unified diff SHA256: `9ff18d6826b7b907558789a1de8f5505f6b4618cdbd393aa3b29e207d8d36ebd`
 - Documentation unified diff SHA256: `02273fa646348096ac1abdd91ef3fb44fad3e99a2a0e382c008648f3cbe2f7a1`
-- Local full suite: **266 tests passed in 366.905s**. Independent full suite: **266 tests passed in 416.764s**. Four focused image tests passed independently in 5.239s.
+- Local full suite: **266 tests passed in 366.905s**. Independent full suite: **266 tests passed in 416.764s**. Four focused image tests passed independently in 5.239s. Evaluation comment: [6588183804](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6588183804); issue #23 now has 76 comments.
 - The C build compiles `runtime/anvil_image.c` only when reachable Anvil image calls use it. Shutdown hooks release loaded image memory.
 - Full requirements remain in issue #23. User-facing packages, broad language/engine capabilities, DXR/Embree, Forge/media, OS/UEFI targets, portability, editor workflows, and measured performance remain incomplete. Goal stays active.
 
