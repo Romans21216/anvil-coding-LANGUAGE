@@ -5,28 +5,23 @@
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
   "current_active_item": null,
-  "current_active_item_status": "Continue the C-first compiler/engine roadmap in canonical issue #23. Full engine, Forge/OS, portability, actual ray backends, editor tooling, #63 evidence, and measured efficiency remain incomplete; current verified score78, below98.",
-  "current_candidate_commit": "6852275d86e43bf75da583961ad64d58aead2f08+source-diff-301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
-  "latest_verified_commit": "6852275d86e43bf75da583961ad64d58aead2f08+source-diff-301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
-  "last_pushed_reviewed_below_threshold_commit": "6852275d86e43bf75da583961ad64d58aead2f08+source-diff-301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
-  "latest_independently_reviewed_candidate_commit": "6852275d86e43bf75da583961ad64d58aead2f08+source-diff-301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
+  "current_active_item_status": "Continue the C-first compiler/engine roadmap in canonical issue #23. Ordinary function-call arguments now evaluate once, left-to-right; #86 independently verified fixed. Full engine, Forge/OS, portability, actual ray backends, editor tooling, #63 evidence, and measured efficiency remain incomplete; current verified score78, below98.",
+  "current_candidate_commit": "3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6",
+  "latest_verified_commit": "3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6",
+  "last_pushed_reviewed_below_threshold_commit": "3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6",
+  "latest_independently_reviewed_candidate_commit": "6e8d36512bb4ece27bd78ec68534ba6f3d8d9471+source-diff-8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Independent full50 review of frozen C-first candidate base 6852275d86e43bf75da583961ad64d58aead2f08, source/test diff SHA256 301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee, complete diff SHA256 0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3: 78/100 FAIL against98; categories13/18/15/17/15; 210 tests passed in219.067s. #83/#84/#85 fixed and independently verified; no new defect. C-first Anvil-to-C/MSVC-to-EXE remains required; direct-native parity optional. Engine/Forge/OS/types/media/targets/DXR/Embree/benchmarks/editor tooling and #63 remain incomplete; goal active.",
+  "latest_push_result": "Pushed reviewed C-first implementation commit 3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6 to origin/main. Full50 score78/100 remains below98; evaluation posted to #23 comment6579733436.",
   "latest_independent_review": {
-    "base_commit": "6852275d86e43bf75da583961ad64d58aead2f08",
-    "source_diff_sha256": "301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
-    "all_diff_sha256": "0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3",
+    "base_commit": "6e8d36512bb4ece27bd78ec68534ba6f3d8d9471",
+    "source_diff_sha256": "8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5",
+    "all_diff_sha256": "0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be",
     "file_sha256": {
-      "compiler/codegen.py": "7db5e287f9d0f6ea871696a2fa28dff1b7b99c40b596c65ffb76a670dfdacdbd",
-      "compiler/module_loader.py": "c7e5a4ab20cf33e213bc236e1f6e502ad98b37c137cc9e69dcdcc6e8c667823d",
-      "compiler/semantics.py": "98feced434cd454dfef92efd217e46698083488b8a388b9fb7a2b664841cb784",
-      "tests/test_authoring.py": "0564e9b1e1cb7e799b2881555cccf983284db85059152cdc9a19e4b370bf2cb1",
-      "docs/ANVIL_EVALUATION.txt": "ccd765699e48ecad27e075d767972a32f27619e723bbae3632ca4b6b05a1d07e",
-      "docs/CODEX_AUTONOMOUS_STATE.json": "bfe9a523f4d0b0c18e7a175ab17427e5eb994705a51db695f82cf8989f4820cd",
-      "docs/COMPLETION_MATRIX.md": "2e98db2959362a8a58a4213599dda26b86374dac0f41331260a1eead94649792",
-      "docs/IMPLEMENTATION_STATUS.json": "302951520a9652b467899aed8e4767bc26cf5624d38d990f9a5391bc9256bbf9",
-      "docs/IMPLEMENTATION_STATUS.md": "44a3eda0fe1cb003cbad3ac7b456670d25efe704b88fc96be20a668b352da1d0",
-      "docs/QA_REPORT.md": "b066ee926122421c65764f5924d8d3dd49b7f0ce5f41c59ff2329b146c0b72fe"
+      "compiler/codegen.py": "af14b478502533574e1ca995eb4ab94c456fe97f941bb7752f676ef244c45e77",
+      "compiler/expressions.py": "1d3e7ee90c552cad942b6036101bf00adc7a1003ffb77067bb58962d04791bc5",
+      "docs/LANGUAGE.md": "4f88ffa55b0b45415bc1c4d8739781638e3f3267e7545464042fc8819f3ae7c2",
+      "docs/LANGUAGE_SPEC.md": "961b4b68faa221df0d26fc03d09a734b78c952158aca41ea3897c9aabd7133c4",
+      "tests/test_authoring.py": "79247c1e02acd72b518ea0f6581b188e414d83e0db3cfef37b53c5b36d742011"
     },
     "score": 78,
     "threshold": 98,
@@ -91,20 +86,21 @@
       0
     ],
     "reviewer": "project_full_review",
-    "full_test_count": 210,
-    "full_test_seconds": 219.067,
+    "full_test_count": 213,
+    "full_test_seconds": 227.671,
     "full_test_result": "PASS",
     "full_test_command": "python -m unittest discover -s tests -q",
-    "full_test_session": 38008,
+    "full_test_session": 53099,
     "full_test_exit": 0,
-    "post_suite_issue23_comments": 60,
+    "post_suite_issue23_comments": 61,
     "verified_fixed": [
       79,
       81,
       82,
       83,
       84,
-      85
+      85,
+      86
     ],
     "new_findings": [],
     "source_extension": "0.1.13",
@@ -113,11 +109,12 @@
     "native_parity_required": false,
     "full_goal_complete": false,
     "findings": [
-      "210 passed in219.067s, independent full run, exit0 without restart",
-      "Issue #23 body and60 comments reread after tests; #80 reviewed",
-      "Nested callbacks and exactly-once source-order top-level evaluation pass default/release; handle capture precedes mutating arguments; unset callback exits2 at original line",
-      "Issues #83/#84/#85 and previous #79/#81/#82 independently verified fixed",
-      "Extension0.1.13 grammar/package and VSIX CRC/source parity, compileall, QA arithmetic, strict JSON and diff checks pass; installed0.1.4 unchanged"
+      "213 tests independently passed in227.671s, exit0 without restart",
+      "Issue #23 body and61 comments reread after tests; #80 reviewed",
+      "Nested ordinary calls154 and recursive caller-frame probe21034 pass default/release; display-hook seven groups/14 evaluations and temp collision diagnostic pass",
+      "Ordinary call argument evaluation is exactly once and left-to-right; #86 independently verified fixed",
+      "Issues #79/#81/#82/#83/#84/#85 remain fixed; no new confirmed finding",
+      "Extension/package/static checks pass; installed0.1.4 unchanged"
     ]
   },
   "previous_independent_review": {
@@ -245,11 +242,11 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "210 passed in219.067s, independent full run exit0",
+    "python_unittest": "213 passed in227.671s, independent full run exit0",
     "extension": "0.1.13 grammar/package and VSIX CRC/source parity passed; installed0.1.4 unchanged",
     "compileall": "passed",
-    "qa_report_validator": "78/100; all50 scores/category arithmetic pass",
-    "git_diff_check": "complete frozen diff passed"
+    "qa_report_validator": "78/100; 50 criteria/category arithmetic passed",
+    "git_diff_check": "passed"
   },
   "pending_documentation_review": null,
   "blocked_items": [
@@ -328,34 +325,35 @@
     82,
     83,
     84,
-    85
+    85,
+    86
   ],
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED",
-    "commit": "6852275d86e43bf75da583961ad64d58aead2f08+source-diff-301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
+    "commit": "6e8d36512bb4ece27bd78ec68534ba6f3d8d9471+source-diff-8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5",
     "reviewed_score": 78,
-    "previous_reviewed_score": 75,
-    "previous_review_commit": "6852275d86e43bf75da583961ad64d58aead2f08+source-diff-87f9eb7f498444d398bde80de9808a7c156a447ef9484740d35cd3d951f628eb",
+    "previous_reviewed_score": 78,
+    "previous_review_commit": "6e8d36512bb4ece27bd78ec68534ba6f3d8d9471+source-diff-301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "210 independently passed in219.067s",
+    "python_unittest": "213 independently passed in227.671s",
     "npm_test": "passed (0.1.13)",
     "compileall": "passed",
     "qa_report_validator": "78/100 current rubric",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "complete reviewed diff passed",
-    "finding": "No new finding. #83/#84/#85 independently verified fixed; full engine/Forge/OS/targets/types/actual accelerated backends/tooling/measurement and #63 remain incomplete."
+    "git_diff_check": "reviewed implementation diff passed",
+    "finding": "No new finding. #86 ordinary named-function argument ordering independently verified fixed; full engine/Forge/OS/targets/types/actual accelerated backends/tooling/measurement and #63 remain incomplete."
   },
-  "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6451810775",
+  "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6579733436",
   "resolved_critic_issue_48": "Fixed strict UTF-8 JSON serialization and synchronized the evaluation SHA to reviewed commit d757c79; strict JSON parsing and QA arithmetic pass in the follow-up snapshot.",
   "resolved_user_reported_issues": [
     57
   ],
-  "current_candidate_status": "Independent full50 review of frozen C-first candidate base 6852275d86e43bf75da583961ad64d58aead2f08, source/test diff SHA256 301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee, complete diff SHA256 0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3: 78/100 FAIL against98; categories13/18/15/17/15; 210 tests passed in219.067s. #83/#84/#85 fixed and independently verified; no new defect. C-first Anvil-to-C/MSVC-to-EXE remains required; direct-native parity optional. Engine/Forge/OS/types/media/targets/DXR/Embree/benchmarks/editor tooling and #63 remain incomplete; goal active.",
+  "current_candidate_status": "Independent full50 review of C-first implementation base 6e8d36512bb4ece27bd78ec68534ba6f3d8d9471, source/test diff SHA256 8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5, complete diff SHA256 0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be, implementation commit 3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6: 78/100 FAIL against98; categories13/18/15/17/15; 213 independent tests passed in227.671s. #83–#86 verified fixed; no new finding. C-first Anvil-to-C/MSVC-to-EXE remains primary; direct-native parity is optional. Full engine, Forge/OS, portability, selectable accelerated ray backends, editor tooling, #63 and measured efficiency remain incomplete.",
   "current_unscored_followup": {
-    "summary": "Continue remaining C-first implementation requirements in issue #23; prioritize shared expression/symbol representation and next missing engine capability, then full tests and independent full50 evaluation.",
+    "summary": "Continue remaining C-first implementation requirements in issue #23; next prioritize shared validated expression representation and a missing engine capability, then run full tests and independent full50 evaluation.",
     "status": "pending implementation",
-    "reviewed_base_commit": "6852275d86e43bf75da583961ad64d58aead2f08",
+    "reviewed_base_commit": "3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6",
     "score": 78
   },
   "open_coordinate_integration_issue": 63,
@@ -363,20 +361,20 @@
   "resolved_critic_issue_81": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Shared valid C UTF-8 metadata literals preserve supplementary source filenames and runtime physical locations; both backends and byte-exact payload/title compilation verified.",
   "resolved_critic_issue_82": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Quote-aware validation of every unbound source identifier reference rejects private calls/array reads/writes before binding; generated references and literals remain valid.",
   "latest_record_parity_check": {
-    "commit": "b91395576e86d25cdd875a6a57db2bc3d2b453d3",
+    "commit": "3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6",
     "result": "PASS",
-    "reviewed_implementation": "b91395576e86d25cdd875a6a57db2bc3d2b453d3",
+    "reviewed_implementation": "3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6",
     "score_unchanged": 78,
-    "summary": "Focused six-record parity PASS: ANVIL_EVALUATION.txt, QA_REPORT.md, IMPLEMENTATION_STATUS.md, COMPLETION_MATRIX.md, IMPLEMENTATION_STATUS.json, and CODEX_AUTONOMOUS_STATE.json agree on source base 6852275d plus source diff 301855e2, score78/100 against98, categories13/18/15/17/15, all50 criterion scores,210 passing tests in219.067s, fixed issues #83/#84/#85, optional native parity, and open engine/Forge/OS/#63 work. Strict UTF-8 JSON and QA arithmetic pass. The reviewed implementation has been committed at b91395576e86d25cdd875a6a57db2bc3d2b453d3; documentation-only parity synchronization makes no implementation change or rescore."
+    "summary": "Six-record evaluation parity PASS: ANVIL_EVALUATION.txt, QA_REPORT.md, IMPLEMENTATION_STATUS.md, COMPLETION_MATRIX.md, IMPLEMENTATION_STATUS.json and CODEX_AUTONOMOUS_STATE.json agree on the reviewed source base/diff, 78/100 against98, categories13/18/15/17/15, all50 scores, 213 tests in227.671s, verified fixed issue #86, C-first requirements and remaining scope. Strict UTF-8 JSON and QA arithmetic pass. Source implementation commit 3cfb5b93 is frozen and independently reviewed; record synchronization does not change its source diff or rescore."
   },
   "latest_evaluation": {
     "score": 78,
     "threshold": 98,
     "result": "FAIL",
-    "commit": "6852275d86e43bf75da583961ad64d58aead2f08+source-diff-301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
-    "base_commit": "6852275d86e43bf75da583961ad64d58aead2f08",
-    "source_diff_sha256": "301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
-    "all_diff_sha256": "0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3",
+    "commit": "6e8d36512bb4ece27bd78ec68534ba6f3d8d9471+source-diff-8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5",
+    "base_commit": "6e8d36512bb4ece27bd78ec68534ba6f3d8d9471",
+    "source_diff_sha256": "8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5",
+    "all_diff_sha256": "0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be",
     "categories": {
       "requirements": "13/20",
       "functionality": "18/20",
@@ -437,22 +435,23 @@
       0
     ],
     "findings": [
-      "210 passed in219.067s, independent full run, exit0 without restart",
-      "Issue #23 body and60 comments reread after tests; #80 reviewed",
-      "Nested callbacks and exactly-once source-order top-level evaluation pass default/release; handle capture precedes mutating arguments; unset callback exits2 at original line",
-      "Issues #83/#84/#85 and previous #79/#81/#82 independently verified fixed",
+      "213 independently passed in227.671s, exit0 without restart",
+      "Issue #23 body and61 comments reread after tests; #80 reviewed",
+      "Ordinary nested function calls preserve left-to-right exactly-once argument evaluation; recursion and display-hook probes pass default/release",
+      "Generated temporaries and collisions are source-located and validated; issues #83/#84/#85 and prior #79/#81/#82 remain verified fixed",
       "Extension0.1.13 grammar/package and VSIX CRC/source parity, compileall, QA arithmetic, strict JSON and diff checks pass; installed0.1.4 unchanged"
     ],
-    "full_test_count": 210,
-    "full_test_seconds": 219.067,
+    "full_test_count": 213,
+    "full_test_seconds": 227.671,
     "full_test_result": "PASS",
     "new_findings": []
   },
-  "latest_followup_status_change": "Independent full50 review of frozen C-first candidate base 6852275d86e43bf75da583961ad64d58aead2f08, source/test diff SHA256 301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee, complete diff SHA256 0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3: 78/100 FAIL against98; categories13/18/15/17/15; 210 tests passed in219.067s. #83/#84/#85 fixed and independently verified; no new defect. C-first Anvil-to-C/MSVC-to-EXE remains required; direct-native parity optional. Engine/Forge/OS/types/media/targets/DXR/Embree/benchmarks/editor tooling and #63 remain incomplete; goal active.",
-  "latest_independent_candidate_result": "Independent full50 review of frozen C-first candidate base 6852275d86e43bf75da583961ad64d58aead2f08, source/test diff SHA256 301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee, complete diff SHA256 0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3: 78/100 FAIL against98; categories13/18/15/17/15; 210 tests passed in219.067s. #83/#84/#85 fixed and independently verified; no new defect. C-first Anvil-to-C/MSVC-to-EXE remains required; direct-native parity optional. Engine/Forge/OS/types/media/targets/DXR/Embree/benchmarks/editor tooling and #63 remain incomplete; goal active.",
+  "latest_followup_status_change": "Independent full50 review of C-first candidate base 6e8d36512bb4ece27bd78ec68534ba6f3d8d9471, source/test diff SHA256 8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5, complete diff SHA256 0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be; 78/100 FAIL against98; 213 tests passed in227.671s; no new finding; #86 ordinary-call ordering independently verified fixed.",
+  "latest_independent_candidate_result": "Independent full50 review of C-first candidate base 6e8d36512bb4ece27bd78ec68534ba6f3d8d9471, source/test diff SHA256 8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5, complete diff SHA256 0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be; 78/100 FAIL against98; 213 tests passed in227.671s; no new finding; #86 ordinary-call ordering independently verified fixed.",
   "latest_evaluation_score": 78,
   "latest_independent_candidate_score": 78,
-  "latest_independently_scored_candidate_commit": "6852275d86e43bf75da583961ad64d58aead2f08+source-diff-301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee",
+  "latest_independently_scored_candidate_commit": "6e8d36512bb4ece27bd78ec68534ba6f3d8d9471+source-diff-8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5",
   "open_critic_issues": [],
-  "required_evaluation_score": 98
+  "required_evaluation_score": 98,
+  "resolved_critic_issue_86": "Independently verified fixed on3cfb5b9. Ordinary user-defined calls evaluate arguments exactly once, left-to-right through per-scope C temporaries; nested expressions, top-level calls, recursion, display hook expressions, generated-name collision diagnostics, and default/release builds pass. Issue #86 closed after 213-test independent full suite and full50 review; no new finding."
 }

@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-11-02
-**Latest independent evaluation:** **78/100 - FAIL** on base `6852275d86e43bf75da583961ad64d58aead2f08`, source/test diff SHA256 `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`, complete diff SHA256 `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`.
+**Latest independent evaluation:** **78/100 - FAIL** on base `6e8d36512bb4ece27bd78ec68534ba6f3d8d9471`, source/test diff SHA256 `8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5`, complete diff SHA256 `0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be`. Reviewed implementation commit `3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6`.
 **Current passing threshold:** 98/100. Historical scores do not establish current full-goal completion.
 **Evaluator:** separate `project_full_review` agent, full 50-criterion review.
 
@@ -9,15 +9,15 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 
 ## Independent verification for this snapshot
 
-- Exact review source: base `6852275d86e43bf75da583961ad64d58aead2f08`, source/test diff SHA256 `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`, complete diff SHA256 `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`; per-file hashes are recorded in both structured status JSON documents.
-- `python -m unittest discover -s tests -q`: **210 passed**,219.067 seconds, original review session without restart.
+- Exact review source: base `6e8d36512bb4ece27bd78ec68534ba6f3d8d9471`, source/test diff SHA256 `8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5`, complete diff SHA256 `0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be`; per-file hashes are recorded in both structured status JSON documents.
+- `python -m unittest discover -s tests -q`: **213 passed**,227.671 seconds, original independent review session without restart.
 - VS Code extension0.1.13 grammar tests, VSIX CRC/source parity, compileall, QA arithmetic, strict UTF-8 JSON, and `git diff --check` passed.
 - Independent release probes: copied15-argument callback returned1120; supplementary-Unicode metadata survived release build and inspection. Installed extension0.1.4 remained unchanged.
-- Prior #79/#81/#82 regressions passed. Reviewer reread #23 plus60 comments and #80 after tests. Direct-native parity is not required by the C-first goal.
-- Issues #83, #84 and #85 are fixed and independently verified. Top-level callback calls now share ordered lowering with function-body calls. Default/release tests verify left-to-right and exactly-once argument evaluation, nested callbacks, handle capture before callback-storage mutation, and source-located unset-callback errors. No new defect was found.
+- Prior #79/#81/#82 regressions passed. Reviewer reread #23 plus61 comments and #80 after tests. Direct-native parity is not required by the C-first goal.
+- Issues #83–#86 are fixed and independently verified. Ordinary named-function calls now use ordered expression temporaries in C lowering. Independent probes verified nested calls and recursion in default/release, display-hook evaluation across seven call groups, and source-located temporary-collision rejection. Existing callback ordering, handle capture and unset-callback tests pass. No new defect was found.
 - Untouched OS mouse-coordinate dispatch gap #63 remains disclosed. No new extension installation or global input was performed.
 
-## Latest 50-criterion scoring — base `6852275d` plus source/test diff `301855e2`
+## Latest 50-criterion scoring — base `6e8d3651` plus source/test diff `8f158a13`
 
 **78/100 — FAIL against98.** Categories: requirements13/20; functionality/reliability18/20; architecture15/20; verification17/20; delivery15/20.
 
@@ -30,19 +30,19 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | 5 | No essential feature missing | 0 | Rich types, audio, GPU/DXR/Embree, broader assets/physics/networking and Forge/OS remain absent or partial. |
 | 6 | Stated constraints respected | 2 | Inspectible C→MSVC→EXE is the required path; no silent backend change. |
 | 7 | Ambiguity resolved logically | 2 | Version 1 compatibility, version 2 scope and optional native limits are explicit. |
-| 8 | Behavior matches documentation | 2 | #83/#84/#85 corrected; top-level and in-function callback argument order, nested calls, and handle capture are independently verified. |
+| 8 | Behavior matches documentation | 2 | #83–#86 corrected; ordinary call argument order, callback handle capture, nested calls, and documented exactly-once semantics are independently verified. |
 | 9 | Important use cases supported | 1 | Major engine and Forge/OS workflows remain unsupported. |
 | 10 | Usable for intended purpose | 1 | Useful prototype; full production purpose remains incomplete. |
 | 11 | Core functionality works | 1 | Primary C build and implemented language/runtime subset pass. |
-| 12 | Secondary functionality works | 2 | Callback and selective-module compositions pass default/release probes, including side effects and nested calls. |
+| 12 | Secondary functionality works | 2 | Ordinary and callback compositions pass default/release probes, including side effects, nested calls, recursion, and display lowering. |
 | 13 | Primary workflows functional | 1 | Forge/package/assembly/UEFI/kernel workflows remain absent. |
 | 14 | Inputs validated | 2 | Invalid references, roots, arity, budgets and domains are checked. |
 | 15 | Errors handled gracefully | 2 | Runtime/compile failures produce controlled diagnostics in tested cases. |
 | 16 | Edge cases covered | 2 | Unicode, numeric, bounds, allocation, clipping and lifetime regressions pass. |
 | 17 | Invalid inputs controlled | 2 | Malformed inputs and unsupported features are rejected in tested paths. |
 | 18 | Stable across repeated operations | 2 | Runtime resource, repeated-operation and recursion tests pass. |
-| 19 | No known critical defects | 2 | No confirmed critical defect remains; issues #83–#85 are fixed and independently verified. |
-| 20 | Components integrate | 2 | Top-level and function-body callback calls now share ordered lowering; verified handle capture and diagnostics. |
+| 19 | No known critical defects | 2 | No confirmed critical defect remains; issues #83–#86 are fixed and independently verified. |
+| 20 | Components integrate | 2 | Ordinary and callback calls use ordered lowering; generated temporary declarations, display composition, recursion and collision diagnostics pass. |
 | 21 | Logical project structure | 2 | Compiler phase and runtime modules have clear responsibilities. |
 | 22 | Readable and consistently formatted | 1 | Dense one-line and inconsistent formatting in new parser/codegen changes hinders maintenance. |
 | 23 | Clear module responsibilities | 1 | Expression parsing, validation and emission remain coupled; add validated IR. |
@@ -53,19 +53,19 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | 28 | No unfinished placeholders | 1 | Required engine and target breadth remains unsupported. |
 | 29 | Configuration understandable | 2 | Selectors, qualifiers, aliases and project boundaries are explicit. |
 | 30 | Conventions followed | 2 | C/Win32 workflow matches current conventions; broader system interfaces remain absent. |
-| 31 | Automated tests provided | 2 | 210 tests and extension0.1.13 checks pass. |
+| 31 | Automated tests provided | 2 | 213 tests and extension0.1.13 checks pass. |
 | 32 | Core tests covered | 2 | Implemented behavior is covered by executable C/native tests. |
 | 33 | Failure scenarios tested | 2 | Missing exports, arity, cycles, boundaries and runtime errors are exercised. |
 | 34 | Edge cases explicitly tested | 2 | Aliases, private helpers/state, recursion, initialization, text and limits are tested. |
 | 35 | Integration behavior tested | 1 | OS mouse-coordinate dispatch coverage #63 remains open. |
 | 36 | Documented test commands work | 2 | Documented unittest/npm/QA commands execute successfully. |
-| 37 | Builds and compilation pass | 2 | C/native executable builds, compileall and package checks pass. |
+| 37 | Builds and compilation pass | 2 | C/MSVC executable builds, compileall and package checks pass. |
 | 38 | Results recorded accurately | 2 | Exact source, score, test timing, previous baseline and current finding are distinguished. |
-| 39 | Regression checks performed | 2 | Full210-test run completed on the immutable reviewed source. |
+| 39 | Regression checks performed | 2 | Full213-test run completed on the immutable reviewed source. |
 | 40 | Verified against original goal | 0 | Full engine/Forge/OS acceptance remains incomplete; passing subsets do not prove completion. |
 | 41 | Installation instructions accurate | 2 | Current C/MSVC and extension instructions are accurate. |
 | 42 | Setup reproducible | 1 | Full target/platform/package setup remains incomplete. |
-| 43 | Usage understandable | 2 | C-first build, metadata, v2 variables and callback usage are documented. |
+| 43 | Usage understandable | 2 | C-first build, metadata, v2 variables, callback usage and source-order function arguments are documented. |
 | 44 | Design decisions documented | 2 | Compatibility and feature boundaries are described. |
 | 45 | Troubleshooting available | 2 | Compiler/include/runtime guides include limits and diagnostics. |
 | 46 | Opens in intended environment | 1 | Full editor/project/runtime workflows remain incomplete. |
@@ -78,11 +78,11 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | | **Code quality and architecture** | **15/20** | |
 | | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **78/100** | Base `6852275d` plus source/test diff `301855e2`; FAIL against98. |
+| | **Total** | **78/100** | Base `6e8d3651` plus source/test diff `8f158a13`; FAIL against98. |
 
 ### Deduction details and follow-up
 
-Issues #83/#84/#85 are fixed and independently verified. The top-level emitter now routes all top-level calls through shared `emit_nodes` lowering. Tests cover the original expected12/actual21 case in default/release, nested side effects (independent default/release output212), callback-handle capture before argument code changes callback storage (56), and unset callbacks exiting2 at original source line6. No new defect was confirmed.
+Issues #83–#86 are fixed and independently verified. Ordinary named-function calls now capture each argument in ordered compiler temporaries before invocation. The new executable tests cover the original expected12/actual21 case in default/release, function-body and top-level contexts, v1/v2 sources, and generated-name conflicts. Independent probes additionally verify nested ordinary calls, recursive frame preservation (21034), seven display call groups/14 evaluations, and display temporary collision diagnostics. Existing callback handle mutation and unset-callback tests pass. No new defect was confirmed.
 
 Other deductions remain open: complete #23 engine/media/networking/runtime/tooling/Forge/OS outputs; actual selectable DXR/Embree; platform/resource workflows and benchmark evidence; untouched #63 integration coverage; editor build/debug/navigation; expression IR and centralized structured binding; normalize new parser/codegen formatting. Direct-native parity is optional under the updated C-first direction.
 
@@ -92,6 +92,8 @@ The numeric score is an exact snapshot result. The C-first implementation is not
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
+| Base `6e8d3651` plus source/test diff `8f158a13…` |78 /98 FAIL|213 tests in227.671s; #86 ordinary argument-order issue verified fixed; no new finding.|
+| Base `6e8d3651` plus source/test diff `8f158a13…` |78 /98 FAIL|213 tests in227.671s; #86 fixed; no new finding.|
 | Base `6852275d` plus source/test diff `301855e2…` |78 /98 FAIL|210 tests in219.067s; #83–#85 fixed; no new finding.|
 | Base `6852275d` plus source/test diff `87f9eb7f…` |75 /98 FAIL|208 tests in215.487s; #83/#84 fixed; #85 was confirmed and later fixed.|
 | Base `6852275d` plus diff `9ec495ff…` |75 /98 FAIL|206 tests in216.413s; #83 fixed; #84 confirmed; historical snapshot.|
@@ -131,4 +133,4 @@ Focused independent record-only recheck at b752f41: PASS. All six current record
 
 ## Latest independent review identity
 
-Base `6852275d86e43bf75da583961ad64d58aead2f08`; source/test diff SHA256 `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`; complete diff SHA256 `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`. The independent full suite passed210 tests in219.067s. #83/#84/#85 are resolved; no new finding.
+Base `6e8d36512bb4ece27bd78ec68534ba6f3d8d9471`; source/test diff SHA256 `8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5`; complete diff SHA256 `0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be`; implementation commit `3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6`. The independent full suite passed213 tests in227.671s. Issues #83–#86 are resolved; no new finding.

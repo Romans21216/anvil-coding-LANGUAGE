@@ -2,7 +2,7 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated2026-11-02. Latest independent candidate: base `6852275d86e43bf75da583961ad64d58aead2f08`, source/test diff `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`, complete diff `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`; **78/100 FAIL against98**, 210 tests in219.067s; categories13/18/15/17/15. Reviewer reread #23 and60 comments after testing. #83/#84/#85 fixed; no new finding. C-first pipeline primary; direct-native parity optional. Engine/Forge/OS/types/targets/actual ray backends/benchmarks/tooling and #63 remain incomplete. Goal active.
+Updated2026-11-02. Latest independent candidate: base `6e8d36512bb4ece27bd78ec68534ba6f3d8d9471`, source/test diff `8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5`, complete diff `0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be`; implementation commit `3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6`; **78/100 FAIL against98**, 213 tests in227.671s; categories13/18/15/17/15. Reviewer reread #23 and61 comments after testing. #83–#86 fixed; no new finding. C-first pipeline primary; direct-native parity optional. Engine/Forge/OS/types/targets/actual ray backends/benchmarks/tooling and #63 remain incomplete. Goal active.
 
 The primary build translates `.ANVL` to inspectable C and invokes MSVC to compile and link the executable. The direct AMD64/PE path is an optional experiment for numeric functions, checked arrays, source includes, a limited 2D surface, input, and procedural math. It is not a prerequisite for C-backend features. Engine breadth, Forge/media/OS targets, actual DXR/Embree backends, richer types, portability, measurements, and #63 remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [experimental native backend](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 
@@ -56,7 +56,7 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 
 ## Latest independent review snapshot
 
-Frozen candidate: base `6852275d86e43bf75da583961ad64d58aead2f08`, source/test diff SHA256 `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`, full diff SHA256 `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`; 78/100 (13/18/15/17/15), below98. Independent full suite:210 passed in219.067s. #83/#84/#85 fixed; no new finding. The full rubric is in `QA_REPORT.md`; the complete requirements list remains only in #23.
+Frozen candidate: base `6e8d36512bb4ece27bd78ec68534ba6f3d8d9471`, source/test diff SHA256 `8f158a13575fcaefcef4e692a0c84fb47e260a93aaae2f51737ae7a7e46ffcf5`, full diff SHA256 `0256b7b93b0109f54c3bfcdddc166396a467adcaf0380f872e2b083802ec82be`; implementation commit `3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6`; 78/100 (13/18/15/17/15), below98. Independent full suite:213 passed in227.671s. #83–#86 fixed; no new finding. Ordinary function-call arguments are sequenced left-to-right, including nested calls. The full rubric is in `QA_REPORT.md`; the complete requirements list remains only in #23.
 
 ## Audit policy
 
