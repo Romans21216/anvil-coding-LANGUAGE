@@ -1,69 +1,78 @@
 ANVIL LANGUAGE AND ENGINE — INDEPENDENT EVALUATION
-Date:2026-11-02
+Date: 2026-11-02
 
-Latest independent full50 review of `de68679f1f05a3a5db7b5eadbf20989e43321a76` against base `2a0f52306363d4bba3e51730148f899f42cc1474`: **78/100 raw, 79/100 after criterion38 record sync; FAIL against98**. Categories after sync:13/20 requirements,19/20 functionality,15/20 architecture,17/20 verification,15/20 delivery. Five-path diff SHA256 `c80724f6849b798a025bdfc8f59d77a211fb1bef18ce144113810740680d15f2` (all changed paths are compiler/runtime-module codegen and tests); implementation-only SHA256 `459ecd965c2f87e0d7f7194bd0dcd073b78620763ef29ef1b0d0f1db47d468a5`. Local full suite253/285.750s; independent full suite253/283.720s; compileall, npm extension validation, QA validator, strict JSON and diff checks pass. No reproducible defect found. Installed VS Code0.1.4 remains unchanged. Issue #23 evaluation comment [issuecomment-6585531493](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6585531493) posted; issue has74 comments. Registry-driven reachable module triggers are implemented. Goal remains active below98; packages/imports, renderer/core separation, full engine, DXR/Embree, Forge/media, OS/UEFI, portability, editor workflows and performance evidence remain incomplete.
+**Reviewed candidate:** `261ac261a31531bbce7702925358e9ac441a5b8f` (base `be4298fac4e6d9a9ecbfd1c8d482ee12119b61e6`). **Independent full50 score: 78/100 raw; 79/100 after criterion 38 record synchronization — FAIL against 98.** Categories: requirements 13/20, functionality/reliability 19/20, architecture 15/20, testing/verification 17/20, delivery 15/20. No reproducible defect was found. Independent six-record parity recheck passed. Evaluation comment: [6587174893](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6587174893); issue #23 now has75 comments.
+
+- Full binary Git diff SHA256: `f277470b9c7ac322957efb191eea9708354fde1d9319195c649690d24c9254c6`
+- Text-only sorted unified diff SHA256 (16 UTF-8 text paths): `1e8c4e516e7292e0aaaf1bb03e4ff9f7bb5fdf5964464e0dccfd9d0beca03bed`
+- Compiler/runtime/tests sorted unified diff SHA256 (10 paths): `9321b2269c2627dab800ec8acb960ba3e8386c5a11f3136b0ad37a48267e5c3b`
+- Local full suite: **263 tests passed in 296.308s**.
+- Independent targeted checks: **33 passed**; independent full-suite rerun was not performed. C and native numeric demo builds each printed `17`; compileall, extension validation, QA validator, strict JSON and exact-commit diff checks passed.
+- New packet API provides bounded, versioned, validated, sequenced UDP packets for one peer; it does not provide reliability, multi-peer management, authentication or encryption. Windows source/project associations and PE resources were verified locally; the reviewer did not run the registry installer or visually inspect Explorer icons. Installed VS Code 0.1.4 remains unchanged.
+- Full requirements stay in GitHub issue #23. Package/plugin imports, broad engine/language work, DXR/Embree, Forge/media, OS/UEFI, portability, editor workflows and measured performance remain incomplete. Goal remains active.
 
 Full 50-criterion review
 
-| # | Criterion | Score | Evidence / remaining work |
+| # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|---:|---|
-| 1 | requirements identified | 2/2 | current #23 and C-first reviewed |
-| 2 | implicit requirements | 1/2 | portability/lifecycle incomplete |
-| 3 | functionality | 1/2 | engine/Forge/OS incomplete |
-| 4 | deliverables | 1/2 | broad deliverables absent |
-| 5 | essential features | 0/2 | many requested systems absent |
-| 6 | constraints | 2/2 | ANVL-C-MSVC-EXE preserved |
-| 7 | ambiguity | 2/2 | backend boundaries clear |
-| 8 | documentation parity | 2/2 | networking/physics module selection matches docs |
-| 9 | use cases | 1/2 | major use cases unsupported |
-| 10 | intended purpose | 1/2 | prototype only |
-| 11 | core functionality | 2/2 | MSVC UDP host executable passed |
-| 12 | secondary functionality | 2/2 | network integration tests pass |
-| 13 | primary workflows | 1/2 | Forge/package/UEFI/kernel absent |
-| 14 | input validation | 2/2 | markers/build arguments validated |
-| 15 | error handling | 2/2 | network setup/receive pass |
-| 16 | edge coverage | 2/2 | duplicate/unknown/text false positives covered |
-| 17 | invalid inputs | 2/2 | unknown marker errors explicit |
-| 18 | repeat stability | 2/2 | full suite passes locally |
-| 19 | critical defects | 2/2 | no new runtime defect |
-| 20 | integration | 2/2 | compiler/runtime integrate |
-| 21 | project structure | 2/2 | files organized |
-| 22 | formatting | 1/2 | formatting debt remains |
-| 23 | module responsibilities | 1/2 | most runtime/compiler phases coupled |
-| 24 | naming | 2/2 | names descriptive |
-| 25 | duplication | 1/2 | binding/reference duplication |
-| 26 | dependencies | 2/2 | Windows/MSVC deps tested |
-| 27 | extensibility | 1/2 | registry internal; packages absent |
-| 28 | unfinished scope | 1/2 | engine/target breadth incomplete |
-| 29 | configuration | 2/2 | build config clear |
-| 30 | conventions | 2/2 | C/Win32 fits |
-| 31 | automated tests | 2/2 | Local253 and independent253 full-suite tests pass |
-| 32 | core tests | 2/2 | changed paths covered |
-| 33 | failure tests | 2/2 | invalid/non-network/UDP covered |
-| 34 | edge tests | 2/2 | duplicate/text false positives covered |
-| 35 | integration tests | 1/2 | #63 remains open |
-| 36 | test commands | 2/2 | QA/npm/compile/JSON/diff checks pass |
-| 37 | builds | 2/2 | MSVC UDP executable passes |
-| 38 | results recorded | 2/2 | Independent full50 result, exact commit, hashes and tests recorded; criterion38 restored after sync |
-| 39 | regressions | 2/2 | local and focused regressions pass |
-| 40 | full goal | 0/2 | full acceptance incomplete |
-| 41 | installation | 2/2 | instructions match |
-| 42 | reproducibility | 1/2 | platform/package setup incomplete |
-| 43 | usage | 2/2 | C-first/reuse documented |
-| 44 | design documentation | 2/2 | boundaries documented |
-| 45 | troubleshooting | 2/2 | troubleshooting exists |
-| 46 | editor workflow | 1/2 | editor/project workflows incomplete |
-| 47 | editor integration | 1/2 | installed0.1.4 preserved; new visible verification absent |
-| 48 | organization | 2/2 | files organized |
-| 49 | limitations | 2/2 | limitations disclosed |
-| 50 | practical scope | 0/2 | full goal remains unverified |
-| | Requirements | 13/20 | |
-| | Functionality/reliability | 19/20 | |
-| | Architecture | 15/20 | |
-| | Verification | 17/20 | |
-| | Delivery | 15/20 | |
-| | **Total** | **79/100** | FAIL against98 |
+| 1 | requirements identified | 2 | requirements reviewed against project objective and issue #23 |
+| 2 | implicit requirements | 1 | portability and lifecycle expectations remain incomplete |
+| 3 | functionality | 1 | the compiler and engine support a useful subset; broad engine and Forge scope remains |
+| 4 | deliverables | 1 | compiler, runtime, extension and docs exist; many systems and workflows remain absent |
+| 5 | essential features | 0 | broad language, engine and target capabilities remain missing |
+| 6 | constraints | 2 | documented C/MSVC default and optional direct-native path are respected |
+| 7 | ambiguity | 2 | backend limits and packet API single-peer limits are documented |
+| 8 | documentation parity | 2 | packet framing, validation and backend availability match language and engine docs |
+| 9 | use cases | 1 | common small-game cases work; many listed use cases do not |
+| 10 | intended purpose | 1 | Anvil remains a prototype rather than a practical general game engine |
+| 11 | core functionality | 2 | C/MSVC and native numeric demo builds ran and printed 17 |
+| 12 | secondary functionality | 2 | packet tests cover framing, IDs, invalid payloads, peer checks and replay rejection |
+| 13 | primary workflows | 1 | build and multiplayer samples work; package, Forge and OS workflows remain absent |
+| 14 | input validation | 2 | packet send checks integral 32-bit IDs and finite values; receive checks exact frames and fields |
+| 15 | error handling | 2 | invalid network frames are ignored without replacing accepted packet; build errors are explicit |
+| 16 | edge coverage | 2 | short/oversized frames, unknown version/type, duplicate/stale sequences and wrong peers are covered |
+| 17 | invalid inputs | 2 | invalid packet cases are rejected in tests; no uncontrolled failure reproduced |
+| 18 | repeat stability | 2 | targeted repeated-network and build tests passed |
+| 19 | critical defects | 2 | no critical defect reproduced in this change |
+| 20 | integration | 2 | compiler built runtime and resource into working C and native executables |
+| 21 | project structure | 2 | source, runtime, build, scripts, docs and tests are organized by role |
+| 22 | formatting | 1 | formatting debt remains in the wider codebase |
+| 23 | module responsibilities | 1 | runtime/compiler responsibilities remain coupled outside networking and physics modules |
+| 24 | naming | 2 | new symbols and packet names are consistent and descriptive |
+| 25 | duplication | 1 | binding and runtime-reference knowledge remains duplicated across compiler components |
+| 26 | dependencies | 2 | MSVC resource compilation works; GCC resource building explicitly requires windres |
+| 27 | extensibility | 1 | runtime-module selection is internal; user-facing package/plugin imports remain unfinished |
+| 28 | unfinished scope | 1 | experimental and incomplete backend and engine areas remain |
+| 29 | configuration | 2 | resource and association settings are explicit; packet format is versioned |
+| 30 | conventions | 2 | C/Win32 and PE conventions are applied consistently in added code |
+| 31 | automated tests | 2 | relevant automated coverage exists |
+| 32 | core tests | 2 | compiler, packet, PE resource and linker argument paths are tested |
+| 33 | failure tests | 2 | failure tests cover malformed packets and invalid ICO data |
+| 34 | edge tests | 2 | boundary tests cover 32-bit IDs, sequence replay/wrap direction and oversized packets |
+| 35 | integration tests | 1 | packet executable integration is covered; registry behavior was inspected rather than independently executed, and #63 remains open |
+| 36 | test commands | 2 | documented extension and QA commands ran successfully |
+| 37 | builds | 2 | C/MSVC and direct-native builds ran successfully and printed 17 |
+| 38 | results recorded | 2 | independent 50-point rubric, exact candidate identity, hashes and separate local/independent test evidence are synchronized across six records |
+| 39 | regressions | 2 | packet/resource regression tests passed |
+| 40 | full goal | 0 | complete objective and backlog remain unimplemented |
+| 41 | installation | 2 | icon registration and build instructions match scripts on inspection |
+| 42 | reproducibility | 1 | Windows-specific registry and resource workflows limit reproducibility |
+| 43 | usage | 2 | language, compiler and build usage are documented |
+| 44 | design documentation | 2 | packet wire format, backend limits and icon behavior are documented |
+| 45 | troubleshooting | 2 | troubleshooting guidance is available |
+| 46 | editor workflow | 1 | VS Code workflow exists; broader project/editor workflow remains incomplete |
+| 47 | editor integration | 1 | extension package validation passes; installed 0.1.4 was preserved and newest package not visually verified |
+| 48 | organization | 2 | deliverables are organized in assets/compiler/runtime/scripts/docs/tests |
+| 49 | limitations | 2 | network, native-backend and engine limitations are disclosed |
+| 50 | practical scope | 0 | deliverable is not suitable as the full production-quality engine described by the objective |
+| | **Requirement fulfillment** | **13/20** | |
+| | **Functionality and reliability** | **19/20** | |
+| | **Code quality and architecture** | **15/20** | |
+| | **Testing and verification** | **17/20** | |
+| | **Developer experience and delivery** | **15/20** | |
+| | **Total** | **79/100** | FAIL against 98 |
 
+Previous review history follows.
 
 Previous review history follows. The appended report below is historical; its score, 233-test evidence, and parity statements refer to the memory-budget candidate and not the current release-pruning candidate.
 
