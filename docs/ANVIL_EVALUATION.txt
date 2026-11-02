@@ -1,28 +1,28 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
-Assessment date:2026-10-29
-Exact independent source:b76fc02a1f6ea9ab24f7af004e8a0981ba249252
+Assessment date:2026-11-02
+Exact independent source:c06744a5585d7e84ece07fc8347fb32df9897e27
 Evaluator:project_full_review
-Score:76/100 — FAIL against98.
-Categories12/18/14/17/15.
-Scores 1-50: 2,1,1,1,0,1,2,2,1,1 / 1,2,1,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,2,1 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Score:75/100 — FAIL against98.
+Categories12/16/15/17/15.
+Scores 1-50: 2,1,1,1,0,2,2,1,1,1 / 1,1,1,2,2,2,2,2,2,1 / 2,1,1,2,1,2,1,1,2,2 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-Full independent review of b76fc02:76/100 FAIL against98, categories12/18/14/17/15;194 tests passed in 281.445s. Selective imports, qualified calls, private helpers/state and aliases verified; #81 supplementary C UTF-8 metadata and #82 private source-reference bypass independently fixed. Full native engine/Forge/OS/types/targets/actual ray backends/benchmarks/tooling and #63 remain incomplete. Goal stays active.
+Full independent review of c06744a:75/100 FAIL against98, categories12/16/15/17/15;203 tests passed in223.038s. The reviewer read #23 and57 comments after testing, including the C-first direction. A zero-argument callback expression over a private selective-module global has overlapping identifier rewrites; filed with exact reproduction/impact/acceptance as #83, label Codex Bugs. Prior #79/#81/#82 remain resolved. The C-first build path is the required target; direct-native parity is optional. Full engine/Forge/OS/types/media/targets/actual ray backends/benchmarks/editor tooling and #63 remain incomplete. Goal stays active.
 
-194 tests independently passed in 281.445s without restart; npm0.1.12/VSIX CRC and source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed.
+203 tests independently passed in 223.038s without restart; npm0.1.13/VSIX CRC and source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed. Installed extension0.1.4 remained unchanged.
 Former #81 supplementary Cyrillic/Japanese/emoji physical source path now compiles on both backends and reports exact raw UTF-8 path/physical line4 with exit2. Shared C byte literals cover all path/allocation/project-title metadata. Byte-exact controls/NUL/DEL/emoji/hex-digit-followers and supplementary-title compilation pass; no C ANSI-window Unicode display claim.
 Additional independent MSVC encoder harness reproduced1164 Unicode scalars as4105 exact UTF-8 bytes, including all ASCII controls/NUL/DEL/quotes/backslashes,1000 randomized scalars and digit-following escapes.
 Former #82 helper calls and private array reads/writes are rejected at original source lines before either backend. All source node identifiers are checked before generated binding, with quoted/comment text unchanged. Alias/private state/helper closure/recursion/init-once/project/limits and preceding runtime regressions pass.
-No new defect confirmed. Full50 review re-read #23 body/52comments after tests and #80 optimization requirements separately. Prior #79 stays verified fixed; installed0.1.4 preserved and untouched coordinate integration gap #63 remains.
+One new P2 defect was confirmed and filed as #83: overlapping source-span rewrites corrupt zero-argument callback expressions over private selective-module globals. Expected compilation and output73; actual a source-located unknown callback-variable error before C compilation. Fix by binding each identifier span once and add var/varl, nested, and version2 regressions. Full50 review reread #23 body/57comments after tests and #80 separately. Prior #79/#81/#82 remain resolved; installed0.1.4 is preserved and OS coordinate gap #63 remains.
 
 Previous independent source 957ee124402e0ba773971aaee24c48c8b277929a retained in QA report history.
 
-Selective source imports: qualified functions, private module helpers/globals/arrays, file-local aliases and canonical module initialization are implemented. Remaining defects/status: #81 and #82 independently VERIFIED FIXED on b76fc02: supplementary UTF-8 metadata compiles/reports correctly, and source cannot name private generated functions/arrays. Prior #79 stays verified fixed. #63 and broader #5–11/#14–15/#24/#23/#80 capability/verification gaps remain open. Confirmed findings retain detailed reproduction, impact and acceptance under Codex Bugs; user reports use Romans21216 - Bugs.
+Selective source imports: qualified functions, private module helpers/globals/arrays, file-local aliases and canonical module initialization are implemented, with zero-argument callback integration defect #83 still open. #81/#82 were independently verified fixed on b76fc02; prior #79 stays verified fixed. #63 and broader #5–11/#14–15/#24/#23/#80 capability/verification gaps remain open. Confirmed findings retain detailed reproduction, impact and acceptance under Codex Bugs; user reports use Romans21216 - Bugs. The complete inventory remains exclusively in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
 
 SUMMARY
 
 Focused record-only check at ba78d22 found one stale ancillary extension field in IMPLEMENTATION_STATUS.md: source0.1.11 instead of0.1.12 (#58). Corrected here; all50 scores, categories, exactb76fc02/76/194/281.445 evidence and remaining records passed. No source change or rescore; focused recheck passed at b752f41.
 -------
-Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The current default compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for numeric programs and an initial RGBA rectangle/circle/line/literal-text 2D runtime. The latest 76/100 review used the earlier direct-machine-code target; the C-first target update has not yet been independently rescored.
+Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The primary compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for a smaller subset. The latest full C-first review scored exact source c06744a at75/100; its confirmed callback/module composition bug is tracked in #83.
 
 The fairest description is a small game scripting language connected to a Windows software-rendering prototype. Its syntax is approachable and it has a working path from source to executable, including parameterized functions and numeric loops, but it is much closer to a learning project than to a complete game engine or mature language ecosystem.
 
