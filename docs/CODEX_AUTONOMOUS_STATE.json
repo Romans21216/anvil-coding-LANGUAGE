@@ -15,14 +15,14 @@
   "latest_independent_review": {
     "base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
     "source_diff_sha256": "e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
-    "implementation_diff_sha256": "8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759",
+    "implementation_diff_sha256": "42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133",
     "full_worktree_diff_sha256_at_review": "ab558713d36734cef86edf1109ceae9b4b004ecc2afda4a528fb847591d4e3b0",
     "file_sha256": {
       "README.md": "c5f3bb1415c128cd6bb49f7a73a96743e330a6a0299fde913f883b9ed3f9f9ef",
       "compiler/codegen.py": "ced45a010cf62caaa73a3b39c13a3321e63d6ff5f89bfa25a9d8fe090fdf0453",
       "compiler/modules.py": "f894eaf05c0aa192a2bfb7eba090757afc328560bdd76261c815b650af0400ce",
       "docs/COMPILER.md": "28922ce8d597cbbdea92a543af89bc6a9691a7c58b6149f8f73debffe0e9add9",
-      "docs/COMPLETION_MATRIX.md": "635e2735fb5cf7bc1136063dda61710dc804112f8b3f2b0985e4b767ea01cc5a",
+      "docs/COMPLETION_MATRIX.md": "258ddb2f4ad48227a053447618750120abea758e7eeb8644a76c612e9e3007d6",
       "docs/LANGUAGE_SPEC.md": "5f9ad68fd7b14cf76fe75389e721dad5f3acb9715cb405a6c2b3eaecab34b96a",
       "docs/Wiki/Compiler-and-Build.md": "67cdd83d475570ff83e6e868f388e42c3dbc54695cdaf414f55b0f421c537dfc",
       "tests/test_authoring.py": "424cc211da03c5e948f34c530ca824ad119221059b68faf4c4cb610a19996c94",
@@ -354,7 +354,7 @@
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED_RECORD_PARITY_PASS",
     "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
-    "implementation_diff_sha256": "8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759",
+    "implementation_diff_sha256": "42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133",
     "reviewed_score": 79,
     "initial_full50_score_before_record_sync": 78,
     "threshold": 98,
@@ -372,7 +372,7 @@
   "resolved_user_reported_issues": [
     57
   ],
-  "current_candidate_status": "Independent full50 review of base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759: 78/100 before record sync; 79/100 FAIL against98 after criterion38 restoration, categories13/19/15/17/15. Independent and local full suites227 pass (254.117s and293.538s). Global storage pruning, imports, callbacks, and v1/v2 shadowing verified. #123 partially improved; runtime subsystems/packages remain whole. Independent six-record parity audit passed.",
+  "current_candidate_status": "Independent full50 review of base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133: 78/100 before record sync; 79/100 FAIL against98 after criterion38 restoration, categories13/19/15/17/15. Independent and local full suites227 pass (254.117s and293.538s). Global storage pruning, imports, callbacks, and v1/v2 shadowing verified. #123 partially improved; runtime subsystems/packages remain whole. Independent six-record parity audit passed.",
   "current_unscored_followup": {
     "summary": "Continue issue #23 toward98: selective linking of unused runtime features/globals/arrays, modular packages/dependency resolution, engine/Forge/OS targets, and measured efficiency.",
     "status": "pending implementation",
@@ -388,7 +388,7 @@
     "result": "PASS",
     "reviewed_implementation": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
     "score_unchanged": 79,
-    "summary": "Independent six-record parity audit PASS for the storage-pruning candidate: source/test SHA e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA 8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759, score79/100 against98, categories13/19/15/17/15, all50 criteria, 227 tests independent254.117s/local293.538s, #89 closed, #123 partial, installed extension0.1.4 unchanged.",
+    "summary": "Independent six-record parity audit PASS for the storage-pruning candidate: source/test SHA e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA 42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133, score79/100 against98, categories13/19/15/17/15, all50 criteria, 227 tests independent254.117s/local293.538s, #89 closed, #123 partial, installed extension0.1.4 unchanged.",
     "independent_recheck": "PASS; all six records, 50 criterion scores, category totals, candidate hashes, test counts/timings, and issue statuses agree."
   },
   "latest_evaluation": {
@@ -400,7 +400,7 @@
     "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
     "base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
     "source_diff_sha256": "e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
-    "implementation_diff_sha256": "8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759",
+    "implementation_diff_sha256": "42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133",
     "full_worktree_diff_sha256_at_review": "ab558713d36734cef86edf1109ceae9b4b004ecc2afda4a528fb847591d4e3b0",
     "hash_method": "Concatenated Python difflib.unified_diff output with three context lines, sorted paths, base content via git show.",
     "categories": {
@@ -484,8 +484,8 @@
     "issue89_status": "closed",
     "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6582314947"
   },
-  "latest_followup_status_change": "Independent full50 review of the C storage-reachability candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759: initial78/100 while criterion38 referenced the prior candidate; after synchronization, score79/100 FAIL against98, categories13/19/15/17/15. Independent suite227 passed in254.117s; local run227 passed in293.538s. A 200,000-element dead global array was omitted while EXE output5 remained. Selective import/global storage, callback array/output9, and v1/v2 shadowing probes passed. #123 now prunes functions and unused global scalar/array declarations, but runtime subsystems/packages remain unselected. Issue #23 body and68 comments reread; no new implementation defect.",
-  "latest_independent_candidate_result": "Independent full50 review of the C storage-reachability candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759: initial78/100 while criterion38 referenced the prior candidate; after synchronization, score79/100 FAIL against98, categories13/19/15/17/15. Independent suite227 passed in254.117s; local run227 passed in293.538s. A 200,000-element dead global array was omitted while EXE output5 remained. Selective import/global storage, callback array/output9, and v1/v2 shadowing probes passed. #123 now prunes functions and unused global scalar/array declarations, but runtime subsystems/packages remain unselected. Issue #23 body and68 comments reread; no new implementation defect.",
+  "latest_followup_status_change": "Independent full50 review of the C storage-reachability candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133: initial78/100 while criterion38 referenced the prior candidate; after synchronization, score79/100 FAIL against98, categories13/19/15/17/15. Independent suite227 passed in254.117s; local run227 passed in293.538s. A 200,000-element dead global array was omitted while EXE output5 remained. Selective import/global storage, callback array/output9, and v1/v2 shadowing probes passed. #123 now prunes functions and unused global scalar/array declarations, but runtime subsystems/packages remain unselected. Issue #23 body and68 comments reread; no new implementation defect.",
+  "latest_independent_candidate_result": "Independent full50 review of the C storage-reachability candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133: initial78/100 while criterion38 referenced the prior candidate; after synchronization, score79/100 FAIL against98, categories13/19/15/17/15. Independent suite227 passed in254.117s; local run227 passed in293.538s. A 200,000-element dead global array was omitted while EXE output5 remained. Selective import/global storage, callback array/output9, and v1/v2 shadowing probes passed. #123 now prunes functions and unused global scalar/array declarations, but runtime subsystems/packages remain unselected. Issue #23 body and68 comments reread; no new implementation defect.",
   "latest_evaluation_score": 79,
   "latest_independent_candidate_score": 79,
   "latest_independently_scored_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
