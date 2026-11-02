@@ -19,6 +19,7 @@ MODULES = {
     "networking": RuntimeModule(
         ROOT / "runtime" / "anvil_network.c", ("-lws2_32",)
     ),
+    "physics": RuntimeModule(ROOT / "runtime" / "anvil_physics.c"),
 }
 
 _MODULE_MARKER = re.compile(

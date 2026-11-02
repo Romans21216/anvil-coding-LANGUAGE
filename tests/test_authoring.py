@@ -85,13 +85,14 @@ class AuthoringSyntaxTests(unittest.TestCase):
         self.assertTrue(preserved_c.is_file())
         self.assertIn("return 23.0;", preserved_c.read_text(encoding="utf-8"))
 
-    def test_console_c_does_not_root_engine_or_network_runtime_subsystems(self):
+    def test_console_c_does_not_root_engine_or_optional_runtime_subsystems(self):
         entry = self.root / "console-roots.ANVL"
         generated = self.root / "console-roots.c"
         entry.write_text(
             'name "anvil_net_host()"\n'
             "fn(main)\n output 23\nend\n"
             "fn(unused_network_feature)\n net host(7777)\n output 0\nend\n"
+            "fn(unused_physics_feature)\n output body_create(0, 0, 1, 1)\nend\n"
             "call fn(main)\n",
             encoding="utf-8",
         )
@@ -105,6 +106,7 @@ class AuthoringSyntaxTests(unittest.TestCase):
         self.assertNotIn("anvil_set_fixed_hz(", c_source)
         self.assertNotIn("anvil_net_close();", c_source)
         self.assertNotIn("ANVIL_RUNTIME_MODULE: networking", c_source)
+        self.assertNotIn("ANVIL_RUNTIME_MODULE: physics", c_source)
 
     def test_c_network_cleanup_root_follows_reachable_network_calls(self):
         entry = self.root / "network-roots.ANVL"
@@ -124,6 +126,24 @@ class AuthoringSyntaxTests(unittest.TestCase):
         self.assertIn("anvil_net_host(7777)", c_source)
         self.assertIn("anvil_net_close();", c_source)
         self.assertIn("ANVIL_RUNTIME_MODULE: networking", c_source)
+
+    def test_reachable_physics_builtin_selects_physics_runtime_module(self):
+        entry = self.root / "physics-module.ANVL"
+        generated = self.root / "physics-module.c"
+        entry.write_text(
+            "fn(main)\n output body_create(0, 0, 1, 1)\nend\ncall fn(main)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--emit-c", str(generated)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "ANVIL_RUNTIME_MODULE: physics",
+            generated.read_text(encoding="utf-8"),
+        )
 
     def test_reachable_receive_builtin_selects_network_runtime_module(self):
         entry = self.root / "receive-module.ANVL"
@@ -147,7 +167,7 @@ class AuthoringSyntaxTests(unittest.TestCase):
         entry = self.root / "network-name.ANVL"
         generated = self.root / "network-name.c"
         entry.write_text(
-            'scene 2d\nfn(draw)\n display text("anvil_net_host()") -l(1, 1)\nend\n',
+            'scene 2d\nfn(draw)\n display text("anvil_net_host() body_create()") -l(1, 1)\nend\n',
             encoding="utf-8",
         )
         result = subprocess.run(
@@ -157,9 +177,10 @@ class AuthoringSyntaxTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         c_source = generated.read_text(encoding="utf-8")
-        self.assertIn('"anvil_net_host()"', c_source)
+        self.assertIn('"anvil_net_host() body_create()"', c_source)
         self.assertNotIn("anvil_net_close();", c_source)
         self.assertNotIn("ANVIL_RUNTIME_MODULE: networking", c_source)
+        self.assertNotIn("ANVIL_RUNTIME_MODULE: physics", c_source)
 
     def test_c_build_elides_dead_functions_and_keeps_callback_targets(self):
         entry = self.root / "tree-shake.ANVL"

@@ -30,6 +30,18 @@ class LinkerGarbageCollectionTests(unittest.TestCase):
         self.assertIn(str(module.source), with_network)
         self.assertIn("-lws2_32", with_network)
 
+    def test_msvc_physics_module_is_an_explicit_translation_unit(self):
+        module = MODULES["physics"]
+        args = _msvc_arguments(
+            "cl.exe",
+            pathlib.Path("program.c"),
+            pathlib.Path("program.exe"),
+            pathlib.Path("objects"),
+            release=True,
+            runtime_modules=(module,),
+        )
+        self.assertIn(str(module.source), args)
+
     def test_msvc_network_module_is_an_explicit_translation_unit(self):
         module = MODULES["networking"]
         args = _msvc_arguments(

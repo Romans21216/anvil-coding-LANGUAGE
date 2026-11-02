@@ -478,6 +478,14 @@ def emit_c(
         for body in reachable_c_body
         for statement in body
     )
+    uses_physics = any(
+        re.search(
+            r"\banvil_(?:body_[A-Za-z0-9_]*|physics_[A-Za-z0-9_]*)\s*\(",
+            mask_strings(statement),
+        )
+        for body in reachable_c_body
+        for statement in body
+    )
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",
         '#include "anvil_runtime.h"',
@@ -486,8 +494,12 @@ def emit_c(
         "#include <stdlib.h>",
         "",
     ]
+    runtime_markers = []
     if uses_network:
-        lines.insert(1, "/* ANVIL_RUNTIME_MODULE: networking */")
+        runtime_markers.append("/* ANVIL_RUNTIME_MODULE: networking */")
+    if uses_physics:
+        runtime_markers.append("/* ANVIL_RUNTIME_MODULE: physics */")
+    lines[1:1] = runtime_markers
     metadata_payload=pack(metadata)
     if metadata_payload:
         lines.append('static const char _anvil_metadata_blob[] = '+c_bytes_literal(metadata_payload)+';')
