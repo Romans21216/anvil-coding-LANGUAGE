@@ -507,7 +507,7 @@
       "tests/test_runtime_modules.py"
     ],
     "local_source_commit": "de68679f1f05a3a5db7b5eadbf20989e43321a76",
-    "publication_status": "Source published to origin/main; evaluation comment posted; six-record parity pending.",
+    "publication_status": "Source published to origin/main; issue #23 evaluation comment posted; independent six-record parity PASS.",
     "post_record_sync_all_11_path_sha256": "12602e30e57b71d4f32b8254fd982be93983ff24c8523999dbb9e586f3d6645e"
   },
   "latest_followup_status_change": "Independent full50 of registry-trigger candidate: raw78; criterion38 restored after record sync to79/100 FAIL versus98. Categories13/20,19/20,15/20,17/20,15/20. Base 2a0f52306363d4bba3e51730148f899f42cc1474; five-path diff SHA256 c80724f6849b798a025bdfc8f59d77a211fb1bef18ce144113810740680d15f2; implementation-only SHA256 459ecd965c2f87e0d7f7194bd0dcd073b78620763ef29ef1b0d0f1db47d468a5. Local full253/285.750s; independent253/283.720s. Compileall/npm/QA/strict JSON/diff checks pass. No defect. Source de68679f1f05a3a5db7b5eadbf20989e43321a76 published; issue comment6585531493 posted (74 comments).",
