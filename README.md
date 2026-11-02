@@ -79,6 +79,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Mouse input sample](examples/mouse_input.ANVL)
 - [BMP image sprite sample](examples/image_sprite.ANVL)
 - [VS Code extension](vscode-extension/README.md)
+- [Windows file icons and registration](docs/WINDOWS_FILE_ICONS.md)
 - [Full improvement backlog](docs/IMPROVEMENT_BACKLOG.md)
 - [Wiki pages](docs/Wiki/Home.md)
 - [Contribution and bug reporting rules](CONTRIBUTING.md)

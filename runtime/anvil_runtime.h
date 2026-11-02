@@ -105,6 +105,9 @@ int anvil_net_set_ip(const char *address);
 int anvil_net_join(const char *address, int port);
 void anvil_net_send(double value);
 double anvil_net_receive(void);
+double anvil_net_packet_send(double message_id, double value);
+double anvil_net_packet_receive(void);
+double anvil_net_packet_id(void);
 void anvil_net_close(void);
 double anvil_body_create(double x, double y, double radius, double mass);
 double anvil_body_create_box(double x, double y, double width, double height,

@@ -100,6 +100,22 @@ class LinkerGarbageCollectionTests(unittest.TestCase):
         self.assertIn("-fdata-sections", args)
         self.assertIn("-Wl,--gc-sections", args)
 
+    def test_gcc_resource_object_is_linked_as_an_input(self):
+        resource = pathlib.Path("anvil_icon.o")
+        args = _gcc_arguments(
+            "gcc", pathlib.Path("program.c"), pathlib.Path("program.exe"), True,
+            resource_object=resource,
+        )
+        self.assertIn(str(resource), args)
+
+    def test_msvc_resource_file_is_passed_to_linker_after_link_switch(self):
+        resource = pathlib.Path("anvil_icon.res")
+        args = _msvc_arguments(
+            "cl.exe", pathlib.Path("program.c"), pathlib.Path("program.exe"),
+            pathlib.Path("objects"), release=False, resource_file=resource,
+        )
+        self.assertEqual(args[-2:], ["/link", str(resource)])
+
     def test_gcc_debug_keeps_release_section_gc_disabled(self):
         args = _gcc_arguments(
             "gcc", pathlib.Path("program.c"), pathlib.Path("program.exe"), False
@@ -151,6 +167,11 @@ class MsvcBuildTests(unittest.TestCase):
                 self.assertNotEqual(generated_helper, existing_helper)
                 self.assertNotEqual(generated_helper.parent, output_dir)
                 observed["helper"] = generated_helper
+                helper_text = generated_helper.read_text(encoding="utf-8")
+                self.assertLess(helper_text.index("rc.exe"), helper_text.index("cl.exe"))
+                self.assertIn("anvil_icon.res", helper_text)
+                resource_source = generated_helper.parent / "anvil_icon.rc"
+                self.assertIn("anvil-executable.ico", resource_source.read_text())
 
             with mock.patch("compiler.build.subprocess.run", side_effect=fake_run):
                 build_c(str(compiler), generated, output, release=False)

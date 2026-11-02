@@ -5,12 +5,78 @@ import sys
 import tempfile
 import unittest
 
-from compiler.native_x64 import minimal_exit_exe
+from compiler.native_x64 import Pe32Plus, minimal_exit_exe
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class NativeX64Tests(unittest.TestCase):
+    def test_generated_native_executable_advertises_its_icon_resources(self):
+        source = "fn(main)\nend\n"
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "icon.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            exe = NativeCodegen(path, functions, top, variables, arrays).generate()
+
+        pe_offset = struct.unpack_from("<I", exe, 0x3C)[0]
+        optional_offset = pe_offset + 4 + 20
+        resource_rva, resource_size = struct.unpack_from("<II", exe, optional_offset + 128)
+        self.assertGreater(resource_rva, 0)
+        self.assertGreater(resource_size, 0)
+
+    def test_native_executable_embeds_anvil_icon_resources(self):
+        icon = (ROOT / "assets" / "icons" / "anvil-executable.ico").read_bytes()
+        exe = Pe32Plus(b"\xC3", [("KERNEL32.dll", "ExitProcess")], icon=icon).build()
+        pe_offset = struct.unpack_from("<I", exe, 0x3C)[0]
+        coff_offset = pe_offset + 4
+        section_count = struct.unpack_from("<H", exe, coff_offset + 2)[0]
+        optional_size = struct.unpack_from("<H", exe, coff_offset + 16)[0]
+        optional_offset = coff_offset + 20
+        resource_rva, resource_size = struct.unpack_from("<II", exe, optional_offset + 128)
+        self.assertEqual(section_count, 4)
+        self.assertGreater(resource_size, 0)
+
+        section_table = optional_offset + optional_size
+        resource_section = None
+        for index in range(section_count):
+            offset = section_table + index * 40
+            name, virtual_size, virtual_address, raw_size, raw_offset = struct.unpack_from(
+                "<8sIIII", exe, offset
+            )
+            if name.rstrip(b"\0") == b".rsrc":
+                resource_section = (virtual_address, raw_offset)
+                break
+        self.assertIsNotNone(resource_section)
+        section_rva, raw_offset = resource_section
+        root_offset = raw_offset + resource_rva - section_rva
+        named, identifiers = struct.unpack_from("<HH", exe, root_offset + 12)
+        self.assertEqual((named, identifiers), (0, 2))
+        type_entries = [struct.unpack_from("<II", exe, root_offset + 16 + index * 8)
+                        for index in range(identifiers)]
+        self.assertEqual({entry[0] for entry in type_entries}, {3, 14})
+
+        def directory_entries(relative_offset):
+            directory = root_offset + relative_offset
+            count = struct.unpack_from("<H", exe, directory + 14)[0]
+            return [struct.unpack_from("<II", exe, directory + 16 + i * 8)
+                    for i in range(count)]
+
+        group_type = next(entry for entry in type_entries if entry[0] == 14)
+        group_id = directory_entries(group_type[1] & 0x7FFFFFFF)[0]
+        language = directory_entries(group_id[1] & 0x7FFFFFFF)[0]
+        data_entry_offset = root_offset + (language[1] & 0x7FFFFFFF)
+        group_rva, group_size = struct.unpack_from("<II", exe, data_entry_offset)
+        group_offset = raw_offset + group_rva - section_rva
+        reserved, kind, icon_count = struct.unpack_from("<HHH", exe, group_offset)
+        self.assertEqual((reserved, kind, icon_count), (0, 1, 7))
+        self.assertEqual(group_size, 6 + 14 * icon_count)
+
+    def test_native_icon_resource_rejects_truncated_ico(self):
+        with self.assertRaisesRegex(ValueError, "valid ICO"):
+            Pe32Plus(b"\xC3", [], icon=b"bad").build()
+
     def _run_source(self, source: str) -> str:
         with tempfile.TemporaryDirectory() as temp:
             path = pathlib.Path(temp) / "sample.ANVL"

@@ -169,11 +169,82 @@ class X64Code:
 class Pe32Plus:
     """Create a fixed-base console PE executable from native x64 sections."""
 
-    def __init__(self, text: bytes, imports: list[tuple[str, str]]) -> None:
+    def __init__(
+        self, text: bytes, imports: list[tuple[str, str]], icon: bytes | None = None
+    ) -> None:
         if not text:
             raise ValueError("PE executable needs a non-empty .text section")
         self.text = text
         self.imports = imports
+        self.icon = icon
+
+    def _icon_resource_section(self, rva: int) -> bytes:
+        """Build PE RT_ICON and RT_GROUP_ICON resources from a PNG-backed ICO."""
+        if self.icon is None:
+            return b""
+        if len(self.icon) < 6:
+            raise ValueError("Anvil executable icon is not a valid ICO file")
+        reserved, kind, count = struct.unpack_from("<HHH", self.icon)
+        if reserved != 0 or kind != 1 or not 1 <= count <= 32:
+            raise ValueError("Anvil executable icon has an unsupported ICO header")
+        directory_end = 6 + 16 * count
+        if directory_end > len(self.icon):
+            raise ValueError("Anvil executable icon directory is truncated")
+        images = []
+        for index in range(count):
+            entry_offset = 6 + 16 * index
+            width, height, colors, reserved_byte, planes, bits, size, offset = (
+                struct.unpack_from("<BBBBHHII", self.icon, entry_offset)
+            )
+            if reserved_byte != 0 or not size or offset < directory_end or offset + size > len(self.icon):
+                raise ValueError("Anvil executable icon image entry is invalid")
+            if not self.icon[offset:offset + size].startswith(b"\x89PNG\r\n\x1a\n"):
+                raise ValueError("Anvil executable icon images must be PNG encoded")
+            images.append((width, height, colors, planes, bits, self.icon[offset:offset + size]))
+
+        root_offset = 0
+        icon_type_offset = 32
+        group_type_offset = icon_type_offset + 16 + 8 * count
+        language_offsets = [group_type_offset + 24 + 24 * i for i in range(count + 1)]
+        data_entries_offset = language_offsets[-1] + 24
+        group_data = bytearray(struct.pack("<HHH", 0, 1, count))
+        for index, (width, height, colors, planes, bits, image) in enumerate(images, 1):
+            group_data.extend(struct.pack(
+                "<BBBBHHIH", width, height, colors, 0, planes, bits,
+                len(image), index
+            ))
+
+        layout = bytearray(data_entries_offset + 16 * (count + 1))
+
+        def write_directory(offset: int, id_count: int, entries: list[tuple[int, int]]) -> None:
+            struct.pack_into("<IIHHHH", layout, offset, 0, 0, 0, 0, 0, id_count)
+            for index, (identifier, target) in enumerate(entries):
+                struct.pack_into("<II", layout, offset + 16 + 8 * index,
+                                 identifier, target)
+
+        write_directory(root_offset, 2, [
+            (3, 0x80000000 | icon_type_offset),
+            (14, 0x80000000 | group_type_offset),
+        ])
+        write_directory(icon_type_offset, count, [
+            (index + 1, 0x80000000 | language_offsets[index])
+            for index in range(count)
+        ])
+        write_directory(group_type_offset, 1, [(1, 0x80000000 | language_offsets[-1])])
+        for index in range(count + 1):
+            data_entry = data_entries_offset + 16 * index
+            write_directory(language_offsets[index], 1, [(0x409, data_entry)])
+
+        data_rva_cursor = data_entries_offset + 16 * (count + 1)
+        for index, image in enumerate([record[5] for record in images] + [bytes(group_data)]):
+            data_rva_cursor = align(len(layout), 4)
+            entry_offset = data_entries_offset + 16 * index
+            struct.pack_into("<IIII", layout, entry_offset, rva + data_rva_cursor,
+                             len(image), 0, 0)
+            if len(layout) < data_rva_cursor:
+                layout.extend(b"\0" * (data_rva_cursor - len(layout)))
+            layout.extend(image)
+        return bytes(layout)
 
     def _import_section(self, rva: int) -> tuple[bytes, dict[str, int]]:
         if not self.imports:
@@ -220,7 +291,7 @@ class Pe32Plus:
     def build(
         self, entry_offset: int = 0, data: bytes = b"\0"
     ) -> bytes:
-        section_count = 3
+        section_count = 4 if self.icon is not None else 3
         optional_size = 240
         headers_end = PE_OFFSET + 4 + 20 + optional_size + section_count * 40
         headers_size = align(headers_end, FILE_ALIGNMENT)
@@ -234,6 +305,12 @@ class Pe32Plus:
             (b".rdata", rdata, rdata_rva, 0x40000040),
             (b".data", data or b"\0", data_rva, 0xC0000040),
         ]
+        resource_rva = None
+        resource = b""
+        if self.icon is not None:
+            resource_rva = data_rva + align(max(1, len(data or b"\0")), SECTION_ALIGNMENT)
+            resource = self._icon_resource_section(resource_rva)
+            sections.append((b".rsrc", resource, resource_rva, 0x40000040))
 
         file_cursor = headers_size
         section_headers = bytearray()
@@ -280,6 +357,8 @@ class Pe32Plus:
             import_count = len({dll for dll, _ in self.imports})
             struct.pack_into("<II", optional, 120, rdata_rva,
                              20 * (import_count + 1))
+        if resource_rva is not None:
+            struct.pack_into("<II", optional, 128, resource_rva, len(resource))
 
         coff = struct.pack(
             "<HHIIIHH", 0x8664, section_count, 0, 0, 0, optional_size, 0x0023

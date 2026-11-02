@@ -9,7 +9,7 @@ import struct
 from dataclasses import dataclass
 
 from compiler.common import (
-    CompileError, KEY_CODES, MAX_ACTIVE_LOCAL_ARRAY_BYTES,
+    CompileError, KEY_CODES, MAX_ACTIVE_LOCAL_ARRAY_BYTES, ROOT,
     MAX_ACTIVE_LOCAL_ARRAY_MIB, Node,
 )
 from compiler.expressions import ExpressionParser, MAX_EXPRESSION_DEPTH, split_args
@@ -970,9 +970,10 @@ class NativeCodegen:
         imports=list(dict.fromkeys(imports+self._net.imports))
         if self._local_arrays.active is not None:
             imports = list(dict.fromkeys(imports + self._local_arrays.IMPORTS))
-        pe = Pe32Plus(bytes(self.code.code), imports)
+        icon_path = ROOT / "assets" / "icons" / "anvil-executable.ico"
+        pe = Pe32Plus(bytes(self.code.code), imports, icon=icon_path.read_bytes())
         targets = pe.fixup_targets(len(self.code.code))
         text = self.code.finish(targets)
-        return Pe32Plus(text, imports).build(
+        return Pe32Plus(text, imports, icon=icon_path.read_bytes()).build(
             entry_offset=self.code.labels["entry"], data=bytes(self._data)
         )

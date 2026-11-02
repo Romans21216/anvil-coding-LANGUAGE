@@ -1118,6 +1118,211 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(process.returncode, 0, stdout + stderr)
             self.assertEqual(stdout.strip(), "42.5")
 
+    def test_versioned_udp_packet_rejects_invalid_frames_before_valid_payload(self):
+        port_probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        port_probe.bind(("127.0.0.1", 0))
+        port = port_probe.getsockname()[1]
+        port_probe.close()
+
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "packet.ANVL"
+            out = pathlib.Path(temp) / "packet.exe"
+            source.write_text(
+                f"net host({port})\n"
+                "fn(main)\n"
+                "  set local(value) = 0\n"
+                "  while packet_id() < 0\n"
+                "    set local(value) = packet_receive()\n"
+                "  end\n"
+                "  output packet_id() + local(value) * 100\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            process = subprocess.Popen(
+                [str(out)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                address = ("127.0.0.1", port)
+                valid = struct.pack("!4sBBHIId", b"ANVP", 1, 1, 0, 1, 42, -12.75)
+                sender.sendto(valid[:-1], address)  # short frame
+                sender.sendto(struct.pack("!4sBBHIId", b"ANVP", 2, 1, 0, 2, 7, 99.0), address)
+                sender.sendto(valid + b"x", address)  # oversize frame
+                sender.sendto(struct.pack("!4sBBHIId", b"ANVP", 1, 2, 0, 3, 8, 100.0), address)
+                deadline = time.monotonic() + 5
+                while process.poll() is None and time.monotonic() < deadline:
+                    sender.sendto(valid, address)
+                    time.sleep(0.01)
+                stdout, stderr = process.communicate(timeout=1)
+            finally:
+                sender.close()
+                if process.poll() is None:
+                    process.terminate()
+                    process.communicate()
+
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertEqual(stdout.splitlines(), ["-1233"])
+
+    def test_versioned_udp_packet_rejects_other_peers_and_old_sequences(self):
+        host_probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        host_probe.bind(("127.0.0.1", 0))
+        port = host_probe.getsockname()[1]
+        host_probe.close()
+
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "packet-peer.ANVL"
+            out = pathlib.Path(temp) / "packet-peer.exe"
+            source.write_text(
+                f"net host({port})\n"
+                "fn(main)\n"
+                "  set local(value) = 0\n"
+                "  while packet_id() < 0\n"
+                "    set local(value) = packet_receive()\n"
+                "  end\n"
+                "  net send(1)\n"
+                "  while packet_id() != 7\n"
+                "    set local(value) = packet_receive()\n"
+                "    if packet_id() = 8 or packet_id() = 9 or packet_id() = 5\n"
+                "      output 999\n"
+                "    end\n"
+                "  end\n"
+                "  output packet_id() + local(value) * 100\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            process = subprocess.Popen(
+                [str(out)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sender.bind(("127.0.0.1", 0))
+            sender.settimeout(3)
+            attacker = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            target = ("127.0.0.1", port)
+
+            def send_packet(sock, sequence, message_id, value):
+                sock.sendto(
+                    struct.pack("!4sBBHIId", b"ANVP", 1, 1, 0,
+                                sequence, message_id, value),
+                    target,
+                )
+
+            try:
+                time.sleep(0.1)  # let the child process bind the probed port
+                send_packet(sender, 1, 42, -12.75)
+                acknowledgement, _ = sender.recvfrom(64)
+                self.assertEqual(struct.unpack("d", acknowledgement)[0], 1.0)
+
+                # The host must keep its first peer and reject duplicate and
+                # wrapped-backward sequence numbers without replacing state.
+                send_packet(attacker, 2, 8, 8.0)
+                time.sleep(0.05)
+                send_packet(sender, 1, 9, 9.0)
+                time.sleep(0.05)
+                send_packet(sender, 0xFFFFFFFF, 5, 5.0)
+                time.sleep(0.05)
+                send_packet(sender, 3, 7, 1.25)
+                stdout, stderr = process.communicate(timeout=3)
+            finally:
+                sender.close()
+                attacker.close()
+                if process.poll() is None:
+                    process.terminate()
+                    process.communicate()
+
+            self.assertEqual(process.returncode, 0, stderr)
+            self.assertEqual(stdout.splitlines(), ["132"])
+
+    def test_packet_builtins_emit_network_runtime_calls(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "packet-builtins.ANVL"
+            generated = pathlib.Path(temp) / "packet-builtins.c"
+            source.write_text(
+                "fn(main)\n"
+                "  set local(sent) = packet_send(12, 3.5)\n"
+                "  output packet_id()\n"
+                "  output packet_receive()\n"
+                "end\ncall fn(main)\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            c_source = generated.read_text(encoding="utf-8")
+            self.assertIn("anvil_net_packet_send", c_source)
+            self.assertIn("anvil_net_packet_id", c_source)
+            self.assertIn("anvil_net_packet_receive", c_source)
+
+    def test_packet_send_serializes_network_order_envelope(self):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        listener.bind(("127.0.0.1", 0))
+        listener.settimeout(5)
+        port = listener.getsockname()[1]
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                source = pathlib.Path(temp) / "packet-send.ANVL"
+                out = pathlib.Path(temp) / "packet-send.exe"
+                source.write_text(
+                    f'net join("127.0.0.1", {port})\n'
+                    "fn(main)\n  output packet_send(4294967295, -12.75)\nend\n"
+                    "call fn(main)\n",
+                    encoding="utf-8",
+                )
+                subprocess.run(
+                    [sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                result = subprocess.run([str(out)], capture_output=True, text=True, check=True)
+                payload, address = listener.recvfrom(64)
+        finally:
+            listener.close()
+
+        self.assertEqual(result.stdout.strip(), "1")
+        self.assertEqual(len(payload), 24)
+        magic, version, kind, reserved, sequence, message_id, value = struct.unpack(
+            "!4sBBHIId", payload
+        )
+        self.assertEqual((magic, version, kind, reserved), (b"ANVP", 1, 1, 0))
+        self.assertEqual(sequence, 1)
+        self.assertEqual(message_id, 4294967295)
+        self.assertEqual(value, -12.75)
+        self.assertEqual(address[0], "127.0.0.1")
+
+    def test_packet_send_rejects_invalid_message_ids_and_nonfinite_values(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "invalid-packet-send.ANVL"
+            out = pathlib.Path(temp) / "invalid-packet-send.exe"
+            source.write_text(
+                "fn(main)\n  output packet_send(1.5, 3.5)\nend\ncall fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = subprocess.run([str(out)], capture_output=True, text=True, check=True)
+            self.assertEqual(result.stdout.strip(), "0")
+
     def test_unknown_statement_has_source_location(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "broken.ANVL"
