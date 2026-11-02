@@ -1,28 +1,28 @@
 ANVIL LANGUAGE AND ENGINE EVALUATION
 Assessment date:2026-11-02
-Exact independent source:c06744a5585d7e84ece07fc8347fb32df9897e27
+Exact independently reviewed source: base 6852275d86e43bf75da583961ad64d58aead2f08 + source/test diff SHA256 301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee + complete diff SHA256 0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3
 Evaluator:project_full_review
-Score:75/100 — FAIL against98.
-Categories12/16/15/17/15.
-Scores 1-50: 2,1,1,1,0,2,2,1,1,1 / 1,1,1,2,2,2,2,2,2,1 / 2,1,1,2,1,2,1,1,2,2 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
+Score:78/100 — FAIL against98.
+Categories13/18/15/17/15.
+Scores 1-50: 2,1,1,1,0,2,2,2,1,1 / 1,2,1,2,2,2,2,2,2,2 / 2,1,1,2,1,2,1,1,2,2 / 2,2,2,2,1,2,2,2,2,0 / 2,1,2,2,2,1,1,2,2,0
 
-Full independent review of c06744a:75/100 FAIL against98, categories12/16/15/17/15;203 tests passed in223.038s. The reviewer read #23 and57 comments after testing, including the C-first direction. A zero-argument callback expression over a private selective-module global has overlapping identifier rewrites; filed with exact reproduction/impact/acceptance as #83, label Codex Bugs. Prior #79/#81/#82 remain resolved. The C-first build path is the required target; direct-native parity is optional. Full engine/Forge/OS/types/media/targets/actual ray backends/benchmarks/editor tooling and #63 remain incomplete. Goal stays active.
+Independent full50 review of frozen C-first candidate base 6852275d86e43bf75da583961ad64d58aead2f08, source/test diff SHA256 301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee, complete diff SHA256 0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3: 78/100 FAIL against98; categories13/18/15/17/15; 210 tests passed in219.067s. #83/#84/#85 fixed and independently verified; no new defect. C-first Anvil-to-C/MSVC-to-EXE remains required; direct-native parity optional. Engine/Forge/OS/types/media/targets/DXR/Embree/benchmarks/editor tooling and #63 remain incomplete; goal active.
 
-203 tests independently passed in 223.038s without restart; npm0.1.13/VSIX CRC and source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed. Installed extension0.1.4 remained unchanged.
+210 tests independently passed in219.067s without restart; extension0.1.13 VSIX CRC/source parity, compileall, QA arithmetic, strict UTF-8 JSON and diff checks passed; installed extension0.1.4 stayed unchanged.
 Former #81 supplementary Cyrillic/Japanese/emoji physical source path now compiles on both backends and reports exact raw UTF-8 path/physical line4 with exit2. Shared C byte literals cover all path/allocation/project-title metadata. Byte-exact controls/NUL/DEL/emoji/hex-digit-followers and supplementary-title compilation pass; no C ANSI-window Unicode display claim.
 Additional independent MSVC encoder harness reproduced1164 Unicode scalars as4105 exact UTF-8 bytes, including all ASCII controls/NUL/DEL/quotes/backslashes,1000 randomized scalars and digit-following escapes.
 Former #82 helper calls and private array reads/writes are rejected at original source lines before either backend. All source node identifiers are checked before generated binding, with quoted/comment text unchanged. Alias/private state/helper closure/recursion/init-once/project/limits and preceding runtime regressions pass.
-One new P2 defect was confirmed and filed as #83: overlapping source-span rewrites corrupt zero-argument callback expressions over private selective-module globals. Expected compilation and output73; actual a source-located unknown callback-variable error before C compilation. Fix by binding each identifier span once and add var/varl, nested, and version2 regressions. Full50 review reread #23 body/57comments after tests and #80 separately. Prior #79/#81/#82 remain resolved; installed0.1.4 is preserved and OS coordinate gap #63 remains.
+Issues #83, #84, and #85 are fixed and independently verified. #85 now shares the callback-order lowering at top level: side effects, nested callbacks, handle capture before callback-storage mutation, and unset-callback line diagnostics pass in default/release builds. Prior #79/#81/#82 remain resolved.
 
 Previous independent source 957ee124402e0ba773971aaee24c48c8b277929a retained in QA report history.
 
-Selective source imports: qualified functions, private module helpers/globals/arrays, file-local aliases and canonical module initialization are implemented, with zero-argument callback integration defect #83 still open. #81/#82 were independently verified fixed on b76fc02; prior #79 stays verified fixed. #63 and broader #5–11/#14–15/#24/#23/#80 capability/verification gaps remain open. Confirmed findings retain detailed reproduction, impact and acceptance under Codex Bugs; user reports use Romans21216 - Bugs. The complete inventory remains exclusively in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
+Selective source imports: qualified functions, private module helpers/globals/arrays, file-local aliases and canonical module initialization are implemented, with #83/#84/#85 fixed; all callback-order and collision probes pass. #81/#82 were independently verified fixed on b76fc02; prior #79 stays verified fixed. #63 and broader #5–11/#14–15/#24/#23/#80 capability/verification gaps remain open. Confirmed findings retain detailed reproduction, impact and acceptance under Codex Bugs; user reports use Romans21216 - Bugs. The complete inventory remains exclusively in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
 
 SUMMARY
 
 Focused record-only check at ba78d22 found one stale ancillary extension field in IMPLEMENTATION_STATUS.md: source0.1.11 instead of0.1.12 (#58). Corrected here; all50 scores, categories, exactb76fc02/76/194/281.445 evidence and remaining records passed. No source change or rescore; focused recheck passed at b752f41.
 -------
-Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The primary compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for a smaller subset. The latest full C-first review scored exact source c06744a at75/100; its confirmed callback/module composition bug is tracked in #83.
+Anvil is a real, early-stage domain-specific programming language for small game-like programs. It has its own syntax, parser, validation rules, diagnostics, compiler, and runtime. The primary compiler translates supported programs to C/MSVC; an experimental native option emits AMD64 and PE32+ directly for a smaller subset. The latest C-first review scored base6852275 plus source/test diff87f9eb7f and full diff051f258a at78/100; #83/#84/#85 are fixed.
 
 The fairest description is a small game scripting language connected to a Windows software-rendering prototype. Its syntax is approachable and it has a working path from source to executable, including parameterized functions and numeric loops, but it is much closer to a learning project than to a complete game engine or mature language ecosystem.
 
@@ -89,3 +89,6 @@ Focused independent record-only recheck of4b5ac844: PASS. All six records, all50
 Focused independent record-only recheck of f5c1fed8: PASS. All six records, all 50 scores and both candidate_validation objects agree on reviewed source 4f5c981, 76/100, categories 12/18/14/17/15 and 180 tests in 286.162s. Current DIB/RGBA evidence and historical #79 verification are distinguished; pending follow-ups are null. No rescore or implementation change.
 
 Focused independent record-only recheck at b752f41: PASS. All six current records, ancillary fields, all50 scores and both candidate_validation objects agree on reviewed source b76fc02,76/100,categories12/18/14/17/15 and194 tests281.445s. Source extension0.1.12/installed0.1.4 and historical71/192/323.089 evidence are distinguished; follow-ups null. #58 correction verified. No source change, new test run or rescore.
+
+
+Latest independent evaluation snapshot: base 6852275d86e43bf75da583961ad64d58aead2f08; source/test diff 301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee; full diff 0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3; 78/100; categories13/18/15/17/15; 210 tests in219.067s. No new finding; #85 fixed. See QA_REPORT.md for all criterion reasons; the complete requirements inventory remains only in GitHub issue #23.

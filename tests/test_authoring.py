@@ -146,6 +146,166 @@ call fn(main)
         )
         self.assertEqual(output, "13")
 
+    def test_selective_import_private_zero_arg_callback_expression_v1_var(self):
+        library = self.root / "lib" / "player.ANVL"
+        library.parent.mkdir()
+        library.write_text(
+            "fn(target)\n  output 73\nend\n"
+            "set var(cb) = fnref(target)\n"
+            "fn(move)\n  output 1 + call var(cb) * 2\nend\n",
+            encoding="utf-8",
+        )
+        _, _, _, output = self.build_and_run(
+            'include fn(move) -- "lib/player.ANVL"\n'
+            "fn(main)\n  output call fn(move -- player)\nend\ncall fn(main)\n",
+            "private-callback-v1-var",
+        )
+        self.assertEqual(output, "147")
+
+    def test_selective_import_private_zero_arg_callback_expression_v1_varl(self):
+        library = self.root / "lib" / "player.ANVL"
+        library.parent.mkdir()
+        library.write_text(
+            "fn(target)\n  output 73\nend\n"
+            "set varl(cb) = fnref(target)\n"
+            "fn(move)\n  output 1 + call varl(cb) * 2\nend\n",
+            encoding="utf-8",
+        )
+        _, _, _, output = self.build_and_run(
+            'include fn(move) -- "lib/player.ANVL"\n'
+            "fn(main)\n  output call fn(move -- player)\nend\ncall fn(main)\n",
+            "private-callback-v1-varl",
+        )
+        self.assertEqual(output, "147")
+
+    def test_selective_import_private_zero_arg_callback_expression_v2(self):
+        library = self.root / "lib" / "player.ANVL"
+        library.parent.mkdir()
+        library.write_text(
+            "language version 2\n"
+            "fn(target)\n  output 73\nend\n"
+            "set varl(cb) = fnref(target)\n"
+            "fn(move)\n  output 1 + call varl(cb) * 2\nend\n",
+            encoding="utf-8",
+        )
+        _, _, _, output = self.build_and_run(
+            'include fn(move) -- "lib/player.ANVL"\n'
+            "fn(main)\n  output call fn(move -- player)\nend\ncall fn(main)\n",
+            "private-callback-v2",
+        )
+        self.assertEqual(output, "147")
+
+    def assert_callback_temporary_collision_is_rejected(self, source, name):
+        entry = self.root / f"{name}.ANVL"
+        generated = self.root / f"{name}.generated.c"
+        executable = self.root / f"{name}.exe"
+        entry.write_text(source, encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--generated-c", str(generated), "--output", str(executable)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0, "colliding compiler temporary must not build")
+        self.assertIn("compiler-generated C name", result.stderr)
+        self.assertFalse(executable.exists())
+
+    def test_callback_temporary_cannot_capture_explicit_v2_global(self):
+        self.assert_callback_temporary_collision_is_rejected(
+            "language version 2\n"
+            "set varl(main___anvil_callable_dispatch_1_arg_0) = 999\n"
+            "fn(identity, x)\n  output var(x)\nend\n"
+            "fn(main)\n"
+            "  set var(cb) = fnref(identity)\n"
+            "  output call var(cb, 5) + varl(main___anvil_callable_dispatch_1_arg_0)\n"
+            "end\ncall fn(main)\n",
+            "callback-global-shadow-v2",
+        )
+
+    def test_callback_temporary_collisions_cover_v1_slots_sites_and_arrays(self):
+        cases = (
+            (
+                "callback-slot-v1",
+                "set var(main___anvil_callable_dispatch_1_arg_1) = 999\n"
+                "fn(sum, left, right)\n  output var(left) + var(right)\nend\n"
+                "fn(main)\n  set var(cb) = fnref(sum)\n"
+                "  output call var(cb, 5, 6) + var(main___anvil_callable_dispatch_1_arg_1)\n"
+                "end\ncall fn(main)\n",
+            ),
+            (
+                "callback-second-site-array-v2",
+                "language version 2\n"
+                "array main___anvil_callable_dispatch_2_arg_0(1)\n"
+                "fn(target)\n  output 5\nend\n"
+                "fn(main)\n  set var(cb) = fnref(target)\n"
+                "  output call var(cb)\n"
+                "  output call var(cb) + array(main___anvil_callable_dispatch_2_arg_0, 0)\n"
+                "end\ncall fn(main)\n",
+            ),
+        )
+        for name, source in cases:
+            with self.subTest(name=name):
+                self.assert_callback_temporary_collision_is_rejected(source, name)
+
+    def test_top_level_callback_arguments_run_in_source_order(self):
+        source = (
+            "set var(counter) = 0\n"
+            "set var(result) = 0\n"
+            "fn(next)\n  add var(counter) 1\n  output var(counter)\nend\n"
+            "fn(pair, left, right)\n"
+            "  set var(result) = var(left) * 10 + var(right)\n"
+            "  output var(result)\nend\n"
+            "set var(callback) = fnref(pair)\n"
+            "call var(callback, call fn(next), call fn(next))\n"
+            "fn(main)\n  output var(result)\nend\ncall fn(main)\n"
+        )
+        for mode, flags in (("default", []), ("release", ["--release"])):
+            with self.subTest(mode=mode):
+                entry = self.root / f"top-callback-order-{mode}.ANVL"
+                executable = self.root / f"top-callback-order-{mode}.exe"
+                entry.write_text(source, encoding="utf-8")
+                build = subprocess.run(
+                    [sys.executable, str(COMPILER), str(entry), *flags, "--output", str(executable)],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(build.returncode, 0, build.stderr)
+                run = subprocess.run([str(executable)], capture_output=True, text=True)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(run.stdout.strip(), "12")
+
+    def test_top_level_callback_captures_handle_before_side_effecting_arguments(self):
+        source = (
+            "language version 2\n"
+            "set varl(result) = 0\n"
+            "fn(pair, left, right)\n"
+            "  set varl(result) = var(left) * 10 + var(right)\n"
+            "  output varl(result)\nend\n"
+            "fn(replacement, left, right)\n"
+            "  set varl(result) = var(left) * 100 + var(right)\n"
+            "  output varl(result)\nend\n"
+            "fn(switch_callback)\n"
+            "  set varl(callback) = fnref(replacement)\n"
+            "  output 5\nend\n"
+            "fn(next)\n  output 6\nend\n"
+            "set varl(callback) = fnref(pair)\n"
+            "call varl(callback, call fn(switch_callback), call fn(next))\n"
+            "fn(main)\n  output varl(result)\nend\ncall fn(main)\n"
+        )
+        for mode, flags in (("default", []), ("release", ["--release"])):
+            with self.subTest(mode=mode):
+                entry = self.root / f"top-callback-handle-{mode}.ANVL"
+                executable = self.root / f"top-callback-handle-{mode}.exe"
+                entry.write_text(source, encoding="utf-8")
+                build = subprocess.run(
+                    [sys.executable, str(COMPILER), str(entry), *flags, "--output", str(executable)],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(build.returncode, 0, build.stderr)
+                run = subprocess.run([str(executable)], capture_output=True, text=True)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(run.stdout.strip(), "56")
+
     def test_cleared_callback_reports_its_original_call_site(self):
         entry = self.root / "cleared.ANVL"
         executable = self.root / "cleared.exe"

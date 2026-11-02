@@ -89,7 +89,23 @@ def validate_program(program: ParsedProgram, *, check_symbols: bool = True) -> N
     for fn in functions.values():
         symbols.extend(
             (fn.name + "__" + name, "function-local", *local_site(fn, name))
-            for name in fn.params + sorted(fn.locals) + sorted(fn.local_arrays)
+            for name in fn.params
+            + sorted(fn.locals)
+            + sorted(fn.local_arrays)
+        )
+        symbols.extend(
+            (
+                fn.name + "__" + name,
+                "function-local compiler temporary",
+                fn.source or path,
+                fn.line,
+            )
+            for name in sorted(fn.c_temporaries)
+        )
+    for node in program.top:
+        symbols.extend(
+            (name, "top-level compiler temporary", node.source or path, node.line)
+            for name in node.c_temporaries
         )
     for name, kind, source, line in sorted(symbols):
         where = location(source, line)
@@ -108,6 +124,13 @@ def validate_program(program: ParsedProgram, *, check_symbols: bool = True) -> N
                     f"{location(previous_source, previous_line)}"
                 )
             if previous_kind != kind:
+                if "compiler temporary" in kind or "compiler temporary" in previous_kind:
+                    raise CompileError(
+                        f"{where}: compiler-generated C name {generated!r} "
+                        f"for {kind} {name!r} conflicts with {previous_kind} "
+                        f"{previous_name!r} at "
+                        f"{location(previous_source, previous_line)}"
+                    )
                 raise CompileError(
                     f"{where}: {kind} {name!r} conflicts with another "
                     "declaration of the same name at "

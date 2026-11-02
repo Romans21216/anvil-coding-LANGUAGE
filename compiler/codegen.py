@@ -216,6 +216,9 @@ def emit_nodes(
                 )
             if n.name.startswith('_anvil_callable_dispatch_'):
                 out.append(f'{indent}(void){lower(n,"call fn("+n.name+(", "+n.value if n.value else "")+")")};')
+            elif scope is None and n.name == "main":
+                values = [lower(n, arg) for arg in args]
+                out.append(f'{indent}printf("%.15g\\n", {c_name(n.name)}({", ".join(values)}));')
             else:
                 values = [lower(n, arg) for arg in args]
                 out.append(f"{indent}(void){c_name(n.name)}({', '.join(values)});")
@@ -520,13 +523,7 @@ def emit_c(
             f"{c_string_literal(project_name)});"
         )
     elif calls:
-        for n in calls:
-            values = [expr(n.source or path, n.line, arg, functions) for arg in split_args(n.value)]
-            call = f"{c_name(n.name)}({', '.join(values)})"
-            if n.name == "main":
-                lines.append(f'    printf("%.15g\\n", {call});')
-            else:
-                lines.append(f"    (void){call};")
+        lines.extend(emit_nodes(path, calls, functions, "    ", arrays=arrays))
     elif "main" in functions:
         if functions["main"].params:
             raise CompileError(

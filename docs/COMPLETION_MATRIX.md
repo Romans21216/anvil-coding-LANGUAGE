@@ -20,7 +20,7 @@ The complete backlog lives only in GitHub issue [#23](https://github.com/Romans2
 
 The full engine goal remains active. A green subset test suite or historical prototype score does not prove completion of missing systems. The [audited ledger](IMPLEMENTATION_STATUS.md) records item-specific evidence without copying the full backlog.
 
-Latest independent full review: `c06744a5585d7e84ece07fc8347fb32df9897e27`,75/100 FAIL against98;203 tests passed in223.038s. The C-first workflow is the required target. Selective-module zero-argument callback expressions fail due to overlapping binding edits; detailed P2 bug and acceptance criteria are in [issue #83](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/83). The current review and 50-score reasoning are in [QA_REPORT.md](QA_REPORT.md).
+Latest independent full review: base `6852275d86e43bf75da583961ad64d58aead2f08`, source/test diff SHA256 `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`, complete diff SHA256 `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`, 78/100 FAIL against98;210 tests passed in219.067s. Issues #83/#84/#85 are independently verified fixed; no new finding. See the complete 50-criterion rubric in [QA_REPORT.md](QA_REPORT.md).
 
 Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
 

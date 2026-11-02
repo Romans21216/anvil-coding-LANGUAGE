@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-11-02
-**Latest independent evaluation:** **75/100 - FAIL** on exact `c06744a5585d7e84ece07fc8347fb32df9897e27`.
+**Latest independent evaluation:** **78/100 - FAIL** on base `6852275d86e43bf75da583961ad64d58aead2f08`, source/test diff SHA256 `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`, complete diff SHA256 `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`.
 **Current passing threshold:** 98/100. Historical scores do not establish current full-goal completion.
 **Evaluator:** separate `project_full_review` agent, full 50-criterion review.
 
@@ -9,17 +9,17 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 
 ## Independent verification for this snapshot
 
-- Exact source: `c06744a5585d7e84ece07fc8347fb32df9897e27`.
-- `python -m unittest discover -s tests -q`: **203 passed**,223.038 seconds, original review session without restart.
+- Exact review source: base `6852275d86e43bf75da583961ad64d58aead2f08`, source/test diff SHA256 `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`, complete diff SHA256 `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`; per-file hashes are recorded in both structured status JSON documents.
+- `python -m unittest discover -s tests -q`: **210 passed**,219.067 seconds, original review session without restart.
 - VS Code extension0.1.13 grammar tests, VSIX CRC/source parity, compileall, QA arithmetic, strict UTF-8 JSON, and `git diff --check` passed.
 - Independent release probes: copied15-argument callback returned1120; supplementary-Unicode metadata survived release build and inspection. Installed extension0.1.4 remained unchanged.
-- Prior #79/#81/#82 regressions passed. Reviewer reread #23 plus57 comments and #80 after tests. Direct-native parity is not required by the C-first goal.
-- One confirmed P2 defect: zero-argument callback expressions over private selective-module globals have overlapping identifier rewrites. Detailed reproducer/impact/acceptance filed as [#83](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/83), label Codex Bugs. Test regression and complete fix remain open.
+- Prior #79/#81/#82 regressions passed. Reviewer reread #23 plus60 comments and #80 after tests. Direct-native parity is not required by the C-first goal.
+- Issues #83, #84 and #85 are fixed and independently verified. Top-level callback calls now share ordered lowering with function-body calls. Default/release tests verify left-to-right and exactly-once argument evaluation, nested callbacks, handle capture before callback-storage mutation, and source-located unset-callback errors. No new defect was found.
 - Untouched OS mouse-coordinate dispatch gap #63 remains disclosed. No new extension installation or global input was performed.
 
-## Latest 50-criterion scoring — `c06744a`
+## Latest 50-criterion scoring — base `6852275d` plus source/test diff `301855e2`
 
-**75/100 — FAIL against98.** Categories: requirements12/20; functionality/reliability16/20; architecture15/20; verification17/20; delivery15/20.
+**78/100 — FAIL against98.** Categories: requirements13/20; functionality/reliability18/20; architecture15/20; verification17/20; delivery15/20.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|:---:|---|
@@ -30,19 +30,19 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | 5 | No essential feature missing | 0 | Rich types, audio, GPU/DXR/Embree, broader assets/physics/networking and Forge/OS remain absent or partial. |
 | 6 | Stated constraints respected | 2 | Inspectible C→MSVC→EXE is the required path; no silent backend change. |
 | 7 | Ambiguity resolved logically | 2 | Version 1 compatibility, version 2 scope and optional native limits are explicit. |
-| 8 | Behavior matches documentation | 1 | Selective import + zero-argument global callback expression fails; fix overlapping rewrites. |
+| 8 | Behavior matches documentation | 2 | #83/#84/#85 corrected; top-level and in-function callback argument order, nested calls, and handle capture are independently verified. |
 | 9 | Important use cases supported | 1 | Major engine and Forge/OS workflows remain unsupported. |
 | 10 | Usable for intended purpose | 1 | Useful prototype; full production purpose remains incomplete. |
 | 11 | Core functionality works | 1 | Primary C build and implemented language/runtime subset pass. |
-| 12 | Secondary functionality works | 1 | Selective-module zero-argument callbacks have a confirmed composition defect. |
+| 12 | Secondary functionality works | 2 | Callback and selective-module compositions pass default/release probes, including side effects and nested calls. |
 | 13 | Primary workflows functional | 1 | Forge/package/assembly/UEFI/kernel workflows remain absent. |
 | 14 | Inputs validated | 2 | Invalid references, roots, arity, budgets and domains are checked. |
 | 15 | Errors handled gracefully | 2 | Runtime/compile failures produce controlled diagnostics in tested cases. |
 | 16 | Edge cases covered | 2 | Unicode, numeric, bounds, allocation, clipping and lifetime regressions pass. |
 | 17 | Invalid inputs controlled | 2 | Malformed inputs and unsupported features are rejected in tested paths. |
 | 18 | Stable across repeated operations | 2 | Runtime resource, repeated-operation and recursion tests pass. |
-| 19 | No known critical defects | 2 | No critical defect found; #83 is a valid-program compile failure. |
-| 20 | Components integrate | 1 | Selective imports and zero-argument global callback expressions fail to compose. |
+| 19 | No known critical defects | 2 | No confirmed critical defect remains; issues #83–#85 are fixed and independently verified. |
+| 20 | Components integrate | 2 | Top-level and function-body callback calls now share ordered lowering; verified handle capture and diagnostics. |
 | 21 | Logical project structure | 2 | Compiler phase and runtime modules have clear responsibilities. |
 | 22 | Readable and consistently formatted | 1 | Dense one-line and inconsistent formatting in new parser/codegen changes hinders maintenance. |
 | 23 | Clear module responsibilities | 1 | Expression parsing, validation and emission remain coupled; add validated IR. |
@@ -53,7 +53,7 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | 28 | No unfinished placeholders | 1 | Required engine and target breadth remains unsupported. |
 | 29 | Configuration understandable | 2 | Selectors, qualifiers, aliases and project boundaries are explicit. |
 | 30 | Conventions followed | 2 | C/Win32 workflow matches current conventions; broader system interfaces remain absent. |
-| 31 | Automated tests provided | 2 | 203 tests and extension0.1.13 checks pass. |
+| 31 | Automated tests provided | 2 | 210 tests and extension0.1.13 checks pass. |
 | 32 | Core tests covered | 2 | Implemented behavior is covered by executable C/native tests. |
 | 33 | Failure scenarios tested | 2 | Missing exports, arity, cycles, boundaries and runtime errors are exercised. |
 | 34 | Edge cases explicitly tested | 2 | Aliases, private helpers/state, recursion, initialization, text and limits are tested. |
@@ -61,7 +61,7 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | 36 | Documented test commands work | 2 | Documented unittest/npm/QA commands execute successfully. |
 | 37 | Builds and compilation pass | 2 | C/native executable builds, compileall and package checks pass. |
 | 38 | Results recorded accurately | 2 | Exact source, score, test timing, previous baseline and current finding are distinguished. |
-| 39 | Regression checks performed | 2 | Full203-test run completed on the immutable reviewed source. |
+| 39 | Regression checks performed | 2 | Full210-test run completed on the immutable reviewed source. |
 | 40 | Verified against original goal | 0 | Full engine/Forge/OS acceptance remains incomplete; passing subsets do not prove completion. |
 | 41 | Installation instructions accurate | 2 | Current C/MSVC and extension instructions are accurate. |
 | 42 | Setup reproducible | 1 | Full target/platform/package setup remains incomplete. |
@@ -73,16 +73,16 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | 48 | Deliverables organized | 2 | Source, examples, tests, package and docs are organized. |
 | 49 | Limitations disclosed | 2 | Engine, Forge/OS, acceleration and optimization gaps are disclosed. |
 | 50 | Practical for intended scope | 0 | Full engine/Forge/OS and measured-efficiency deliverables remain absent. |
-| | **Requirement fulfillment** | **12/20** | |
-| | **Functionality and reliability** | **16/20** | |
+| | **Requirement fulfillment** | **13/20** | |
+| | **Functionality and reliability** | **18/20** | |
 | | **Code quality and architecture** | **15/20** | |
 | | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **75/100** | Exact commit `c06744a`; FAIL against98. |
+| | **Total** | **78/100** | Base `6852275d` plus source/test diff `301855e2`; FAIL against98. |
 
 ### Deduction details and follow-up
 
-The independently reproduced #83 is a P2 compilation failure for valid source: `ProgramLoader.rewrite` adds two edits to the same callback identifier span when `call var(cb)` / `call varl(cb)` has zero arguments in a selective module. Private module callback `target` returning73, assigned to `var(cb)`, then called from exported `move`, fails at the library call line with a duplicated generated name. Expected: compile and print73. Actual: C and native selections reject the source before build. Fix structured binding to apply each identifier span once; test private global var/varl, nested expression, v2 module, and preserve statement/nonzero-argument/quoted cases.
+Issues #83/#84/#85 are fixed and independently verified. The top-level emitter now routes all top-level calls through shared `emit_nodes` lowering. Tests cover the original expected12/actual21 case in default/release, nested side effects (independent default/release output212), callback-handle capture before argument code changes callback storage (56), and unset callbacks exiting2 at original source line6. No new defect was confirmed.
 
 Other deductions remain open: complete #23 engine/media/networking/runtime/tooling/Forge/OS outputs; actual selectable DXR/Embree; platform/resource workflows and benchmark evidence; untouched #63 integration coverage; editor build/debug/navigation; expression IR and centralized structured binding; normalize new parser/codegen formatting. Direct-native parity is optional under the updated C-first direction.
 
@@ -92,7 +92,10 @@ The numeric score is an exact snapshot result. The C-first implementation is not
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
-| `c06744a5585d7e84ece07fc8347fb32df9897e27` |75 /98 FAIL|203 tests in223.038s; C-first goal reviewed. #83 zero-argument callback/selective-module overlap confirmed and filed; #79/#81/#82 remain resolved.|
+| Base `6852275d` plus source/test diff `301855e2…` |78 /98 FAIL|210 tests in219.067s; #83–#85 fixed; no new finding.|
+| Base `6852275d` plus source/test diff `87f9eb7f…` |75 /98 FAIL|208 tests in215.487s; #83/#84 fixed; #85 was confirmed and later fixed.|
+| Base `6852275d` plus diff `9ec495ff…` |75 /98 FAIL|206 tests in216.413s; #83 fixed; #84 confirmed; historical snapshot.|
+| `c06744a5585d7e84ece07fc8347fb32df9897e27` |75 /98 FAIL|203 tests in223.038s; historical review; #83 discovered.|
 | `b76fc02a1f6ea9ab24f7af004e8a0981ba249252` |76 /98 FAIL|194 tests in 281.445s; selective imports reviewed. #81/#82 independently verified fixed; no new finding; full goal remains incomplete.|
 | `957ee124402e0ba773971aaee24c48c8b277929a` |71 /98 FAIL|192 tests in 323.089s; selective imports reviewed. #81 residual and #82 private-reference bypass confirmed; both open.|
 | `68ff824b53cae9952fbfbce7fd27d29ac4bfc7f2` |76 /98 FAIL|175 tests in218.389s; native literal Unicode text verified; no new finding.|
@@ -124,3 +127,8 @@ Focused record-only check at ba78d22 found one stale ancillary extension field i
 #81 and #82 independently VERIFIED FIXED on b76fc02: supplementary UTF-8 metadata compiles/reports correctly, and source cannot name private generated functions/arrays. Prior #79 stays verified fixed. #63 and broader #5–11/#14–15/#24/#23/#80 capability/verification gaps remain open. Confirmed findings retain detailed reproduction, impact and acceptance under Codex Bugs; user reports use Romans21216 - Bugs. Complete inventory only in [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
 
 Focused independent record-only recheck at b752f41: PASS. All six current records, ancillary fields, all50 scores and both candidate_validation objects agree on reviewed source b76fc02,76/100,categories12/18/14/17/15 and194 tests281.445s. Source extension0.1.12/installed0.1.4 and historical71/192/323.089 evidence are distinguished; follow-ups null. #58 correction verified. No source change, new test run or rescore.
+
+
+## Latest independent review identity
+
+Base `6852275d86e43bf75da583961ad64d58aead2f08`; source/test diff SHA256 `301855e224bc437e8c6a2f20e4bf2bff616fc5fbca350561e9b98ca0c65eaaee`; complete diff SHA256 `0ed000205e948578d1dd937c9197bbce6d3a85736d7bb49f9a5cfdd35cc124a3`. The independent full suite passed210 tests in219.067s. #83/#84/#85 are resolved; no new finding.

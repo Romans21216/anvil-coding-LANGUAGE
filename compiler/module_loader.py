@@ -252,7 +252,14 @@ class ProgramLoader:
                 if name not in scope.arrays:
                     self.error(node,f"unknown array {name!r} in included module")
                 edits.append((match.start(1),match.end(1),scope.symbol("a",name)))
-        for start,end,value in sorted(edits,reverse=True):
+        by_span = {}
+        for start, end, value in edits:
+            key = start, end
+            previous = by_span.get(key)
+            if previous is not None and previous != value:
+                self.error(node, "conflicting compiler bindings for one source identifier")
+            by_span[key] = value
+        for (start, end), value in sorted(by_span.items(), reverse=True):
             text = text[:start]+value+text[end:]
         return text
 
