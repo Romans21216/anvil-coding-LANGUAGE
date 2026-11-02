@@ -950,7 +950,8 @@
       "tests/test_runtime_modules.py"
     ],
     "local_source_commit": "de68679f1f05a3a5db7b5eadbf20989e43321a76",
-    "publication_status": "Source published to origin/main; evaluation comment posted; six-record parity pending."
+    "publication_status": "Source published to origin/main; evaluation comment posted; six-record parity pending.",
+    "post_record_sync_all_11_path_sha256": "12602e30e57b71d4f32b8254fd982be93983ff24c8523999dbb9e586f3d6645e"
   },
   "current_candidate_commit": "de68679f1f05a3a5db7b5eadbf20989e43321a76",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
@@ -1182,7 +1183,7 @@
     "published_commit": "de68679f1f05a3a5db7b5eadbf20989e43321a76",
     "issue23_comment_id": 6585531493,
     "issue23_comment_count": 74,
-    "post_record_sync_all_11_path_sha256": "PENDING",
+    "post_record_sync_all_11_path_sha256": "12602e30e57b71d4f32b8254fd982be93983ff24c8523999dbb9e586f3d6645e",
     "issue23_comment_url": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6585531493"
   },
   "latest_push_result": "Source de68679 published to origin/main; issue #23 comment6585531493 posted; evaluation records being synchronized.",
@@ -1294,7 +1295,8 @@
       "tests/test_runtime_modules.py"
     ],
     "local_source_commit": "de68679f1f05a3a5db7b5eadbf20989e43321a76",
-    "publication_status": "Source published to origin/main; evaluation comment posted; six-record parity pending."
+    "publication_status": "Source published to origin/main; evaluation comment posted; six-record parity pending.",
+    "post_record_sync_all_11_path_sha256": "12602e30e57b71d4f32b8254fd982be93983ff24c8523999dbb9e586f3d6645e"
   },
   "previous_independent_review": {
     "commit": "6852275d86e43bf75da583961ad64d58aead2f08+working-tree",
@@ -1410,14 +1412,14 @@
   },
   "current_active_item_status": "Physics is separately compiled with networking; 79/100 after record sync versus98. Independent full suite250/255.521s. Package imports, renderer/core separation, Forge/OS/UEFI, actual DXR/Embree and benchmarks remain.",
   "last_test_results": {
-    "python_unittest": "Local250/247.322s before final test-literal-only update; independent250/255.521s exact candidate",
-    "independent_targeted_tests": "42 authoring/build/module tests/50.921s; six physics executable tests/13.093s; final literal regression PASS",
-    "extension": "npm validation passed; installed0.1.4 unchanged",
+    "python_unittest": "Local253/285.750s; independent253/283.720s; exact candidate PASS",
+    "independent_targeted_tests": "Full independent suite independently rerun; 253 passed.",
+    "extension": "npm extension validation PASS; installed0.1.4 unchanged",
     "compileall": "PASS",
     "qa_report_validator": "PASS 50 rows sum79; categories agree",
     "strict_json": "PASS",
     "git_diff_check": "PASS",
-    "msvc_release_probe": "Physics executable integrations passed"
+    "msvc_release_probe": "Full suite executable build coverage passed"
   },
   "resolved_critic_issue_86": "Independently verified fixed on3cfb5b9. Ordinary user-defined calls evaluate arguments exactly once, left-to-right through per-scope C temporaries; nested expressions, top-level calls, recursion, display hook expressions, generated-name collision diagnostics, and default/release builds pass. Issue #86 closed after 213-test independent full suite and full50 review; no new finding.",
   "resolved_critic_issue_87": "Independently verified fixed on base 0e2126ecf01f1815bffef33a7d270f7cf2f3da50 plus source/test diff ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9. MSVC helper and objects use a unique build-owned temporary directory; success executable/sentinel regression and mocked compiler-failure cleanup probe pass. GitHub issue #87 closed.",
