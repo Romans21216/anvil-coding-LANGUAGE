@@ -1,23 +1,24 @@
 # Anvil QA report
 
 **Review date:** 2026-11-02
-**Latest independent evaluation:** **79/100 - FAIL** on base `7b0e921dce5b562c53b042003339f33309983aa1`, code/test difflib SHA256 `e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f`, implementation diff SHA256 `42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133`. The independent full50 review scored78 while criterion38 records referred to the previous candidate; synchronizing the 227-test candidate evidence restores criterion38 to2. An independent audit confirmed parity across all six records.
+**Latest independent evaluation:** **79/100 - FAIL** on base `87e23d6943028222619f9febe0ed970e8d1a7ed7`, source/test diff SHA256 `57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c`, implementation diff SHA256 `24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac`. The independent full50 review scored78 while criterion38 still referenced the previous candidate; syncing this 233-test candidate restores criterion38 to2. The independent six-record parity recheck passed.
 **Current passing threshold:** 98/100. Historical scores do not establish current full-goal completion.
-**Evaluator:** separate `final_review` agent, independent full50 review and independent six-record parity audit; both are complete.
+**Evaluator:** separate `final_review` agent; the independent full50 review is complete and the six-record parity recheck passed.
 
 The generated-C/MSVC path is the required compiler workflow; direct-native parity is optional. The full engine, selectable DXR/Embree, rich types, Forge formats, assembly/UEFI/OS targets and measured optimization remain incomplete. The complete inventory remains exclusively in issue #23/comments.
 
 ## Independent verification for this snapshot
 
-- Base `7b0e921dce5b562c53b042003339f33309983aa1`; code/test SHA256 `e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f`; implementation SHA256 `42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133`; full 14-path worktree snapshot at review SHA256 `ab558713d36734cef86edf1109ceae9b4b004ecc2afda4a528fb847591d4e3b0`. Hashes use sorted paths and concatenated `difflib.unified_diff` output with three context lines.
-- `python -m unittest discover -s tests -q`: **227 passed in254.117s** in the independent review; our run also passed227 in293.538s. Independent compileall for compiler/tests/scripts, VS Code extension0.1.13 validation, QA arithmetic, strict UTF-8 JSON and `git diff --check` passed. Installed VS Code0.1.4 remains unchanged.
+- Base `87e23d6943028222619f9febe0ed970e8d1a7ed7`; source/test SHA256 `57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c`; implementation SHA256 `24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac`; all16 changed paths at review SHA256 `caa73ca775bfd3ecca4aa1ef57e5c522cf39ae6d89b37d7333249ceedc514615`. Hashes use sorted paths and concatenated `difflib.unified_diff` output with three context lines.
+- `python -m unittest discover -s tests -q`: **233 passed in253.611s** in the independent review; local run passed233 in269.749s. Three targeted C recursion, imported-native recursion and maximum-budget tests passed in2.147s. Independent compileall, VS Code extension0.1.13 validation, QA arithmetic, strict UTF-8 JSON and `git diff --check` passed. Installed VS Code0.1.4 remains unchanged.
 - C function elimination starts from explicit top-level calls, or `main` when no explicit call statements exist; graphical programs start at `draw`/`update`. Transitive ordinary calls, callback dispatch targets and engine helpers remain. All function bodies are still validated.
 - C generation omits unreachable Anvil functions and global scalar/array declarations unused by top-level initialization and emitted functions. Reachable writes and expression evaluation remain. A 200,000-element dead global array was omitted from generated C, while a compiled executable still printed5. A selectively imported function retained its live module storage and removed storage reachable only through an uncalled imported function. Callback targets and version1/version2 local shadowing probes also passed.
-- Issues #88 and #89 are independently verified fixed and closed. Item #123 is now more complete but remains partial: unreachable functions and unused global scalar/array declarations are pruned; runtime subsystems and package features are not selectively linked.
-- Reviewer reread issue #23 and its68 comments after tests, including the C toolchain, OS/modularity clarification, and item #123 context. No new implementation defect was found. Direct-native parity remains optional; #63 integration evidence remains open.
-- Record reconciliation changes criterion38 from1 to2 for the verified snapshot, yielding79/100. Independent record-only parity confirmation passed for all six records. The complete goal remains below the required98.
+- Issue #90 was filed under Codex Bugs for the native local-array failure location. The fix reports the earliest declaration line and declaring source path, including imported modules; independent regressions assert the library path and line2. Issue #90 is fixed and will be closed after commit publication. Items #80/#81 now have partial per-project memory-budget support.
+- Issues #88/#89 remain fixed. Item #123 remains partial: unreachable functions and unused global scalar/array declarations are pruned, but runtime subsystems/package features are not selectively linked.
+- Reviewer reread current issue #23 and comments after tests. No new implementation defect remains. Direct-native parity remains optional; #63 integration evidence remains open.
+- Synchronizing records restores criterion38 from1 to2 and the score to79/100. Independent six-record parity confirmation passed. The complete goal remains below98.
 
-## Latest 50-criterion scoring — base `7b0e921dce5b562c53b042003339f33309983aa1` plus code/test diff `e61e6091`
+## Latest 50-criterion scoring — base `87e23d6943028222619f9febe0ed970e8d1a7ed7` plus source/test diff `57b0392f`
 
 **79/100 — FAIL against98.** Categories: requirements13/20; functionality/reliability19/20; architecture15/20; verification17/20; delivery15/20.
 
@@ -41,7 +42,7 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | 16 | Edge cases covered | 2 | Unicode, numeric, bounds, allocation, clipping and lifetime regressions pass. |
 | 17 | Invalid inputs controlled | 2 | Malformed inputs and unsupported features are rejected in tested paths. |
 | 18 | Stable across repeated operations | 2 | Runtime resource, repeated-operation and recursion tests pass. |
-| 19 | No known critical defects | 2 | No current implementation defect was confirmed; #83–#89 are fixed and independently verified. |
+| 19 | No known critical defects | 2 | No current implementation defect was confirmed; #83–#90 are fixed and independently verified. Issue #90 closure follows commit publication. |
 | 20 | Components integrate | 2 | Ordinary and callback calls use ordered lowering; generated temporary declarations, display composition, recursion and collision diagnostics pass. |
 | 21 | Logical project structure | 2 | Compiler phase and runtime modules have clear responsibilities. |
 | 22 | Readable and consistently formatted | 1 | Dense one-line and inconsistent formatting in new parser/codegen changes hinders maintenance. |
@@ -53,15 +54,15 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | 28 | No unfinished placeholders | 1 | Required engine and target breadth remains unsupported. |
 | 29 | Configuration understandable | 2 | Selectors, qualifiers, aliases and project boundaries are explicit. |
 | 30 | Conventions followed | 2 | C/Win32 workflow matches current conventions; broader system interfaces remain absent. |
-| 31 | Automated tests provided | 2 | 227 tests passed independently in254.117s and locally in293.538s; extension0.1.13 checks pass. |
+| 31 | Automated tests provided | 2 | 233 tests passed independently in253.611s and locally in269.749s; extension0.1.13 checks pass. |
 | 32 | Core tests covered | 2 | Implemented behavior is covered by executable C/native tests. |
 | 33 | Failure scenarios tested | 2 | Missing exports, arity, cycles, boundaries and runtime errors are exercised. |
 | 34 | Edge cases explicitly tested | 2 | Aliases, private helpers/state, recursion, initialization, text and limits are tested. |
 | 35 | Integration behavior tested | 1 | OS mouse-coordinate dispatch coverage #63 remains open. |
 | 36 | Documented test commands work | 2 | Documented unittest/npm/QA commands execute successfully. |
 | 37 | Builds and compilation pass | 2 | C/MSVC executable builds, compileall and package checks pass. |
-| 38 | Results recorded accurately | 2 | Exact code/test/implementation hashes, both 227-test runs, rubric and issue statuses are synchronized; an independent record-parity audit passed. |
-| 39 | Regression checks performed | 2 | Two full227-test runs completed on the frozen storage-pruning source; executable storage, import, callback, and shadowing probes pass. |
+| 38 | Results recorded accurately | 2 | Exact source/test/implementation hashes, both 233-test runs and all50 criterion scores are synchronized; independent record-parity recheck passed. |
+| 39 | Regression checks performed | 2 | Full233-test runs passed independently and locally; C/native memory bounds, recursive exhaustion and imported-source diagnostics are covered. |
 | 40 | Verified against original goal | 0 | Full engine/Forge/OS acceptance remains incomplete; passing subsets do not prove completion. |
 | 41 | Installation instructions accurate | 2 | Current C/MSVC and extension instructions are accurate. |
 | 42 | Setup reproducible | 1 | Full target/platform/package setup remains incomplete. |
@@ -78,7 +79,7 @@ The generated-C/MSVC path is the required compiler workflow; direct-native parit
 | | **Code quality and architecture** | **15/20** | |
 | | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **79/100** | Base `7b0e921d` plus code/test diff `e61e6091`; FAIL against98. |
+| | **Total** | **79/100** | Base `87e23d69` plus source/test diff `57b0392f`; FAIL against98. |
 
 ### Deduction details and follow-up
 
@@ -92,7 +93,8 @@ The numeric score is an exact snapshot result. The C-first implementation is not
 
 | Exact snapshot | Score / threshold | Evidence and changes |
 |---|---|---|
-| Base `7b0e921d` plus code/test diff `e61e6091…` |79 /98 FAIL|227 tests passed locally in293.538s and independently in254.117s; global storage, selective-import, callback, and local-shadowing probes passed; final score79 after record synchronization, independent parity audit passed.|
+| Base `87e23d69` plus source/test diff `57b0392f…` |79 /98 FAIL|233 tests passed locally in269.749s and independently in253.611s; project memory budgets and imported native diagnostics reviewed; criterion38 restored after record sync; independent six-record parity recheck passed.|
+| Base `7b0e921d` plus code/test diff `e61e6091…` |79 /98 FAIL|227 tests passed locally in293.538s and independently in254.117s; global storage, selective-import, callback, and local-shadowing probes passed; historical parity audit passed.|
 | Base `7b0e921d` plus code/test diff `24dbf3ea…` |79 /98 FAIL|224 tests passed in both local250.318s and independent257.990s runs; #89 graphical startup and C DCE roots verified; score79 after record synchronization and independent parity recheck passed.|
 | Base `0e2126ec` plus source/test diff `ddf56f5f…` |78 /98 FAIL|216 tests in242.910s; default build cleanup and explicit C preservation verified; #87 fixed/closed; no new finding.|
 | Base `6e8d3651` plus source/test diff `8f158a13…` |78 /98 FAIL|213 tests in227.671s; #86 ordinary argument-order issue verified fixed; no new finding.|
@@ -136,6 +138,8 @@ Focused independent record-only recheck at b752f41: PASS. All six current record
 
 ## Latest independent review identity
 
-Base `7b0e921dce5b562c53b042003339f33309983aa1`; code/test SHA256 `e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f`; implementation SHA256 `42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133`; full diff SHA256 `ab558713d36734cef86edf1109ceae9b4b004ecc2afda4a528fb847591d4e3b0`. Full suite passed227 tests in independent254.117s and local293.538s. Categories13/19/15/17/15; score79/100 after syncing records, with independent six-record parity audit passed. The C backend now prunes unused global scalar/array declarations and unreachable functions. Selective-import, callback, and v1/v2 shadowing probes passed. #87–#89 are fixed and verified; #123 remains partial because runtime subsystems and packages are not selectively linked.
+Base `87e23d6943028222619f9febe0ed970e8d1a7ed7`; source/test SHA256 `57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c`; implementation SHA256 `24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac`; all16 changed paths at review SHA256 `caa73ca775bfd3ecca4aa1ef57e5c522cf39ae6d89b37d7333249ceedc514615`. Full suite passed233 tests independently in253.611s and locally in269.749s. Categories13/19/15/17/15; score79/100 after record sync. `[memory]` limits apply to C/native builds and nested includes; native allocation diagnostics report the declaring module path and line. #90 is fixed but remains open pending commit publication; issues #87–#89 are closed. #123 remains partial because runtime subsystems and packages are not selectively linked. The full goal remains incomplete.
 
 Evaluation comment: https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6582314947
+
+Independent six-record record-only recheck: PASS. All six current records agree on candidate base/hash identity, score79/100, criterion vector/category subtotals, 233 local/independent test results and timings, 3 focused tests, issue #23 comment count69 before this update, and issue #90 fixed-but-open status. No source change, test rerun, or rescore.

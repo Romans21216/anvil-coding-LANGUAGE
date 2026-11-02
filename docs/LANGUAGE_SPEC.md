@@ -115,7 +115,7 @@ A function parameter is numeric. `var(name)` inside a function resolves to a sam
 
 `array(name, index)` reads a numeric element. `set array(name, index) = expression` writes an element and is only valid in a function. Indexes are zero-based finite whole numbers in `[0, size)`. Invalid indexes terminate execution with a path-and-line diagnostic and exit code 2.
 
-An array may be global or local to a function. Arrays cannot be resized. A function may declare at most 8,192 local array elements in total; active local-array storage across recursive calls is capped at 16 MiB. Local arrays are zero-initialized, allocated per invocation, and freed on every generated return. Allocation failure or budget exhaustion is a source-located runtime error. Each global array has a maximum size of 1,048,576 elements.
+An array may be global or local to a function. Arrays cannot be resized. The default project limit is 8,192 local array elements per function and 16 MiB of active local-array storage across recursive calls. An `.ANVLproj` may override these with `[memory].local_array_elements` (1–1,048,576) and `[memory].active_call_memory_mib` (1–2,048 MiB). The compiler rejects a function whose statically declared local arrays cannot fit its active-call budget; the shared budget also guards simultaneous recursive invocations at runtime. Local arrays are zero-initialized, allocated per invocation, and freed on every generated return. Allocation failure or budget exhaustion is a source-located runtime error. Each global array has a maximum size of 1,048,576 elements.
 
 ### 3.3 Branches and loops
 

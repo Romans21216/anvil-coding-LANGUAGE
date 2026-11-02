@@ -1244,6 +1244,129 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_set_fixed_hz(60)", generated)
             self.assertIn('"First World"', generated)
 
+    def test_project_memory_settings_control_c_local_array_limits(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            source = root / "main.ANVL"
+            source.write_text(
+                "fn(main)\n array scratch(4)\n"
+                " set array(scratch, 0) = 7\n"
+                " output array(scratch, 0)\nend\n",
+                encoding="utf-8",
+            )
+            project = root / "game.ANVLproj"
+            project.write_text(
+                'entry = "main.ANVL"\n[memory]\n'
+                "local_array_elements = 4\nactive_call_memory_mib = 2\n",
+                encoding="utf-8",
+            )
+            generated = root / "game.c"
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(project), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            c_source = generated.read_text(encoding="utf-8")
+            self.assertIn("#define ANVIL_LOCAL_ARRAY_BUDGET_BYTES 2097152u", c_source)
+            self.assertIn("anvil_local_array_alloc(4", c_source)
+
+            project.write_text(
+                'entry = "main.ANVL"\n[memory]\n'
+                "local_array_elements = 3\nactive_call_memory_mib = 2\n",
+                encoding="utf-8",
+            )
+            rejected = subprocess.run(
+                [sys.executable, str(COMPILER), str(project), "--emit-c", str(root / "bad.c")],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("local arrays in a function may contain at most 3 elements", rejected.stderr)
+            self.assertIn("main.ANVL:2", rejected.stderr)
+
+    def test_project_memory_manifest_values_are_bounded(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "main.ANVL").write_text("fn(main)\nend\n", encoding="utf-8")
+            project = root / "bad-memory.ANVLproj"
+            for setting in (
+                "local_array_elements = 0",
+                "local_array_elements = 1048577",
+                "local_array_elements = true",
+                "active_call_memory_mib = 0",
+                "active_call_memory_mib = 2049",
+                "active_call_memory_mib = false",
+                "other = 1",
+            ):
+                project.write_text(
+                    'entry = "main.ANVL"\n[memory]\n' + setting + "\n",
+                    encoding="utf-8",
+                )
+                result = subprocess.run(
+                    [sys.executable, str(COMPILER), str(project), "--emit-c", str(root / "bad.c")],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertNotEqual(result.returncode, 0, setting)
+                self.assertIn(str(project), result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+
+    def test_active_call_memory_limit_rejects_impossible_single_local_array(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "main.ANVL").write_text(
+                "fn(main)\n array scratch(131073)\nend\n", encoding="utf-8"
+            )
+            project = root / "small-budget.ANVLproj"
+            project.write_text(
+                'entry = "main.ANVL"\n[memory]\n'
+                "local_array_elements = 200000\nactive_call_memory_mib = 1\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(project), "--emit-c", str(root / "bad.c")],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("main.ANVL:2", result.stderr)
+            self.assertIn("above the active-call memory limit of 1048576 bytes", result.stderr)
+
+    def test_active_call_memory_budget_is_shared_across_c_recursion(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "main.ANVL").write_text(
+                "fn(recurse, depth)\n"
+                " array cells(131000)\n"
+                " if var(depth) > 0\n"
+                "  output call fn(recurse, var(depth) - 1)\n"
+                " end\n"
+                " output 0\n"
+                "end\n"
+                "fn(main)\n output call fn(recurse, 2)\nend\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            project = root / "recursive.ANVLproj"
+            project.write_text(
+                'entry = "main.ANVL"\n[memory]\n'
+                "local_array_elements = 131000\nactive_call_memory_mib = 1\n",
+                encoding="utf-8",
+            )
+            executable = root / "recursive.exe"
+            subprocess.run(
+                [sys.executable, str(COMPILER), str(project), "--output", str(executable)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=10
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("active local arrays exceed the 1 MiB Anvil memory limit", result.stderr)
+
     def test_project_manifest_rejects_invalid_fixed_rate(self):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp)

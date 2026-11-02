@@ -8,7 +8,10 @@ import re
 import struct
 from dataclasses import dataclass
 
-from compiler.common import CompileError, KEY_CODES, Node
+from compiler.common import (
+    CompileError, KEY_CODES, MAX_ACTIVE_LOCAL_ARRAY_BYTES,
+    MAX_ACTIVE_LOCAL_ARRAY_MIB, Node,
+)
 from compiler.expressions import ExpressionParser, MAX_EXPRESSION_DEPTH, split_args
 from compiler.lexer import strip_comment
 from compiler.native_x64 import Pe32Plus, X64Code
@@ -258,7 +261,7 @@ class NativeCodegen:
     MAX_DATA_BYTES = 16 * 1024 * 1024
     MAX_FRAME_BYTES = 4096
 
-    def __init__(self, path, functions, top, variables, arrays=None, *, fixed_hz=60, title="Anvil Native 2D"):
+    def __init__(self, path, functions, top, variables, arrays=None, *, fixed_hz=60, title="Anvil Native 2D", active_local_array_bytes=MAX_ACTIVE_LOCAL_ARRAY_BYTES):
         self.path = path
         from compiler.program_metadata import extract,pack
         metadata=extract(top)
@@ -268,9 +271,21 @@ class NativeCodegen:
         self._local_arrays = NativeArrays(self)
         if isinstance(fixed_hz, bool) or not isinstance(fixed_hz, int) or not 1 <= fixed_hz <= 240:
             raise CompileError(f"{path}: fixed_hz must be an integer from 1 to 240")
+        if (
+            isinstance(active_local_array_bytes, bool)
+            or not isinstance(active_local_array_bytes, int)
+            or not 1024 * 1024 <= active_local_array_bytes
+            <= MAX_ACTIVE_LOCAL_ARRAY_MIB * 1024 * 1024
+            or active_local_array_bytes % (1024 * 1024)
+        ):
+            raise CompileError(
+                f"{path}: active local array budget must be an integer number of MiB "
+                f"from 1 to {MAX_ACTIVE_LOCAL_ARRAY_MIB} MiB"
+            )
         if not isinstance(title, str) or not title.strip() or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in title):
             raise CompileError(f"{path}: title must be a non-empty Unicode string without control characters")
         self.fixed_hz = fixed_hz
+        self.active_local_array_bytes = active_local_array_bytes
         self.title = title
         if any(name.startswith("_anvil_native_") or fn.original_name.startswith("_anvil_native_")
                for name,fn in functions.items()):

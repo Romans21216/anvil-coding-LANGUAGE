@@ -7,6 +7,7 @@ import re
 
 from compiler.common import (
     MAX_ACTIVE_LOCAL_ARRAY_BYTES,
+    MAX_ACTIVE_LOCAL_ARRAY_MIB,
     CompileError,
     Node,
     array_code,
@@ -365,7 +366,19 @@ def emit_c(
     arrays: dict[str, int] | None = None,
     fixed_hz: int = 60,
     project_name: str = "Anvil Game",
+    active_local_array_bytes: int = MAX_ACTIVE_LOCAL_ARRAY_BYTES,
 ) -> str:
+    if (
+        isinstance(active_local_array_bytes, bool)
+        or not isinstance(active_local_array_bytes, int)
+        or not 1024 * 1024 <= active_local_array_bytes
+        <= MAX_ACTIVE_LOCAL_ARRAY_MIB * 1024 * 1024
+        or active_local_array_bytes % (1024 * 1024)
+    ):
+        raise CompileError(
+            f"{path}: active local array budget must be an integer number of MiB "
+            f"from 1 to {MAX_ACTIVE_LOCAL_ARRAY_MIB} MiB"
+        )
     arrays = arrays or {}
     from compiler.program_metadata import extract,pack
     metadata=extract(top)
@@ -478,7 +491,7 @@ def emit_c(
         lines.extend(
             [
                 f"#define ANVIL_LOCAL_ARRAY_BUDGET_BYTES "
-                f"{MAX_ACTIVE_LOCAL_ARRAY_BYTES}u",
+                f"{active_local_array_bytes}u",
                 "static size_t anvil_active_local_array_bytes;",
                 "static double *anvil_local_array_alloc(size_t count, "
                 "const char *path, int line) {",

@@ -29,6 +29,83 @@ class NativeProjectTests(unittest.TestCase):
                 result = subprocess.run([str(output)], capture_output=True, text=True, timeout=5)
                 self.assertEqual((result.returncode, result.stdout.strip()), (0, '20'))
 
+    def test_project_memory_settings_reach_native_array_backend(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            entry = root / "main.ANVL"
+            source = "fn(main)\n array scratch(4)\n output 9\nend\ncall fn(main)\n"
+            entry.write_text(source, encoding="utf-8")
+            project = root / "game.ANVLproj"
+            project.write_text(
+                'entry="main.ANVL"\n[memory]\n'
+                "local_array_elements=4\nactive_call_memory_mib=2048\n",
+                encoding="utf-8",
+            )
+            output = root / "game.exe"
+            with mock.patch.object(
+                sys, "argv", ["anvil", str(project), "--backend", "native", "-o", str(output)]
+            ):
+                self.assertEqual(main(), 0)
+            expected = NativeCodegen(
+                entry.resolve(),
+                *parse(
+                    entry.resolve(),
+                    source,
+                    include_root=root,
+                    local_array_elements=4,
+                    active_local_array_bytes=2048 * 1024 * 1024,
+                ),
+                active_local_array_bytes=2048 * 1024 * 1024,
+            ).generate()
+            self.assertEqual(output.read_bytes(), expected)
+
+    def test_active_call_memory_budget_is_shared_across_native_recursion(self):
+        if sys.platform != "win32":
+            self.skipTest("native backend emits Windows PE executables")
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            entry = root / "main.ANVL"
+            entry.write_text(
+                'include fn(recurse) -- "lib/arrays.ANVL"\n'
+                "fn(main)\n output call fn(recurse -- arrays, 2)\nend\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            (root / "lib").mkdir()
+            library = root / "lib" / "arrays.ANVL"
+            library.write_text(
+                "fn(recurse, depth)\n"
+                " array cells(131000)\n"
+                " if var(depth) > 0\n"
+                "  output call fn(recurse, var(depth) - 1)\n"
+                " end\n"
+                " output 0\n"
+                "end\n",
+                encoding="utf-8",
+            )
+            project = root / "recursive.ANVLproj"
+            project.write_text(
+                'entry="main.ANVL"\n[memory]\n'
+                "local_array_elements=131000\nactive_call_memory_mib=1\n",
+                encoding="utf-8",
+            )
+            output = root / "recursive.exe"
+            with mock.patch.object(
+                sys,
+                "argv",
+                ["anvil", str(project), "--backend", "native", "-o", str(output)],
+            ):
+                self.assertEqual(main(), 0)
+            result = subprocess.run(
+                [str(output)], capture_output=True, text=True, timeout=10
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(
+                "local array allocation/budget error", result.stdout + result.stderr
+            )
+            self.assertIn("at line 2 (", result.stdout + result.stderr)
+            self.assertIn(str(library.resolve()), result.stdout + result.stderr)
+
     def test_graphical_project_wiring_and_invalid_manifests(self):
         import contextlib
         import io

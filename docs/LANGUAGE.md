@@ -69,7 +69,7 @@ Arithmetic uses `+`, `-`, `*`, `/`, and `%`; division by a value equal to zero (
 
 ## Fixed-size numeric arrays
 
-Declare a global numeric array at top level, or a function-local numeric array inside a function, using `array name(size)`. Both kinds are fixed-size and start with every element set to zero. A local array belongs to the current function call, so recursive calls and separate invocations get independent storage. Local arrays use checked heap allocation and are freed on every function return; each function call may declare up to 8,192 local elements, and all active local arrays in the process are limited to 16 MiB. Allocation failure or budget exhaustion prints the source path and line and exits with code 2. Globals may contain up to 1,048,576 elements each. Read an element using `array(name, index)` in any numeric expression and write it inside a function with `set array(name, index) = expression`. A local array is visible only inside its declaring function and cannot share a name with that function's parameter or scalar local. Indexes are zero-based and must be finite whole numbers from zero through `size - 1`; an invalid runtime index prints the source path and line and exits with code 2. Resizing, strings, and structures are not supported yet.
+Declare a global numeric array at top level, or a function-local numeric array inside a function, using `array name(size)`. Both kinds are fixed-size and start with every element set to zero. A local array belongs to the current function call, so recursive calls and separate invocations get independent storage. Local arrays use checked heap allocation and are freed on every function return. Defaults allow up to 8,192 local elements per function and 16 MiB of active local-array storage across all calls; a project can override those budgets in its manifest. Allocation failure or budget exhaustion prints the source path and line and exits with code 2. Globals may contain up to 1,048,576 elements each. Read an element using `array(name, index)` in any numeric expression and write it inside a function with `set array(name, index) = expression`. A local array is visible only inside its declaring function and cannot share a name with that function's parameter or scalar local. Indexes are zero-based and must be finite whole numbers from zero through `size - 1`; an invalid runtime index prints the source path and line and exits with code 2. Resizing, strings, and structures are not supported yet.
 
 ```anv
 array scores(4)
@@ -157,7 +157,7 @@ The current experimental API is `net host(port)`, `net join("IPv4",port)`, `net 
 
 ## Project and file formats
 
-`.ANVL` is the source extension. `.ANVLproj` is the TOML project manifest. It accepts a project `name`, an `entry` path that must stay inside the project folder, and optional `[engine].fixed_hz` from 1 to 240. Unsupported settings are reported instead of silently ignored.
+`.ANVL` is the source extension. `.ANVLproj` is the TOML project manifest. It accepts a project `name`, an `entry` path that must stay inside the project folder, and optional `[engine].fixed_hz` from 1 to 240. Optional `[memory]` settings are `local_array_elements` (1–1,048,576 per function, default 8,192) and `active_call_memory_mib` (1–2,048 MiB total across active local arrays, default 16 MiB). These settings apply to both the C and direct-native backends; unsupported settings are reported instead of silently ignored.
 
 ```toml
 name = "First World"
@@ -165,6 +165,10 @@ entry = "examples/first_world.ANVL"
 
 [engine]
 fixed_hz = 60
+
+[memory]
+local_array_elements = 8192
+active_call_memory_mib = 16
 ```
 
 ## Not implemented yet

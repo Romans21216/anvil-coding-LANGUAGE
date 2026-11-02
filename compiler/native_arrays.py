@@ -1,7 +1,6 @@
 """Per-invocation native array storage using the Windows process heap."""
 
 import struct
-from compiler.common import MAX_ACTIVE_LOCAL_ARRAY_BYTES
 
 
 class NativeArrays:
@@ -39,7 +38,8 @@ class NativeArrays:
         o, c = self.owner, self.owner.code
         failure, ready = o.label('array_allocation_error'), o.label('array_allocated')
         c.rip_int(0, self.active)
-        c.bytes(b'\x48\x3d' + struct.pack('<I', MAX_ACTIVE_LOCAL_ARRAY_BYTES-self.total))
+        c.mov_imm(1, o.active_local_array_bytes - self.total)
+        c.bytes(b'\x48\x39\xc8')  # cmp rax, rcx; use full-width budget
         c.conditional_jump(0x87, failure)
         c.bytes(b'\x48\x83\xec\x30')
         c.rip_call_import('GetProcessHeap')
@@ -55,7 +55,12 @@ class NativeArrays:
         c.rip_int(0, self.active, store=True)
         c.jump(ready)
         c.label(failure)
-        o.emit_runtime_error(f'Anvil local array allocation/budget error at line {fn.line} ({o.path})\n')
+        line = min(fn.local_array_lines.values(), default=fn.line)
+        source = fn.source or o.path
+        o.emit_runtime_error(
+            f'Anvil local array allocation/budget error at line {line} '
+            f'({source})\n'
+        )
         c.label(ready)
 
     def leave(self, fn):

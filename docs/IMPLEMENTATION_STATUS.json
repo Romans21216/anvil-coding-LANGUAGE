@@ -10,10 +10,10 @@
     "IN PROGRESS": 4
   },
   "latest_verified_commit": "1c2e277b9bfe3de94af82004eb522379e6400079",
-  "latest_independently_reviewed_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
+  "latest_independently_reviewed_candidate_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "016fff66a4e4068260f04870ca81da4a75707307",
-  "latest_followup_status_change": "Independent full50 review of the C storage-reachability candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133: initial78/100 while criterion38 referenced the prior candidate; after synchronization, score79/100 FAIL against98, categories13/19/15/17/15. Independent suite227 passed in254.117s; local run227 passed in293.538s. A 200,000-element dead global array was omitted while EXE output5 remained. Selective import/global storage, callback array/output9, and v1/v2 shadowing probes passed. #123 now prunes functions and unused global scalar/array declarations, but runtime subsystems/packages remain unselected. Issue #23 body and68 comments reread; no new implementation defect.",
+  "latest_followup_status_change": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. #90 fixed in worktree; no new defect remains. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete.",
   "latest_evaluation_score": 79,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
@@ -848,12 +848,12 @@
     "result": "FAIL",
     "initial_score_before_record_sync": 78,
     "record_sync_restored_criterion38": true,
-    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
-    "base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
-    "source_diff_sha256": "e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
-    "implementation_diff_sha256": "42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133",
-    "full_worktree_diff_sha256_at_review": "ab558713d36734cef86edf1109ceae9b4b004ecc2afda4a528fb847591d4e3b0",
-    "hash_method": "Concatenated Python difflib.unified_diff output with three context lines, sorted paths, base content via git show.",
+    "commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+    "base_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7",
+    "source_diff_sha256": "57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+    "implementation_diff_sha256": "24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac",
+    "full_worktree_diff_sha256_at_review": "caa73ca775bfd3ecca4aa1ef57e5c522cf39ae6d89b37d7333249ceedc514615",
+    "hash_method": "Sorted paths; Python difflib.unified_diff with three context lines; base bytes from git show; concatenated UTF-8 output.",
     "categories": {
       "requirements": "13/20",
       "functionality": "19/20",
@@ -913,45 +913,50 @@
       2,
       0
     ],
-    "full_test_count": 227,
-    "local_full_test_seconds": 293.538,
-    "independent_full_test_seconds": 254.117,
+    "full_test_count": 233,
+    "local_full_test_seconds": 269.749,
+    "independent_full_test_seconds": 253.611,
     "full_test_result": "PASS",
     "full_test_command": "python -m unittest discover -s tests -q",
     "full_test_exit": 0,
+    "focused_test_count": 3,
+    "focused_test_seconds": 2.147,
     "findings": [
-      "Independent review scored78 before syncing criterion38; after syncing candidate records, score79/100.",
-      "Local and independent complete suites each passed227 tests.",
-      "C generation omits unreachable functions and unused global scalar/array declarations while preserving top-level initialization, emitted writes, and expression evaluation.",
-      "Independent MSVC executable printed5 with a 200,000-element dead array and its dead scalar absent from generated C.",
-      "Selective module storage, callback target/global array, and v1/v2 local-shadowing probes passed.",
-      "No new implementation defect found; #123 remains partial because runtime subsystems/package features are not selectively linked.",
-      "Issue #23 body and68 comments reread after tests; full required scope remains."
+      "Independent review scored78 pending criterion38; syncing the current six records restores79/100.",
+      "Full suite233 passed independently in253.611s and locally in269.749s.",
+      "Project memory.local_array_elements and memory.active_call_memory_mib are bounded and wired through includes to C/native.",
+      "C/native recursive active-call budget overruns exit2; imported native diagnostic identifies source file and declaration line2.",
+      "Issue #90 was filed for and the native declaration-location diagnostic fix passed independent and local regression tests.",
+      "No new implementation defect remains; items #80/#81 partial and engine/package/Forge/OS scope incomplete."
     ],
     "source_extension": "0.1.13",
     "installed_extension": "0.1.4 unchanged",
     "native_parity_required": false,
     "full_goal_complete": false,
-    "issue89_status": "closed",
-    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6582314947"
+    "issue90_status": "fixed in candidate; close after commit",
+    "issue23_evaluation_comment": "pending GitHub issue #23 evaluation update"
   },
-  "current_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
+  "current_candidate_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
     "status": "INDEPENDENTLY_REVIEWED_RECORD_PARITY_PASS",
-    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
-    "implementation_diff_sha256": "42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133",
+    "commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+    "base_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7",
+    "source_diff_sha256": "57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+    "implementation_diff_sha256": "24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac",
     "reviewed_score": 79,
     "initial_full50_score_before_record_sync": 78,
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "227 passed independently in254.117s and locally in293.538s, exit0",
-    "npm_test": "passed (source extension0.1.13; installed0.1.4 unchanged)",
+    "python_unittest": "233 passed independently in253.611s and locally in269.749s, exit0",
+    "focused_tests": "3 passed in2.147s, including imported-native source path/line",
+    "npm_test": "passed (extension0.1.13; installed0.1.4 unchanged)",
     "compileall": "passed (compiler, tests, scripts)",
-    "qa_report_validator": "79/100; all50 arithmetic and category totals agree",
+    "qa_report_validator": "79/100 after criterion38 sync; 50-criterion arithmetic consistent",
     "strict_json": "both structured records parse as UTF-8",
-    "git_diff_check": "passed; LF-to-CRLF notices only",
-    "finding": "No new implementation defect. #88/#89 fixed and closed. #123 now prunes functions and unused global scalar/array declarations but does not select runtime subsystems or packages."
+    "git_diff_check": "passed",
+    "finding": "No new defect remains. Issue #90 native diagnostic line fixed and independently tested. Items #80/#81 partial; broad engine, runtime modules, Forge and OS work remain.",
+    "independent_record_parity": "PASS; six records match candidate hashes, score/vector, tests, issue count69, and issue #90 open/fixed status."
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -966,14 +971,14 @@
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 79,
-  "latest_independent_candidate_result": "Independent full50 review of the C storage-reachability candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133: initial78/100 while criterion38 referenced the prior candidate; after synchronization, score79/100 FAIL against98, categories13/19/15/17/15. Independent suite227 passed in254.117s; local run227 passed in293.538s. A 200,000-element dead global array was omitted while EXE output5 remained. Selective import/global storage, callback array/output9, and v1/v2 shadowing probes passed. #123 now prunes functions and unused global scalar/array declarations, but runtime subsystems/packages remain unselected. Issue #23 body and68 comments reread; no new implementation defect.",
+  "latest_independent_candidate_result": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. #90 fixed in worktree; no new defect remains. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete.",
   "current_unscored_followup": {
     "summary": "Continue issue #23 toward98: selective linking of unused runtime features/globals/arrays, modular packages/dependency resolution, engine/Forge/OS targets, and measured efficiency.",
     "status": "pending implementation",
     "reviewed_base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
     "score": 78
   },
-  "latest_independently_scored_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
+  "latest_independently_scored_candidate_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1064,7 +1069,7 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Independent full50 review of base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133: 78/100 before record sync; 79/100 FAIL against98 after criterion38 restoration, categories13/19/15/17/15. Independent and local full suites227 pass (254.117s and293.538s). Global storage pruning, imports, callbacks, and v1/v2 shadowing verified. #123 partially improved; runtime subsystems/packages remain whole. Independent six-record parity audit passed.",
+  "current_candidate_status": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. #90 fixed in worktree; no new defect remains. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete.",
   "resolved_critic_issue_79": "Both unbounded C-circle traversal and extreme negative-tangent membership loss independently verified fixed on139f924;169 tests plus110 extra full-frame guard cases pass.",
   "previous_independent_evaluation": {
     "commit": "b76fc02a1f6ea9ab24f7af004e8a0981ba249252",
@@ -1144,31 +1149,20 @@
   "resolved_critic_issue_81": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Shared valid C UTF-8 metadata literals preserve supplementary source filenames and runtime physical locations; both backends and byte-exact payload/title compilation verified.",
   "resolved_critic_issue_82": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Quote-aware validation of every unbound source identifier reference rejects private calls/array reads/writes before binding; generated references and literals remain valid.",
   "latest_record_parity_check": {
-    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
+    "commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
     "result": "PASS",
-    "reviewed_implementation": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
+    "reviewed_implementation": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
     "score_unchanged": 79,
-    "summary": "Independent six-record parity audit PASS for the storage-pruning candidate: source/test SHA e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA 42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133, score79/100 against98, categories13/19/15/17/15, all50 criteria, 227 tests independent254.117s/local293.538s, #89 closed, #123 partial, installed extension0.1.4 unchanged.",
-    "independent_recheck": "PASS; all six records, 50 criterion scores, category totals, candidate hashes, test counts/timings, and issue statuses agree."
+    "summary": "Six evaluation records updated to base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac, 79/100 against98, categories13/19/15/17/15,233 tests (independent253.611s/local269.749s), issue #90 fixed, items #80/#81 partial. Independent record-only parity recheck PASS; no rescore.",
+    "independent_recheck": "PASS; all six current records, candidate hashes, score/vector, test evidence, issue count69, and issue #90 status agree."
   },
-  "latest_push_result": "Storage-pruning candidate and synchronized evaluation records pushed to origin/main at 1c2e277b9bfe3de94af82004eb522379e6400079; issue #23 evaluation comment posted; independent score79/100 remains below98.",
+  "latest_push_result": "Memory-budget candidate independently reviewed at79/100; six-record parity passes. Commit/push, issue #90 closure, and issue #23 evaluation update remain pending.",
   "latest_independent_review": {
-    "base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
-    "source_diff_sha256": "e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
-    "implementation_diff_sha256": "42d49f42ee392e8423a5a994aa12c72971bb7532c515d8fc3bad0aa45befb133",
-    "full_worktree_diff_sha256_at_review": "ab558713d36734cef86edf1109ceae9b4b004ecc2afda4a528fb847591d4e3b0",
-    "file_sha256": {
-      "README.md": "c5f3bb1415c128cd6bb49f7a73a96743e330a6a0299fde913f883b9ed3f9f9ef",
-      "compiler/codegen.py": "ced45a010cf62caaa73a3b39c13a3321e63d6ff5f89bfa25a9d8fe090fdf0453",
-      "compiler/modules.py": "f894eaf05c0aa192a2bfb7eba090757afc328560bdd76261c815b650af0400ce",
-      "docs/COMPILER.md": "28922ce8d597cbbdea92a543af89bc6a9691a7c58b6149f8f73debffe0e9add9",
-      "docs/COMPLETION_MATRIX.md": "258ddb2f4ad48227a053447618750120abea758e7eeb8644a76c612e9e3007d6",
-      "docs/LANGUAGE_SPEC.md": "5f9ad68fd7b14cf76fe75389e721dad5f3acb9715cb405a6c2b3eaecab34b96a",
-      "docs/Wiki/Compiler-and-Build.md": "67cdd83d475570ff83e6e868f388e42c3dbc54695cdaf414f55b0f421c537dfc",
-      "tests/test_authoring.py": "424cc211da03c5e948f34c530ca824ad119221059b68faf4c4cb610a19996c94",
-      "tests/test_compiler_modules.py": "8b9e92f0a15ed5d4fddbc8618d3a6a30ba7a205eaf34bdae58fc05bb043b3e6e"
-    },
-    "hash_method": "Concatenated Python difflib.unified_diff output with three context lines over sorted paths; base via git show.",
+    "base_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7",
+    "source_diff_sha256": "57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+    "implementation_diff_sha256": "24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac",
+    "full_worktree_diff_sha256_at_review": "caa73ca775bfd3ecca4aa1ef57e5c522cf39ae6d89b37d7333249ceedc514615",
+    "hash_method": "Sorted paths; Python difflib.unified_diff with three context lines; base bytes from git show; concatenated UTF-8 output.",
     "score": 78,
     "score_after_record_sync": 79,
     "initial_score_before_record_sync": 78,
@@ -1237,13 +1231,15 @@
       0
     ],
     "reviewer": "final_review",
-    "full_test_count": 227,
-    "full_test_seconds": 254.117,
+    "full_test_count": 233,
+    "full_test_seconds": 253.611,
     "full_test_result": "PASS",
     "full_test_command": "python -m unittest discover -s tests -q",
     "full_test_exit": 0,
-    "local_full_test_seconds": 293.538,
-    "post_suite_issue23_comments": 68,
+    "local_full_test_seconds": 269.749,
+    "focused_test_count": 3,
+    "focused_test_seconds": 2.147,
+    "post_suite_issue23_comments": 69,
     "verified_fixed": [
       79,
       81,
@@ -1254,7 +1250,8 @@
       86,
       87,
       88,
-      89
+      89,
+      90
     ],
     "new_findings": [],
     "source_extension": "0.1.13",
@@ -1262,15 +1259,13 @@
     "snapshot_unchanged": true,
     "native_parity_required": false,
     "full_goal_complete": false,
-    "issue89_status": "closed",
-    "findings": [
-      "C storage reachability removed unused scalar/array declarations from generated C.",
-      "MSVC executable output5 and generated-C omission of 200,000-element dead array verified.",
-      "Imported module live storage, callback target/global array output9, and v1/v2 shadowing outputs3/4 verified.",
-      "Full suite227 passed independently.",
-      "No new defect; #123 remains partial while runtime subsystems and package-level feature selection remain incomplete."
-    ],
-    "record_parity_audit": "Independent record-only review confirmed six-record consistency; QA arithmetic and strict JSON passed."
+    "issue90_status": "fix verified; closure after commit publication",
+    "reviewed_features": [
+      "Project configurable memory.local_array_elements",
+      "Project configurable memory.active_call_memory_mib",
+      "Limits propagate to included modules and C/native backends",
+      "Native over-budget diagnostics use earliest array declaration source path and line"
+    ]
   },
   "previous_independent_review": {
     "commit": "6852275d86e43bf75da583961ad64d58aead2f08+working-tree",
@@ -1384,17 +1379,17 @@
       "Extension0.1.13 package/grammar, VSIX CRC/source parity, compileall, QA arithmetic, strict JSON/diff checks passed"
     ]
   },
-  "current_active_item_status": "C generation prunes unreachable Anvil functions and unused global scalar/array declarations, preserving top-level initialization, reachable writes, callback targets, and expression evaluation. The local suite and independent suite each passed227 tests. #88/#89 remain fixed and closed. #123 is partially implemented; runtime subsystems and optional packages remain linked as a whole. The C-first engine, Forge, and Anvil-authored OS UI goals remain incomplete; current score79/100 below98.",
+  "current_active_item_status": "Project memory limits configure per-function local array elements and recursive active-call memory for both C and native backends. Included sources inherit limits. Native failures report the imported declaration location. Full suite233 passes; score79/100 after criterion38 sync. #90 fixed; #80/#81 partially addressed; full Anvil engine/Forge/OS goal incomplete.",
   "last_test_results": {
-    "python_unittest": "227 passed locally in293.538s and independently in254.117s, frozen candidate exit0",
-    "extension": "0.1.13 validation passed; installed0.1.4 unchanged",
+    "python_unittest": "233 passed locally in269.749s and independently in253.611s, frozen candidate exit0",
+    "focused_tests": "3 C recursion/imported-native recursion/max-budget tests passed locally and independently in2.147s",
+    "extension": "0.1.13 package validation passed; installed0.1.4 unchanged",
     "compileall": "compiler/tests/scripts passed independently",
-    "qa_report_validator": "79/100; all50 score/category arithmetic passed",
-    "strict_json": "both records parse as UTF-8",
+    "qa_report_validator": "79/100 after criterion38 sync; arithmetic check passes",
+    "strict_json": "both structured records parse as UTF-8",
     "git_diff_check": "passed",
-    "global_storage_executable": "dead 200,000-element global array omitted; executable printed5",
-    "import_probe": "live imported array/scalar retained; dead imported storage omitted; executable printed2",
-    "callback_and_shadow_probes": "callback array output9; v1/v2 shadows output3/4"
+    "memory_settings": "project local_array_elements and active_call_memory_mib propagate to C/native and included source",
+    "recursive_budget": "C/native recursive over-budget allocation exits2; native imported failure identifies declaration path and line2"
   },
   "resolved_critic_issue_86": "Independently verified fixed on3cfb5b9. Ordinary user-defined calls evaluate arguments exactly once, left-to-right through per-scope C temporaries; nested expressions, top-level calls, recursion, display hook expressions, generated-name collision diagnostics, and default/release builds pass. Issue #86 closed after 213-test independent full suite and full50 review; no new finding.",
   "resolved_critic_issue_87": "Independently verified fixed on base 0e2126ecf01f1815bffef33a7d270f7cf2f3da50 plus source/test diff ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9. MSVC helper and objects use a unique build-owned temporary directory; success executable/sentinel regression and mocked compiler-failure cleanup probe pass. GitHub issue #87 closed.",
@@ -1422,5 +1417,10 @@
     "score_unchanged": 79,
     "summary": "All six records now identify 7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537; source/test SHA 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499, 79/100 against98, categories13/19/15/17/15, 224 tests in257.990s independent and250.318s local, #89 fixed/closed, #123 partial. Independent six-record parity recheck passed.",
     "independent_recheck": "PASS; all six records, criterion vector, categories, hashes, test counts/timings and issue status agree."
-  }
+  },
+  "current_required_qa_threshold": 98,
+  "open_critic_issues": [
+    90
+  ],
+  "resolved_critic_issue_90": "Native active-call memory-budget failures previously pointed to the function header. Fixed to report the earliest local-array declaration path/line, including selectively imported source; targeted and full independent suites pass. Issue #90 closure pending commit publication."
 }

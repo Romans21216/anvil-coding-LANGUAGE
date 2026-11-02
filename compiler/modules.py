@@ -42,9 +42,15 @@ def include_spec(raw, path, line):
     return match[1], alias, match[2]
 
 
-def load_program(path, source, *, include_root=None):
+def load_program(
+    path, source, *, include_root=None, local_array_elements=None,
+    active_local_array_bytes=None,
+):
     from compiler.module_loader import ProgramLoader
-    return ProgramLoader(path, include_root).load(source)
+    return ProgramLoader(
+        path, include_root, local_array_elements=local_array_elements,
+        active_local_array_bytes=active_local_array_bytes,
+    ).load(source)
 
 
 def called_functions(nodes):

@@ -83,7 +83,19 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Wiki pages](docs/Wiki/Home.md)
 - [Contribution and bug reporting rules](CONTRIBUTING.md)
 
-`.ANVL` is the source extension and `.ANVLproj` is the TOML project manifest. The compiler resolves the manifest's entry path within the project folder and applies its project name and fixed update rate. Anvil is a working project name; it has not had trademark clearance.
+`.ANVL` is the source extension and `.ANVLproj` is the TOML project manifest. The compiler resolves the manifest's entry path within the project folder and applies its project name and fixed update rate. An optional `[memory]` table can set `local_array_elements` (1–1,048,576 per function, default 8,192) and `active_call_memory_mib` (1–2,048 MiB across active local arrays, default 16 MiB). The compiler rejects settings outside those ranges, and rejects a function whose local arrays cannot fit in the configured active-call budget. These settings apply to both build backends. Anvil is a working project name; it has not had trademark clearance.
+
+```toml
+name = "My Game"
+entry = "src/main.ANVL"
+
+[engine]
+fixed_hz = 60
+
+[memory]
+local_array_elements = 8192
+active_call_memory_mib = 16
+```
 
 ## Troubleshooting
 

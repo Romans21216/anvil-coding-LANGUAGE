@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 
 from compiler.common import (ArrayDeclarations, CompileError, ParsedProgram,
+                             MAX_LOCAL_ARRAY_ELEMENTS,
+                             MAX_ACTIVE_LOCAL_ARRAY_BYTES,
                              IDENTIFIER, FUNCTION_REFERENCE, c_name, function_reference)
 from compiler.expressions import split_args, validate_expression_depth
 from compiler.lexer import mask_strings
@@ -54,9 +56,20 @@ def clone_node(node):
 
 
 class ProgramLoader:
-    def __init__(self, path, root):
+    def __init__(self, path, root, *, local_array_elements=None,
+                 active_local_array_bytes=None):
         self.path = Path(path)
         self.root = Path(root).resolve() if root is not None else self.path.resolve().parent
+        self.local_array_elements = (
+            MAX_LOCAL_ARRAY_ELEMENTS
+            if local_array_elements is None
+            else local_array_elements
+        )
+        self.active_local_array_bytes = (
+            MAX_ACTIVE_LOCAL_ARRAY_BYTES
+            if active_local_array_bytes is None
+            else active_local_array_bytes
+        )
         self.flat = Scope(0)
         self.scopes = [self.flat]
         self.modules = {}
@@ -92,7 +105,11 @@ class ProgramLoader:
         self.source_bytes += size
         if self.source_bytes > limits.MAX_SOURCE_BYTES:
             raise CompileError(f"{where}: include source exceeds the 4 MiB budget")
-        unit = parse_syntax(path,text)
+        unit = parse_syntax(
+            path, text,
+            local_array_elements=self.local_array_elements,
+            active_local_array_bytes=self.active_local_array_bytes,
+        )
         # Compiler-owned identities cannot alias source symbols after C sanitizing.
         sites = [(name,fn.line) for name,fn in unit.functions.items()]
         sites += [(name,unit.arrays.locations[name][1]) for name in unit.arrays]

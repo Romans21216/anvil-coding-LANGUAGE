@@ -10,6 +10,8 @@ from compiler.common import (
     ArrayDeclarations,
     MAX_ARRAY_SIZE,
     MAX_LOCAL_ARRAY_ELEMENTS,
+    MAX_ACTIVE_LOCAL_ARRAY_BYTES,
+    MAX_ACTIVE_LOCAL_ARRAY_MIB,
     CompileError,
     Node,
     ParsedProgram,
@@ -20,7 +22,32 @@ from compiler.lexer import mask_strings, split_keyword, strip_comment, validate_
 from compiler.semantics import validate_program
 
 
-def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
+def parse_syntax(
+    path: pathlib.Path,
+    source: str,
+    *,
+    local_array_elements: int = MAX_LOCAL_ARRAY_ELEMENTS,
+    active_local_array_bytes: int = MAX_ACTIVE_LOCAL_ARRAY_BYTES,
+) -> ParsedProgram:
+    if (
+        isinstance(local_array_elements, bool)
+        or not isinstance(local_array_elements, int)
+        or not 1 <= local_array_elements <= MAX_ARRAY_SIZE
+    ):
+        raise CompileError(
+            f"{path}: local array element limit must be from 1 to {MAX_ARRAY_SIZE}"
+        )
+    if (
+        isinstance(active_local_array_bytes, bool)
+        or not isinstance(active_local_array_bytes, int)
+        or not 1024 * 1024 <= active_local_array_bytes
+        <= MAX_ACTIVE_LOCAL_ARRAY_MIB * 1024 * 1024
+        or active_local_array_bytes % (1024 * 1024)
+    ):
+        raise CompileError(
+            f"{path}: active-call memory limit must be an integer number of MiB "
+            f"from 1 to {MAX_ACTIVE_LOCAL_ARRAY_MIB} MiB"
+        )
     functions: dict[str, Node] = {}
     top: list[Node] = []
     variables: set[str] = set()
@@ -151,14 +178,22 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     )
                 if (
                     sum(current_function.local_arrays.values()) + size
-                    > MAX_LOCAL_ARRAY_ELEMENTS
+                    > local_array_elements
                 ):
                     raise CompileError(
                         f"{path}:{line_no}: local arrays in a function may "
-                        f"contain at most {MAX_LOCAL_ARRAY_ELEMENTS} elements total"
+                        f"contain at most {local_array_elements} elements total"
                     )
                 current_function.local_arrays[name] = size
                 current_function.local_array_lines[name] = line_no
+                local_bytes = sum(current_function.local_arrays.values()) * 8
+                if local_bytes > active_local_array_bytes:
+                    raise CompileError(
+                        f"{path}:{line_no}: local arrays in function "
+                        f"{current_function.name!r} need {local_bytes} bytes, "
+                        f"above the active-call memory limit of "
+                        f"{active_local_array_bytes} bytes"
+                    )
             continue
         fn = re.fullmatch(r"fn\(([A-Za-z_][\w-]*)(?:\s*,\s*(.*))?\)", line)
         if fn:
@@ -428,11 +463,20 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
 
 
 def parse(
-    path: pathlib.Path, source: str, *, include_root: pathlib.Path | None = None
+    path: pathlib.Path,
+    source: str,
+    *,
+    include_root: pathlib.Path | None = None,
+    local_array_elements: int = MAX_LOCAL_ARRAY_ELEMENTS,
+    active_local_array_bytes: int = MAX_ACTIVE_LOCAL_ARRAY_BYTES,
 ) -> tuple[dict[str, Node], list[Node], set[str], dict[str, int]]:
     """Parse Anvil syntax, run semantic checks, and preserve the legacy tuple API."""
     from compiler.modules import load_program
-    program = load_program(path, source, include_root=include_root)
+    program = load_program(
+        path, source, include_root=include_root,
+        local_array_elements=local_array_elements,
+        active_local_array_bytes=active_local_array_bytes,
+    )
     validate_program(program)
     from compiler.callables import lower_callables
     lower_callables(program)
