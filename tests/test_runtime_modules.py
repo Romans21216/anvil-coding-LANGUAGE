@@ -28,6 +28,10 @@ class RuntimeModuleSelectionTests(unittest.TestCase):
         self.assertEqual(modules[0].source.name, "anvil_physics.c")
         self.assertEqual(modules[0].gcc_libraries, ())
 
+    def test_modules_declare_reachable_call_triggers(self):
+        self.assertTrue(MODULES["networking"].trigger_patterns)
+        self.assertTrue(MODULES["physics"].trigger_patterns)
+
     def test_duplicate_markers_select_module_once(self):
         generated = "\n".join(
             ["/* ANVIL_RUNTIME_MODULE: physics */"] * 2

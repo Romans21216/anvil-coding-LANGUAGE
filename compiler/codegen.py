@@ -20,6 +20,7 @@ from compiler.common import (
 from compiler.expressions import expr, split_args
 from compiler.display_syntax import take_display_modifiers as _take_display_modifiers
 from compiler.lexer import mask_strings
+from compiler.runtime_modules import MODULES as RUNTIME_MODULES
 
 
 
@@ -473,19 +474,20 @@ def emit_c(
     reachable_c_body = [setup_body, calls_body] + [
         function_bodies[name] for name, _fn in emitted_functions
     ]
-    uses_network = any(
-        re.search(r"\banvil_net_[A-Za-z0-9_]*\s*\(", mask_strings(statement))
+    reachable_statements = [
+        mask_strings(statement)
         for body in reachable_c_body
         for statement in body
-    )
-    uses_physics = any(
-        re.search(
-            r"\banvil_(?:body_[A-Za-z0-9_]*|physics_[A-Za-z0-9_]*)\s*\(",
-            mask_strings(statement),
+    ]
+    selected_runtime_modules = {
+        name
+        for name, module in RUNTIME_MODULES.items()
+        if any(
+            re.search(pattern, statement)
+            for pattern in module.trigger_patterns
+            for statement in reachable_statements
         )
-        for body in reachable_c_body
-        for statement in body
-    )
+    }
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",
         '#include "anvil_runtime.h"',
@@ -494,11 +496,10 @@ def emit_c(
         "#include <stdlib.h>",
         "",
     ]
-    runtime_markers = []
-    if uses_network:
-        runtime_markers.append("/* ANVIL_RUNTIME_MODULE: networking */")
-    if uses_physics:
-        runtime_markers.append("/* ANVIL_RUNTIME_MODULE: physics */")
+    runtime_markers = [
+        f"/* ANVIL_RUNTIME_MODULE: {name} */"
+        for name in sorted(selected_runtime_modules)
+    ]
     lines[1:1] = runtime_markers
     metadata_payload=pack(metadata)
     if metadata_payload:
@@ -599,7 +600,7 @@ def emit_c(
                 "require an explicit call with arguments"
             )
         lines.append(f'    printf("%.15g\\n", {c_name("main")}());')
-    if uses_network:
+    if "networking" in selected_runtime_modules:
         lines.append("    anvil_net_close();")
     lines.extend(["    return 0;", "}", ""])
     from compiler.semantics import validate_program

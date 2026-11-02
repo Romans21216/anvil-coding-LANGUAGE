@@ -145,6 +145,30 @@ class AuthoringSyntaxTests(unittest.TestCase):
             generated.read_text(encoding="utf-8"),
         )
 
+    def test_reachable_physics_and_network_calls_select_both_runtime_modules(self):
+        entry = self.root / "combined-modules.ANVL"
+        generated = self.root / "combined-modules.c"
+        entry.write_text(
+            "fn(main)\n"
+            "  net host(7777)\n"
+            "  output body_create(0, 0, 1, 1)\n"
+            "end\ncall fn(main)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--emit-c", str(generated)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        c_source = generated.read_text(encoding="utf-8")
+        networking = "ANVIL_RUNTIME_MODULE: networking"
+        physics = "ANVIL_RUNTIME_MODULE: physics"
+        self.assertIn(networking, c_source)
+        self.assertIn(physics, c_source)
+        self.assertLess(c_source.index(networking), c_source.index(physics))
+        self.assertIn("anvil_net_close();", c_source)
+
     def test_reachable_receive_builtin_selects_network_runtime_module(self):
         entry = self.root / "receive-module.ANVL"
         generated = self.root / "receive-module.c"
