@@ -11,6 +11,67 @@ import tempfile
 from compiler.common import INCLUDE, RUNTIME
 
 
+def _msvc_arguments(
+    compiler: str,
+    generated: pathlib.Path,
+    output: pathlib.Path,
+    object_dir: pathlib.Path,
+    release: bool,
+) -> list[str]:
+    args = [
+        compiler,
+        "/nologo",
+        "/TC",
+        "/utf-8",
+        "/I" + str(INCLUDE),
+        str(generated),
+        str(RUNTIME),
+        "/Fe:" + str(output),
+        "/Fo:" + str(object_dir) + "\\",
+    ]
+    if release:
+        # COMDAT sections let LINK discard runtime features the Anvil program
+        # does not reference. Keep debug builds easy to inspect instead.
+        args.extend(["/O2", "/Gy", "/Gw", "/link", "/OPT:REF"])
+    else:
+        args.append("/Od")
+    return args
+
+
+def _gcc_arguments(
+    compiler: str,
+    generated: pathlib.Path,
+    output: pathlib.Path,
+    release: bool,
+) -> list[str]:
+    args = [
+        compiler,
+        str(generated),
+        str(RUNTIME),
+        "-I",
+        str(INCLUDE),
+        "-o",
+        str(output),
+        "-lm",
+        "-lgdi32",
+        "-luser32",
+        "-lws2_32",
+    ]
+    if release:
+        args.extend(
+            [
+                "-O3",
+                "-DNDEBUG",
+                "-ffunction-sections",
+                "-fdata-sections",
+                "-Wl,--gc-sections",
+            ]
+        )
+    else:
+        args.extend(["-O0", "-g"])
+    return args
+
+
 def find_compiler(requested: str | None):
     # MSVC is the supported default for the Windows-only native runtime.
     for name in ([requested] if requested else ["cl"]):
@@ -35,18 +96,7 @@ def build_c(
     if pathlib.Path(compiler).name.lower() == "cl.exe":
         with tempfile.TemporaryDirectory(prefix="anvil-obj-") as object_dir:
             obj_dir = pathlib.Path(object_dir)
-            args = [
-                compiler,
-                "/nologo",
-                "/TC",
-                "/utf-8",
-                "/I" + str(INCLUDE),
-                str(generated),
-                str(RUNTIME),
-                "/Fe:" + str(output),
-                "/Fo:" + str(obj_dir) + "\\",
-                "/O2" if release else "/Od",
-            ]
+            args = _msvc_arguments(compiler, generated, output, obj_dir, release)
             install_root = pathlib.Path(compiler).parents[7]
             devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
             if os.name == "nt" and devcmd.exists():
@@ -66,18 +116,5 @@ def build_c(
             else:
                 subprocess.run(args, check=True)
     else:
-        args = [
-            compiler,
-            str(generated),
-            str(RUNTIME),
-            "-I",
-            str(INCLUDE),
-            "-o",
-            str(output),
-            "-lm",
-            "-lgdi32",
-            "-luser32",
-            "-lws2_32",
-        ]
-        args += ["-O3", "-DNDEBUG"] if release else ["-O0", "-g"]
+        args = _gcc_arguments(compiler, generated, output, release)
         subprocess.run(args, check=True)

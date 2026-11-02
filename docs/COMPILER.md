@@ -31,7 +31,7 @@ The compiler formatting convention is Black's default 88-column style; some nati
 
 ## Reachability and dead-code elimination
 
-The C backend emits only Anvil functions reachable from the program entry calls or engine callbacks. It follows ordinary calls and the generated dispatch calls for function-reference variables, so callback targets remain present. Graphical startup runs top-level `call fn(...)` initializers after project setup and before `anvil_run`. Semantic checks still validate every declared function before emission; an unused function with an invalid reference remains a compile error. After validation, the C pass removes unreachable function definitions and global scalar/array declarations unused by top-level initialization and emitted functions. It preserves reachable writes and expression evaluation. Runtime subsystems are still linked as a whole; package-level feature selection and a separate object linker are not implemented.
+The C backend emits only Anvil functions reachable from the program entry calls or engine callbacks. It follows ordinary calls and the generated dispatch calls for function-reference variables, so callback targets remain present. Graphical startup runs top-level `call fn(...)` initializers after project setup and before `anvil_run`. Semantic checks still validate every declared function before emission; an unused function with an invalid reference remains a compile error. After validation, the C pass removes unreachable function definitions and global scalar/array declarations unused by top-level initialization and emitted functions. It preserves reachable writes and expression evaluation. Console programs do not root engine fixed-step configuration; networking teardown is emitted only when reachable code uses a network API. Release MSVC builds package functions/data with `/Gy` and `/Gw` and pass `/OPT:REF` to the linker; GCC-compatible release invocations use function/data sections and `--gc-sections`. Package-level imports, a feature registry and separate object linking are not implemented.
 
 ```powershell
 python compiler/anvil.py examples/first_world.ANVL --emit-c build/first_world.c
@@ -51,7 +51,7 @@ The current parser checks expression structure and operator precedence, built-in
 
 ## Native performance
 
-Ahead-of-time compilation removes VM dispatch from generated function calls. MSVC release builds use `/O2`. No benchmark suite or cross-language comparison exists yet, so the compiler makes no speed claim. The conventional software rasterizer and CPU BVH ray tracing are both CPU-bound; there is no GPU/DXR backend.
+Ahead-of-time compilation removes VM dispatch from generated function calls. MSVC release builds use `/O2` with function/data COMDAT elimination (`/Gy`, `/Gw`, `/OPT:REF`). A paired Windows release build of a small numeric program printed `23` in both variants; removing the legacy unconditional engine/network roots reduced the executable from143,360 to142,848 bytes (512 bytes). This is one executable-size sample, not a general estimate or runtime-speed result. No broader benchmark suite or cross-language comparison exists. The conventional software rasterizer and CPU BVH ray tracing are both CPU-bound; there is no GPU/DXR backend.
 
 ## Native backend limits
 

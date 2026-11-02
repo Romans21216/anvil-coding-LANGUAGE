@@ -85,6 +85,61 @@ class AuthoringSyntaxTests(unittest.TestCase):
         self.assertTrue(preserved_c.is_file())
         self.assertIn("return 23.0;", preserved_c.read_text(encoding="utf-8"))
 
+    def test_console_c_does_not_root_engine_or_network_runtime_subsystems(self):
+        entry = self.root / "console-roots.ANVL"
+        generated = self.root / "console-roots.c"
+        entry.write_text(
+            'name "anvil_net_host()"\n'
+            "fn(main)\n output 23\nend\n"
+            "fn(unused_network_feature)\n net host(7777)\n output 0\nend\n"
+            "call fn(main)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--emit-c", str(generated)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        c_source = generated.read_text(encoding="utf-8")
+        self.assertNotIn("anvil_set_fixed_hz(", c_source)
+        self.assertNotIn("anvil_net_close();", c_source)
+
+    def test_c_network_cleanup_root_follows_reachable_network_calls(self):
+        entry = self.root / "network-roots.ANVL"
+        generated = self.root / "network-roots.c"
+        entry.write_text(
+            'name "anvil_net_host()"\n'
+            "fn(main)\n net host(7777)\n output 0\nend\ncall fn(main)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--emit-c", str(generated)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        c_source = generated.read_text(encoding="utf-8")
+        self.assertIn("anvil_net_host(7777)", c_source)
+        self.assertIn("anvil_net_close();", c_source)
+
+    def test_network_api_text_does_not_select_network_runtime(self):
+        entry = self.root / "network-name.ANVL"
+        generated = self.root / "network-name.c"
+        entry.write_text(
+            'scene 2d\nfn(draw)\n display text("anvil_net_host()") -l(1, 1)\nend\n',
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--emit-c", str(generated)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        c_source = generated.read_text(encoding="utf-8")
+        self.assertIn('"anvil_net_host()"', c_source)
+        self.assertNotIn("anvil_net_close();", c_source)
+
     def test_c_build_elides_dead_functions_and_keeps_callback_targets(self):
         entry = self.root / "tree-shake.ANVL"
         generated = self.root / "tree-shake.c"

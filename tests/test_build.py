@@ -8,7 +8,51 @@ import tempfile
 import unittest
 from unittest import mock
 
-from compiler.build import build_c
+from compiler.build import _gcc_arguments, _msvc_arguments, build_c
+
+
+class LinkerGarbageCollectionTests(unittest.TestCase):
+    def test_msvc_release_packages_functions_and_data_for_linker_pruning(self):
+        args = _msvc_arguments(
+            "cl.exe",
+            pathlib.Path("program.c"),
+            pathlib.Path("program.exe"),
+            pathlib.Path("objects"),
+            release=True,
+        )
+        self.assertIn("/Gy", args)
+        self.assertIn("/Gw", args)
+        self.assertEqual(args[args.index("/link") + 1], "/OPT:REF")
+
+    def test_msvc_debug_does_not_enable_release_linker_pruning(self):
+        args = _msvc_arguments(
+            "cl.exe",
+            pathlib.Path("program.c"),
+            pathlib.Path("program.exe"),
+            pathlib.Path("objects"),
+            release=False,
+        )
+        self.assertIn("/Od", args)
+        self.assertNotIn("/Gy", args)
+        self.assertNotIn("/Gw", args)
+        self.assertNotIn("/OPT:REF", args)
+
+    def test_gcc_release_enables_function_and_data_section_gc(self):
+        args = _gcc_arguments(
+            "gcc", pathlib.Path("program.c"), pathlib.Path("program.exe"), True
+        )
+        self.assertIn("-ffunction-sections", args)
+        self.assertIn("-fdata-sections", args)
+        self.assertIn("-Wl,--gc-sections", args)
+
+    def test_gcc_debug_keeps_release_section_gc_disabled(self):
+        args = _gcc_arguments(
+            "gcc", pathlib.Path("program.c"), pathlib.Path("program.exe"), False
+        )
+        self.assertIn("-O0", args)
+        self.assertNotIn("-ffunction-sections", args)
+        self.assertNotIn("-fdata-sections", args)
+        self.assertNotIn("-Wl,--gc-sections", args)
 
 
 @unittest.skipUnless(os.name == "nt", "MSVC helper wrapping is Windows-specific")

@@ -19,6 +19,7 @@ from compiler.common import (
 )
 from compiler.expressions import expr, split_args
 from compiler.display_syntax import take_display_modifiers as _take_display_modifiers
+from compiler.lexer import mask_strings
 
 
 
@@ -469,6 +470,14 @@ def emit_c(
     }
     setup_body = emit_nodes(path, setup, functions, "    ", arrays=arrays)
     calls_body = emit_nodes(path, calls, functions, "    ", arrays=arrays)
+    reachable_c_body = [setup_body, calls_body] + [
+        function_bodies[name] for name, _fn in emitted_functions
+    ]
+    uses_network = any(
+        re.search(r"\banvil_net_[A-Za-z0-9_]*\s*\(", mask_strings(statement))
+        for body in reachable_c_body
+        for statement in body
+    )
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",
         '#include "anvil_runtime.h"',
@@ -557,7 +566,8 @@ def emit_c(
     lines.append("int main(void) {")
     if metadata_payload:
         lines.append('    const char *volatile _anvil_metadata_keep = _anvil_metadata_blob; (void)_anvil_metadata_keep;')
-    lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
+    if has_engine:
+        lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
     lines.extend(setup_body)
     if has_engine:
         lines.extend(calls_body)
@@ -575,7 +585,8 @@ def emit_c(
                 "require an explicit call with arguments"
             )
         lines.append(f'    printf("%.15g\\n", {c_name("main")}());')
-    lines.append("    anvil_net_close();")
+    if uses_network:
+        lines.append("    anvil_net_close();")
     lines.extend(["    return 0;", "}", ""])
     from compiler.semantics import validate_program
     from compiler.common import ParsedProgram
