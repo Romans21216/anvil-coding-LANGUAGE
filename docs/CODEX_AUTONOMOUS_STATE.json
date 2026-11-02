@@ -5,28 +5,28 @@
   "last_completed_batch": 10,
   "last_completed_backlog_item": 104,
   "current_active_item": "Continue issue #23 C-first compiler, modular packages, and engine/OS capabilities",
-  "current_active_item_status": "C generation removes unreachable Anvil functions, preserves explicit top-level/transitive/callback/graphical roots, and runs graphical top-level initializers after setup before anvil_run. #88 and #89 are fixed and closed. Current evaluation79/100 below98 after record sync. #123 remains partial: unused globals, arrays, runtime subsystems and packages are not pruned. The Anvil-authored OS UI and modular packages remain future work.",
-  "current_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
+  "current_active_item_status": "C generation prunes unreachable Anvil functions and unused global scalar/array declarations, preserving top-level initialization, reachable writes, callback targets, and expression evaluation. The local suite and independent suite each passed227 tests. #88/#89 remain fixed and closed. #123 is partially implemented; runtime subsystems and optional packages remain linked as a whole. The C-first engine, Forge, and Anvil-authored OS UI goals remain incomplete; current score79/100 below98.",
+  "current_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
   "latest_verified_commit": "313ab4d760bc70b6706cacb784860b446ace4ca3",
   "last_pushed_reviewed_below_threshold_commit": "016fff66a4e4068260f04870ca81da4a75707307",
-  "latest_independently_reviewed_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
+  "latest_independently_reviewed_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Implementation and six-record evaluation update pushed to origin/main at 016fff66a4e4068260f04870ca81da4a75707307. GitHub issue #23 evaluation comment 6581786371 posted; #89 closed after independent verification.",
+  "latest_push_result": "Storage-pruning candidate independently reviewed at 79/100; six-record parity passed and evaluation comment posted to issue #23. Candidate changes remain locally uncommitted.",
   "latest_independent_review": {
     "base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
-    "source_diff_sha256": "24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
-    "implementation_diff_sha256": "d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499",
-    "full_worktree_diff_sha256_at_review": "3240cb6e89cc0b8e6abfb5b406995258ba97f531653dd3047f034b2a639597f5",
+    "source_diff_sha256": "e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
+    "implementation_diff_sha256": "8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759",
+    "full_worktree_diff_sha256_at_review": "ab558713d36734cef86edf1109ceae9b4b004ecc2afda4a528fb847591d4e3b0",
     "file_sha256": {
-      "README.md": "cfb0bcc8df4575e75784e160a8a46db33e760e8132033a22b94e4f92312e2d17",
-      "compiler/codegen.py": "1331076a14213f30a0eb1684033a53468d9041d8af635b9e344b473d7a882872",
-      "compiler/modules.py": "151cdefe67d00a47abfd17df0fc5256cb9a137c22f34ba6db1a0def6c689cd61",
-      "docs/COMPILER.md": "3dd7e09a9d44a58b7250f8876f85bfc754ac9973858197207628ecf70f8af02c",
-      "docs/COMPLETION_MATRIX.md": "585302765496fd98fd43b7c89a672f0d65d1e0848f6e2528b4e9efd55b678dac",
+      "README.md": "c5f3bb1415c128cd6bb49f7a73a96743e330a6a0299fde913f883b9ed3f9f9ef",
+      "compiler/codegen.py": "ced45a010cf62caaa73a3b39c13a3321e63d6ff5f89bfa25a9d8fe090fdf0453",
+      "compiler/modules.py": "f894eaf05c0aa192a2bfb7eba090757afc328560bdd76261c815b650af0400ce",
+      "docs/COMPILER.md": "28922ce8d597cbbdea92a543af89bc6a9691a7c58b6149f8f73debffe0e9add9",
+      "docs/COMPLETION_MATRIX.md": "635e2735fb5cf7bc1136063dda61710dc804112f8b3f2b0985e4b767ea01cc5a",
       "docs/LANGUAGE_SPEC.md": "5f9ad68fd7b14cf76fe75389e721dad5f3acb9715cb405a6c2b3eaecab34b96a",
-      "docs/Wiki/Compiler-and-Build.md": "320e57f6aa0c37ba122f07c32dd597a493f336dcef6f19543b62d05108981460",
-      "tests/test_authoring.py": "b688e8697ba085e65668e03ad02156223557d0641bba21ba5cdba43b8365a82f",
-      "tests/test_compiler_modules.py": "9d0357bbbd7f410e4482e1d8e3bb77140a9e10922408bd94c1a517b99f011bb3"
+      "docs/Wiki/Compiler-and-Build.md": "67cdd83d475570ff83e6e868f388e42c3dbc54695cdaf414f55b0f421c537dfc",
+      "tests/test_authoring.py": "424cc211da03c5e948f34c530ca824ad119221059b68faf4c4cb610a19996c94",
+      "tests/test_compiler_modules.py": "8b9e92f0a15ed5d4fddbc8618d3a6a30ba7a205eaf34bdae58fc05bb043b3e6e"
     },
     "hash_method": "Concatenated Python difflib.unified_diff output with three context lines over sorted paths; base via git show.",
     "score": 78,
@@ -35,6 +35,8 @@
     "threshold": 98,
     "result": "FAIL",
     "record_parity_restored_criterion38": true,
+    "record_parity_confirmed": true,
+    "record_parity_check_result": "PASS",
     "categories": {
       "requirements": "13/20",
       "functionality": "19/20",
@@ -95,13 +97,13 @@
       0
     ],
     "reviewer": "final_review",
-    "full_test_count": 224,
-    "full_test_seconds": 257.99,
+    "full_test_count": 227,
+    "full_test_seconds": 254.117,
     "full_test_result": "PASS",
     "full_test_command": "python -m unittest discover -s tests -q",
     "full_test_exit": 0,
-    "local_full_test_seconds": 250.318,
-    "post_suite_issue23_comments": 67,
+    "local_full_test_seconds": 293.538,
+    "post_suite_issue23_comments": 68,
     "verified_fixed": [
       79,
       81,
@@ -120,19 +122,15 @@
     "snapshot_unchanged": true,
     "native_parity_required": false,
     "full_goal_complete": false,
-    "findings": [
-      "#89 graphical top-level startup fixed; independent MSVC harness verified call before anvil_run.",
-      "All224 tests passed independently in257.990s; local frozen suite224 passed in250.318s.",
-      "Independent compileall, extension validation, QA validator, strict UTF-8 JSON and diff check passed.",
-      "No current implementation finding; #123 is function-only dead-code elimination and remains partial.",
-      "Criterion38 was initially1 because records were stale; after synchronization it is2, resulting in79/100 independent parity check passed."
-    ],
-    "record_parity_confirmed": true,
     "issue89_status": "closed",
-    "record_parity_check_result": "PASS",
-    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371",
-    "issue23_comment_after_sync": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371",
-    "implementation_commit": "016fff66a4e4068260f04870ca81da4a75707307"
+    "findings": [
+      "C storage reachability removed unused scalar/array declarations from generated C.",
+      "MSVC executable output5 and generated-C omission of 200,000-element dead array verified.",
+      "Imported module live storage, callback target/global array output9, and v1/v2 shadowing outputs3/4 verified.",
+      "Full suite227 passed independently.",
+      "No new defect; #123 remains partial while runtime subsystems and package-level feature selection remain incomplete."
+    ],
+    "record_parity_audit": "Independent record-only review confirmed six-record consistency; QA arithmetic and strict JSON passed."
   },
   "previous_independent_review": {
     "commit": "6852275d86e43bf75da583961ad64d58aead2f08+working-tree",
@@ -259,13 +257,15 @@
     "result_at_time": "PASS; below the new 98-point threshold"
   },
   "last_test_results": {
-    "python_unittest": "224 passed locally in250.318s and independently in257.990s, frozen source exit0",
-    "extension": "0.1.13 grammar validation passed; installed0.1.4 unchanged",
-    "compileall": "compiler/tests/scripts passed in independent review",
-    "qa_report_validator": "79/100; all50 criterion and category arithmetic passed",
-    "strict_json": "both structured records parse as UTF-8",
+    "python_unittest": "227 passed locally in293.538s and independently in254.117s, frozen candidate exit0",
+    "extension": "0.1.13 validation passed; installed0.1.4 unchanged",
+    "compileall": "compiler/tests/scripts passed independently",
+    "qa_report_validator": "79/100; all50 score/category arithmetic passed",
+    "strict_json": "both records parse as UTF-8",
     "git_diff_check": "passed",
-    "independent_runtime_probe": "MSVC harness verified graphical startup global state before anvil_run"
+    "global_storage_executable": "dead 200,000-element global array omitted; executable printed5",
+    "import_probe": "live imported array/scalar retained; dead imported storage omitted; executable printed2",
+    "callback_and_shadow_probes": "callback array output9; v1/v2 shadows output3/4"
   },
   "pending_documentation_review": null,
   "blocked_items": [
@@ -352,30 +352,27 @@
     88
   ],
   "candidate_validation": {
-    "status": "INDEPENDENTLY_REVIEWED_AND_RECORD_PARITY_CONFIRMED",
-    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
+    "status": "INDEPENDENTLY_REVIEWED_RECORD_PARITY_PASS",
+    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
+    "implementation_diff_sha256": "8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759",
     "reviewed_score": 79,
-    "previous_reviewed_score": 78,
-    "previous_review_commit": "0e2126ecf01f1815bffef33a7d270f7cf2f3da50+source-test-diff-ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9",
+    "initial_full50_score_before_record_sync": 78,
     "threshold": 98,
     "result": "FAIL",
-    "python_unittest": "224 passed independently in257.990s and locally in250.318s, exit0",
+    "python_unittest": "227 passed independently in254.117s and locally in293.538s, exit0",
     "npm_test": "passed (source extension0.1.13; installed0.1.4 unchanged)",
     "compileall": "passed (compiler, tests, scripts)",
     "qa_report_validator": "79/100; all50 arithmetic and category totals agree",
-    "strict_json": "both current structured records parse as UTF-8",
+    "strict_json": "both structured records parse as UTF-8",
     "git_diff_check": "passed; LF-to-CRLF notices only",
-    "finding": "No current implementation finding. #88/#89 fixed and closed after independent evidence. #123 remains partial; globals, arrays, runtime subsystems and packages are not pruned.",
-    "initial_full50_score_before_record_sync": 78,
-    "independent_record_parity": "PASS across all six evaluation/status records",
-    "implementation_commit": "016fff66a4e4068260f04870ca81da4a75707307"
+    "finding": "No new implementation defect. #88/#89 fixed and closed. #123 now prunes functions and unused global scalar/array declarations but does not select runtime subsystems or packages."
   },
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6579733436",
   "resolved_critic_issue_48": "Fixed strict UTF-8 JSON serialization and synchronized the evaluation SHA to reviewed commit d757c79; strict JSON parsing and QA arithmetic pass in the follow-up snapshot.",
   "resolved_user_reported_issues": [
     57
   ],
-  "current_candidate_status": "Independent full50 review of base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA256 d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499: 78/100 before record sync; final79/100 FAIL against98 after criterion38 restoration, categories13/19/15/17/15. Independent and local full suites224 pass (257.990s and250.318s). #89 fixed and independently verified; #88/#89 closed; #123 partial. Six-record parity recheck passed independently. Implementation commit 016fff66a4e4068260f04870ca81da4a75707307 pushed to origin/main.",
+  "current_candidate_status": "Independent full50 review of base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759: 78/100 before record sync; 79/100 FAIL against98 after criterion38 restoration, categories13/19/15/17/15. Independent and local full suites227 pass (254.117s and293.538s). Global storage pruning, imports, callbacks, and v1/v2 shadowing verified. #123 partially improved; runtime subsystems/packages remain whole. Independent six-record parity audit passed.",
   "current_unscored_followup": {
     "summary": "Continue issue #23 toward98: selective linking of unused runtime features/globals/arrays, modular packages/dependency resolution, engine/Forge/OS targets, and measured efficiency.",
     "status": "pending implementation",
@@ -387,12 +384,12 @@
   "resolved_critic_issue_81": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Shared valid C UTF-8 metadata literals preserve supplementary source filenames and runtime physical locations; both backends and byte-exact payload/title compilation verified.",
   "resolved_critic_issue_82": "Independently verified fixed on b76fc02a1f6ea9ab24f7af004e8a0981ba249252; Quote-aware validation of every unbound source identifier reference rejects private calls/array reads/writes before binding; generated references and literals remain valid.",
   "latest_record_parity_check": {
-    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
+    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
     "result": "PASS",
-    "reviewed_implementation": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537; implementation-d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499",
+    "reviewed_implementation": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
     "score_unchanged": 79,
-    "summary": "All six records now identify 7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537; source/test SHA 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499, 79/100 against98, categories13/19/15/17/15, 224 tests in257.990s independent and250.318s local, #89 fixed/closed, #123 partial. Independent six-record parity recheck passed.",
-    "independent_recheck": "PASS; all six records, criterion vector, categories, hashes, test counts/timings and issue status agree."
+    "summary": "Independent six-record parity audit PASS for the storage-pruning candidate: source/test SHA e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA 8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759, score79/100 against98, categories13/19/15/17/15, all50 criteria, 227 tests independent254.117s/local293.538s, #89 closed, #123 partial, installed extension0.1.4 unchanged.",
+    "independent_recheck": "PASS; all six records, 50 criterion scores, category totals, candidate hashes, test counts/timings, and issue statuses agree."
   },
   "latest_evaluation": {
     "score": 79,
@@ -400,12 +397,12 @@
     "result": "FAIL",
     "initial_score_before_record_sync": 78,
     "record_sync_restored_criterion38": true,
-    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
+    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
     "base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
-    "source_diff_sha256": "24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
-    "implementation_diff_sha256": "d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499",
-    "full_worktree_diff_sha256_at_review": "3240cb6e89cc0b8e6abfb5b406995258ba97f531653dd3047f034b2a639597f5",
-    "hash_method": "Concatenated Python difflib.unified_diff output with three context lines, sorted paths; implementation hash covers README.md, compiler/codegen.py, compiler/modules.py, docs/COMPILER.md, docs/COMPLETION_MATRIX.md, docs/LANGUAGE_SPEC.md, docs/Wiki/Compiler-and-Build.md, tests/test_authoring.py, tests/test_compiler_modules.py.",
+    "source_diff_sha256": "e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
+    "implementation_diff_sha256": "8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759",
+    "full_worktree_diff_sha256_at_review": "ab558713d36734cef86edf1109ceae9b4b004ecc2afda4a528fb847591d4e3b0",
+    "hash_method": "Concatenated Python difflib.unified_diff output with three context lines, sorted paths, base content via git show.",
     "categories": {
       "requirements": "13/20",
       "functionality": "19/20",
@@ -465,40 +462,33 @@
       2,
       0
     ],
-    "full_test_count": 224,
-    "local_full_test_seconds": 250.318,
-    "independent_full_test_seconds": 257.99,
+    "full_test_count": 227,
+    "local_full_test_seconds": 293.538,
+    "independent_full_test_seconds": 254.117,
     "full_test_result": "PASS",
     "full_test_command": "python -m unittest discover -s tests -q",
-    "full_test_session": 74052,
     "full_test_exit": 0,
     "findings": [
-      "Independent full50 review score78 before record sync; criterion38 returns to2 once records match the frozen candidate.",
-      "All224 tests passed in local and independent runs.",
-      "Graphical top-level initializer emitted after setup and before anvil_run; independent compiled MSVC harness verified global state before runtime boundary.",
-      "Issues #88 and #89 fixed; #88 closed and #89 independently verified.",
-      "#123 remains partial: globals, arrays, runtime subsystems and feature packages are not eliminated.",
-      "Issue #23 body and67 comments reread after tests; C-first and modular OS clarification included.",
-      "No other current implementation defect; full goal remains below98."
+      "Independent review scored78 before syncing criterion38; after syncing candidate records, score79/100.",
+      "Local and independent complete suites each passed227 tests.",
+      "C generation omits unreachable functions and unused global scalar/array declarations while preserving top-level initialization, emitted writes, and expression evaluation.",
+      "Independent MSVC executable printed5 with a 200,000-element dead array and its dead scalar absent from generated C.",
+      "Selective module storage, callback target/global array, and v1/v2 local-shadowing probes passed.",
+      "No new implementation defect found; #123 remains partial because runtime subsystems/package features are not selectively linked.",
+      "Issue #23 body and68 comments reread after tests; full required scope remains."
     ],
     "source_extension": "0.1.13",
     "installed_extension": "0.1.4 unchanged",
     "native_parity_required": false,
     "full_goal_complete": false,
-    "issue89": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/89",
-    "issue23_comment_after_sync": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371",
     "issue89_status": "closed",
-    "issue89_verification_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/89#issuecomment-6581673429",
-    "record_parity_confirmed": true,
-    "record_parity_check_result": "PASS",
-    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371",
-    "implementation_commit": "016fff66a4e4068260f04870ca81da4a75707307"
+    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6582314947"
   },
-  "latest_followup_status_change": "Independent full50 review of graphical startup/DCE candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA256 d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499: initial78/100 while criterion38 evidence referred to old records; after synchronization, final79/100 FAIL against98, categories13/19/15/17/15. Independent suite224 passed in257.990s; local run224 passed in250.318s. The compiled MSVC harness verified startup state before anvil_run. #89 fixed and closed; #123 remains partial; no new implementation finding.",
-  "latest_independent_candidate_result": "Independent full50 review of graphical startup/DCE candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA256 d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499: initial78/100 while criterion38 evidence referred to old records; after synchronization, final79/100 FAIL against98, categories13/19/15/17/15. Independent suite224 passed in257.990s; local run224 passed in250.318s. The compiled MSVC harness verified startup state before anvil_run. #89 fixed and closed; #123 remains partial; no new implementation finding.",
+  "latest_followup_status_change": "Independent full50 review of the C storage-reachability candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759: initial78/100 while criterion38 referenced the prior candidate; after synchronization, score79/100 FAIL against98, categories13/19/15/17/15. Independent suite227 passed in254.117s; local run227 passed in293.538s. A 200,000-element dead global array was omitted while EXE output5 remained. Selective import/global storage, callback array/output9, and v1/v2 shadowing probes passed. #123 now prunes functions and unused global scalar/array declarations, but runtime subsystems/packages remain unselected. Issue #23 body and68 comments reread; no new implementation defect.",
+  "latest_independent_candidate_result": "Independent full50 review of the C storage-reachability candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f, implementation SHA256 8b3443dd0427c24f606d64baad655cb8381f02ea8553c047e15ccd8ac3cb5759: initial78/100 while criterion38 referenced the prior candidate; after synchronization, score79/100 FAIL against98, categories13/19/15/17/15. Independent suite227 passed in254.117s; local run227 passed in293.538s. A 200,000-element dead global array was omitted while EXE output5 remained. Selective import/global storage, callback array/output9, and v1/v2 shadowing probes passed. #123 now prunes functions and unused global scalar/array declarations, but runtime subsystems/packages remain unselected. Issue #23 body and68 comments reread; no new implementation defect.",
   "latest_evaluation_score": 79,
   "latest_independent_candidate_score": 79,
-  "latest_independently_scored_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
+  "latest_independently_scored_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
   "open_critic_issues": [],
   "required_evaluation_score": 98,
   "resolved_critic_issue_86": "Independently verified fixed on3cfb5b9. Ordinary user-defined calls evaluate arguments exactly once, left-to-right through per-scope C temporaries; nested expressions, top-level calls, recursion, display hook expressions, generated-name collision diagnostics, and default/release builds pass. Issue #86 closed after 213-test independent full suite and full50 review; no new finding.",
@@ -521,5 +511,13 @@
     "summary": "Current sync candidate: base 7b0e921dce5b562c53b042003339f33309983aa1, code/test difflib SHA256 3336f6f1d5e26a0ac09df2662c689743f065819013e8c10810b5a065538cb9ac, full review hash 21af08e7e6e5d547d6990bc2558a941a9fa655590bd57180c179b87371fdf832; final78/100 against98 after criterion38 synchronization, categories13/18/15/17/15, 224 tests249.142s, issue #88 fixed/closed, #123 partial. All six records point to #23 and preserve 0.1.4 installed extension. Independent parity recheck pending."
   },
   "resolved_critic_issue_89": "Fixed and independently verified in generated-C/MSVC harness: graphical top-level initializers execute after setup and before anvil_run; issue #89 is closed with label Codex Bugs.",
-  "current_commit": "016fff66a4e4068260f04870ca81da4a75707307"
+  "current_commit": "016fff66a4e4068260f04870ca81da4a75707307",
+  "previous_record_parity_check_before_storage_review": {
+    "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
+    "result": "PASS",
+    "reviewed_implementation": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537; implementation-d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499",
+    "score_unchanged": 79,
+    "summary": "All six records now identify 7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537; source/test SHA 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499, 79/100 against98, categories13/19/15/17/15, 224 tests in257.990s independent and250.318s local, #89 fixed/closed, #123 partial. Independent six-record parity recheck passed.",
+    "independent_recheck": "PASS; all six records, criterion vector, categories, hashes, test counts/timings and issue status agree."
+  }
 }

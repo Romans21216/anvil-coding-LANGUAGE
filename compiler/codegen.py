@@ -444,9 +444,12 @@ def emit_c(
             f"{functions['main'].source or path}:{functions['main'].line}: main function parameters "
             "require an explicit call with arguments"
         )
-    from compiler.modules import reachable_functions
+    from compiler.modules import reachable_functions, reachable_storage
 
     emitted_functions = reachable_functions(functions, top, graphical=has_engine)
+    emitted_variables, emitted_arrays = reachable_storage(
+        top, emitted_functions, variables, arrays
+    )
     function_bodies = {
         name: emit_nodes(path, fn.body, functions, "    ", fn, arrays)
         for name, fn in functions.items()
@@ -464,11 +467,12 @@ def emit_c(
     metadata_payload=pack(metadata)
     if metadata_payload:
         lines.append('static const char _anvil_metadata_blob[] = '+c_bytes_literal(metadata_payload)+';')
-    lines += [f"static double {c_name(name)};" for name in sorted(variables)]
+    lines += [f"static double {c_name(name)};" for name in sorted(emitted_variables)]
     lines += [f'static double {c_name(name)};' for node in top for name in sorted(node.c_temporaries)]
     lines += [
         f"static double {c_name(name)}[{size}];"
         for name, size in sorted(arrays.items())
+        if name in emitted_arrays
     ]
     if any(fn.local_arrays for _name, fn in emitted_functions):
         lines.extend(

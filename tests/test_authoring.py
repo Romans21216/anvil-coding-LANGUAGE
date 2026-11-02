@@ -123,6 +123,49 @@ class AuthoringSyntaxTests(unittest.TestCase):
         run = subprocess.run([str(executable)], capture_output=True, text=True)
         self.assertEqual((run.returncode, run.stdout.strip()), (0, "7"), run.stderr)
 
+    def test_c_build_elides_unreachable_global_storage(self):
+        entry = self.root / "storage-tree-shake.ANVL"
+        generated = self.root / "storage-tree-shake.c"
+        executable = self.root / "storage-tree-shake.exe"
+        entry.write_text(
+            "array live_array(2)\n"
+            "array dead_array(200000)\n"
+            "set varl(initialized) = 5\n"
+            "fn(main)\n"
+            " set array(live_array, 0) = varl(initialized)\n"
+            " output array(live_array, 0)\n"
+            "end\n"
+            "fn(unused)\n"
+            " set varl(dead_value) = array(dead_array, 0)\n"
+            " output varl(dead_value)\n"
+            "end\n"
+            "call fn(main)\n",
+            encoding="utf-8",
+        )
+
+        build = subprocess.run(
+            [
+                sys.executable,
+                str(COMPILER),
+                str(entry),
+                "--generated-c",
+                str(generated),
+                "--output",
+                str(executable),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(build.returncode, 0, build.stderr)
+        c_source = generated.read_text(encoding="utf-8")
+        self.assertIn("static double anvil_live_array[2];", c_source)
+        self.assertIn("static double anvil_initialized;", c_source)
+        self.assertNotIn("anvil_dead_array", c_source)
+        self.assertNotIn("anvil_dead_value", c_source)
+        run = subprocess.run([str(executable)], capture_output=True, text=True)
+        self.assertEqual((run.returncode, run.stdout.strip()), (0, "5"), run.stderr)
+
     def test_explicit_top_level_entry_omits_unreachable_main(self):
         compiler = find_compiler(None)
         if not compiler:

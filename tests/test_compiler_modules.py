@@ -129,6 +129,50 @@ class CompilerModuleTests(unittest.TestCase):
         self.assertIn("anvil__anvil_callable_dispatch_", generated)
         self.assertNotIn("anvil_unused", generated)
 
+    def test_c_codegen_prunes_unreachable_global_variables_and_arrays(self):
+        source_path = pathlib.Path("storage-tree-shake.ANVL")
+        source = (
+            "array live_array(2)\n"
+            "array dead_array(4096)\n"
+            "set varl(initialized) = 5\n"
+            "fn(main)\n"
+            " set array(live_array, 0) = varl(initialized)\n"
+            " output array(live_array, 0)\n"
+            "end\n"
+            "fn(unused)\n"
+            " set varl(dead_value) = array(dead_array, 0)\n"
+            " output varl(dead_value)\n"
+            "end\n"
+            "call fn(main)\n"
+        )
+        functions, top, variables, arrays = parse(source_path, source)
+
+        generated = emit_c(source_path, functions, top, variables, arrays)
+
+        self.assertIn("static double anvil_live_array[2];", generated)
+        self.assertNotIn("anvil_dead_array", generated)
+        self.assertIn("static double anvil_initialized;", generated)
+        self.assertNotIn("anvil_dead_value", generated)
+
+    def test_c_codegen_does_not_emit_shadowed_global_array_for_local_array(self):
+        source_path = pathlib.Path("local-array-shadows-global.ANVL")
+        source = (
+            "language version 2\n"
+            "array shared(64)\n"
+            "fn(main)\n"
+            " array shared(2)\n"
+            " set array(shared, 0) = 9\n"
+            " output array(shared, 0)\n"
+            "end\n"
+            "call fn(main)\n"
+        )
+        functions, top, variables, arrays = parse(source_path, source)
+
+        generated = emit_c(source_path, functions, top, variables, arrays)
+
+        self.assertNotIn("static double anvil_shared[64];", generated)
+        self.assertIn("anvil_local_array_alloc(2", generated)
+
     def test_legacy_compiler_facade_reexports_phases(self):
         from compiler.codegen import emit_c as module_emit_c
         from compiler.parser import parse as module_parse
