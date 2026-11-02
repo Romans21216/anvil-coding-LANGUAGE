@@ -1,85 +1,86 @@
 # Anvil QA report
 
-**Review date:** 2026-11-02
-**Latest independent evaluation:** **79/100 - FAIL** on base `57101e5e517cbc533b94fa394dc0c9e7d419851f`, source/test diff SHA256 `3f4b3b491c43b75a502ab76a46e785d6bd0716cc913de964896e268f8a7a63fc`, non-test implementation diff SHA256 `17d6c2242467e1f97a964247e258b96962685002bc97682c5687f79b97f328f7`, and original eight-path reviewed diff SHA256 `e7fe4e704c5693071deace3724f62dee1b9cb28d29dc8e8dba65f736c8866ee4`. The post-record-sync eight-path worktree hash is `96150fc7c167fce8cc33abf4fade221d76f1a341d9c532444ca093b39ebab363`; that hash includes the evaluation summary edit in `COMPLETION_MATRIX.md` and does not change the reviewed code/test hash. Full50 independent review initially scored78/100 because criterion38 records still identified the previous candidate; syncing the six records restores criterion38 and the score to79. Categories13/19/15/17/15. Independent six-record record-only parity recheck: PASS.
-**Evaluation comment:** https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583971959 (issue #23 now has71 comments). Candidate source commit `18ec564a53b79dc7577e804f78bf6a5cebeff7d1` is published to origin/main.
-**Current passing threshold:** 98/100. Historical scores and passing subsets do not establish full-goal completion.
-**Evaluator:** separate `final_review` agent. It ran9 targeted build/code-generation tests, all passing; `compileall`, QA arithmetic and diff checks passed. The 240-test full-suite result (310.826s) is the local exact-candidate run; the reviewer did not repeat that long run.
+## Current reviewed candidate
 
-## Reviewed candidate and verification
+**Latest independent evaluation:** **79/100 - FAIL** against98.
 
-- Reviewed base `57101e5e517cbc533b94fa394dc0c9e7d419851f` plus the eight-file implementation/documentation batch. Sorted-path UTF-8 `difflib.unified_diff` with three context lines: compiler/test SHA256 `3f4b3b491c43b75a502ab76a46e785d6bd0716cc913de964896e268f8a7a63fc`; non-test implementation SHA256 `17d6c2242467e1f97a964247e258b96962685002bc97682c5687f79b97f328f7`; original eight-path reviewed SHA256 `e7fe4e704c5693071deace3724f62dee1b9cb28d29dc8e8dba65f736c8866ee4` (post-sync eight-path hash is recorded in the summary header).
-- Local: `python -m unittest discover -s tests -q` passed **240 tests in310.826s**. `python -m compileall -q compiler tests scripts`, `python scripts/validate_qa_report.py`, strict UTF-8 JSON parsing and `git diff --check` passed.
-- Independent reviewer: **9 targeted tests passed**; paired MSVC release executables both printed `23`. Without synthetic legacy runtime roots, size was142,848 bytes versus143,360 bytes (512-byte reduction). This is one sample and gives no broad CPU, memory or size claim.
-- No new confirmed defect. The former helper collision finding is fixed in the current source: the MSVC helper lives in its owned object temporary directory, and a sentinel preservation test passes. Installed VS Code0.1.4 remains unchanged.
-- This batch enables release COMDAT/linker pruning and removes unconditional engine/network roots for console programs. Runtime sources remain monolithic; feature packages, broad engine/runtime systems, Forge, OS/UEFI work, DXR/Embree, and measured efficiency remain incomplete. Full requirement inventory stays only in [GitHub issue #23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23).
+Base 13289a550e159ccd6c6fa7bb70c6815805233092; compiler/test SHA256 464e0dd834dd3a3fe03a0388900ba2a2cbad4a2e95c07c12f04c0d37f67603ba; runtime/build SHA256 c064537f4ae36b1a24e330c49a5320038b1498b26128399c6f7f3e7234daf09f; all-12-path SHA256 f13b30de68e9e318645bb4fc3d3b033a95fe1cb9c06924a73f478e3b38c9ee55. Post-record-sync all-12-path hash after updating the completion matrix: 104d7d26dfcc1635b05b7ef78afbc6f57032c4681dde0167c74457bd1d7067d0. Sorted-path UTF-8 difflib unified-diff hashes, three context lines; new file base content is empty.
 
-## Latest 50-criterion scoring — base `57101e5e517cbc533b94fa394dc0c9e7d419851f` plus compiler/test diff `3f4b3b491c43b75a502ab76a46e785d6bd0716cc913de964896e268f8a7a63fc`
+Source commit `108e38c94578d0d55e85426a1530c7e5b001fcff` published on origin/main; issue #23 evaluation comment [6584578058](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6584578058). Issue now has72 comments. Six-record parity PASS. Local suite247/326.881s. Independent review15 focused/3.210s including MSVC UDP executable; no independent full suite. Compileall/npm extension validation/QA arithmetic/strict JSON/diff checks passed. VS Code0.1.4 remains unchanged. No new runtime defect confirmed.
 
-**79/100 — FAIL against98 after record synchronization** (independent raw score78 before criterion38 synchronization).
+## Latest 50-criterion scoring
+
+79/100 — FAIL against98 after six-record synchronization (raw independent78; criterion38 restored to2). Categories13/19/15/17/15.
+
+Base 13289a550e159ccd6c6fa7bb70c6815805233092; compiler/test SHA256 464e0dd834dd3a3fe03a0388900ba2a2cbad4a2e95c07c12f04c0d37f67603ba; runtime/build SHA256 c064537f4ae36b1a24e330c49a5320038b1498b26128399c6f7f3e7234daf09f; all-12-path SHA256 f13b30de68e9e318645bb4fc3d3b033a95fe1cb9c06924a73f478e3b38c9ee55. Sorted-path UTF-8 difflib unified-diff hashes, three context lines; new file base content is empty.
+
+The compiler marks reachable networking built-ins; the build compiles runtime/anvil_network.c separately and links Winsock only when selected. This is an internal runtime feature boundary. User-facing packages and separate renderer/physics/core modules remain unfinished.
+
+Local full suite247 passed in326.881s. Independent reviewer ran15 focused tests in3.210s including a real MSVC UDP host executable; no independent full-suite claim. Compileall, npm extension/package validation, QA arithmetic, strict JSON and diff checks passed. VS Code0.1.4 remains unchanged. No runtime defect confirmed. Source commit 108e38c94578d0d55e85426a1530c7e5b001fcff. Full backlog remains in GitHub issue #23. Goal active; substantial language, engine, package, GPU, Forge, OS, platform and efficiency work remains.
+
 
 | # | Criterion | Score | Evidence, deduction, and status |
-|---:|---|:---:|---|
-| 1 | Explicit requirements identified | 2 | Current #23 requirements and C-first direction were reviewed. |
-| 2 | Implicit requirements addressed | 1 | Portability and full resource lifecycle remain incomplete. |
-| 3 | Functionality matches intended goal | 1 | Implemented language works; complete engine and Forge/OS scope do not. |
-| 4 | Required deliverables present | 1 | Compiler, runtime, docs and extension exist; broad deliverables remain. |
-| 5 | No essential feature missing | 0 | Rich types, audio, GPU/DXR/Embree, broad assets/physics/networking, Forge/OS are absent or partial. |
-| 6 | Stated constraints respected | 2 | Required .ANVL-to-C-to-MSVC-to-EXE path remains intact. |
-| 7 | Ambiguity resolved logically | 2 | Compatibility and backend boundaries are documented. |
-| 8 | Behavior matches documentation | 2 | Release linker GC and conditional engine/network roots match docs. |
-| 9 | Important use cases supported | 1 | Major engine and Forge/OS use cases remain unsupported. |
-| 10 | Usable for intended purpose | 1 | Useful prototype, not the full intended product. |
-| 11 | Core functionality works | 2 | Targeted executable/build probes and paired output probe pass. |
-| 12 | Secondary functionality works | 2 | Root selection and linker options have focused regressions. |
-| 13 | Primary workflows functional | 1 | Forge, package, assembly, UEFI and kernel workflows remain absent. |
-| 14 | Inputs validated | 2 | Tested compiler/build inputs are validated. |
-| 15 | Errors handled gracefully | 2 | Helper cleanup and unrelated sentinel-file preservation are tested. |
-| 16 | Edge cases covered | 2 | Focused linker/root cases pass. |
-| 17 | Invalid inputs controlled | 2 | Invalid and unsupported input handling remains tested. |
-| 18 | Stable across repeated operations | 2 | No repeated-operation issue was found in the changed path. |
-| 19 | No known critical defects | 2 | No new critical defect confirmed; helper collision fix is present. |
-| 20 | Components integrate | 2 | Compiler, C output, linker settings and tests integrate for this behavior. |
-| 21 | Logical project structure | 2 | Compiler/build responsibilities remain understandable. |
-| 22 | Readable and consistently formatted | 1 | Dense and inconsistent formatting remains a maintenance cost. |
-| 23 | Clear module responsibilities | 1 | Parsing, validation and emission remain coupled; validated IR is absent. |
-| 24 | Consistent descriptive naming | 2 | Names are generally descriptive. |
-| 25 | Duplication minimized | 1 | Textual rewrites and repeated reference handling remain. |
-| 26 | Dependencies appropriate | 2 | Current build dependencies fit the Windows/MSVC target. |
-| 27 | Supports future extensions | 1 | Platform abstraction and package/object boundaries remain limited. |
-| 28 | No unfinished placeholders | 1 | Required engine and target breadth remains unfinished. |
-| 29 | Configuration understandable | 2 | Current build configuration is understandable. |
-| 30 | Conventions followed | 2 | C/Win32 conventions fit this implementation. |
-| 31 | Automated tests provided | 2 | 240 full-suite tests pass on the candidate; reviewer ran 9 focused tests. |
-| 32 | Core tests covered | 2 | Changed linker and code-generation paths have regressions. |
-| 33 | Failure scenarios tested | 2 | Build failure cleanup and root selection have focused coverage. |
-| 34 | Edge cases explicitly tested | 2 | Release/debug separation and string false-positive cases are tested. |
-| 35 | Integration behavior tested | 1 | OS mouse-coordinate dispatch integration gap #63 remains open. |
-| 36 | Documented test commands work | 2 | QA arithmetic, compileall and diff checks pass. |
-| 37 | Builds and compilation pass | 2 | MSVC release probe succeeded with matching program output. |
-| 38 | Results recorded accurately | 2 | Independent review initially scored1 while records described the previous candidate; record sync restores2. |
-| 39 | Regression checks performed | 2 | Full local suite plus reviewer targeted checks pass. |
-| 40 | Verified against original goal | 0 | Complete engine/Forge/OS acceptance remains incomplete. |
-| 41 | Installation instructions accurate | 2 | Current installation instructions remain accurate. |
-| 42 | Setup reproducible | 1 | Platform and package setup is still incomplete. |
-| 43 | Usage understandable | 2 | C-first workflow is clear. |
-| 44 | Design decisions documented | 2 | Current design boundaries are documented. |
-| 45 | Troubleshooting available | 2 | Troubleshooting and compiler/build documentation exist. |
-| 46 | Opens in intended environment | 1 | Full editor, project and runtime workflows remain incomplete. |
-| 47 | Editor integration works | 1 | Extension validation exists; newer visible verification is incomplete and installed0.1.4 stays unchanged. |
-| 48 | Deliverables organized | 2 | Files are organized; helper intermediates are isolated and cleaned. |
-| 49 | Limitations disclosed | 2 | Major limitations are disclosed. |
-| 50 | Practical for intended scope | 0 | Full engine and Forge/OS objective remains unverified. |
+|---:|---|---:|---|
+| 1 | requirements identified | 2 | current #23 and C-first reviewed |
+| 2 | implicit requirements | 1 | portability/lifecycle incomplete |
+| 3 | functionality | 1 | engine/Forge/OS incomplete |
+| 4 | deliverables | 1 | broad deliverables absent |
+| 5 | essential features | 0 | many requested systems absent |
+| 6 | constraints | 2 | ANVL-C-MSVC-EXE preserved |
+| 7 | ambiguity | 2 | backend boundaries clear |
+| 8 | documentation parity | 2 | network module selection matches docs |
+| 9 | use cases | 1 | major use cases unsupported |
+| 10 | intended purpose | 1 | prototype only |
+| 11 | core functionality | 2 | MSVC UDP host executable passed |
+| 12 | secondary functionality | 2 | network integration tests pass |
+| 13 | primary workflows | 1 | Forge/package/UEFI/kernel absent |
+| 14 | input validation | 2 | markers/build arguments validated |
+| 15 | error handling | 2 | network setup/receive pass |
+| 16 | edge coverage | 2 | duplicate/unknown/text false positives covered |
+| 17 | invalid inputs | 2 | unknown marker errors explicit |
+| 18 | repeat stability | 2 | full suite passes locally |
+| 19 | critical defects | 2 | no new runtime defect |
+| 20 | integration | 2 | compiler/runtime integrate |
+| 21 | project structure | 2 | files organized |
+| 22 | formatting | 1 | formatting debt remains |
+| 23 | module responsibilities | 1 | most runtime/compiler phases coupled |
+| 24 | naming | 2 | names descriptive |
+| 25 | duplication | 1 | binding/reference duplication |
+| 26 | dependencies | 2 | Windows/MSVC deps tested |
+| 27 | extensibility | 1 | registry internal; packages absent |
+| 28 | unfinished scope | 1 | engine/target breadth incomplete |
+| 29 | configuration | 2 | build config clear |
+| 30 | conventions | 2 | C/Win32 fits |
+| 31 | automated tests | 2 | 247 local and 15 independent focused tests |
+| 32 | core tests | 2 | changed paths covered |
+| 33 | failure tests | 2 | invalid/non-network/UDP covered |
+| 34 | edge tests | 2 | duplicate/text false positives covered |
+| 35 | integration tests | 1 | #63 remains open |
+| 36 | test commands | 2 | QA/npm/compile/JSON/diff checks pass |
+| 37 | builds | 2 | MSVC UDP executable passes |
+| 38 | results recorded | 2 | criterion38 restored by record sync |
+| 39 | regressions | 2 | local and focused regressions pass |
+| 40 | full goal | 0 | full acceptance incomplete |
+| 41 | installation | 2 | instructions match |
+| 42 | reproducibility | 1 | platform/package setup incomplete |
+| 43 | usage | 2 | C-first/reuse documented |
+| 44 | design documentation | 2 | boundaries documented |
+| 45 | troubleshooting | 2 | troubleshooting exists |
+| 46 | editor workflow | 1 | editor/project workflows incomplete |
+| 47 | editor integration | 1 | installed0.1.4 preserved; new visible verification absent |
+| 48 | organization | 2 | files organized |
+| 49 | limitations | 2 | limitations disclosed |
+| 50 | practical scope | 0 | full goal remains unverified |
 | | **Requirement fulfillment** | **13/20** | |
 | | **Functionality and reliability** | **19/20** | |
 | | **Code quality and architecture** | **15/20** | |
 | | **Testing and verification** | **17/20** | |
 | | **Developer experience and delivery** | **15/20** | |
-| | **Total** | **79/100** | Base `57101e5e517cbc533b94fa394dc0c9e7d419851f` plus source/test diff `3f4b3b491c43b75a502ab76a46e785d6bd0716cc913de964896e268f8a7a63fc`; FAIL against98. Independent pre-sync score78; criterion38 is restored after six-record synchronization. |
+| | **Total** | **79/100** | FAIL against98 |
 
 ### Deduction details and follow-up
 
-The current change improves release executable reachability and size by removing unnecessary generated roots and enabling linker garbage collection. Its measured saving is512 bytes in the paired sample only. The overall implementation still needs modular feature packages and automatic dependency handling; broader language, engine, rendering backends, media/audio, physics/networking, Forge formats, system/UEFI/OS workflows, benchmark evidence, and editor workflows remain substantial work. Item #63 integration evidence remains open. Direct-native parity is optional under the current C-first direction. The full goal remains below98 and active.
+Networking is separately compiled only when reachable. User-facing package resolution, other runtime module boundaries, broad engine/language, DXR/Embree, Forge, UEFI/OS, cross-platform, editor and measured performance requirements remain incomplete. Full inventory: GitHub issue #23.
 
 ## Review history
 
@@ -128,12 +129,12 @@ Focused record-only check at ba78d22 found one stale ancillary extension field i
 Focused independent record-only recheck at b752f41: PASS. All six current records, ancillary fields, all50 scores and both candidate_validation objects agree on reviewed source b76fc02,76/100,categories12/18/14/17/15 and194 tests281.445s. Source extension0.1.12/installed0.1.4 and historical71/192/323.089 evidence are distinguished; follow-ups null. #58 correction verified. No source change, new test run or rescore.
 
 
-## Latest independent review identity
+## Historical review identity — project memory-budget candidate (superseded)
 
 Base `87e23d6943028222619f9febe0ed970e8d1a7ed7`; source/test SHA256 `57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c`; implementation SHA256 `24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac`; all16 changed paths at review SHA256 `caa73ca775bfd3ecca4aa1ef57e5c522cf39ae6d89b37d7333249ceedc514615`. Full suite passed233 tests independently in253.611s and locally in269.749s. Categories13/19/15/17/15; score79/100 after record sync. `[memory]` limits apply to C/native builds and nested includes; native allocation diagnostics report the declaring module path and line. #90 was fixed, independently verified, and closed after publication; issues #87–#89 are also closed. #123 remains partial because runtime subsystems and packages are not selectively linked. The full goal remains incomplete.
 
 Latest evaluation comment: https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339
 
-Independent six-record record-only recheck: PASS. All six current records agree on candidate base/hash identity, score79/100, criterion vector/category subtotals, 233 local/independent test results and timings, 3 focused tests, issue #23 comment count69 before this update, and issue #90 fixed-but-open status. No source change, test rerun, or rescore.
+Historical record-only recheck for the project-memory-budget candidate: PASS at that time. Its 233-test evidence, 69-comment issue count, and #90 state do not describe the current candidate.
 
-Publication record: reviewed candidate pushed to `main` as `b4e8a20ee511388123f4982001ac997c6c720e4f`; issue #90 closed with exact reproduction and passing test evidence; issue #23 evaluation comment https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339 posted (70 comments after publication). Score remains79/100; no rescore.
+Historical publication record for the superseded project-memory-budget candidate: commit `b4e8a20ee511388123f4982001ac997c6c720e4f`; issue #90 closed; issue #23 evaluation comment #6583162339. This does not describe the current networking-module candidate.
