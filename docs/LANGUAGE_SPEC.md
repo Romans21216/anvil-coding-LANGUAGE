@@ -158,6 +158,11 @@ key_name         = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
                  | "LEFT" | "RIGHT" | "ENTER" | "ESCAPE" ;
 ```
 
+User-defined function call arguments are evaluated exactly once, from left to
+right, including nested calls. The compiler preserves this order regardless of
+the selected C compiler. For example, in `call fn(pair, call fn(next), call
+fn(next))`, the first `next` call supplies the first argument to `pair`.
+
 All binary operators associate left-to-right. Precedence, from lowest to highest, is:
 
 | Precedence | Operators |

@@ -174,6 +174,8 @@ class ExpressionParser:
         functions: dict[str, Node] | None,
         scope: Node | None = None,
         arrays: dict[str, int] | None = None,
+        temporary_owner: Node | None = None,
+        temporary_counter: list[int] | None = None,
     ):
         self.path, self.line, self.source, self.functions = (
             path,
@@ -183,6 +185,8 @@ class ExpressionParser:
         )
         self.scope = scope
         self.arrays = arrays or {}
+        self.temporary_owner = temporary_owner
+        self.temporary_counter = temporary_counter if temporary_counter is not None else [0]
         validate_expression_depth(source, path, line)
         self.tokens: list[tuple[str, str]] = []
         pos = 0
@@ -327,7 +331,14 @@ class ExpressionParser:
             if size is None:
                 raise CompileError(f"{self.path}:{self.line}: unknown array {name!r}")
             index_expr = ExpressionParser(
-                self.path, self.line, parts[1], self.functions, self.scope, self.arrays
+                self.path,
+                self.line,
+                parts[1],
+                self.functions,
+                self.scope,
+                self.arrays,
+                self.temporary_owner,
+                self.temporary_counter,
             ).compile()
             left = (
                 f"anvil_array_get({array_code(name, self.scope)}, {size}, "
@@ -353,7 +364,14 @@ class ExpressionParser:
                 )
             args = [
                 ExpressionParser(
-                    self.path, self.line, arg, self.functions, self.scope, self.arrays
+                    self.path,
+                    self.line,
+                    arg,
+                    self.functions,
+                    self.scope,
+                    self.arrays,
+                    self.temporary_owner,
+                    self.temporary_counter,
                 ).compile()
                 for arg in raw_args
             ]
@@ -364,7 +382,33 @@ class ExpressionParser:
                 invocation=c_name(name)+'('+', '.join(temporaries)+')'
                 left=('('+', '.join(assignments+[invocation])+')','number')
             else:
-                left = (c_name(name) + "(" + ", ".join(args) + ")", "number")
+                invocation = c_name(name) + "(" + ", ".join(args) + ")"
+                if args and self.temporary_owner is not None:
+                    temporaries = []
+                    for argument in args:
+                        index = self.temporary_counter[0]
+                        self.temporary_counter[0] += 1
+                        temporary_name = f"_anvil_expr_arg_{index}"
+                        self.temporary_owner.c_temporaries.add(temporary_name)
+                        temporary = (
+                            c_name(self.scope.name + "__" + temporary_name)
+                            if self.scope
+                            else c_name(temporary_name)
+                        )
+                        temporaries.append((temporary, argument))
+                    assignments = [
+                        f"{temporary} = ({argument})"
+                        for temporary, argument in temporaries
+                    ]
+                    invocation = c_name(name) + "(" + ", ".join(
+                        temporary for temporary, _ in temporaries
+                    ) + ")"
+                    left = (
+                        "(" + ", ".join(assignments + [invocation]) + ")",
+                        "number",
+                    )
+                else:
+                    left = (invocation, "number")
         elif kind == "op" and value in ("+", "-"):
             left = (f"({value}{self.require_number(self.parse(7))})", "number")
         elif kind == "op" and value == "(":
@@ -503,10 +547,19 @@ def expr(
     expected: str = "number",
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
+    temporary_owner: Node | None = None,
+    temporary_counter: list[int] | None = None,
 ) -> str:
     source = source.strip()
     if source.startswith("compute(") and source.endswith(")"):
         source = source[8:-1]
-    return ExpressionParser(path, line, source, functions, scope, arrays).compile(
-        expected
-    )
+    return ExpressionParser(
+        path,
+        line,
+        source,
+        functions,
+        scope,
+        arrays,
+        temporary_owner,
+        temporary_counter,
+    ).compile(expected)

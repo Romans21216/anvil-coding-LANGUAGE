@@ -28,6 +28,8 @@ def rgb_style(
     functions: dict[str, Node],
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
+    temporary_owner: Node | None = None,
+    temporary_counter: list[int] | None = None,
 ) -> tuple[list[str], str]:
     color = ["255", "255", "255", "255"]
     modifiers, raw = _take_display_modifiers(raw, {"rgb", "rgba"}, path, line)
@@ -36,7 +38,8 @@ def rgb_style(
         if len(vals) not in (3, 4):
             raise CompileError(f"{path}:{line}: -rgb/-rgba expects 3 or 4 values")
         color = [
-            expr(path, line, value, functions, scope=scope, arrays=arrays)
+            expr(path, line, value, functions, scope=scope, arrays=arrays,
+                 temporary_owner=temporary_owner, temporary_counter=temporary_counter)
             for value in vals
         ]
         if len(color) == 3:
@@ -51,9 +54,12 @@ def _lower_display(
     functions: dict[str, Node],
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
+    temporary_owner: Node | None = None,
+    temporary_counter: list[int] | None = None,
 ) -> tuple[str, str]:
     raw = node.value.strip()
-    color, raw = rgb_style(raw, path, node.line, functions, scope, arrays)
+    color, raw = rgb_style(raw, path, node.line, functions, scope, arrays,
+                           temporary_owner, temporary_counter)
     rot = ["0", "0", "0"]
     loc = None
     modifiers, raw = _take_display_modifiers(raw, {"rotate", "l"}, path, node.line)
@@ -63,7 +69,8 @@ def _lower_display(
             raise CompileError(f"{path}:{node.line}: malformed display command: repeated -{name} modifier")
         seen.add(name)
         values = [
-            expr(path, node.line, value, functions, scope=scope, arrays=arrays)
+            expr(path, node.line, value, functions, scope=scope, arrays=arrays,
+                 temporary_owner=temporary_owner, temporary_counter=temporary_counter)
             for value in split_args(arguments)
         ]
         if name == "rotate":
@@ -89,7 +96,8 @@ def _lower_display(
         if dynamic:
             prefix = dynamic.group(1)[:-1].replace("%", "%%")
             value = expr(
-                path, node.line, dynamic.group(2), functions, scope=scope, arrays=arrays
+                path, node.line, dynamic.group(2), functions, scope=scope, arrays=arrays,
+                temporary_owner=temporary_owner, temporary_counter=temporary_counter,
             )
             separator = "" if prefix.endswith((" ", "\t")) else " "
             fmt = prefix + separator + '%.0f"'
@@ -99,7 +107,8 @@ def _lower_display(
             )
     expected = "string" if shape == "text" else "number"
     values = [
-        expr(path, node.line, item, functions, expected, scope=scope, arrays=arrays)
+        expr(path, node.line, item, functions, expected, scope=scope, arrays=arrays,
+             temporary_owner=temporary_owner, temporary_counter=temporary_counter)
         for item in args
     ]
     tail = ", ".join(color)
@@ -148,10 +157,13 @@ def emit_nodes(
             expected,
             scope,
             arrays,
+            scope or n,
+            temporary_counter,
         )
 
     original_path = path
     for n in nodes:
+        temporary_counter = [0]
         path = n.source or original_path
         source_path = c_string_literal(str(path))
         if n.kind == "noop":
@@ -214,14 +226,13 @@ def emit_nodes(
                     f"{n.source or path}:{n.line}: function {n.name!r} expects "
                     f"{len(functions[n.name].params)} argument(s), got {len(args)}"
                 )
-            if n.name.startswith('_anvil_callable_dispatch_'):
-                out.append(f'{indent}(void){lower(n,"call fn("+n.name+(", "+n.value if n.value else "")+")")};')
-            elif scope is None and n.name == "main":
-                values = [lower(n, arg) for arg in args]
-                out.append(f'{indent}printf("%.15g\\n", {c_name(n.name)}({", ".join(values)}));')
+            call_expression = "call fn(" + n.name + (", " + n.value if n.value else "") + ")"
+            if scope is None and n.name == "main":
+                out.append(
+                    f'{indent}printf("%.15g\\n", {lower(n, call_expression)});'
+                )
             else:
-                values = [lower(n, arg) for arg in args]
-                out.append(f"{indent}(void){c_name(n.name)}({', '.join(values)});")
+                out.append(f"{indent}(void){lower(n, call_expression)};")
         elif n.kind=='callable_error':
             message=c_string_literal(f'{path}:{n.line}: function reference is unset or invalid\n')
             out.append(f'{indent}fputs({message},stderr); exit(2);')
@@ -308,7 +319,9 @@ def emit_nodes(
                 raise CompileError(f"{path}:{n.line}: clear rgba expects 4 values")
             out.append(f"{indent}anvil_clear({', '.join(lower(n, x) for x in args)});")
         elif n.kind == "display":
-            shape, statement = _lower_display(path, n, indent, functions, scope, arrays)
+            shape, statement = _lower_display(
+                path, n, indent, functions, scope, arrays, scope or n, temporary_counter
+            )
             if shape != "ray_sphere":
                 out.append(f"{indent}anvil_trace_finish();")
             out.append(statement)
@@ -358,6 +371,85 @@ def emit_c(
     metadata=extract(top)
     project_name=metadata.get('name',project_name)
     top=[node for node in top if node.kind!='metadata']
+    setup = [
+        n
+        for n in top
+        if n.kind
+        in (
+            "set",
+            "global_set",
+            "scene",
+            "camera",
+            "camera_fov",
+            "camera_control",
+            "clear",
+            "seed",
+            "net_host",
+            "net_ip",
+            "net_leave",
+            "net_join",
+        )
+    ]
+    calls = [n for n in top if n.kind == "call"]
+    invalid = [
+        n
+        for n in top
+        if n.kind
+        not in (
+            "set",
+            "global_set",
+            "scene",
+            "camera",
+            "camera_fov",
+            "camera_control",
+            "clear",
+            "seed",
+            "net_host",
+            "net_ip",
+            "net_leave",
+            "net_join",
+            "call",
+            "noop",
+        )
+    ]
+    if invalid:
+        raise CompileError(
+            f"{invalid[0].source or path}:{invalid[0].line}: only configuration, initial values, "
+            "and calls are allowed at top level"
+        )
+    for n in calls:
+        if n.name not in functions:
+            raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
+        if len(split_args(n.value)) != len(functions[n.name].params):
+            raise CompileError(
+                f"{n.source or path}:{n.line}: function {n.name!r} expects "
+                f"{len(functions[n.name].params)} argument(s), "
+                f"got {len(split_args(n.value))}"
+            )
+    has_engine = (
+        any(
+            n.kind in ("scene", "camera", "camera_fov", "camera_control", "clear")
+            for n in setup
+        )
+        or "draw" in functions
+        or "update" in functions
+    )
+    if has_engine and "main" in functions and functions["main"].params:
+        raise CompileError(
+            f"{functions['main'].source or path}:{functions['main'].line}: main cannot have parameters "
+            "when used as an engine callback program"
+        )
+    if not has_engine and not calls and "main" in functions and functions["main"].params:
+        raise CompileError(
+            f"{functions['main'].source or path}:{functions['main'].line}: main function parameters "
+            "require an explicit call with arguments"
+        )
+    function_bodies = {
+        name: emit_nodes(path, fn.body, functions, "    ", fn, arrays)
+        for name, fn in functions.items()
+    }
+    setup_body = emit_nodes(path, setup, functions, "    ", arrays=arrays)
+    calls_body = emit_nodes(path, calls, functions, "    ", arrays=arrays)
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",
         '#include "anvil_runtime.h"',
@@ -436,86 +528,17 @@ def emit_c(
             f"{fn.local_array_lines[local]});"
             for local, size in sorted(fn.local_arrays.items())
         )
-        body = emit_nodes(path, fn.body, functions, "    ", fn, arrays)
+        body = function_bodies[name]
         lines.extend(body)
         if not any(n.kind == "output" for n in fn.body):
             lines.extend(local_array_cleanup(fn, "    "))
             lines.append("    return 0.0;")
         lines.extend(["}", ""])
-    # Setup commands and initial values run before callbacks.
-    setup = [
-        n
-        for n in top
-        if n.kind
-        in (
-            "set",
-            "global_set",
-            "scene",
-            "camera",
-            "camera_fov",
-            "camera_control",
-            "clear",
-            "seed",
-            "net_host",
-            "net_ip",
-            "net_leave",
-            "net_join",
-        )
-    ]
-    calls = [n for n in top if n.kind == "call"]
-    invalid = [
-        n
-        for n in top
-        if n.kind
-        not in (
-            "set",
-            "global_set",
-            "scene",
-            "camera",
-            "camera_fov",
-            "camera_control",
-            "clear",
-            "seed",
-            "net_host",
-            "net_ip",
-            "net_leave",
-            "net_join",
-            "call",
-            "noop",
-        )
-    ]
-    if invalid:
-        raise CompileError(
-            f"{invalid[0].source or path}:{invalid[0].line}: only configuration, initial values, "
-            "and calls are allowed at top level"
-        )
-    for n in calls:
-        if n.name not in functions:
-            raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
-        if len(split_args(n.value)) != len(functions[n.name].params):
-            raise CompileError(
-                f"{n.source or path}:{n.line}: function {n.name!r} expects "
-                f"{len(functions[n.name].params)} argument(s), "
-                f"got {len(split_args(n.value))}"
-            )
-    has_engine = (
-        any(
-            n.kind in ("scene", "camera", "camera_fov", "camera_control", "clear")
-            for n in setup
-        )
-        or "draw" in functions
-        or "update" in functions
-    )
-    if has_engine and "main" in functions and functions["main"].params:
-        raise CompileError(
-            f"{functions['main'].source or path}:{functions['main'].line}: main cannot have parameters "
-            "when used as an engine callback program"
-        )
     lines.append("int main(void) {")
     if metadata_payload:
         lines.append('    const char *volatile _anvil_metadata_keep = _anvil_metadata_blob; (void)_anvil_metadata_keep;')
     lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
-    lines.extend(emit_nodes(path, setup, functions, "    ", arrays=arrays))
+    lines.extend(setup_body)
     if has_engine:
         lines.append(
             f"    anvil_run({c_name('update') if 'update' in functions else 'NULL'}, "
@@ -523,7 +546,7 @@ def emit_c(
             f"{c_string_literal(project_name)});"
         )
     elif calls:
-        lines.extend(emit_nodes(path, calls, functions, "    ", arrays=arrays))
+        lines.extend(calls_body)
     elif "main" in functions:
         if functions["main"].params:
             raise CompileError(
@@ -533,4 +556,7 @@ def emit_c(
         lines.append(f'    printf("%.15g\\n", {c_name("main")}());')
     lines.append("    anvil_net_close();")
     lines.extend(["    return 0;", "}", ""])
+    from compiler.semantics import validate_program
+    from compiler.common import ParsedProgram
+    validate_program(ParsedProgram(path, functions, top, variables, arrays, [], []))
     return "\n".join(lines)

@@ -306,6 +306,65 @@ call fn(main)
                 self.assertEqual(run.returncode, 0, run.stderr)
                 self.assertEqual(run.stdout.strip(), "56")
 
+    def test_ordinary_function_expression_arguments_run_left_to_right(self):
+        source = (
+            "set varl(counter) = 0\n"
+            "fn(next)\n  add varl(counter) 1\n  output varl(counter)\nend\n"
+            "fn(pair, left, right)\n  output var(left) * 10 + var(right)\nend\n"
+            "fn(main)\n"
+            "  output call fn(pair, call fn(next), call fn(next))\n"
+            "end\ncall fn(main)\n"
+        )
+        for version, prefix in ((1, ""), (2, "language version 2\n")):
+            for mode, flags in (("default", []), ("release", ["--release"])):
+                with self.subTest(version=version, mode=mode):
+                    entry = self.root / f"function-order-v{version}-{mode}.ANVL"
+                    executable = self.root / f"function-order-v{version}-{mode}.exe"
+                    entry.write_text(prefix + source, encoding="utf-8")
+                    build = subprocess.run(
+                        [sys.executable, str(COMPILER), str(entry), *flags, "--output", str(executable)],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(build.returncode, 0, build.stderr)
+                    run = subprocess.run([str(executable)], capture_output=True, text=True)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    self.assertEqual(run.stdout.strip(), "12")
+
+    def test_ordinary_function_top_level_arguments_run_left_to_right(self):
+        source = (
+            "set varl(counter) = 0\n"
+            "set varl(result) = 0\n"
+            "fn(next)\n  add varl(counter) 1\n  output varl(counter)\nend\n"
+            "fn(pair, left, right)\n"
+            "  set varl(result) = var(left) * 10 + var(right)\n"
+            "  output varl(result)\nend\n"
+            "call fn(pair, call fn(next), call fn(next))\n"
+            "fn(main)\n  output varl(result)\nend\ncall fn(main)\n"
+        )
+        for mode, flags in (("default", []), ("release", ["--release"])):
+            with self.subTest(mode=mode):
+                entry = self.root / f"function-order-top-{mode}.ANVL"
+                executable = self.root / f"function-order-top-{mode}.exe"
+                entry.write_text(source, encoding="utf-8")
+                build = subprocess.run(
+                    [sys.executable, str(COMPILER), str(entry), *flags, "--output", str(executable)],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(build.returncode, 0, build.stderr)
+                run = subprocess.run([str(executable)], capture_output=True, text=True)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(run.stdout.strip(), "12")
+
+    def test_generated_expression_temporary_collision_is_rejected(self):
+        self.assert_callback_temporary_collision_is_rejected(
+            "set varl(main___anvil_expr_arg_0) = 999\n"
+            "fn(identity, value)\n  output var(value)\nend\n"
+            "fn(main)\n  output call fn(identity, 5)\nend\ncall fn(main)\n",
+            "ordinary-call-temporary-collision",
+        )
+
     def test_cleared_callback_reports_its_original_call_site(self):
         entry = self.root / "cleared.ANVL"
         executable = self.root / "cleared.exe"
