@@ -1,7 +1,7 @@
 # Anvil QA report
 
 **Review date:** 2026-11-02
-**Latest independent evaluation:** **78/100 - FAIL** on base `0e2126ecf01f1815bffef33a7d270f7cf2f3da50`, source/test diff SHA256 `ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9`, reviewed complete diff SHA256 `8498be7b670f7f676dbc0e90942535eb68e6efcbc3228cddaa0d95a13ed7bc70`. The review covered the build-cleanup source/test snapshot; this report update is documentation synchronization.
+**Latest independent evaluation:** **78/100 - FAIL** on base `0e2126ecf01f1815bffef33a7d270f7cf2f3da50`, source/test diff SHA256 `ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9`, reviewed complete diff SHA256 `8498be7b670f7f676dbc0e90942535eb68e6efcbc3228cddaa0d95a13ed7bc70`. The source/test SHA256 is the concatenated Python `difflib.unified_diff` output (three context lines) over sorted paths, with base files read through `git show`; the complete review hash uses the same method on the ten paths in that frozen snapshot. This report update is documentation synchronization.
 **Current passing threshold:** 98/100. Historical scores do not establish current full-goal completion.
 **Evaluator:** separate `final_review` agent, full 50-criterion review.
 
