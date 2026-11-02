@@ -2,22 +2,21 @@
 
 ## Current reviewed candidate
 
-**Latest independent evaluation:** **79/100 - FAIL** against98.
+**Latest independent evaluation:** **79/100 - FAIL** against98 after record sync (raw77; criteria8 and38 restored to2).
 
-Base 13289a550e159ccd6c6fa7bb70c6815805233092; compiler/test SHA256 464e0dd834dd3a3fe03a0388900ba2a2cbad4a2e95c07c12f04c0d37f67603ba; runtime/build SHA256 c064537f4ae36b1a24e330c49a5320038b1498b26128399c6f7f3e7234daf09f; all-12-path SHA256 f13b30de68e9e318645bb4fc3d3b033a95fe1cb9c06924a73f478e3b38c9ee55. Post-record-sync all-12-path hash after updating the completion matrix: 104d7d26dfcc1635b05b7ef78afbc6f57032c4681dde0167c74457bd1d7067d0. Sorted-path UTF-8 difflib unified-diff hashes, three context lines; new file base content is empty.
+Base f17498e709094573230c07c22de11278729e9858; source/test SHA256 fa614535072b589b80ce32146d44d91a046461c2fd7d26401f30f7c03f6affc2; runtime/build SHA256 fd0cb05bdc8b14824c6f8ca2bef5feef9f6c39f1bbb69b5f599498aee8919777; README/docs SHA256 adc351995a5ba3fbfe3c927963bbdb423e7366cbfa7fcc8c108cafeac3ae1fe5; all11-path SHA256 7ad64dd97eb0e90f9060fba1c2e0910513d651041ffba8a37ddf0bfa49aa2c70. Post-record-sync all11 hash: f4a8e4d7f5fe99c04cc37fe85bb93e60239f5632f1cee0793d6435498f50d548. Sorted UTF-8 difflib unified diff with three context lines; added physics file has empty base.
 
-Source commit `108e38c94578d0d55e85426a1530c7e5b001fcff` published on origin/main; issue #23 evaluation comment [6584578058](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6584578058). Issue now has72 comments. Six-record parity PASS. Local suite247/326.881s. Independent review15 focused/3.210s including MSVC UDP executable; no independent full suite. Compileall/npm extension validation/QA arithmetic/strict JSON/diff checks passed. VS Code0.1.4 remains unchanged. No new runtime defect confirmed.
+Source commit `028cfb2c72284b348a0c1282ba47bd01f69fe346` is published on origin/main; evaluation comment [#6585206519](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6585206519) posted (73 comments). Independent full suite250/255.521s; local full250/247.322s before a test-only literal update; focused authoring/build/module42/50.921s, six physics executable regressions6/13.093s, final literal case passes. Compileall/npm/QA/JSON/diff checks pass. VS Code0.1.4 unchanged. No runtime defect confirmed. Physics and networking are internal separate modules; packages and renderer/core separation remain incomplete.
 
 ## Latest 50-criterion scoring
 
-79/100 — FAIL against98 after six-record synchronization (raw independent78; criterion38 restored to2). Categories13/19/15/17/15.
+79/100 — FAIL against98 after six-record sync (raw77; criteria8 and38 restored to2). Categories13/19/15/17/15.
 
-Base 13289a550e159ccd6c6fa7bb70c6815805233092; compiler/test SHA256 464e0dd834dd3a3fe03a0388900ba2a2cbad4a2e95c07c12f04c0d37f67603ba; runtime/build SHA256 c064537f4ae36b1a24e330c49a5320038b1498b26128399c6f7f3e7234daf09f; all-12-path SHA256 f13b30de68e9e318645bb4fc3d3b033a95fe1cb9c06924a73f478e3b38c9ee55. Sorted-path UTF-8 difflib unified-diff hashes, three context lines; new file base content is empty.
+Base f17498e709094573230c07c22de11278729e9858; source/test SHA256 fa614535072b589b80ce32146d44d91a046461c2fd7d26401f30f7c03f6affc2; runtime/build SHA256 fd0cb05bdc8b14824c6f8ca2bef5feef9f6c39f1bbb69b5f599498aee8919777; README/docs SHA256 adc351995a5ba3fbfe3c927963bbdb423e7366cbfa7fcc8c108cafeac3ae1fe5; all11 SHA256 7ad64dd97eb0e90f9060fba1c2e0910513d651041ffba8a37ddf0bfa49aa2c70. Post-record-sync all11 hash: f4a8e4d7f5fe99c04cc37fe85bb93e60239f5632f1cee0793d6435498f50d548. Sorted UTF-8 difflib unified diff with 3 context lines; added physics file base is empty.
 
-The compiler marks reachable networking built-ins; the build compiles runtime/anvil_network.c separately and links Winsock only when selected. This is an internal runtime feature boundary. User-facing packages and separate renderer/physics/core modules remain unfinished.
+The compiler selects separate networking and physics translation units only for reachable built-ins. This is internal modularity; package imports and renderer/core separation remain incomplete.
 
-Local full suite247 passed in326.881s. Independent reviewer ran15 focused tests in3.210s including a real MSVC UDP host executable; no independent full-suite claim. Compileall, npm extension/package validation, QA arithmetic, strict JSON and diff checks passed. VS Code0.1.4 remains unchanged. No runtime defect confirmed. Source commit 108e38c94578d0d55e85426a1530c7e5b001fcff. Full backlog remains in GitHub issue #23. Goal active; substantial language, engine, package, GPU, Forge, OS, platform and efficiency work remains.
-
+Independent full suite250/255.521s; local full250/247.322s before a test-only literal update. Focused authoring/build/module42/50.921s, six physics executable tests6/13.093s and final literal case passed. Compileall/npm/QA/JSON/diff checks passed. VS Code0.1.4 unchanged.
 
 | # | Criterion | Score | Evidence, deduction, and status |
 |---:|---|---:|---|
