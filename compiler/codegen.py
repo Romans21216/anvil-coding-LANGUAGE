@@ -444,6 +444,9 @@ def emit_c(
             f"{functions['main'].source or path}:{functions['main'].line}: main function parameters "
             "require an explicit call with arguments"
         )
+    from compiler.modules import reachable_functions
+
+    emitted_functions = reachable_functions(functions, top, graphical=has_engine)
     function_bodies = {
         name: emit_nodes(path, fn.body, functions, "    ", fn, arrays)
         for name, fn in functions.items()
@@ -467,7 +470,7 @@ def emit_c(
         f"static double {c_name(name)}[{size}];"
         for name, size in sorted(arrays.items())
     ]
-    if any(fn.local_arrays for fn in functions.values()):
+    if any(fn.local_arrays for _name, fn in emitted_functions):
         lines.extend(
             [
                 f"#define ANVIL_LOCAL_ARRAY_BUDGET_BYTES "
@@ -501,7 +504,7 @@ def emit_c(
                 "",
             ]
         )
-    for name, fn in functions.items():
+    for name, fn in emitted_functions:
         if name in ("draw", "update") and fn.params:
             raise CompileError(
                 f"{fn.source or path}:{fn.line}: engine callback '{name}' cannot have parameters"
@@ -512,7 +515,7 @@ def emit_c(
         )
         lines.append(f"static double {c_name(name)}({params});")
     lines.append("")
-    for name, fn in functions.items():
+    for name, fn in emitted_functions:
         params = (
             ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
             or "void"
@@ -540,6 +543,7 @@ def emit_c(
     lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
     lines.extend(setup_body)
     if has_engine:
+        lines.extend(calls_body)
         lines.append(
             f"    anvil_run({c_name('update') if 'update' in functions else 'NULL'}, "
             f"{c_name('draw') if 'draw' in functions else 'NULL'}, "

@@ -34,6 +34,101 @@ class CompilerModuleTests(unittest.TestCase):
         ):
             validate_program(program)
 
+    def test_c_codegen_elides_unreachable_functions_and_keeps_transitive_calls(self):
+        source_path = pathlib.Path("tree-shake.ANVL")
+        source = (
+            "fn(main)\n output call fn(used)\nend\n"
+            "fn(used)\n output call fn(helper)\nend\n"
+            "fn(helper)\n output 7\nend\n"
+            "fn(unused)\n output 999\nend\n"
+            "call fn(main)\n"
+        )
+        functions, top, variables, arrays = parse(source_path, source)
+
+        generated = emit_c(source_path, functions, top, variables, arrays)
+
+        self.assertIn("static double anvil_main(void);", generated)
+        self.assertIn("static double anvil_used(void);", generated)
+        self.assertIn("static double anvil_helper(void);", generated)
+        self.assertNotIn("anvil_unused", generated)
+
+    def test_c_codegen_uses_top_level_calls_instead_of_unused_main(self):
+        source_path = pathlib.Path("explicit-entry.ANVL")
+        source = (
+            "fn(main)\n output 999\nend\n"
+            "fn(actual)\n output 7\nend\n"
+            "call fn(actual)\n"
+        )
+        functions, top, variables, arrays = parse(source_path, source)
+
+        generated = emit_c(source_path, functions, top, variables, arrays)
+
+        self.assertIn("static double anvil_actual(void);", generated)
+        self.assertNotIn("anvil_main", generated)
+
+    def test_explicit_top_level_call_can_reach_main_transitively(self):
+        source_path = pathlib.Path("transitive-main.ANVL")
+        source = (
+            "fn(main)\n output 7\nend\n"
+            "fn(actual)\n output call fn(main)\nend\n"
+            "call fn(actual)\n"
+        )
+        functions, top, variables, arrays = parse(source_path, source)
+
+        generated = emit_c(source_path, functions, top, variables, arrays)
+
+        self.assertIn("static double anvil_main(void);", generated)
+        self.assertIn("static double anvil_actual(void);", generated)
+
+    def test_c_codegen_still_validates_unreachable_function_bodies(self):
+        source = (
+            "fn(main)\n output 1\nend\ncall fn(main)\n"
+            "fn(unused)\n output var(missing)\nend\n"
+        )
+
+        with self.assertRaisesRegex(CompileError, "unknown variable 'missing'"):
+            parse(pathlib.Path("unreachable-invalid.ANVL"), source)
+
+    def test_c_codegen_roots_engine_callbacks_and_their_dependencies(self):
+        source_path = pathlib.Path("engine-tree-shake.ANVL")
+        source = (
+            "scene 2d\n"
+            "call fn(startup)\n"
+            "fn(startup)\n output 0\nend\n"
+            "fn(draw)\n call fn(draw_helper)\nend\n"
+            "fn(update)\n call fn(update_helper)\nend\n"
+            "fn(draw_helper)\n output 1\nend\n"
+            "fn(update_helper)\n output 2\nend\n"
+            "fn(main)\n output 3\nend\n"
+            "fn(unused)\n output 999\nend\n"
+        )
+        functions, top, variables, arrays = parse(source_path, source)
+
+        generated = emit_c(source_path, functions, top, variables, arrays)
+
+        for function in ("startup", "draw", "update", "draw_helper", "update_helper"):
+            self.assertIn(f"anvil_{function}", generated)
+        self.assertNotIn("anvil_main", generated)
+        self.assertNotIn("anvil_unused", generated)
+        main_body = generated[generated.index("int main(void) {", generated.index("static double anvil_startup")):]
+        self.assertLess(main_body.index("anvil_startup();"), main_body.index("anvil_run("))
+
+    def test_c_codegen_keeps_callback_targets_and_drops_unreferenced_functions(self):
+        source_path = pathlib.Path("callback-tree-shake.ANVL")
+        source = (
+            "set varl(callback) = fnref(target)\n"
+            "call varl(callback)\n"
+            "fn(target)\n output 7\nend\n"
+            "fn(unused)\n output 999\nend\n"
+        )
+        functions, top, variables, arrays = parse(source_path, source)
+
+        generated = emit_c(source_path, functions, top, variables, arrays)
+
+        self.assertIn("anvil_target", generated)
+        self.assertIn("anvil__anvil_callable_dispatch_", generated)
+        self.assertNotIn("anvil_unused", generated)
+
     def test_legacy_compiler_facade_reexports_phases(self):
         from compiler.codegen import emit_c as module_emit_c
         from compiler.parser import parse as module_parse

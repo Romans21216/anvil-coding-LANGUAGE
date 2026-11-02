@@ -66,7 +66,10 @@ def called_functions(nodes):
 
 def reachable_functions(functions, top, *, graphical):
     needed = called_functions(top)
-    needed.update(name for name in (("draw", "update") if graphical else ("main",)) if name in functions)
+    if graphical:
+        needed.update(name for name in ("draw", "update") if name in functions)
+    elif not any(node.kind == "call" for node in top) and "main" in functions:
+        needed.add("main")
     pending = list(needed)
     while pending:
         name = pending.pop()

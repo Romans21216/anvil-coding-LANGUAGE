@@ -48,3 +48,5 @@ Native project builds accept `.ANVLproj` with `--backend native`. The existing `
 
 
 Build artifacts: normal Anvil builds keep generated C, MSVC object files, and the Visual Studio environment helper in temporary build-owned directories and remove them after the build. Use `--generated-c PATH` to preserve generated C while building, or `--emit-c PATH` to write C only.
+
+The C backend emits functions reachable from top-level calls, `main`, or graphical callbacks. It follows callback dispatch helpers so `fnref(...)` targets remain available, while still validating every function body. Runtime subsystems and unused global storage are not yet removed selectively.

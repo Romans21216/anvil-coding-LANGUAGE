@@ -29,6 +29,10 @@ The production CLI order is source reading → syntax parsing → semantic valid
 
 The compiler formatting convention is Black's default 88-column style; some native emitters still require formatting and instruction abstractions. Contributors can check formatting with `python -m black --check compiler tests/test_compiler_modules.py` when Black is installed. The project does not require Black to run or build Anvil.
 
+## Reachability and dead-code elimination
+
+The C backend emits only Anvil functions reachable from the program entry calls or engine callbacks. It follows ordinary calls and the generated dispatch calls for function-reference variables, so callback targets remain present. Graphical startup runs top-level `call fn(...)` initializers after project setup and before `anvil_run`. Semantic checks and code generation still inspect every declared function before emission; an unused function with an invalid reference remains a compile error. This pass currently removes unreachable Anvil function definitions only. It does not remove unused global variables, arrays, or runtime subsystems, and does not replace package-level feature selection or a separate object linker.
+
 ```powershell
 python compiler/anvil.py examples/first_world.ANVL --emit-c build/first_world.c
 python compiler/anvil.py examples/first_world.ANVL --release --output build/first_world.exe

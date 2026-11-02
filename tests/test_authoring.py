@@ -12,6 +12,8 @@ import tempfile
 import time
 import unittest
 
+from compiler.build import build_c, find_compiler
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPILER = ROOT / "compiler" / "anvil.py"
 
@@ -82,6 +84,87 @@ class AuthoringSyntaxTests(unittest.TestCase):
         self.assertEqual(failed_preserved.returncode, 2)
         self.assertTrue(preserved_c.is_file())
         self.assertIn("return 23.0;", preserved_c.read_text(encoding="utf-8"))
+
+    def test_c_build_elides_dead_functions_and_keeps_callback_targets(self):
+        entry = self.root / "tree-shake.ANVL"
+        generated = self.root / "tree-shake.c"
+        executable = self.root / "tree-shake.exe"
+        entry.write_text(
+            "set varl(callback) = fnref(target)\n"
+            "fn(main)\n output call fn(used) + call varl(callback)\nend\n"
+            "fn(used)\n output call fn(helper)\nend\n"
+            "fn(helper)\n output 3\nend\n"
+            "fn(target)\n output 4\nend\n"
+            "fn(unused)\n output 999\nend\n"
+            "call fn(main)\n",
+            encoding="utf-8",
+        )
+
+        build = subprocess.run(
+            [
+                sys.executable,
+                str(COMPILER),
+                str(entry),
+                "--generated-c",
+                str(generated),
+                "--output",
+                str(executable),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(build.returncode, 0, build.stderr)
+        c_source = generated.read_text(encoding="utf-8")
+        self.assertIn("anvil_helper", c_source)
+        self.assertIn("anvil_target", c_source)
+        self.assertIn("anvil__anvil_callable_dispatch_", c_source)
+        self.assertNotIn("anvil_unused", c_source)
+        run = subprocess.run([str(executable)], capture_output=True, text=True)
+        self.assertEqual((run.returncode, run.stdout.strip()), (0, "7"), run.stderr)
+
+    def test_explicit_top_level_entry_omits_unreachable_main(self):
+        compiler = find_compiler(None)
+        if not compiler:
+            self.skipTest("MSVC required")
+        entry = self.root / "explicit-entry.ANVL"
+        generated = self.root / "explicit-entry.c"
+        executable = self.root / "explicit-entry.exe"
+        entry.write_text(
+            "set varl(result) = 0\n"
+            "fn(main)\n set varl(result) = 999\n output 999\nend\n"
+            "fn(actual)\n set varl(result) = 7\n output 7\nend\n"
+            "call fn(actual)\n",
+            encoding="utf-8",
+        )
+
+        emit = subprocess.run(
+            [
+                sys.executable,
+                str(COMPILER),
+                str(entry),
+                "--emit-c",
+                str(generated),
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(emit.returncode, 0, emit.stderr)
+        c_source = generated.read_text(encoding="utf-8")
+        self.assertIn("anvil_actual", c_source)
+        self.assertNotIn("anvil_main", c_source)
+        harness = self.root / "entry_harness.c"
+        harness.write_text(
+            '#define main anvil_generated_main\n'
+            '#include "explicit-entry.c"\n'
+            '#undef main\n'
+            'int main(void) { anvil_generated_main(); return anvil_result == 7.0 ? 0 : 1; }\n',
+            encoding="utf-8",
+        )
+        build_c(compiler[1], harness, executable, release=True)
+        run = subprocess.run([str(executable)], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
 
     def build_and_run(self, source: str, name: str = "game"):
         entry = self.root / f"{name}.ANVL"

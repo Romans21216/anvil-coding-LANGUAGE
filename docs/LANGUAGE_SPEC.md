@@ -217,7 +217,7 @@ camera_coordinate = ? one whitespace-free expression token sequence accepted by 
 
 `ray_sphere` submits a sphere to the per-frame CPU BVH ray tracer. The current batch supports at most 32 ray-traced spheres. Hardware RTX/DXR and Embree are unavailable. Conventional 2D/3D primitives use the current fixed-size software renderer.
 
-The native runtime starts when the program has an `update` or `draw` callback, or top-level engine configuration. It calls `update` at the configured fixed rate and `draw` to render. A `.ANVLproj` manifest may set `[engine].fixed_hz` from 1 through 240; default is 60. Without engine mode, a top-level `call fn(...)` invokes a function; absent explicit calls, a zero-argument `main` function is invoked and its numeric result is printed.
+The runtime starts when the program has an `update` or `draw` callback, or top-level engine configuration. It calls `update` at the configured fixed rate and `draw` to render. In engine mode, top-level `call fn(...)` initializers run once after project setup and before the runtime loop. A `.ANVLproj` manifest may set `[engine].fixed_hz` from 1 through 240; default is 60. Without engine mode, a top-level `call fn(...)` invokes a function; absent explicit calls, a zero-argument `main` function is invoked and its numeric result is printed.
 
 ## 7. Static validation, runtime errors, and compilation
 
