@@ -486,6 +486,8 @@ def emit_c(
         "#include <stdlib.h>",
         "",
     ]
+    if uses_network:
+        lines.insert(1, "/* ANVIL_RUNTIME_MODULE: networking */")
     metadata_payload=pack(metadata)
     if metadata_payload:
         lines.append('static const char _anvil_metadata_blob[] = '+c_bytes_literal(metadata_payload)+';')

@@ -9,9 +9,39 @@ import unittest
 from unittest import mock
 
 from compiler.build import _gcc_arguments, _msvc_arguments, build_c
+from compiler.runtime_modules import MODULES
 
 
 class LinkerGarbageCollectionTests(unittest.TestCase):
+    def test_network_module_is_only_compiled_and_linked_when_selected(self):
+        module = MODULES["networking"]
+        base = _gcc_arguments(
+            "gcc", pathlib.Path("program.c"), pathlib.Path("program.exe"), True
+        )
+        with_network = _gcc_arguments(
+            "gcc",
+            pathlib.Path("program.c"),
+            pathlib.Path("program.exe"),
+            True,
+            (module,),
+        )
+        self.assertNotIn(str(module.source), base)
+        self.assertNotIn("-lws2_32", base)
+        self.assertIn(str(module.source), with_network)
+        self.assertIn("-lws2_32", with_network)
+
+    def test_msvc_network_module_is_an_explicit_translation_unit(self):
+        module = MODULES["networking"]
+        args = _msvc_arguments(
+            "cl.exe",
+            pathlib.Path("program.c"),
+            pathlib.Path("program.exe"),
+            pathlib.Path("objects"),
+            release=True,
+            runtime_modules=(module,),
+        )
+        self.assertIn(str(module.source), args)
+
     def test_msvc_release_packages_functions_and_data_for_linker_pruning(self):
         args = _msvc_arguments(
             "cl.exe",

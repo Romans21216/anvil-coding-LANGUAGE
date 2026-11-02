@@ -104,6 +104,7 @@ class AuthoringSyntaxTests(unittest.TestCase):
         c_source = generated.read_text(encoding="utf-8")
         self.assertNotIn("anvil_set_fixed_hz(", c_source)
         self.assertNotIn("anvil_net_close();", c_source)
+        self.assertNotIn("ANVIL_RUNTIME_MODULE: networking", c_source)
 
     def test_c_network_cleanup_root_follows_reachable_network_calls(self):
         entry = self.root / "network-roots.ANVL"
@@ -122,6 +123,25 @@ class AuthoringSyntaxTests(unittest.TestCase):
         c_source = generated.read_text(encoding="utf-8")
         self.assertIn("anvil_net_host(7777)", c_source)
         self.assertIn("anvil_net_close();", c_source)
+        self.assertIn("ANVIL_RUNTIME_MODULE: networking", c_source)
+
+    def test_reachable_receive_builtin_selects_network_runtime_module(self):
+        entry = self.root / "receive-module.ANVL"
+        generated = self.root / "receive-module.c"
+        entry.write_text(
+            "fn(main)\n output receive()\nend\ncall fn(main)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--emit-c", str(generated)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "ANVIL_RUNTIME_MODULE: networking",
+            generated.read_text(encoding="utf-8"),
+        )
 
     def test_network_api_text_does_not_select_network_runtime(self):
         entry = self.root / "network-name.ANVL"
@@ -139,6 +159,7 @@ class AuthoringSyntaxTests(unittest.TestCase):
         c_source = generated.read_text(encoding="utf-8")
         self.assertIn('"anvil_net_host()"', c_source)
         self.assertNotIn("anvil_net_close();", c_source)
+        self.assertNotIn("ANVIL_RUNTIME_MODULE: networking", c_source)
 
     def test_c_build_elides_dead_functions_and_keeps_callback_targets(self):
         entry = self.root / "tree-shake.ANVL"

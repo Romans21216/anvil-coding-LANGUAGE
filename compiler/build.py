@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 
 from compiler.common import INCLUDE, RUNTIME
+from compiler.runtime_modules import RuntimeModule, select_runtime_modules
 
 
 def _msvc_arguments(
@@ -17,6 +18,7 @@ def _msvc_arguments(
     output: pathlib.Path,
     object_dir: pathlib.Path,
     release: bool,
+    runtime_modules: tuple[RuntimeModule, ...] = (),
 ) -> list[str]:
     args = [
         compiler,
@@ -26,6 +28,7 @@ def _msvc_arguments(
         "/I" + str(INCLUDE),
         str(generated),
         str(RUNTIME),
+        *(str(module.source) for module in runtime_modules),
         "/Fe:" + str(output),
         "/Fo:" + str(object_dir) + "\\",
     ]
@@ -43,11 +46,13 @@ def _gcc_arguments(
     generated: pathlib.Path,
     output: pathlib.Path,
     release: bool,
+    runtime_modules: tuple[RuntimeModule, ...] = (),
 ) -> list[str]:
     args = [
         compiler,
         str(generated),
         str(RUNTIME),
+        *(str(module.source) for module in runtime_modules),
         "-I",
         str(INCLUDE),
         "-o",
@@ -55,8 +60,9 @@ def _gcc_arguments(
         "-lm",
         "-lgdi32",
         "-luser32",
-        "-lws2_32",
     ]
+    libraries = sorted({library for module in runtime_modules for library in module.gcc_libraries})
+    args.extend(libraries)
     if release:
         args.extend(
             [
@@ -93,10 +99,13 @@ def build_c(
     compiler: str, generated: pathlib.Path, output: pathlib.Path, release: bool
 ):
     output.parent.mkdir(parents=True, exist_ok=True)
+    runtime_modules = select_runtime_modules(generated.read_text(encoding="utf-8"))
     if pathlib.Path(compiler).name.lower() == "cl.exe":
         with tempfile.TemporaryDirectory(prefix="anvil-obj-") as object_dir:
             obj_dir = pathlib.Path(object_dir)
-            args = _msvc_arguments(compiler, generated, output, obj_dir, release)
+            args = _msvc_arguments(
+                compiler, generated, output, obj_dir, release, runtime_modules
+            )
             install_root = pathlib.Path(compiler).parents[7]
             devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
             if os.name == "nt" and devcmd.exists():
@@ -116,5 +125,5 @@ def build_c(
             else:
                 subprocess.run(args, check=True)
     else:
-        args = _gcc_arguments(compiler, generated, output, release)
+        args = _gcc_arguments(compiler, generated, output, release, runtime_modules)
         subprocess.run(args, check=True)
