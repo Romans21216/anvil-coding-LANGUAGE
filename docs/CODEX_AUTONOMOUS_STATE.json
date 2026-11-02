@@ -7,11 +7,11 @@
   "current_active_item": "Continue issue #23 C-first compiler, modular packages, and engine/OS capabilities",
   "current_active_item_status": "C generation prunes unreachable Anvil functions and unused global scalar/array declarations, preserving top-level initialization, reachable writes, callback targets, and expression evaluation. The local suite and independent suite each passed227 tests. #88/#89 remain fixed and closed. #123 is partially implemented; runtime subsystems and optional packages remain linked as a whole. The C-first engine, Forge, and Anvil-authored OS UI goals remain incomplete; current score79/100 below98.",
   "current_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
-  "latest_verified_commit": "313ab4d760bc70b6706cacb784860b446ace4ca3",
+  "latest_verified_commit": "1c2e277b9bfe3de94af82004eb522379e6400079",
   "last_pushed_reviewed_below_threshold_commit": "016fff66a4e4068260f04870ca81da4a75707307",
   "latest_independently_reviewed_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Storage-pruning candidate independently reviewed at 79/100; six-record parity passed and evaluation comment posted to issue #23. Candidate changes remain locally uncommitted.",
+  "latest_push_result": "Storage-pruning candidate and synchronized evaluation records pushed to origin/main at 1c2e277b9bfe3de94af82004eb522379e6400079; issue #23 evaluation comment posted; independent score79/100 remains below98.",
   "latest_independent_review": {
     "base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
     "source_diff_sha256": "e61e6091b9f80f1b01badf6899c18d13a3489e3de675710ab397767e3e0c945f",
@@ -511,7 +511,7 @@
     "summary": "Current sync candidate: base 7b0e921dce5b562c53b042003339f33309983aa1, code/test difflib SHA256 3336f6f1d5e26a0ac09df2662c689743f065819013e8c10810b5a065538cb9ac, full review hash 21af08e7e6e5d547d6990bc2558a941a9fa655590bd57180c179b87371fdf832; final78/100 against98 after criterion38 synchronization, categories13/18/15/17/15, 224 tests249.142s, issue #88 fixed/closed, #123 partial. All six records point to #23 and preserve 0.1.4 installed extension. Independent parity recheck pending."
   },
   "resolved_critic_issue_89": "Fixed and independently verified in generated-C/MSVC harness: graphical top-level initializers execute after setup and before anvil_run; issue #89 is closed with label Codex Bugs.",
-  "current_commit": "016fff66a4e4068260f04870ca81da4a75707307",
+  "current_commit": "1c2e277b9bfe3de94af82004eb522379e6400079",
   "previous_record_parity_check_before_storage_review": {
     "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
     "result": "PASS",
