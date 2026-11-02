@@ -1,6 +1,9 @@
 #ifndef ANVIL_RUNTIME_H
 #define ANVIL_RUNTIME_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -10,6 +13,9 @@
 #endif
 
 typedef double (*AnvilCallback)(void);
+typedef void (*AnvilRuntimeShutdownHook)(void);
+
+enum { ANVIL_FRAME_WIDTH = 960, ANVIL_FRAME_HEIGHT = 600 };
 
 enum {
   ANVIL_KEY_SPACE = VK_SPACE,
@@ -48,6 +54,8 @@ enum {
 };
 
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title);
+int anvil_runtime_register_shutdown_hook(AnvilRuntimeShutdownHook hook);
+uint32_t *anvil_runtime_framebuffer(void);
 double anvil_divide(double numerator, double denominator, const char *path,
                     int line);
 double anvil_check_number(double value, const char *path, int line);
@@ -61,6 +69,7 @@ double anvil_mouse_y(void);
 double anvil_mouse_pressed(const char *button);
 double anvil_mouse_held(const char *button);
 double anvil_mouse_wheel(void);
+void anvil_image_shutdown(void);
 double anvil_image_load(const char *path);
 double anvil_image_width(double handle);
 double anvil_image_height(double handle);

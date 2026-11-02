@@ -110,6 +110,8 @@ def array_code(name: str, scope: Node | None) -> str:
 
 RUNTIME_C_NAMES = {
     "anvil_run",
+    "anvil_runtime_register_shutdown_hook",
+    "anvil_runtime_framebuffer",
     "anvil_divide",
     "anvil_check_number",
     "anvil_set_scene3d",
@@ -137,6 +139,7 @@ RUNTIME_C_NAMES = {
     "anvil_mouse_pressed",
     "anvil_mouse_held",
     "anvil_mouse_wheel",
+    "anvil_image_shutdown",
     "anvil_image_load",
     "anvil_image_width",
     "anvil_image_height",

@@ -17,6 +17,10 @@ class RuntimeModule:
 
 
 MODULES = {
+    "images": RuntimeModule(
+        ROOT / "runtime" / "anvil_image.c",
+        trigger_patterns=(r"\banvil_image_[A-Za-z0-9_]*\s*\(",),
+    ),
     "networking": RuntimeModule(
         ROOT / "runtime" / "anvil_network.c",
         gcc_libraries=("-lws2_32",),

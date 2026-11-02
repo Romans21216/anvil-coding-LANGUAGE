@@ -38,7 +38,8 @@ class RuntimeIntegrationTests(unittest.TestCase):
             file_header = struct.pack("<2sIHHI", b"BM", 14 + len(dib) + len(pixel_data), 0, 0, 14 + len(dib))
             path.write_bytes(file_header + dib + pixel_data)
 
-        harness = r'''#include "anvil_runtime.h"
+        harness = r'''/* ANVIL_RUNTIME_MODULE: images */
+#include "anvil_runtime.h"
 #include <stdio.h>
 
 static double image;
@@ -54,6 +55,7 @@ static double replacement;
 static double stale_width;
 static double replacement_width;
 static double stale_draw;
+static double width_after_runtime_shutdown;
 static const char *image_path;
 
 static double draw(void) {
@@ -68,7 +70,6 @@ static double draw(void) {
   stale_width = anvil_image_width(image);
   replacement_width = anvil_image_width(replacement);
   stale_draw = anvil_image_draw(image, 0, 0);
-  anvil_image_destroy(replacement);
   PostQuitMessage(0);
   return 0.0;
 }
@@ -88,16 +89,18 @@ int main(int argc, char **argv) {
   double fractional = anvil_image_width(image + 0.5);
   double missing = anvil_image_height(64);
   anvil_run(NULL, draw, "Anvil Image Probe");
+  width_after_runtime_shutdown = anvil_image_width(replacement);
   printf("load=%.0f size=%.0f,%.0f second=%.0f second_size=%.0f,%.0f "
          "bad=%.0f oversized=%.0f fractional=%.0f missing=%.0f "
          "draw=%.0f top_down_draw=%.0f scaled=%.0f clipped=%.0f "
          "release=%.0f second_release=%.0f after=%.0f replacement=%.0f "
-         "stale_width=%.0f replacement_width=%.0f stale_draw=%.0f\n",
+         "stale_width=%.0f replacement_width=%.0f stale_draw=%.0f "
+         "shutdown_width=%.0f\n",
          image, width, height, top_down_image, second_width, second_height,
          bad, oversized, fractional, missing, natural_draw, top_down_draw,
          scaled_draw, clipped_draw, destroyed, top_down_destroyed,
          width_after_destroy, replacement, stale_width, replacement_width,
-         stale_draw);
+         stale_draw, width_after_runtime_shutdown);
   return 0;
 }
 '''
@@ -139,7 +142,7 @@ int main(int argc, char **argv) {
             r"load=1 size=2,2 second=2 second_size=1,2 bad=0 oversized=0 "
             r"fractional=0 missing=0 draw=1 top_down_draw=1 scaled=1 "
             r"clipped=1 release=1 second_release=1 after=0 replacement=65 "
-            r"stale_width=0 replacement_width=2 stale_draw=0",
+            r"stale_width=0 replacement_width=2 stale_draw=0 shutdown_width=0",
         )
 
     def test_mouse_events_map_to_virtual_frame_and_preserve_update_edges(self):

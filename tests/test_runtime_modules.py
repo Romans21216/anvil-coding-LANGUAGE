@@ -28,9 +28,18 @@ class RuntimeModuleSelectionTests(unittest.TestCase):
         self.assertEqual(modules[0].source.name, "anvil_physics.c")
         self.assertEqual(modules[0].gcc_libraries, ())
 
+    def test_images_marker_selects_image_translation_unit(self):
+        modules = select_runtime_modules(
+            "/* ANVIL_RUNTIME_MODULE: images */\nint main(void) { return 0; }"
+        )
+        self.assertEqual(modules, (MODULES["images"],))
+        self.assertEqual(modules[0].source.name, "anvil_image.c")
+        self.assertEqual(modules[0].gcc_libraries, ())
+
     def test_modules_declare_reachable_call_triggers(self):
         self.assertTrue(MODULES["networking"].trigger_patterns)
         self.assertTrue(MODULES["physics"].trigger_patterns)
+        self.assertTrue(MODULES["images"].trigger_patterns)
 
     def test_duplicate_markers_select_module_once(self):
         generated = "\n".join(

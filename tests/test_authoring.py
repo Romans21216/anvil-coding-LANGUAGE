@@ -145,6 +145,45 @@ class AuthoringSyntaxTests(unittest.TestCase):
             generated.read_text(encoding="utf-8"),
         )
 
+    def test_reachable_image_builtin_selects_image_runtime_module(self):
+        entry = self.root / "image-module.ANVL"
+        generated = self.root / "image-module.c"
+        entry.write_text(
+            'fn(main)\n output image_width(image_load("sprite.bmp"))\nend\n'
+            "call fn(main)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--emit-c", str(generated)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "ANVIL_RUNTIME_MODULE: images",
+            generated.read_text(encoding="utf-8"),
+        )
+
+    def test_unreachable_image_builtin_does_not_select_image_runtime_module(self):
+        entry = self.root / "unused-image-module.ANVL"
+        generated = self.root / "unused-image-module.c"
+        entry.write_text(
+            "fn(main)\n output 7\nend\n"
+            'fn(unused_image)\n output image_load("sprite.bmp")\nend\n'
+            "call fn(main)\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--emit-c", str(generated)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(
+            "ANVIL_RUNTIME_MODULE: images",
+            generated.read_text(encoding="utf-8"),
+        )
+
     def test_reachable_physics_and_network_calls_select_both_runtime_modules(self):
         entry = self.root / "combined-modules.ANVL"
         generated = self.root / "combined-modules.c"

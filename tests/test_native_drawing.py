@@ -6,12 +6,26 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 from compiler.common import CompileError
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 from tests.native_app import NativeApp
+
+
+class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
+    """Retry cleanup while Windows releases a just-executed image file."""
+
+    def cleanup(self):
+        for attempt in range(10):
+            try:
+                return super().cleanup()
+            except PermissionError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.1)
 
 
 @unittest.skipUnless(sys.platform == "win32", "own-window native rendering")
@@ -189,7 +203,7 @@ end
         for primitive, initial, count in cases:
             for index in range(count):
                 for value in (-1073741825,1073741825):
-                    with self.subTest(primitive=primitive,index=index,value=value), tempfile.TemporaryDirectory() as temp:
+                    with self.subTest(primitive=primitive,index=index,value=value), RetryingTemporaryDirectory() as temp:
                         root = pathlib.Path(temp)
                         library = root / "shapes_\u03bb.ANVL"
                         arguments = list(initial)
