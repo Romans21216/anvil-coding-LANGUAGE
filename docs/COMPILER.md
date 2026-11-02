@@ -6,7 +6,7 @@
 .ANVL source → Anvil parser and source-located validation → generated C → C compiler/linker → machine-code executable
 ```
 
-`compiler/anvil.py` is the command-line compiler. A normal build performs both stages automatically: Anvil validates and translates the source to ordinary C, then invokes the selected C compiler and linker to produce machine code and the executable. `--emit-c` stops after translation so the generated source can be inspected. The C toolchain is intentionally responsible for machine-code generation and linking. The `--backend native` switch is an optional direct-x64 experiment, not the required architecture; its limited feature coverage is documented in [the experimental backend status](NATIVE_X64_COMPILER_MIGRATION.md).
+`compiler/anvil.py` is the command-line compiler. A normal build performs both stages automatically: Anvil validates and translates the source to ordinary C in a temporary build directory, invokes the selected C compiler and linker, then removes the C and object intermediates. `--generated-c PATH` preserves the translated C alongside the executable for inspection; `--emit-c PATH` stops after translation. The C toolchain is responsible for machine-code generation and linking. The `--backend native` switch is an optional direct-x64 experiment, not the required architecture; its limited feature coverage is documented in [the experimental backend status](NATIVE_X64_COMPILER_MIGRATION.md).
 
 ## Compiler architecture
 
@@ -31,12 +31,13 @@ The compiler formatting convention is Black's default 88-column style; some nati
 
 ```powershell
 python compiler/anvil.py examples/first_world.ANVL --emit-c build/first_world.c
+python compiler/anvil.py examples/first_world.ANVL --release --output build/first_world.exe
 python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
 python compiler/anvil.py examples/functions.ANVL --backend native --output build/functions-native.exe
 ```
 
-The existing C backend requires Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC `cl` is the verified native compiler and is the only automatic compiler choice. `--emit-c` stops after C generation. The experimental `--backend native` path requires only Python and Windows; it supports numeric programs and an initial 2D runtime and writes an EXE directly.
+The existing C backend requires Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC `cl` is the verified native compiler and is the only automatic compiler choice. Normal C builds keep their C and object intermediates in temporary directories; `--generated-c` preserves C and `--emit-c` stops after generation. The experimental `--backend native` path requires only Python and Windows; it supports numeric programs and an initial 2D runtime and writes an EXE directly.
 
 ## Current language slice
 
@@ -55,3 +56,6 @@ The direct backend supports up to sixteen numeric parameters, scalar globals/loc
 Other graphics primitives, text/alpha blending, 3D/camera, assets/audio, physics/networking and trigonometry remain unsupported on the direct path. The C/MSVC backend is the primary supported build. See [native semantics and limits](NATIVE_X64_COMPILER_MIGRATION.md), [include troubleshooting](INCLUDES.md#compiler-depth-limits-and-troubleshooting) and [current evaluation evidence](QA_REPORT.md).
 
 Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
+
+
+By default, the CLI keeps generated C, MSVC object files, and its environment helper in build-owned temporary directories and removes them after the build. Use `--generated-c PATH` to retain C while building, or `--emit-c PATH` to write C and stop before linking.

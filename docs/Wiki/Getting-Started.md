@@ -31,9 +31,12 @@ python compiler/anvil.py examples/functions.ANVL --release --output build/functi
 ./build/functions_demo.exe
 ```
 
-The sample prints `13`. Use `--emit-c build/program.c` to inspect the generated C without building an executable.
+The sample prints `13`. Normal builds keep generated C in a temporary directory and remove it after linking. Add `--generated-c build/program.c` to preserve it alongside the executable, or use `--emit-c build/program.c` to inspect C without compiling an executable.
 
 ## Editor support
 
 The VS Code extension is in `vscode-extension/`. The current package is `anvil-language-support-0.1.13.vsix`; install it through **Extensions: Install from VSIX...** if you want the newer syntax coloring. Installed Anvil extension 0.1.4 is preserved in the existing development setup. The extension provides syntax coloring and editor pairing/indentation rules; it does not provide autocomplete, diagnostics, or debugging.
 
+
+
+Build artifacts: normal Anvil builds keep generated C, MSVC object files, and the Visual Studio environment helper in temporary build-owned directories and remove them after the build. Use `--generated-c PATH` to preserve generated C while building, or `--emit-c PATH` to write C only.

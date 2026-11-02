@@ -6,6 +6,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import tempfile
 
 from compiler.common import INCLUDE, RUNTIME
 
@@ -32,38 +33,38 @@ def build_c(
 ):
     output.parent.mkdir(parents=True, exist_ok=True)
     if pathlib.Path(compiler).name.lower() == "cl.exe":
-        obj_dir = output.parent / (output.stem + "_obj")
-        obj_dir.mkdir(exist_ok=True)
-        args = [
-            compiler,
-            "/nologo",
-            "/TC",
-            "/utf-8",
-            "/I" + str(INCLUDE),
-            str(generated),
-            str(RUNTIME),
-            "/Fe:" + str(output),
-            "/Fo:" + str(obj_dir) + "\\",
-            "/O2" if release else "/Od",
-        ]
-        install_root = pathlib.Path(compiler).parents[7]
-        devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
-        if os.name == "nt" and devcmd.exists():
-            helper = output.parent / (output.stem + ".build.cmd")
-            helper.write_text(
-                '@echo off\ncall "'
-                + str(devcmd)
-                + '" -arch=x64 >nul\nif errorlevel 1 exit /b %errorlevel%\n'
-                + subprocess.list2cmdline(args)
-                + "\nexit /b %errorlevel%\n",
-                encoding="utf-8",
-            )
-            try:
-                subprocess.run(["cmd.exe", "/d", "/c", str(helper)], check=True)
-            finally:
-                helper.unlink(missing_ok=True)
-        else:
-            subprocess.run(args, check=True)
+        with tempfile.TemporaryDirectory(prefix="anvil-obj-") as object_dir:
+            obj_dir = pathlib.Path(object_dir)
+            args = [
+                compiler,
+                "/nologo",
+                "/TC",
+                "/utf-8",
+                "/I" + str(INCLUDE),
+                str(generated),
+                str(RUNTIME),
+                "/Fe:" + str(output),
+                "/Fo:" + str(obj_dir) + "\\",
+                "/O2" if release else "/Od",
+            ]
+            install_root = pathlib.Path(compiler).parents[7]
+            devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
+            if os.name == "nt" and devcmd.exists():
+                helper = obj_dir / (output.stem + ".build.cmd")
+                helper.write_text(
+                    '@echo off\ncall "'
+                    + str(devcmd)
+                    + '" -arch=x64 >nul\nif errorlevel 1 exit /b %errorlevel%\n'
+                    + subprocess.list2cmdline(args)
+                    + "\nexit /b %errorlevel%\n",
+                    encoding="utf-8",
+                )
+                try:
+                    subprocess.run(["cmd.exe", "/d", "/c", str(helper)], check=True)
+                finally:
+                    helper.unlink(missing_ok=True)
+            else:
+                subprocess.run(args, check=True)
     else:
         args = [
             compiler,

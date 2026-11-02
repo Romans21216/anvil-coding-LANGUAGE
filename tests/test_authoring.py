@@ -24,6 +24,65 @@ class AuthoringSyntaxTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_default_c_build_keeps_generated_source_temporary(self):
+        entry = self.root / "temporary-source.ANVL"
+        executable = self.root / "temporary-source.exe"
+        generated = entry.with_suffix(".generated.c")
+        object_dir = self.root / "temporary-source_obj"
+        helper = self.root / "temporary-source.build.cmd"
+        helper_contents = b"@echo preserve this user file\r\n"
+        helper.write_bytes(helper_contents)
+        entry.write_text(
+            "fn(main)\n  output 23\nend\ncall fn(main)\n", encoding="utf-8"
+        )
+
+        build = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--output", str(executable)],
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(build.returncode, 0, build.stderr)
+        self.assertTrue(executable.is_file())
+        self.assertFalse(generated.exists())
+        self.assertFalse(object_dir.exists())
+        self.assertEqual(helper.read_bytes(), helper_contents)
+        run = subprocess.run([str(executable)], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(run.stdout.strip(), "23")
+
+    def test_missing_c_compiler_only_preserves_requested_generated_source(self):
+        entry = self.root / "missing-compiler.ANVL"
+        default_c = entry.with_suffix(".generated.c")
+        preserved_c = self.root / "preserved.c"
+        entry.write_text("fn(main)\n  output 23\nend\ncall fn(main)\n", encoding="utf-8")
+
+        failed_default = subprocess.run(
+            [sys.executable, str(COMPILER), str(entry), "--cc", "anvil-no-such-compiler"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(failed_default.returncode, 2)
+        self.assertFalse(default_c.exists())
+        self.assertIn("--generated-c PATH or --emit-c PATH", failed_default.stderr)
+
+        failed_preserved = subprocess.run(
+            [
+                sys.executable,
+                str(COMPILER),
+                str(entry),
+                "--cc",
+                "anvil-no-such-compiler",
+                "--generated-c",
+                str(preserved_c),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(failed_preserved.returncode, 2)
+        self.assertTrue(preserved_c.is_file())
+        self.assertIn("return 23.0;", preserved_c.read_text(encoding="utf-8"))
+
     def build_and_run(self, source: str, name: str = "game"):
         entry = self.root / f"{name}.ANVL"
         generated = self.root / f"{name}.generated.c"

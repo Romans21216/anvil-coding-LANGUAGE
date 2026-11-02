@@ -22,7 +22,7 @@ This is an early prototype. Conventional primitives use a fixed-size software ra
 On Windows, install Python 3.11 or newer and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC is the verified compiler. Then run:
 
 ```powershell
-python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe
+python compiler/anvil.py examples/first_world.ANVL --release --output build/first_world.exe
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
 python compiler/anvil.py examples/loops.ANVL --release --output build/loops.exe
 python compiler/anvil.py examples/arrays.ANVL --release --output build/arrays.exe
@@ -32,7 +32,7 @@ python compiler/anvil.py examples/physics_friction.ANVL --release --output build
 python compiler/anvil.py examples/image_sprite.ANVL --release --output build/image_sprite.exe
 ```
 
-This writes inspectable C and compiles it with MSVC in the same build command. To only translate Anvil to C, use `--emit-c build/first_world.c`. The generated C is ordinary C, while the supplied runtime currently targets Windows. Anvil owns the language front end, validation, feature selection, and runtime; the C toolchain performs machine-code generation and linking.
+This compiles through temporary C with MSVC in the same build command, then removes the C and object intermediates automatically. To preserve the translated C for inspection, add `--generated-c build/first_world.c`; to only translate without building, use `--emit-c build/first_world.c`. The generated C is ordinary C, while the supplied runtime currently targets Windows. Anvil owns the language front end, validation, feature selection, and runtime; the C toolchain performs machine-code generation and linking.
 
 To try the experimental direct backend, only Python 3.11 or newer is required on Windows x64:
 

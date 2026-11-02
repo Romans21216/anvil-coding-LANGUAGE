@@ -7,6 +7,7 @@ import json
 import pathlib
 import subprocess
 import sys
+import tempfile
 import tomllib
 
 from compiler.build import build_c, find_compiler
@@ -129,25 +130,37 @@ def main() -> int:
         generated = emit_c(
             source_path, funcs, top, variables, arrays, fixed_hz, project_name
         )
-        c_path = (
-            args.emit_c or args.generated_c or source_path.with_suffix(".generated.c")
-        )
-        c_path.parent.mkdir(parents=True, exist_ok=True)
-        c_path.write_text(generated, encoding="utf-8", newline="\n")
         if args.emit_c:
+            c_path = args.emit_c
+            c_path.parent.mkdir(parents=True, exist_ok=True)
+            c_path.write_text(generated, encoding="utf-8", newline="\n")
             print(f"Wrote {c_path}")
             return 0
         compiler = find_compiler(args.cc)
         if not compiler:
+            if args.generated_c:
+                args.generated_c.parent.mkdir(parents=True, exist_ok=True)
+                args.generated_c.write_text(generated, encoding="utf-8", newline="\n")
+                generated_note = f" Generated source: {args.generated_c}."
+            else:
+                generated_note = " Use --generated-c PATH or --emit-c PATH to preserve it."
             print(
                 "No C compiler found. Install Visual Studio 2022 Build Tools "
-                "with the C++ workload. Generated source: "
-                f"{c_path}",
+                "with the C++ workload." + generated_note,
                 file=sys.stderr,
             )
             return 2
         out = args.output or source_path.with_suffix(".exe")
-        build_c(compiler[1], c_path, out, args.release)
+        if args.generated_c:
+            c_path = args.generated_c
+            c_path.parent.mkdir(parents=True, exist_ok=True)
+            c_path.write_text(generated, encoding="utf-8", newline="\n")
+            build_c(compiler[1], c_path, out, args.release)
+        else:
+            with tempfile.TemporaryDirectory(prefix="anvil-build-") as build_dir:
+                c_path = pathlib.Path(build_dir) / "program.c"
+                c_path.write_text(generated, encoding="utf-8", newline="\n")
+                build_c(compiler[1], c_path, out, args.release)
         print(f"Built {out} using {compiler[0]}")
         return 0
     except tomllib.TOMLDecodeError as e:

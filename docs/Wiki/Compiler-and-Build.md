@@ -6,7 +6,7 @@ The primary pipeline is:
 .ANVL source -> Anvil parser and semantic checks -> ordinary C source -> MSVC -> Windows .exe
 ```
 
-One normal build command runs the full pipeline: Anvil validates and translates `.ANVL` to C, then invokes the C compiler/linker to produce machine code and an executable. The generated C can be inspected with `--generated-c` or emitted alone with `--emit-c`. The optional `native` backend directly emits x64/PE for a limited subset; it is experimental and not a prerequisite for the primary workflow. See [the experimental native backend](../NATIVE_X64_COMPILER_MIGRATION.md).
+One normal build command runs the full pipeline: Anvil validates and translates `.ANVL` to temporary C, invokes the C compiler/linker to produce machine code and an executable, then removes the C and object intermediates. Use `--generated-c PATH` to preserve C for inspection or `--emit-c PATH` to emit it without building. The optional `native` backend directly emits x64/PE for a limited subset; it is experimental and not a prerequisite for the primary workflow. See [the experimental native backend](../NATIVE_X64_COMPILER_MIGRATION.md).
 
 ## Direct native executable
 
@@ -21,6 +21,7 @@ The C runtime is Windows-focused and remains short of the broader engine, Forge,
 ## Direct source build
 
 ```powershell
+python compiler/anvil.py examples/first_world.ANVL --release --output build/first_world.exe
 python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe
 ```
 
@@ -44,3 +45,6 @@ python compiler/anvil.py examples/functions.ANVL --emit-c build/functions.c
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](../INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
 
 Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
+
+
+Build artifacts: normal Anvil builds keep generated C, MSVC object files, and the Visual Studio environment helper in temporary build-owned directories and remove them after the build. Use `--generated-c PATH` to preserve generated C while building, or `--emit-c PATH` to write C only.
