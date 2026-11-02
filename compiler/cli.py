@@ -28,6 +28,7 @@ def main() -> int:
         help="input .ANVL source or .ANVLproj project manifest",
     )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
+    ap.add_argument('--inspect-metadata',action='store_true',help='read embedded Anvil name/author/version from an executable')
     ap.add_argument("--generated-c", type=pathlib.Path, help="choose generated C path")
     ap.add_argument("--output", "-o", type=pathlib.Path, help="output executable")
     ap.add_argument(
@@ -46,6 +47,10 @@ def main() -> int:
     )
     args = ap.parse_args()
     try:
+        if args.inspect_metadata:
+            from compiler.program_metadata import unpack
+            sys.stdout.buffer.write((json.dumps(unpack(args.source.read_bytes()),ensure_ascii=False,indent=2)+'\n').encode('utf-8'))
+            return 0
         source_path = args.source
         include_root = None
         fixed_hz = 60

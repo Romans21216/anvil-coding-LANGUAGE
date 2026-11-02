@@ -26,6 +26,7 @@ class Node:
     local_array_lines: dict[str, int] = field(default_factory=dict)
     source: pathlib.Path | None = None
     original_name: str = ""
+    c_temporaries: set[str] = field(default_factory=set)
 
 
 class ArrayDeclarations(dict):
@@ -54,7 +55,7 @@ class CompileError(Exception):
 
 
 IDENTIFIER = r"[A-Za-z_][\w-]*"
-FUNCTION_REFERENCE = rf"({IDENTIFIER})(?:\s+-\s+({IDENTIFIER}))?"
+FUNCTION_REFERENCE = rf"({IDENTIFIER})(?:\s+--?\s+({IDENTIFIER}))?"
 
 
 def function_reference(raw: str, path, line: int) -> tuple[str, str | None]:
@@ -75,12 +76,16 @@ def c_string_literal(value: str) -> str:
     Fixed three-digit octal escapes cannot consume a following hex digit.
     Keep ordinary ASCII readable and independent of the C execution charset.
     """
-    escapes = {8: r"\b", 9: r"\t", 10: r"\n", 12: r"\f", 13: r"\r",
-               34: r'\"', 92: r"\\"}
     try:
         payload = value.encode("utf-8")
     except UnicodeError as error:
         raise CompileError("C string requires valid Unicode scalar values") from error
+    return c_bytes_literal(payload)
+
+
+def c_bytes_literal(payload: bytes) -> str:
+    escapes = {8: r"\b", 9: r"\t", 10: r"\n", 12: r"\f", 13: r"\r",
+               34: r'\"', 92: r"\\"}
     return '"' + ''.join(escapes.get(byte, chr(byte) if 32 <= byte < 127
                                    else f"\\{byte:03o}") for byte in payload) + '"'
 
@@ -143,6 +148,8 @@ RUNTIME_C_NAMES = {
     "anvil_noise",
     "anvil_fbm",
     "anvil_net_host",
+    "anvil_net_host_at",
+    "anvil_net_set_ip",
     "anvil_net_join",
     "anvil_net_send",
     "anvil_net_receive",

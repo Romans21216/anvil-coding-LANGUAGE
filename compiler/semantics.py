@@ -34,7 +34,7 @@ def validate_program(program: ParsedProgram, *, check_symbols: bool = True) -> N
             )
     for name, line_no, function_name, source in program.local_references:
         fn = functions.get(function_name) if function_name else None
-        if fn is None or name not in fn.locals:
+        if fn is None or (name not in fn.locals and name not in fn.params):
             raise CompileError(
                 f"{source}:{line_no}: unknown local variable {name!r}; "
                 f"declare it with set local({name}) first"

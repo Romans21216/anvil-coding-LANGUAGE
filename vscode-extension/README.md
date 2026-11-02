@@ -12,7 +12,7 @@ To install the included package, use **Extensions: Install from VSIX...** and se
 
 ## Highlighted constructs
 
-The grammar scopes comments, escaped strings, `fn(name)` declarations, `call fn(name)` calls, `array name(size)` declarations and `array(name,index)` accesses, `var(...)` and `flag(...)` bindings, engine commands, control keywords, constants, rendering, ray backend, keyboard and mouse input built-ins, image/sprite resource built-ins, networking, and physics built-ins including `physics_capacity` and `body_friction`, numbers, operators, and punctuation. Standard TextMate scopes are used so installed themes supply the colors.
+The grammar scopes comments, escaped strings, `fn(name)` declarations, qualified `call fn(...)` calls, `fnref(...)` references, `array name(size)` declarations and `array(name,index)` accesses, `var(...)`, `varl(...)`, and `flag(...)` bindings, `name`/`author`/`version` metadata, engine commands, control keywords, constants, rendering, ray backend, keyboard and mouse input built-ins, image/sprite resource built-ins, compact networking commands, and physics built-ins including `physics_capacity` and `body_friction`, numbers, operators, and punctuation. Standard TextMate scopes are used so installed themes supply the colors.
 
 ## Validation
 
@@ -22,3 +22,5 @@ Run `npm ci` once, then `npm run validate` to validate the JSON manifest, langua
 Version 0.1.11 corrects indentation and folding for function, if, while, for, else and end statements, including trailing comments. Automated configuration tests exercise real control-flow headers and unrelated text. This package has not been installed or visibly verified; installed 0.1.4 is preserved per user preference.
 
 Version 0.1.12 adds selective imports (`include fn(move) - "lib/player.ANVL" as input`) and qualified calls (`call fn(move - input, 10)`). Automated TextMate token tests cover selectors, source qualifiers, aliases, nested calls and existing hyphenated names. The package is statically verified only; installed 0.1.4 remains unchanged.
+
+Version 0.1.13 adds token checks for program metadata, callback references, `varl(...)`, compact network commands, and the preferred double-dash selective-import/qualified-call syntax. The package is statically verified only; installed 0.1.4 remains unchanged.

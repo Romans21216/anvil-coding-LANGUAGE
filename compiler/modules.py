@@ -32,7 +32,7 @@ def include_spec(raw, path, line):
     if not raw.startswith("fn("):
         include_name(raw, path, line)
         return "", "", raw
-    match = re.fullmatch(rf'fn\(\s*({IDENTIFIER})\s*\)\s+-\s+("(?:\\.|[^"\\])*")(?:\s+as\s+({IDENTIFIER}))?', raw)
+    match = re.fullmatch(rf'fn\(\s*({IDENTIFIER})\s*\)\s+--?\s+("(?:\\.|[^"\\])*")(?:\s+as\s+({IDENTIFIER}))?', raw)
     if not match:
         raise CompileError(f'{path}:{line}: expected include fn(name) - "file.ANVL" [as alias]')
     relative = include_name(match[2], path, line)

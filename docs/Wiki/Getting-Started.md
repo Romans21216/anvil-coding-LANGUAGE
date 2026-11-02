@@ -35,5 +35,5 @@ The sample prints `13`. Use `--emit-c build/program.c` to inspect the generated 
 
 ## Editor support
 
-The VS Code extension is in `vscode-extension/`. Install `anvil-language-support-0.1.6.vsix` through **Extensions: Install from VSIX...**. It provides syntax coloring and editor pairing/indentation rules; it does not yet provide autocomplete, diagnostics, or debugging.
+The VS Code extension is in `vscode-extension/`. The current package is `anvil-language-support-0.1.13.vsix`; install it through **Extensions: Install from VSIX...** if you want the newer syntax coloring. Installed Anvil extension 0.1.4 is preserved in the existing development setup. The extension provides syntax coloring and editor pairing/indentation rules; it does not provide autocomplete, diagnostics, or debugging.
 

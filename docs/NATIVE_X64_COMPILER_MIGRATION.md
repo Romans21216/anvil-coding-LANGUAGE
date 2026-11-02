@@ -1,10 +1,8 @@
 # Anvil Native x64 Compiler Migration
 
-## Required end state
+## Optional experimental backend
 
-The Anvil compiler parses and validates `.ANVL` itself, generates x86-64 machine code, and writes a Windows PE executable directly. It does not emit C or Rust source, invoke a C or Rust compiler, or route the engine runtime through a C/Rust shim.
-
-The `.ANVL` source syntax and engine APIs remain Anvil-owned. Generated EXEs contain native code for the validated program and the Anvil runtime components it uses.
+This document describes the optional `--backend native` experiment. It is not the required build architecture. The primary compiler parses and validates `.ANVL`, generates ordinary C, then invokes the selected C compiler and linker to produce the machine-code executable. The Anvil language front end and runtime APIs remain Anvil-owned; the C toolchain handles machine-code generation and linking. Do not treat direct-backend parity as a prerequisite for the supported C workflow.
 
 ## Current state
 
@@ -12,7 +10,7 @@ An experimental direct backend is available with `python -m compiler.anvil <file
 
 The direct backend now has an initial Windows 2D runtime: `scene 2d`, literal opaque `clear rgba`, top-level numeric initialization, `fn(draw)`, `display rect(...)`, `display circle(...)`, `display line(...)` with `-rgb(...)` or dynamic `-rgba(...)` blending, and optional `fn(update)` with `time()`, `delta()`, `compute()`, `held(key)`, `pressed(key)` and the mouse queries below. Runtime instructions and the PE are emitted by Anvil; USER32/GDI32 functions are imported directly from Windows. No C/Rust source, compiler, linker, or runtime shim is used.
 
-The regular build still defaults to the C backend. The native backend does **not** yet support the full language, general strings/numeric text formatting, text opacity, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
+The regular build uses the C backend. This optional direct backend does **not** yet support the full language, general strings/numeric text formatting, text opacity, 3D, assets, audio, physics, trigonometry, or networking. These limits apply only to the experiment; the primary target is generated C compiled by a C toolchain.
 
 ## Native 2D scene
 

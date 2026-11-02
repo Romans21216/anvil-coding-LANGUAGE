@@ -100,6 +100,8 @@ double anvil_noise(double x, double y, double z);
 double anvil_fbm(double x, double y, double z, int octaves, double lacunarity,
                  double gain);
 int anvil_net_host(int port);
+int anvil_net_host_at(int port, int local_only);
+int anvil_net_set_ip(const char *address);
 int anvil_net_join(const char *address, int port);
 void anvil_net_send(double value);
 double anvil_net_receive(void);

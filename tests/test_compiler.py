@@ -26,7 +26,7 @@ class CompilerTests(unittest.TestCase):
 
     def test_language_version_errors_are_source_located(self):
         cases = {
-            "unsupported": ("language version 2\nfn(main)\nend\n", "unsupported Anvil language version 2; compiler supports version 1", 1),
+            "unsupported": ("language version 3\nfn(main)\nend\n", "unsupported Anvil language version 3; compiler supports versions 1 and 2", 1),
             "malformed": ("language version next\nfn(main)\nend\n", "language version declaration must use 'language version N'", 1),
             "duplicate": ("language version 1\nlanguage version 1\nfn(main)\nend\n", "language version may only be declared once", 2),
             "late": ("fn(main)\nend\nlanguage version 1\n", "language version declaration must appear before all other source code", 3),
@@ -46,7 +46,7 @@ class CompilerTests(unittest.TestCase):
             source.write_text("language version " + ("9" * 5000) + "\nfn(main)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "oversized.c")], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn(f"{source}:1: unsupported Anvil language version value too large; compiler supports version 1", result.stderr)
+            self.assertIn(f"{source}:1: unsupported Anvil language version value too large; compiler supports versions 1 and 2", result.stderr)
             self.assertNotIn("Traceback", result.stderr)
 
     def test_unicode_decimal_digit_is_rejected_as_invalid_anvil_syntax(self):

@@ -3,7 +3,7 @@
 The broader engine APIs below describe the C/MSVC-backed Windows runtime. Direct `--backend native` output currently supports a smaller numeric and 2D rectangle/input/procedural subset; see [native backend availability](NATIVE_X64_COMPILER_MIGRATION.md).
 
 
-For the normative version 1 syntax and behavior contract, see the [formal language specification](LANGUAGE_SPEC.md).
+For the normative versioned syntax and behavior contract, see the [formal language specification](LANGUAGE_SPEC.md).
 
 Anvil uses UTF-8 text in `.ANVL` files. Its syntax is designed to read like a small BASIC/Lua-inspired scripting language: define a function with `fn(name)` or `fn(name, parameter, ...)`, indent the body for readability, and close it with `end`. Indentation is optional; `end` defines the block.
 
@@ -34,12 +34,36 @@ Comments begin with `#` outside a quoted string. Names are case-sensitive. Funct
 An optional version declaration may appear once, before any other source code:
 
 ```anv
-language version 1
+language version 2
 ```
 
-Blank lines and comments may appear before it. Version 1 is the current language definition. If the declaration is omitted, the compiler treats the file as version 1 so existing `.ANVL` projects continue to build. Unsupported versions, malformed declarations, duplicates, and declarations after source code receive a path-and-line diagnostic. A future incompatible syntax change can introduce a newer version without silently changing the meaning of older files.
+Blank lines and comments may appear before it. The compiler supports versions 1 and 2. If the declaration is omitted, the compiler treats the file as version 1 so existing `.ANVL` projects continue to build. Unsupported versions, malformed declarations, duplicates, and declarations after source code receive a path-and-line diagnostic.
 
 `var(name)` reads a global numeric variable, except that a function parameter with the same name takes precedence inside that function. `set local(name) = expression` declares function-local numeric state, initialized to `0` at function entry; `local(name)` reads it, and `add local(name) amount` / `sub local(name) amount` update it. Local names are visible only in their declaring function. Existing `set var(name)` assignments continue to use global state unless `name` is a parameter of the current function. The compiler validates local/global references and function-call arity before generating C.
+
+Version 2 keeps `local(name)` available and changes `var(name)` to function-local storage. `var(name)` can be assigned/read inside a function and follows the function's local lifetime; it cannot be used at top level. `varl(name)` always addresses a global in both versions. Thus a parameter or local may share a name with a global accessed explicitly through `varl(name)`. Version 1 keeps its established `var(name)` global/parameter-shadowing behavior.
+
+Version 2 also supports program metadata and checked function references:
+
+```anv
+language version 2
+name "Anvil Example"
+author("Romans21216")
+version("1.0.0")
+
+fn(move, distance)
+  output distance + 1
+end
+
+fn(main)
+  set var(movement) = fnref(move)
+  output call var(movement, 9)
+end
+```
+
+Metadata values are quoted Unicode strings. `name`, `author`, and program `version` each appear at most once at the top level. The name is embedded in the executable metadata; a project manifest's `name` is used as a fallback when source metadata omits it. `python compiler/anvil.py build/game.exe --inspect-metadata` prints embedded metadata as JSON.
+
+`fnref(function)` creates an opaque, checked callback value. Store it in a local (`var(name)` in version 2) or global (`varl(name)`) and invoke it with `call var(name, arguments...)`, `call local(name, arguments...)`, or `call varl(name, arguments...)`. Assigning another callback or `null` is supported. Calling an unset callback reports the original source location and exits with code 2. Referenced functions must use the same numeric arity; callback values cannot be passed as function parameters or returned, put in arrays, or used as numbers. The initial callback signature limit is 15 numeric arguments. Version 1 retains its old `var(name)` meaning; use `varl(name)` for global callback storage there.
 
 Arithmetic uses `+`, `-`, `*`, `/`, and `%`; division by a value equal to zero (including negative zero) terminates the program with exit code 2 and reports the `.ANVL` source path and line. Nonzero division keeps normal floating-point behavior. Every numeric expression must produce a finite value: overflow to positive/negative infinity or an invalid result such as `sqrt(-1)` reports the source path and line and exits with code 2. The check happens before comparisons too, so an overflowing intermediate cannot silently become a true/false result.
 

@@ -183,7 +183,7 @@ end
         source='include fn(value) - "a.ANVL"\ninclude "a.ANVL"\nfn(main)\n output 0\nend\n'
         with mock.patch("compiler.modules.MAX_INCLUDE_FILES",2),self.assertRaisesRegex(CompileError,"graph exceeds"):
             self.program(source)
-        with self.assertRaisesRegex(CompileError,"reserved for include identities"):
+        with self.assertRaisesRegex(CompileError,"reserved for compiler-generated symbols"):
             self.program('fn(_anvil-include_1_f_value)\n output 1\nend\n')
         self.write("a.ANVL",'fn(_anvil_native_foo)\n output 1\nend\n')
         path,program=self.program('include fn(_anvil_native_foo) - "a.ANVL"\nfn(main)\n output call fn(_anvil_native_foo - a)\nend\n')
@@ -258,7 +258,7 @@ end
                 with self.subTest(backend=backend,body=body),mock.patch.object(sys,"argv",['anvil',str(path),'--backend',backend,'-o',str(output)]),mock.patch('compiler.cli.find_compiler',side_effect=AssertionError('backend reached')),contextlib.redirect_stderr(io.StringIO()) as errors:
                     self.assertEqual(main(),1)
                     self.assertIn(str(path)+f':{line}:',errors.getvalue())
-                    self.assertIn('reserved for include identities',errors.getvalue())
+                    self.assertIn('reserved for compiler-generated symbols',errors.getvalue())
                     self.assertFalse(output.exists())
         # Comments and literals never become identifier references.
         text='call fn(_anvil_include_1_f_hidden) array(_anvil_include_1_a_secret,0)'

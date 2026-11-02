@@ -1231,7 +1231,16 @@ static int anvil_net_ready(void) {
   anvil_winsock_started = 1;
   return 1;
 }
-int anvil_net_host(int port) {
+static unsigned long anvil_net_bind_ip;
+int anvil_net_set_ip(const char *address) {
+  struct in_addr parsed;
+  if (!anvil_net_ready() || !address || inet_pton(AF_INET, address, &parsed) != 1)
+    return 0;
+  anvil_net_bind_ip = parsed.s_addr;
+  return 1;
+}
+int anvil_net_host(int port) { return anvil_net_host_at(port, 0); }
+int anvil_net_host_at(int port, int local_only) {
   if (!anvil_net_ready())
     return 0;
   if (anvil_net_socket != INVALID_SOCKET)
@@ -1242,12 +1251,17 @@ int anvil_net_host(int port) {
   SOCKADDR_IN local;
   memset(&local, 0, sizeof(local));
   local.sin_family = AF_INET;
-  local.sin_addr.s_addr = htonl(INADDR_ANY);
+  local.sin_addr.s_addr = local_only ? htonl(INADDR_LOOPBACK) : anvil_net_bind_ip;
   local.sin_port = htons((u_short)port);
   u_long nonblocking = 1;
-  ioctlsocket(anvil_net_socket, FIONBIO, &nonblocking);
+  if (ioctlsocket(anvil_net_socket, FIONBIO, &nonblocking) != 0) {
+    closesocket(anvil_net_socket); anvil_net_socket = INVALID_SOCKET; return 0;
+  }
   anvil_net_has_peer = 0;
-  return bind(anvil_net_socket, (SOCKADDR *)&local, sizeof(local)) == 0;
+  if (bind(anvil_net_socket, (SOCKADDR *)&local, sizeof(local)) != 0) {
+    closesocket(anvil_net_socket); anvil_net_socket = INVALID_SOCKET; return 0;
+  }
+  return 1;
 }
 int anvil_net_join(const char *address, int port) {
   if (!anvil_net_ready())
@@ -1266,7 +1280,11 @@ int anvil_net_join(const char *address, int port) {
     return 0;
   }
   u_long nonblocking = 1;
-  ioctlsocket(anvil_net_socket, FIONBIO, &nonblocking);
+  if (ioctlsocket(anvil_net_socket, FIONBIO, &nonblocking) != 0) {
+    closesocket(anvil_net_socket);
+    anvil_net_socket = INVALID_SOCKET;
+    return 0;
+  }
   anvil_net_has_peer = 1;
   return 1;
 }
@@ -1811,7 +1829,7 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     return 0;
   }
   }
-  return DefWindowProcA(window, message, wparam, lparam);
+  return DefWindowProcW(window, message, wparam, lparam);
 }
 
 static void anvil_release_frame_resources(void) {
@@ -1836,8 +1854,16 @@ static void anvil_release_frame_resources(void) {
 }
 
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
-  HINSTANCE instance = GetModuleHandleA(NULL);
-  WNDCLASSEXA wc;
+  HINSTANCE instance = GetModuleHandleW(NULL);
+  const char *utf8_title = title ? title : "Anvil Game";
+  int title_units = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_title, -1, NULL, 0);
+  if (title_units <= 0) return;
+  wchar_t *wide_title = (wchar_t *)malloc((size_t)title_units * sizeof(wchar_t));
+  if (!wide_title) return;
+  if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_title, -1, wide_title, title_units)) {
+    free(wide_title); return;
+  }
+  WNDCLASSEXW wc;
   memset(&wc, 0, sizeof(wc));
   wc.cbSize = sizeof(wc);
   wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -1845,16 +1871,17 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   wc.hInstance = instance;
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-  wc.lpszClassName = "AnvilNativeGameWindow";
-  RegisterClassExA(&wc);
+  wc.lpszClassName = L"AnvilNativeGameWindow";
+  if (!RegisterClassExW(&wc)) { free(wide_title); return; }
   RECT rect = {0, 0, ANVIL_WIDTH, ANVIL_HEIGHT};
   AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
-  anvil_window = CreateWindowExA(
-      0, wc.lpszClassName, title ? title : "Anvil Game", WS_OVERLAPPEDWINDOW,
+  anvil_window = CreateWindowExW(
+      0, wc.lpszClassName, wide_title, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left,
       rect.bottom - rect.top, NULL, NULL, instance, NULL);
+  free(wide_title);
   if (!anvil_window) {
-    UnregisterClassA(wc.lpszClassName, instance);
+    UnregisterClassW(wc.lpszClassName, instance);
     return;
   }
   anvil_memory_dc = CreateCompatibleDC(NULL);
@@ -1885,13 +1912,13 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   anvil_running = 1;
   MSG msg;
   while (anvil_running) {
-    while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) {
         anvil_running = 0;
         break;
       }
       TranslateMessage(&msg);
-      DispatchMessageA(&msg);
+      DispatchMessageW(&msg);
     }
     if (!anvil_running)
       break;
@@ -1941,14 +1968,14 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
       Sleep(0);
   }
   anvil_release_frame_resources();
-  UnregisterClassA(wc.lpszClassName, instance);
+  UnregisterClassW(wc.lpszClassName, instance);
   return;
 
 failed_startup:
   anvil_release_frame_resources();
   if (anvil_window)
     DestroyWindow(anvil_window);
-  UnregisterClassA(wc.lpszClassName, instance);
+  UnregisterClassW(wc.lpszClassName, instance);
 }
 
 static size_t anvil_array_checked_index(const double *values, int size,

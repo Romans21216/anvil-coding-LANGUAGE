@@ -13,6 +13,7 @@ from compiler.common import (
     array_size,
     c_name,
     c_string_literal,
+    c_bytes_literal,
     variable_code,
 )
 from compiler.expressions import expr, split_args
@@ -153,8 +154,10 @@ def emit_nodes(
     for n in nodes:
         path = n.source or original_path
         source_path = c_string_literal(str(path))
-        if n.kind == "set":
-            out.append(f"{indent}{variable_code(n.name, scope)} = {lower(n)};")
+        if n.kind == "noop":
+            continue
+        elif n.kind in ("set","global_set"):
+            out.append(f"{indent}{variable_code(n.name, None if n.kind=='global_set' else scope)} = {lower(n)};")
         elif n.kind == "local_set":
             out.append(f"{indent}{c_name(scope.name + '__' + n.name)} = {lower(n)};")
         elif n.kind == "array_set":
@@ -176,9 +179,9 @@ def emit_nodes(
                     f"{indent}}}",
                 ]
             )
-        elif n.kind in ("add", "sub"):
-            op = "+" if n.kind == "add" else "-"
-            target = variable_code(n.name, scope)
+        elif n.kind in ("add", "sub",'global_add','global_sub'):
+            op = "+" if n.kind in ("add",'global_add') else "-"
+            target = variable_code(n.name, None if n.kind.startswith('global_') else scope)
             value = lower(n)
             out.append(
                 f"{indent}{target} = anvil_check_number(({target} {op} {value}), "
@@ -211,8 +214,14 @@ def emit_nodes(
                     f"{n.source or path}:{n.line}: function {n.name!r} expects "
                     f"{len(functions[n.name].params)} argument(s), got {len(args)}"
                 )
-            values = [lower(n, arg) for arg in args]
-            out.append(f"{indent}(void){c_name(n.name)}({', '.join(values)});")
+            if n.name.startswith('_anvil_callable_dispatch_'):
+                out.append(f'{indent}(void){lower(n,"call fn("+n.name+(", "+n.value if n.value else "")+")")};')
+            else:
+                values = [lower(n, arg) for arg in args]
+                out.append(f"{indent}(void){c_name(n.name)}({', '.join(values)});")
+        elif n.kind=='callable_error':
+            message=c_string_literal(f'{path}:{n.line}: function reference is unset or invalid\n')
+            out.append(f'{indent}fputs({message},stderr); exit(2);')
         elif n.kind == "if":
             out.append(f"{indent}if ({lower(n)} != 0.0) {{")
             out.extend(
@@ -305,10 +314,23 @@ def emit_nodes(
         elif n.kind == "net_send":
             out.append(f"{indent}anvil_net_send({lower(n)});")
         elif n.kind == "net_host":
-            out.append(f"{indent}(void)anvil_net_host({n.value});")
+            local=1 if n.params==['local'] else 0
+            message=c_string_literal(f'{path}:{n.line}: unable to host UDP socket\n')
+            invocation=f'anvil_net_host_at({n.value},1)' if local else f'anvil_net_host({n.value})'
+            out.append(f'{indent}if (!{invocation}) {{ fputs({message},stderr); exit(2); }}')
+        elif n.kind=='net_ip':
+            address=c_string_literal(n.value)
+            message=c_string_literal(f'{path}:{n.line}: unable to configure UDP bind address\n')
+            out.append(f'{indent}if (!anvil_net_set_ip({address})) {{ fputs({message},stderr); exit(2); }}')
+        elif n.kind=='net_leave':
+            out.append(f'{indent}anvil_net_close();')
         elif n.kind == "net_join":
             address, port = n.value.rsplit(",", 1)
-            out.append(f"{indent}(void)anvil_net_join({address}, {port});")
+            message = c_string_literal(f"{path}:{n.line}: unable to join UDP peer\n")
+            out.append(
+                f"{indent}if (!anvil_net_join({address}, {port})) "
+                f"{{ fputs({message}, stderr); exit(2); }}"
+            )
     return out
 
 
@@ -329,6 +351,10 @@ def emit_c(
     project_name: str = "Anvil Game",
 ) -> str:
     arrays = arrays or {}
+    from compiler.program_metadata import extract,pack
+    metadata=extract(top)
+    project_name=metadata.get('name',project_name)
+    top=[node for node in top if node.kind!='metadata']
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",
         '#include "anvil_runtime.h"',
@@ -337,7 +363,11 @@ def emit_c(
         "#include <stdlib.h>",
         "",
     ]
+    metadata_payload=pack(metadata)
+    if metadata_payload:
+        lines.append('static const char _anvil_metadata_blob[] = '+c_bytes_literal(metadata_payload)+';')
     lines += [f"static double {c_name(name)};" for name in sorted(variables)]
+    lines += [f'static double {c_name(name)};' for node in top for name in sorted(node.c_temporaries)]
     lines += [
         f"static double {c_name(name)}[{size}];"
         for name, size in sorted(arrays.items())
@@ -395,7 +425,7 @@ def emit_c(
         lines.append(f"static double {c_name(name)}({params}) {{")
         lines.extend(
             f"    double {c_name(name + '__' + local)} = 0.0;"
-            for local in sorted(fn.locals)
+            for local in sorted(fn.locals | fn.c_temporaries)
         )
         lines.extend(
             f"    double *{c_name(name + '__' + local)} = "
@@ -416,6 +446,7 @@ def emit_c(
         if n.kind
         in (
             "set",
+            "global_set",
             "scene",
             "camera",
             "camera_fov",
@@ -423,6 +454,8 @@ def emit_c(
             "clear",
             "seed",
             "net_host",
+            "net_ip",
+            "net_leave",
             "net_join",
         )
     ]
@@ -433,6 +466,7 @@ def emit_c(
         if n.kind
         not in (
             "set",
+            "global_set",
             "scene",
             "camera",
             "camera_fov",
@@ -440,8 +474,11 @@ def emit_c(
             "clear",
             "seed",
             "net_host",
+            "net_ip",
+            "net_leave",
             "net_join",
             "call",
+            "noop",
         )
     ]
     if invalid:
@@ -472,6 +509,8 @@ def emit_c(
             "when used as an engine callback program"
         )
     lines.append("int main(void) {")
+    if metadata_payload:
+        lines.append('    const char *volatile _anvil_metadata_keep = _anvil_metadata_blob; (void)_anvil_metadata_keep;')
     lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
     lines.extend(emit_nodes(path, setup, functions, "    ", arrays=arrays))
     if has_engine:

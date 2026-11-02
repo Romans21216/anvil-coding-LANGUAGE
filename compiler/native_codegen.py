@@ -85,8 +85,8 @@ class _Expression:
             self.owner.emit_float(number)
             left = _Value("number", value)
         elif kind == "variable":
-            name = value[4:-1]
-            self.owner.load_variable(name, self.scope, self.line)
+            name = value[value.index('(')+1:-1]
+            self.owner.load_variable(name, None if value.startswith('varl(') else self.scope, self.line)
             left = _Value("number", name)
         elif kind == "local":
             name = value[6:-1]
@@ -186,6 +186,10 @@ class _Expression:
 
     def _emit_builtin(self, name: str) -> None:
         self._expect("(")
+        if name=='receive':
+            self._expect(')')
+            self.owner._net.receive(self.line)
+            return
         if name in self.owner._math.ARITY:
             self.owner._math.emit_builtin(self, name)
             return
@@ -247,6 +251,7 @@ class NativeCodegen:
                ("KERNEL32.dll", "WriteFile"),
                ("KERNEL32.dll", "ExitProcess")]
     BUILTIN_NAMES = {"compute", "time", "delta", "held", "pressed",
+                     "receive",
                      "mouse_x", "mouse_y", "mouse_held", "mouse_pressed", "mouse_wheel",
                      "abs", "sqrt", "floor", "ceil", "min", "max", "rnd", "noise", "fbm",
                      "_anvil_native_hash"}
@@ -255,6 +260,10 @@ class NativeCodegen:
 
     def __init__(self, path, functions, top, variables, arrays=None, *, fixed_hz=60, title="Anvil Native 2D"):
         self.path = path
+        from compiler.program_metadata import extract,pack
+        metadata=extract(top)
+        title=metadata.get('name',title)
+        top=[node for node in top if node.kind!='metadata']
         from compiler.native_arrays import NativeArrays
         self._local_arrays = NativeArrays(self)
         if isinstance(fixed_hz, bool) or not isinstance(fixed_hz, int) or not 1 <= fixed_hz <= 240:
@@ -319,9 +328,16 @@ class NativeCodegen:
             )
         self._data_size = max(8, next_offset)
         self._data = bytearray(self._data_size)
+        payload=pack(metadata)
+        if len(self._data)+len(payload)>self.MAX_DATA_BYTES:
+            raise CompileError(f'{path}: program metadata and global data exceed the native data budget')
+        if payload:
+            self.reserve_data(payload)
         self._window = None
         from compiler.native_math import NativeMath
         self._math = NativeMath(self)
+        from compiler.native_network import NativeNetwork
+        self._net=NativeNetwork(self)
 
     def reserve_data(self, payload: bytes) -> int:
         offset = (len(self._data) + 7) & ~7
@@ -573,13 +589,17 @@ class NativeCodegen:
 
     def _emit_nodes(self, nodes: list[Node], scope: Node | None) -> None:
         for node in nodes:
-            if node.kind == "seed":
+            if node.kind == 'noop':
+                continue
+            elif node.kind in ('net_ip','net_host','net_join','net_send','net_leave'):
+                self._net.emit_node(node,scope)
+            elif node.kind == "seed":
                 self.emit_expression(node.value, node.line, scope)
                 self.emit_finite_check(node.line)
                 self._math.seed(node.line)
-            elif node.kind == "set":
+            elif node.kind in ("set",'global_set'):
                 self.emit_expression(node.value, node.line, scope)
-                self.store_variable(node.name, scope, node.line)
+                self.store_variable(node.name, None if node.kind=='global_set' else scope, node.line)
             elif node.kind == "local_set":
                 self.emit_expression(node.value, node.line, scope)
                 self.store_local(node.name)
@@ -589,28 +609,31 @@ class NativeCodegen:
                 )
             elif node.kind == "display" and self._window is not None:
                 self._window.emit_display(node, scope)
-            elif node.kind in ("add", "sub", "local_add", "local_sub"):
+            elif node.kind in ("add", "sub", "local_add", "local_sub",'global_add','global_sub'):
                 name = node.name
+                target_scope=None if node.kind.startswith('global_') else scope
                 is_local = node.kind in ("local_add", "local_sub")
                 if is_local:
                     self.load_local(name, scope, node.line)
                 else:
-                    self.load_variable(name, scope, node.line)
+                    self.load_variable(name, target_scope, node.line)
                 temp = self.push_temp()
                 self.store_local(temp)
                 self.emit_expression(node.value, node.line, scope)
-                self.emit_binary("+" if node.kind in ("add", "local_add") else "-", temp, node.line)
+                self.emit_binary("+" if node.kind in ("add", "local_add",'global_add') else "-", temp, node.line)
                 self.pop_temp()
                 if is_local:
                     self.store_local(name)
                 else:
-                    self.store_variable(name, scope, node.line)
+                    self.store_variable(name, target_scope, node.line)
             elif node.kind == "output":
                 self.emit_expression(node.value, node.line, scope)
                 if self._local_arrays.total:
                     self.code.jump(self._local_arrays.return_label)
                 else:
                     self.code.bytes(b"\xc9\xc3")  # leave; ret
+            elif node.kind=='callable_error':
+                self.emit_runtime_error(f'{self.path}:{node.line}: function reference is unset or invalid\n')
             elif node.kind == "if":
                 else_label = self.label("else")
                 end_label = self.label("endif")
@@ -847,15 +870,16 @@ class NativeCodegen:
         if any(node.kind == "scene" for node in self.top):
             return self._generate_window()
         calls = [node for node in self.top if node.kind == "call"]
-        if any(node.kind not in ("call", "seed") for node in self.top):
-            unsupported = next(node for node in self.top if node.kind not in ("call", "seed"))
+        allowed=("call", "seed",'global_set','net_ip','net_host','net_join','net_leave')
+        if any(node.kind not in allowed for node in self.top):
+            unsupported = next(node for node in self.top if node.kind not in allowed)
             raise CompileError(
                 f"{unsupported.source or self.path}:{unsupported.line}: top-level configuration is not implemented by the native x64 backend yet"
             )
         from compiler.modules import reachable_functions
         for name, fn in reachable_functions(self.functions, self.top, graphical=False):
             self._emit_function(name, fn)
-        setup = [node for node in self.top if node.kind == "seed"]
+        setup = [node for node in self.top if node.kind in ("seed",'global_set','net_ip','net_host','net_join','net_leave')]
         if setup:
             self._emit_function("native:console_setup", Node("function", 1, body=setup))
         if calls:
@@ -868,6 +892,7 @@ class NativeCodegen:
                 body=[Node("output", calls[0].line, value=expression, source=calls[0].source)],
             ))
         self._math.emit_pending()
+        self._net.emit()
         self._emit_print_helper()
         self.code.label("entry")
         self.code.bytes(b"\x48\x83\xec\x28")
@@ -882,6 +907,8 @@ class NativeCodegen:
         else:
             raise CompileError(f"{self.path}: native executable needs fn(main)")
         self.code.call("runtime:print_number")
+        if self._net.active:
+            self.code.call('network:cleanup')
         self.code.bytes(b"\x31\xc9")
         self.code.rip_call_import("ExitProcess")
         self.code.bytes(b"\xcc")
@@ -909,7 +936,7 @@ class NativeCodegen:
                         or any(int(part) > 255 for part in parts) or parts[3] != "255"):
                     raise CompileError(f"{node.source or self.path}:{node.line}: native clear requires four literal channels in 0..255 and alpha 255")
                 clear = [int(part) for part in parts]
-            elif node.kind in ("set", "add", "sub", "call", "seed"):
+            elif node.kind in ("set", "add", "sub", "call", "seed",'global_set','global_add','global_sub','net_ip','net_host','net_join','net_leave'):
                 setup.append(node)
             else:
                 raise CompileError(f"{node.source or self.path}:{node.line}: native scene setup does not support {node.kind!r}")
@@ -920,10 +947,12 @@ class NativeCodegen:
         self.code.label("native:setup")
         self._emit_function("native:setup", Node("function", 1, name="native:setup", body=setup))
         self._math.emit_pending()
+        self._net.emit()
         self._window.emit()
         return self._build(list(self.IMPORTS) + self._window.imports)
 
     def _build(self, imports: list[tuple[str, str]]) -> bytes:
+        imports=list(dict.fromkeys(imports+self._net.imports))
         if self._local_arrays.active is not None:
             imports = list(dict.fromkeys(imports + self._local_arrays.IMPORTS))
         pe = Pe32Plus(bytes(self.code.code), imports)

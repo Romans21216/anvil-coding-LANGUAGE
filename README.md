@@ -1,6 +1,6 @@
 # Anvil
 
-**Anvil** is a small BASIC/Lua-inspired game language with its own `.ANVL` source format. The current default compiler emits C and invokes MSVC for broader engine coverage. An experimental direct x64 backend (`--backend native`) writes a Windows `.exe` without emitting C/Rust or invoking another compiler; it supports numeric programs and an initial 2D window runtime. The project target is a complete Anvil-owned compiler and runtime with no C or Rust dependency.
+**Anvil** is a small BASIC/Lua-inspired game language with its own `.ANVL` source format. The intended build is one command: Anvil parses and validates the source, generates C, then invokes the selected C compiler to produce machine code and an executable. The C translation is available for inspection with `--emit-c`. An experimental direct x64 backend (`--backend native`) remains optional; it is not the required architecture or a prerequisite for engine features.
 
 ## What works now
 
@@ -32,7 +32,7 @@ python compiler/anvil.py examples/physics_friction.ANVL --release --output build
 python compiler/anvil.py examples/image_sprite.ANVL --release --output build/image_sprite.exe
 ```
 
-This writes inspectable C and compiles it with MSVC. To only translate Anvil to C, add `--emit-c build/first_world.c`. The generated C is ordinary C, while the runtime currently targets Windows.
+This writes inspectable C and compiles it with MSVC in the same build command. To only translate Anvil to C, use `--emit-c build/first_world.c`. The generated C is ordinary C, while the supplied runtime currently targets Windows. Anvil owns the language front end, validation, feature selection, and runtime; the C toolchain performs machine-code generation and linking.
 
 To try the experimental direct backend, only Python 3.11 or newer is required on Windows x64:
 
@@ -90,6 +90,8 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - **No C compiler found:** install the Visual Studio Build Tools C++ workload, then rerun the command from a new PowerShell session.
 - **Manifest entry is rejected:** use a path relative to `game.ANVLproj`; entries must stay inside that project folder.
 - **VS Code validation cannot find a package:** run `npm ci --prefix vscode-extension` once, then rerun the validation command.
+
+Version 2 programs may declare `name "..."`, `author("...")`, and `version("...")`, use `var(name)` for local variables and `varl(name)` for globals, and store checked function references with `fnref(function)`. Selective imports and qualified calls accept the clearer two-dash form: `include fn(move) -- "lib/player.ANVL"` and `call fn(move -- player, 10)`. The older single-dash qualifier and version 1 variable meanings remain supported.
 
 The `.ANVL` suffix is used here for Anvil source; the name also appears in an unrelated metadata serialization format, so the suffix is not globally unique.
 

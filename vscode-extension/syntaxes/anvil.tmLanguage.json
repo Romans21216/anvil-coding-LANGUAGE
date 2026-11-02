@@ -19,6 +19,12 @@
       "include": "#language-version"
     },
     {
+      "include": "#program-metadata"
+    },
+    {
+      "include": "#function-reference"
+    },
+    {
       "include": "#array-declaration"
     },
     {
@@ -62,6 +68,19 @@
         "5": {
           "name": "constant.numeric.integer.anvil"
         }
+      }
+    },
+    "program-metadata": {
+      "match": "\\b(name|author|version)\\b(?=\\s*(?:\\(|\"))",
+      "name": "storage.modifier.anvil"
+    },
+    "function-reference": {
+      "match": "\\b(fnref)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?:\\s+(--?)\\s+([A-Za-z_][A-Za-z0-9_-]*))?(?=\\s*\\))",
+      "captures": {
+        "1": {"name": "support.function.anvil"},
+        "4": {"name": "variable.function.anvil"},
+        "5": {"name": "keyword.operator.anvil"},
+        "6": {"name": "entity.name.namespace.anvil"}
       }
     },
     "comments": {
@@ -128,7 +147,7 @@
       ]
     },
     "function-call": {
-      "match": "\\b(call)(\\s+)(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?:\\s+(-)\\s+([A-Za-z_][A-Za-z0-9_-]*))?(?=\\s*(?:,|\\)))",
+      "match": "\\b(call)(\\s+)(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?:\\s+(--?)\\s+([A-Za-z_][A-Za-z0-9_-]*))?(?=\\s*(?:,|\\)))",
       "captures": {
         "1": {
           "name": "keyword.control.call.anvil"
@@ -173,7 +192,7 @@
     "variables": {
       "patterns": [
         {
-          "match": "\\b(var|local|flag)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))",
+          "match": "\\b(varl|var|local|flag)\\s*(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\))",
           "captures": {
             "1": {
               "name": "support.type.anvil"
@@ -206,7 +225,7 @@
       ]
     },
     "engine-commands": {
-      "match": "\\b(scene|camera|clear|display|wait|load|start|import|lookup|save|load-save|net|seed|create)\\b",
+      "match": "\\b(scene|camera|clear|display|wait|load|start|import|lookup|save|load-save|net|nethost|netHost|netip|netIP|seed|create)\\b",
       "name": "support.function.engine.anvil"
     },
     "keywords": {
@@ -218,7 +237,7 @@
       "name": "constant.language.anvil"
     },
     "builtins": {
-      "match": "\\b(array|compute|floor|ceil|sqrt|sin|cos|abs|min|max|clamp|rnd|noise|fbm|time|delta|pressed|held|mouse_x|mouse_y|mouse_pressed|mouse_held|mouse_wheel|image_load|image_width|image_height|image_destroy|image_draw|image_draw_scaled|axis|rgba|rgb|cube|sphere|ray_sphere|ray_backend|ray_backend_available|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave|body_create|body_create_box|body_destroy|body_active|body_x|body_y|body_vx|body_vy|body_set_velocity|body_force|body_restitution|body_friction|body_collision|physics_capacity|physics_gravity|physics_step)\\b(?=\\s*\\()",
+      "match": "\\b(array|fnref|compute|floor|ceil|sqrt|sin|cos|abs|min|max|clamp|rnd|noise|fbm|time|delta|pressed|held|mouse_x|mouse_y|mouse_pressed|mouse_held|mouse_wheel|image_load|image_width|image_height|image_destroy|image_draw|image_draw_scaled|axis|rgba|rgb|cube|sphere|ray_sphere|ray_backend|ray_backend_available|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave|body_create|body_create_box|body_destroy|body_active|body_x|body_y|body_vx|body_vy|body_set_velocity|body_force|body_restitution|body_friction|body_collision|physics_capacity|physics_gravity|physics_step|receive)\\b(?=\\s*\\()",
       "name": "support.function.anvil"
     },
     "numbers": {
@@ -242,7 +261,7 @@
       "name": "punctuation.separator.anvil"
     },
     "selective-include": {
-      "match": "\\b(include)(\\s+)(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\s*\\))(\\s+)(-)(?=\\s+\")",
+      "match": "\\b(include)(\\s+)(fn)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(\\s*\\))(\\s+)(--?)(?=\\s+\")",
       "captures": {
         "1": {
           "name": "keyword.control.anvil"

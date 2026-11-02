@@ -42,7 +42,7 @@ def validate_expression_depth(source, path, line):
 
 TOKEN = re.compile(
     r"""\s*(?:([0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)|("(?:\\.|[^"\\])*")|"""
-    r"""(var\([A-Za-z_][\w-]*\))|(local\([A-Za-z_][\w-]*\))|"""
+    r"""(varl?\([A-Za-z_][\w-]*\))|(local\([A-Za-z_][\w-]*\))|"""
     r"""(<=|>=|!=|==|[(),+\-*/%=<>])|([A-Za-z_][\w-]*))"""
 )
 
@@ -306,11 +306,11 @@ class ExpressionParser:
         elif kind == "string":
             left = (value, "string")
         elif kind == "variable":
-            name = value[4:-1]
-            left = (variable_code(name, self.scope), "number")
+            name = value[value.index('(')+1:-1]
+            left = (variable_code(name, None if value.startswith('varl(') else self.scope), "number")
         elif kind == "local":
             name = value[6:-1]
-            if not self.scope or name not in self.scope.locals:
+            if not self.scope or (name not in self.scope.locals and name not in self.scope.params):
                 raise CompileError(
                     f"{self.path}:{self.line}: unknown local variable {name!r}"
                 )
@@ -357,7 +357,14 @@ class ExpressionParser:
                 ).compile()
                 for arg in raw_args
             ]
-            left = (c_name(name) + "(" + ", ".join(args) + ")", "number")
+            if name.startswith('_anvil_callable_dispatch_'):
+                temporary_names=[f'{name}_arg_{i}' for i in range(len(args))]
+                temporaries=[c_name(self.scope.name+'__'+item) if self.scope else c_name(item) for item in temporary_names]
+                assignments=[f'{temporary} = ({argument})' for temporary,argument in zip(temporaries,args)]
+                invocation=c_name(name)+'('+', '.join(temporaries)+')'
+                left=('('+', '.join(assignments+[invocation])+')','number')
+            else:
+                left = (c_name(name) + "(" + ", ".join(args) + ")", "number")
         elif kind == "op" and value in ("+", "-"):
             left = (f"({value}{self.require_number(self.parse(7))})", "number")
         elif kind == "op" and value == "(":

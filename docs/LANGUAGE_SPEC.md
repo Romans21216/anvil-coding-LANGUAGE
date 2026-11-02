@@ -54,7 +54,7 @@ line_end         = physical_newline | end_of_file ;
 
 There must be at least one function. Function definitions are top-level and function names must be unique. Parameter names within a function must be unique. Functions can be declared in any order and may call themselves recursively. The compiler generates a numeric function prototype for every function before generating its body.
 
-At most one `language version N` line may occur, and it must precede all source code; blank lines and comments may precede it. Only version 1 is supported. Malformed, repeated, misplaced, and unsupported declarations produce a source path and line diagnostic. Existing files without a declaration are interpreted as version 1.
+At most one `language version N` line may occur, and it must precede all source code; blank lines and comments may precede it. Versions 1 and 2 are supported. Malformed, repeated, misplaced, and unsupported declarations produce a source path and line diagnostic. Existing files without a declaration are interpreted as version 1. This section defines version 1; version 2 changes and additions are listed in §8.
 
 Scalar globals are introduced by `set var(name) = expression`. Globals begin at zero. A global fixed-size numeric array is declared at top level as `array name(size)`; its elements begin at zero and `size` must be from 1 through 1,048,576.
 
@@ -259,3 +259,15 @@ Native project builds accept `.ANVLproj` with `--backend native`. The existing `
 ## Selective source functions
 
 `include fn(move) - "lib/player.ANVL"` imports `move` with the filename qualifier; `call fn(move - player, 10)` invokes it. `as alias` overrides the qualifier. Helpers, globals and arrays are private to the canonical selectively imported module. Aliases/exports are local to the including file. Whole-file includes retain their shared namespace. See [include rules](INCLUDES.md) for dependency closure, initialization, diagnostics and limits.
+
+## Version 2 additions
+
+Version 2 retains the statements and expressions above, with these variable meanings and additions:
+
+- `var(name)` is function-local state and may be used only in a function. `varl(name)` explicitly refers to global numeric state. `local(name)` remains supported. Version 1 keeps the global/parameter-shadowing meaning of `var(name)`.
+- Top-level metadata uses `name "program name"`, `author("author name")`, and `version("version text")`. Each key can appear once. Values are quoted Unicode strings. The compiler embeds metadata in the executable; it is available through `--inspect-metadata`.
+- `fnref(function)` produces an opaque callback handle assignable to a local or global variable. `call var(callback, args...)`, `call local(callback, args...)`, or `call varl(callback, args...)` invokes the stored target. Callback variables may also be copied or cleared with `null`. Targets assigned to one callback must agree on numeric arity; the initial callback lowering supports at most 15 numeric arguments. A callback cannot be passed or returned as a value, stored in an array, or used in numeric expressions. An unset callback fails at its call site.
+- Selective imports and qualified calls accept the preferred double-dash form: `include fn(move) -- "lib/player.ANVL"` and `call fn(move -- player, 10)`. Existing single-dash forms remain accepted.
+- Networking accepts `netip("IPv4")` (also `netIP`), `nethost(port) --local`, `nethost(port)`, and `netleave()`. `--local` binds loopback. Without it, the host binds the configured IPv4 address; the default `0.0.0.0` listens on all local interfaces. Firewall and router configuration determine external reachability.
+
+The required build path is Anvil parsing and validation → generated C → the selected C compiler/linker → machine code and executable. The direct x64 backend is an optional experiment, not the required project architecture.

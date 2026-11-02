@@ -12,7 +12,9 @@ from compiler.lexer import mask_strings
 
 PRIVATE_PREFIX = "_anvil_include"
 CALL = re.compile(rf'\bcall\s+fn\(\s*({FUNCTION_REFERENCE})(?=\s*[,\)])')
-VARIABLE = re.compile(rf'\bvar\(({IDENTIFIER})\)')
+VARIABLE = re.compile(rf'\b(varl|var)\(({IDENTIFIER})\)')
+FNREF = re.compile(rf'\bfnref\(\s*({FUNCTION_REFERENCE})\s*\)')
+INDIRECT = re.compile(rf'\bcall\s+(varl|var|local)\(\s*({IDENTIFIER})(?=\s*[,\)])')
 ARRAY = re.compile(rf'\barray\(\s*({IDENTIFIER})(?=\s*,)')
 
 
@@ -36,6 +38,7 @@ def clone_node(node):
     """Clone without Python recursion, including untrusted deeply nested syntax."""
     def shell(old):
         return replace(old, params=list(old.params), locals=set(old.locals),
+                       c_temporaries=set(old.c_temporaries),
                        local_arrays=dict(old.local_arrays),
                        local_array_lines=dict(old.local_array_lines), body=[], otherwise=[])
     result = shell(node)
@@ -102,14 +105,20 @@ class ProgramLoader:
         pending = list(unit.top)+list(unit.functions.values())
         while pending:
             node = pending.pop()
+            if node.kind=='metadata':
+                continue  # decoded metadata is text, never source identifiers
             for text in [node.name,node.value]+node.params:
                 sites.extend((match[0],node.line)
                              for match in re.finditer(IDENTIFIER,mask_strings(text)))
             pending.extend(node.body)
             pending.extend(node.otherwise)
         for name,line in sites:
-            if c_name(name).startswith(c_name(PRIVATE_PREFIX)):
-                raise CompileError(f"{path}:{line}: identifier prefix {PRIVATE_PREFIX} is reserved for include identities")
+            for prefix in (PRIVATE_PREFIX,'_anvil_callable'):
+                if c_name(name).startswith(c_name(prefix)):
+                    raise CompileError(
+                        f"{path}:{line}: identifier prefix {prefix} is reserved "
+                        "for compiler-generated symbols"
+                    )
         self.cache[canonical] = unit,size
         return unit,size
 
@@ -149,7 +158,9 @@ class ProgramLoader:
         scope.local_references.extend(unit.local_references)
         for node in unit.top:
             if node.kind != "include":
-                if scope.number and node.kind not in ("set","add","sub","call","seed"):
+                if node.kind=='metadata' and origin is not None:
+                    continue  # library metadata does not rename its importer
+                if scope.number and node.kind not in ("set","add","sub","global_set","global_add","global_sub","callback_clear","call","seed"):
                     self.error(node,"selective include requires a library; use a whole-file include for engine configuration")
                 scope.top.append(node)
                 self.order.append((scope,node))
@@ -209,6 +220,12 @@ class ProgramLoader:
     def rewrite(self, text, scope, fn, node):
         masked = mask_strings(text)
         edits = []
+        for match in FNREF.finditer(masked):
+            edits.append((match.start(1),match.end(1),self.resolve(match[1],scope,node)))
+        if scope.number:
+            for match in INDIRECT.finditer(masked):
+                if match[1]=='varl' or (match[1]=='var' and (fn is None or match[2] not in fn.params)):
+                    edits.append((match.start(2),match.end(2),scope.symbol('v',match[2])))
         for match in CALL.finditer(masked):
             if not scope.number and match[3] is None:
                 continue  # preserve legacy unqualified validation/emission timing
@@ -225,9 +242,9 @@ class ProgramLoader:
             edits.append((match.start(1),match.end(1),self.resolve(match[1],scope,node,count)))
         if scope.number:
             for match in VARIABLE.finditer(masked):
-                name = match[1]
-                if fn is None or name not in fn.params:
-                    edits.append((match.start(1),match.end(1),scope.symbol("v",name)))
+                name = match[2]
+                if match[1]=='varl' or fn is None or name not in fn.params:
+                    edits.append((match.start(2),match.end(2),scope.symbol("v",name)))
             for match in ARRAY.finditer(masked):
                 name = match[1]
                 if fn is not None and name in fn.local_arrays:
@@ -244,11 +261,21 @@ class ProgramLoader:
         pending = [result]
         while pending:
             node = pending.pop()
+            if node.kind=='metadata':
+                continue
             if node.kind == "call":
                 node.name = self.resolve(node.name,scope,node,len(split_args(node.value)))
+            elif scope.number and node.kind=='indirect_call':
+                if node.params[0]=='varl' or (node.params[0]=='var' and (fn is None or node.name not in fn.params)):
+                    node.name=scope.symbol('v',node.name)
+            elif scope.number and node.kind == 'callback_clear':
+                if node.params[0] == 'varl' or (node.params[0] == 'var' and (fn is None or node.name not in fn.params)):
+                    node.name = scope.symbol('v', node.name)
             elif scope.number and node.kind in ("set","add","sub"):
                 if fn is None or node.name not in fn.params:
                     node.name = scope.symbol("v",node.name)
+            elif scope.number and node.kind in ('global_set','global_add','global_sub'):
+                node.name=scope.symbol('v',node.name)
             elif scope.number and node.kind == "array_set":
                 if fn is None or node.name not in fn.local_arrays:
                     if node.name not in scope.arrays:

@@ -539,6 +539,8 @@ class NativeWindow:
         c.rip_lea_data(1, self.class_name)
         c.rip_int(2, self.instance)
         self.call("UnregisterClassW")
+        if self.owner._net.active:
+            c.call('network:cleanup')
         c.mov_imm(1, 0)
         self.call("ExitProcess")
         c.bytes(b"\xcc")

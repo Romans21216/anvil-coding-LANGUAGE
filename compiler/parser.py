@@ -30,6 +30,8 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
     version_declared = False
     source_code_seen = False
+    version = "1"
+    metadata_keys = set()
     for line_no, raw in enumerate(source.splitlines(), 1):
         line = strip_comment(raw).strip()
         if not line:
@@ -55,17 +57,34 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             # Compare decimal text without constructing an unbounded Python int.
             # Python limits extremely long int conversions and would leak ValueError.
             version = version_text.lstrip("0") or "0"
-            if version != str(LANGUAGE_VERSION):
+            if version not in ("1","2"):
                 shown_version = version if len(version) <= 32 else "value too large"
                 raise CompileError(
                     f"{path}:{line_no}: unsupported Anvil language version "
-                    f"{shown_version}; compiler supports version {LANGUAGE_VERSION}"
+                    f"{shown_version}; compiler supports versions 1 and 2"
                 )
             continue
         source_code_seen = True
         current_function = next(
             (frame[2] for frame in reversed(stack) if frame[1] == "function"), None
         )
+        if version == "2":
+            # Version1 keeps legacy global var(); version2 uses var() locally.
+            # Rewrite only unquoted tokens; varl() always denotes a global.
+            for match in reversed(list(re.finditer(r'\bvar\(',mask_strings(line)))):
+                line=line[:match.start()]+"local("+line[match.end():]
+        metadata = re.fullmatch(r'(name|author|version)(?:\s+(.+)|\((.*)\))',line)
+        if metadata:
+            if len(stack)!=1:
+                raise CompileError(f'{path}:{line_no}: program metadata must be top-level')
+            key=metadata[1]
+            if key in metadata_keys:
+                raise CompileError(f'{path}:{line_no}: duplicate program metadata {key!r}')
+            from compiler.program_metadata import metadata_value
+            value=metadata_value(metadata[2] if metadata[2] is not None else metadata[3],path,line_no)
+            metadata_keys.add(key)
+            top.append(Node('metadata',line_no,value=value,name=key,source=path))
+            continue
         if re.match(r"include\b", line):
             if len(stack) != 1:
                 raise CompileError(f"{path}:{line_no}: include must be at top level")
@@ -76,12 +95,12 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                             params=[alias] if alias else [], source=path))
             continue
         reference_text = mask_strings(line)
-        for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", reference_text):
+        for reference in re.finditer(r"\b(varl|var)\(([A-Za-z_][\w-]*)\)", reference_text):
             variable_references.append(
                 (
-                    reference.group(1),
+                    reference.group(2),
                     line_no,
-                    current_function.name if current_function else None,
+                    current_function.name if current_function and reference[1]=='var' else None,
                     path,
                 )
             )
@@ -223,7 +242,8 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 raise CompileError(
                     f"{path}:{line_no}: for loop needs start, end, and step expressions"
                 )
-            current_function.locals.add(loop_name)
+            if loop_name not in current_function.params:
+                current_function.locals.add(loop_name)
             node = Node(
                 "for", line_no, name=loop_name, params=[start_expr, end_expr, step_expr]
             )
@@ -231,22 +251,37 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             stack.append((node.body, "for", node))
             continue
         node = None
-        if re.fullmatch(r"set\s+var\([A-Za-z_][\w-]*\)\s*=\s*null", line):
-            # Cleanup after output is syntactic sugar; scalar values live in globals.
-            continue
+        null_assignment = re.fullmatch(
+            r"set\s+(varl|var|local)\(([A-Za-z_][\w-]*)\)\s*=\s*null", line
+        )
+        if null_assignment:
+            storage, name = null_assignment.groups()
+            if storage == "local":
+                if current_function is None:
+                    raise CompileError(f"{path}:{line_no}: local variables must be declared inside a function")
+                if name in current_function.params and version == "1":
+                    raise CompileError(f"{path}:{line_no}: local variable {name!r} conflicts with a function parameter")
+                if name not in current_function.params:
+                    current_function.locals.add(name)
+            elif storage == "varl":
+                variables.add(name)
+            elif current_function is None or name not in current_function.params:
+                variables.add(name)
+            node = Node("callback_clear", line_no, name=name, params=[storage])
         match = re.fullmatch(r"set\s+local\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
-        if match:
+        if match and node is None:
             if current_function is None:
                 raise CompileError(
                     f"{path}:{line_no}: local variables must be "
                     "declared inside a function"
                 )
-            if match.group(1) in current_function.params:
+            if match.group(1) in current_function.params and version == "1":
                 raise CompileError(
                     f"{path}:{line_no}: local variable {match.group(1)!r} "
                     "conflicts with a function parameter"
                 )
-            current_function.locals.add(match.group(1))
+            if match.group(1) not in current_function.params:
+                current_function.locals.add(match.group(1))
             node = Node("local_set", line_no, match.group(2), match.group(1))
         if node is None:
             match = re.fullmatch(
@@ -270,6 +305,16 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             ):
                 variables.add(match.group(1))
         if node is None:
+            match=re.fullmatch(r"set\s+varl\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)",line)
+            if match:
+                node=Node('global_set',line_no,match[2],match[1])
+                variables.add(match[1])
+        if node is None:
+            match=re.fullmatch(r"(add|sub)\s+varl\(([A-Za-z_][\w-]*)\)\s+(.+)",line)
+            if match:
+                node=Node('global_'+match[1],line_no,match[3],match[2])
+                variables.add(match[2])
+        if node is None:
             match = re.fullmatch(r"(add|sub)\s+local\(([A-Za-z_][\w-]*)\)\s+(.+)", line)
             if match:
                 if current_function is None:
@@ -277,12 +322,13 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                         f"{path}:{line_no}: local variables can only be "
                         "changed inside a function"
                     )
-                if match.group(2) in current_function.params:
+                if match.group(2) in current_function.params and version == "1":
                     raise CompileError(
                         f"{path}:{line_no}: local variable {match.group(2)!r} "
                         "conflicts with a function parameter"
                     )
-                current_function.locals.add(match.group(2))
+                if match.group(2) not in current_function.params:
+                    current_function.locals.add(match.group(2))
                 node = Node(
                     "local_" + match.group(1), line_no, match.group(3), match.group(2)
                 )
@@ -299,6 +345,13 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             match = re.fullmatch(r"output\s+(.+)", line)
             if match:
                 node = Node("output", line_no, match.group(1))
+        if node is None:
+            match=re.fullmatch(r'call\s+(varl|var|local)\((.*)\)',line)
+            if match:
+                parts=split_args(match[2])
+                if not parts or not re.fullmatch(r'[A-Za-z_][\w-]*',parts[0]):
+                    raise CompileError(f'{path}:{line_no}: callback call needs a variable name')
+                node=Node('indirect_call',line_no,value=', '.join(parts[1:]),name=parts[0],params=[match[1]])
         if node is None:
             match = re.fullmatch(r"call\s+fn\((.*)\)", line)
             if match:
@@ -325,16 +378,22 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 node = Node("clear", line_no, value=line[len("clear rgba") :])
             elif line.startswith("display "):
                 node = Node("display", line_no, value=line[len("display ") :])
-            elif m := re.fullmatch(r"net\s+host\(([0-9]+)\)", line):
+            elif m := re.fullmatch(r"(?:net\s+host|nethost|netHost)\(([0-9]+)\)(?:\s+(--local))?", line):
                 validate_port(path, line_no, m.group(1))
-                node = Node("net_host", line_no, value=m.group(1))
+                node = Node("net_host", line_no, value=m.group(1),params=['local'] if m[2] else [])
+            elif m := re.fullmatch(r'(?:netip|netIP)\((.*)\)',line):
+                from compiler.network_config import ipv4
+                node=Node('net_ip',line_no,value=ipv4(m[1],path,line_no))
             elif m := re.fullmatch(
-                r'net\s+join\(("(?:\\.|[^"\\])*")\s*,\s*([0-9]+)\)', line
+                r'(?:net\s+join|netjoin|netJoin)\(("(?:\\.|[^"\\])*")\s*,\s*([0-9]+)\)', line
             ):
                 validate_port(path, line_no, m.group(2))
-                node = Node("net_join", line_no, value=m.group(1) + "," + m.group(2))
-            elif line.startswith("net send(") and line.endswith(")"):
-                node = Node("net_send", line_no, value=line[len("net send(") : -1])
+                from compiler.network_config import ipv4
+                node = Node("net_join", line_no, value='"'+ipv4(m[1],path,line_no)+'",'+m.group(2))
+            elif m := re.fullmatch(r'(?:net\s+send|netsend|netSend)\((.*)\)',line):
+                node = Node("net_send", line_no, value=m[1])
+            elif re.fullmatch(r'(?:netleave|netLeave|net\s+leave)\(\)',line):
+                node=Node('net_leave',line_no)
             elif line.startswith("seed(") and line.endswith(")"):
                 node = Node("seed", line_no, value=line[5:-1])
         if node is None:
@@ -374,5 +433,8 @@ def parse(
     """Parse Anvil syntax, run semantic checks, and preserve the legacy tuple API."""
     from compiler.modules import load_program
     program = load_program(path, source, include_root=include_root)
+    validate_program(program)
+    from compiler.callables import lower_callables
+    lower_callables(program)
     validate_program(program)
     return program.functions, program.top, program.variables, program.arrays
