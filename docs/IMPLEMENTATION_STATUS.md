@@ -56,7 +56,7 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 
 ## Latest independent review snapshot
 
-Frozen candidate: base `0e2126ecf01f1815bffef33a7d270f7cf2f3da50`, source/test diff SHA256 `ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9`, reviewed full diff SHA256 `8498be7b670f7f676dbc0e90942535eb68e6efcbc3228cddaa0d95a13ed7bc70`; 78/100 (13/18/15/17/15), below98. Independent full suite:216 passed in242.910s. #87 fixed and independently verified; no new finding. C outputs are cleaned by default while `--generated-c` and `--emit-c` retain explicit options. The full rubric is in `QA_REPORT.md`; the complete requirements list remains only in #23.
+Frozen candidate: base `0e2126ecf01f1815bffef33a7d270f7cf2f3da50`, source/test diff SHA256 `ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9`, reviewed full diff SHA256 `8498be7b670f7f676dbc0e90942535eb68e6efcbc3228cddaa0d95a13ed7bc70`; 78/100 (13/18/15/17/15), below98. Implementation commit `313ab4d760bc70b6706cacb784860b446ace4ca3`. Independent full suite:216 passed in242.910s. #87 fixed and independently verified; no new finding. C outputs are cleaned by default while `--generated-c` and `--emit-c` retain explicit options. The full rubric is in `QA_REPORT.md`; the complete requirements list remains only in #23.
 
 ## Audit policy
 

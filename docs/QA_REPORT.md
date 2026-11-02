@@ -134,6 +134,6 @@ Focused independent record-only recheck at b752f41: PASS. All six current record
 
 ## Latest independent review identity
 
-Base `0e2126ecf01f1815bffef33a7d270f7cf2f3da50`; source/test diff SHA256 `ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9`; reviewed complete diff SHA256 `8498be7b670f7f676dbc0e90942535eb68e6efcbc3228cddaa0d95a13ed7bc70`. Full suite passed216 tests in242.910s. Categories13/18/15/17/15; FAIL against98. Issue #87's temporary helper ownership fix is independently verified and closed; no new defect. The full C-first evaluation remains incomplete against issue #23.
+Base `0e2126ecf01f1815bffef33a7d270f7cf2f3da50`; source/test diff SHA256 `ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9`; reviewed complete diff SHA256 `8498be7b670f7f676dbc0e90942535eb68e6efcbc3228cddaa0d95a13ed7bc70`. Implementation commit `313ab4d760bc70b6706cacb784860b446ace4ca3` contains the reviewed source and synchronized records. Full suite passed216 tests in242.910s. Categories13/18/15/17/15; FAIL against98. Issue #87's temporary helper ownership fix is independently verified and closed; no new defect. The full C-first evaluation remains incomplete against issue #23.
 
 Evaluation comment: https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6580462677
