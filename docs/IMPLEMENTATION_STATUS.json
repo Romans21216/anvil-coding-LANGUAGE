@@ -13,7 +13,7 @@
   "latest_independently_reviewed_candidate_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "016fff66a4e4068260f04870ca81da4a75707307",
-  "latest_followup_status_change": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. #90 fixed in worktree; no new defect remains. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete.",
+  "latest_followup_status_change": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. Candidate published as b4e8a20ee511388123f4982001ac997c6c720e4f; issue #90 fixed and closed. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete. Latest evaluation comment: https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339 (70 issue comments).",
   "latest_evaluation_score": 79,
   "required_evaluation_score": 98,
   "backlog_list_location": "GitHub issue #23 body and comments only; the original 450-item inventory and subsequent backlog additions are not duplicated in repository files.",
@@ -937,7 +937,9 @@
     "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339",
     "reviewed_base_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7",
     "issue23_comments_after_publication": 70,
-    "issue23_comments_at_review": 69
+    "issue23_comments_at_review": 69,
+    "implementation_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
+    "docs_publication_status": "Synchronized evaluation records are pushed to origin/main; use the repository history for the published document revision."
   },
   "current_candidate_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
@@ -980,7 +982,7 @@
   },
   "resolved_critic_issue_48": "Historical UTF-8/candidate metadata fix was independently verified on c102604. Current native evaluation metadata is synchronized separately by issue #58.",
   "latest_independent_candidate_score": 79,
-  "latest_independent_candidate_result": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. #90 fixed in worktree; no new defect remains. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete.",
+  "latest_independent_candidate_result": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. Candidate published as b4e8a20ee511388123f4982001ac997c6c720e4f; issue #90 fixed and closed. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete. Latest evaluation comment: https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339 (70 issue comments).",
   "current_unscored_followup": {
     "summary": "Continue issue #23 toward98: selective linking of unused runtime features/globals/arrays, modular packages/dependency resolution, engine/Forge/OS targets, and measured efficiency.",
     "status": "pending implementation",
@@ -1078,7 +1080,7 @@
     "finding": "Generation-checked image handles prevent stale handles aliasing a reused resource slot."
   },
   "status_counts_validation_method": "Post-review independent row/count/Markdown/state parity check for issue #58 passed.",
-  "current_candidate_status": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. #90 fixed in worktree; no new defect remains. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete.",
+  "current_candidate_status": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. Candidate published as b4e8a20ee511388123f4982001ac997c6c720e4f; issue #90 fixed and closed. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete. Latest evaluation comment: https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339 (70 issue comments).",
   "resolved_critic_issue_79": "Both unbounded C-circle traversal and extreme negative-tangent membership loss independently verified fixed on139f924;169 tests plus110 extra full-frame guard cases pass.",
   "previous_independent_evaluation": {
     "commit": "b76fc02a1f6ea9ab24f7af004e8a0981ba249252",
@@ -1277,7 +1279,9 @@
       "Native over-budget diagnostics use earliest array declaration source path and line"
     ],
     "issue23_comments_at_independent_review": 69,
-    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339"
+    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339",
+    "source_review_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
+    "docs_publication_status": "Evaluation records synchronized and pushed to origin/main; repository history identifies the published document revision."
   },
   "previous_independent_review": {
     "commit": "6852275d86e43bf75da583961ad64d58aead2f08+working-tree",
