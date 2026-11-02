@@ -9,8 +9,8 @@
     "COMPLETE": 21,
     "IN PROGRESS": 4
   },
-  "latest_verified_commit": "1c2e277b9bfe3de94af82004eb522379e6400079",
-  "latest_independently_reviewed_candidate_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+  "latest_verified_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
+  "latest_independently_reviewed_candidate_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
   "last_pushed_reviewed_below_threshold_commit": "016fff66a4e4068260f04870ca81da4a75707307",
   "latest_followup_status_change": "Independent full50 review of memory-budget candidate base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA256 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA256 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac: initial78/100 while criterion38 still referenced the previous snapshot; after record synchronization79/100 FAIL against98, categories13/19/15/17/15. Full suite233 passed independently in253.611s and locally in269.749s; 3 focused allocation/import tests passed in2.147s. Project memory settings configure local-array per-function elements and active-call MiB in C and native; native budget diagnostics report imported declaration path/line. #90 fixed in worktree; no new defect remains. #80/#81 partial; full engine/Forge/OS and package selection remain incomplete.",
@@ -848,7 +848,7 @@
     "result": "FAIL",
     "initial_score_before_record_sync": 78,
     "record_sync_restored_criterion38": true,
-    "commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+    "commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
     "base_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7",
     "source_diff_sha256": "57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
     "implementation_diff_sha256": "24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac",
@@ -933,13 +933,16 @@
     "installed_extension": "0.1.4 unchanged",
     "native_parity_required": false,
     "full_goal_complete": false,
-    "issue90_status": "fixed in candidate; close after commit",
-    "issue23_evaluation_comment": "pending GitHub issue #23 evaluation update"
+    "issue90_status": "fixed, verified, closed",
+    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339",
+    "reviewed_base_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7",
+    "issue23_comments_after_publication": 70,
+    "issue23_comments_at_review": 69
   },
-  "current_candidate_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+  "current_candidate_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
   "status_counts_validated_on": "edfbe86252deb5af39504161f6e8571ae917fbb9",
   "candidate_validation": {
-    "status": "INDEPENDENTLY_REVIEWED_RECORD_PARITY_PASS",
+    "status": "PUBLISHED_INDEPENDENTLY_REVIEWED_RECORD_PARITY_PASS",
     "commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
     "base_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7",
     "source_diff_sha256": "57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
@@ -956,7 +959,13 @@
     "strict_json": "both structured records parse as UTF-8",
     "git_diff_check": "passed",
     "finding": "No new defect remains. Issue #90 native diagnostic line fixed and independently tested. Items #80/#81 partial; broad engine, runtime modules, Forge and OS work remain.",
-    "independent_record_parity": "PASS; six records match candidate hashes, score/vector, tests, issue count69, and issue #90 open/fixed status."
+    "independent_record_parity": "PASS; six records matched immediately before publication. Publication changed status records only; no implementation or rescore.",
+    "published_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
+    "published_to": "origin/main",
+    "issue90_status": "closed after verified fix publication",
+    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339",
+    "issue23_comments_after_publication": 70,
+    "issue23_comments_at_review": 69
   },
   "resolved_critic_issue_45": "The ambiguous current_active_item value was cleared; last_reviewed_rubric_criterion separately records 22. Closed after synchronization.",
   "resolved_critic_issue_46": "The independent f12c0ac review confirmed corrected tracking of resize work as canonical backlog item #172; issue #46 is commented with the verification evidence and closed.",
@@ -978,7 +987,7 @@
     "reviewed_base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
     "score": 78
   },
-  "latest_independently_scored_candidate_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
+  "latest_independently_scored_candidate_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
   "historical_c_backed_evaluation": {
     "score": 92,
     "threshold": 98,
@@ -1153,10 +1162,11 @@
     "result": "PASS",
     "reviewed_implementation": "87e23d6943028222619f9febe0ed970e8d1a7ed7+source-test-57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
     "score_unchanged": 79,
-    "summary": "Six evaluation records updated to base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac, 79/100 against98, categories13/19/15/17/15,233 tests (independent253.611s/local269.749s), issue #90 fixed, items #80/#81 partial. Independent record-only parity recheck PASS; no rescore.",
-    "independent_recheck": "PASS; all six current records, candidate hashes, score/vector, test evidence, issue count69, and issue #90 status agree."
+    "summary": "Six evaluation records updated to base 87e23d6943028222619f9febe0ed970e8d1a7ed7, source/test SHA 57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c, implementation SHA 24ad1dc17364afc5c94eb80ae8dcd8fbfafa8113f5a579c3a7c39683cd6954ac, 79/100 against98, categories13/19/15/17/15,233 tests (independent253.611s/local269.749s), issue #90 fixed and closed after publication, items #80/#81 partial. Independent record-only parity recheck PASS; no rescore.",
+    "independent_recheck": "PASS; all six current records, candidate hashes, score/vector, test evidence, issue count69, and issue #90 status agree.",
+    "published_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f"
   },
-  "latest_push_result": "Memory-budget candidate independently reviewed at79/100; six-record parity passes. Commit/push, issue #90 closure, and issue #23 evaluation update remain pending.",
+  "latest_push_result": "Published reviewed candidate b4e8a20ee511388123f4982001ac997c6c720e4f to origin/main; issue #90 fixed, independently verified and closed; current 79/100 evaluation posted to issue #23 as comment 6583162339; issue now has70 comments.",
   "latest_independent_review": {
     "base_commit": "87e23d6943028222619f9febe0ed970e8d1a7ed7",
     "source_diff_sha256": "57b0392fa1a325a23fda8d1aa202e7299b141e92d390b1cc518cc0b0ad22db5c",
@@ -1239,7 +1249,7 @@
     "local_full_test_seconds": 269.749,
     "focused_test_count": 3,
     "focused_test_seconds": 2.147,
-    "post_suite_issue23_comments": 69,
+    "post_suite_issue23_comments": 70,
     "verified_fixed": [
       79,
       81,
@@ -1259,13 +1269,15 @@
     "snapshot_unchanged": true,
     "native_parity_required": false,
     "full_goal_complete": false,
-    "issue90_status": "fix verified; closure after commit publication",
+    "issue90_status": "fix verified; issue closed after publication",
     "reviewed_features": [
       "Project configurable memory.local_array_elements",
       "Project configurable memory.active_call_memory_mib",
       "Limits propagate to included modules and C/native backends",
       "Native over-budget diagnostics use earliest array declaration source path and line"
-    ]
+    ],
+    "issue23_comments_at_independent_review": 69,
+    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339"
   },
   "previous_independent_review": {
     "commit": "6852275d86e43bf75da583961ad64d58aead2f08+working-tree",
@@ -1379,7 +1391,7 @@
       "Extension0.1.13 package/grammar, VSIX CRC/source parity, compileall, QA arithmetic, strict JSON/diff checks passed"
     ]
   },
-  "current_active_item_status": "Project memory limits configure per-function local array elements and recursive active-call memory for both C and native backends. Included sources inherit limits. Native failures report the imported declaration location. Full suite233 passes; score79/100 after criterion38 sync. #90 fixed; #80/#81 partially addressed; full Anvil engine/Forge/OS goal incomplete.",
+  "current_active_item_status": "Project memory limits configure per-function local array elements and recursive active-call memory for both C and native backends; included sources inherit limits. Native failures report imported declaration locations. Full suite233 passes; score79/100 after criterion38 sync and independent six-record parity PASS. Issue #90 is fixed and closed; #80/#81 partial; full engine/Forge/OS goal incomplete.",
   "last_test_results": {
     "python_unittest": "233 passed locally in269.749s and independently in253.611s, frozen candidate exit0",
     "focused_tests": "3 C recursion/imported-native recursion/max-budget tests passed locally and independently in2.147s",
@@ -1409,7 +1421,7 @@
     "summary": "Current sync candidate: base 7b0e921dce5b562c53b042003339f33309983aa1, code/test difflib SHA256 3336f6f1d5e26a0ac09df2662c689743f065819013e8c10810b5a065538cb9ac, full review hash 21af08e7e6e5d547d6990bc2558a941a9fa655590bd57180c179b87371fdf832; final78/100 against98 after criterion38 synchronization, categories13/18/15/17/15, 224 tests249.142s, issue #88 fixed/closed, #123 partial. All six records point to #23 and preserve 0.1.4 installed extension. Independent parity recheck pending."
   },
   "resolved_critic_issue_89": "Fixed and independently verified in generated-C/MSVC harness: graphical top-level initializers execute after setup and before anvil_run; issue #89 is closed with label Codex Bugs.",
-  "current_commit": "1c2e277b9bfe3de94af82004eb522379e6400079",
+  "current_commit": "b4e8a20ee511388123f4982001ac997c6c720e4f",
   "previous_record_parity_check_before_storage_review": {
     "commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
     "result": "PASS",
@@ -1419,8 +1431,7 @@
     "independent_recheck": "PASS; all six records, criterion vector, categories, hashes, test counts/timings and issue status agree."
   },
   "current_required_qa_threshold": 98,
-  "open_critic_issues": [
-    90
-  ],
-  "resolved_critic_issue_90": "Native active-call memory-budget failures previously pointed to the function header. Fixed to report the earliest local-array declaration path/line, including selectively imported source; targeted and full independent suites pass. Issue #90 closure pending commit publication."
+  "open_critic_issues": [],
+  "resolved_critic_issue_90": "Native active-call memory-budget failures previously pointed to the function header. Fixed to report the earliest local-array declaration path/line, including selectively imported source; targeted and full independent suites pass. Published commit b4e8a20ee511388123f4982001ac997c6c720e4f; GitHub issue #90 closed after verification.",
+  "latest_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339"
 }
