@@ -8,10 +8,10 @@
   "current_active_item_status": "C generation removes unreachable Anvil functions, preserves explicit top-level/transitive/callback/graphical roots, and runs graphical top-level initializers after setup before anvil_run. #88 and #89 are fixed and closed. Current evaluation79/100 below98 after record sync. #123 remains partial: unused globals, arrays, runtime subsystems and packages are not pruned. The Anvil-authored OS UI and modular packages remain future work.",
   "current_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
   "latest_verified_commit": "313ab4d760bc70b6706cacb784860b446ace4ca3",
-  "last_pushed_reviewed_below_threshold_commit": "313ab4d760bc70b6706cacb784860b446ace4ca3",
+  "last_pushed_reviewed_below_threshold_commit": "016fff66a4e4068260f04870ca81da4a75707307",
   "latest_independently_reviewed_candidate_commit": "7b0e921dce5b562c53b042003339f33309983aa1+code-test-difflib-24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
   "item_47_implementation_commit": "6c52b959dc3d5d13d174e37e57006f63d4cda951",
-  "latest_push_result": "Six-record parity confirmed; 79/100 evaluation comment posted to GitHub issue #23 (comment 6581786371). Local commit and push pending.",
+  "latest_push_result": "Implementation and six-record evaluation update pushed to origin/main at 016fff66a4e4068260f04870ca81da4a75707307. GitHub issue #23 evaluation comment 6581786371 posted; #89 closed after independent verification.",
   "latest_independent_review": {
     "base_commit": "7b0e921dce5b562c53b042003339f33309983aa1",
     "source_diff_sha256": "24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537",
@@ -131,7 +131,8 @@
     "issue89_status": "closed",
     "record_parity_check_result": "PASS",
     "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371",
-    "issue23_comment_after_sync": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371"
+    "issue23_comment_after_sync": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371",
+    "implementation_commit": "016fff66a4e4068260f04870ca81da4a75707307"
   },
   "previous_independent_review": {
     "commit": "6852275d86e43bf75da583961ad64d58aead2f08+working-tree",
@@ -366,14 +367,15 @@
     "git_diff_check": "passed; LF-to-CRLF notices only",
     "finding": "No current implementation finding. #88/#89 fixed and closed after independent evidence. #123 remains partial; globals, arrays, runtime subsystems and packages are not pruned.",
     "initial_full50_score_before_record_sync": 78,
-    "independent_record_parity": "PASS across all six evaluation/status records"
+    "independent_record_parity": "PASS across all six evaluation/status records",
+    "implementation_commit": "016fff66a4e4068260f04870ca81da4a75707307"
   },
   "source_of_truth_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6579733436",
   "resolved_critic_issue_48": "Fixed strict UTF-8 JSON serialization and synchronized the evaluation SHA to reviewed commit d757c79; strict JSON parsing and QA arithmetic pass in the follow-up snapshot.",
   "resolved_user_reported_issues": [
     57
   ],
-  "current_candidate_status": "Independent full50 review of base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA256 d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499: 78/100 before record sync; final79/100 FAIL against98 after criterion38 restoration, categories13/19/15/17/15. Independent and local full suites224 pass (257.990s and250.318s). #89 fixed and independently verified; #88/#89 closed; #123 partial. Six-record parity recheck passed independently.",
+  "current_candidate_status": "Independent full50 review of base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA256 d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499: 78/100 before record sync; final79/100 FAIL against98 after criterion38 restoration, categories13/19/15/17/15. Independent and local full suites224 pass (257.990s and250.318s). #89 fixed and independently verified; #88/#89 closed; #123 partial. Six-record parity recheck passed independently. Implementation commit 016fff66a4e4068260f04870ca81da4a75707307 pushed to origin/main.",
   "current_unscored_followup": {
     "summary": "Continue issue #23 toward98: selective linking of unused runtime features/globals/arrays, modular packages/dependency resolution, engine/Forge/OS targets, and measured efficiency.",
     "status": "pending implementation",
@@ -489,7 +491,8 @@
     "issue89_verification_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/89#issuecomment-6581673429",
     "record_parity_confirmed": true,
     "record_parity_check_result": "PASS",
-    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371"
+    "issue23_evaluation_comment": "https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6581786371",
+    "implementation_commit": "016fff66a4e4068260f04870ca81da4a75707307"
   },
   "latest_followup_status_change": "Independent full50 review of graphical startup/DCE candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA256 d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499: initial78/100 while criterion38 evidence referred to old records; after synchronization, final79/100 FAIL against98, categories13/19/15/17/15. Independent suite224 passed in257.990s; local run224 passed in250.318s. The compiled MSVC harness verified startup state before anvil_run. #89 fixed and closed; #123 remains partial; no new implementation finding.",
   "latest_independent_candidate_result": "Independent full50 review of graphical startup/DCE candidate base 7b0e921dce5b562c53b042003339f33309983aa1, source/test SHA256 24dbf3eae421336b0aceb1e11ecf43ea939455fbf279e6b8ba796cb08c088537, implementation SHA256 d6f1deece3b0da0b5ac8bbe4467e2bc52f6cbddbd61a3f3f5a5923e31425f499: initial78/100 while criterion38 evidence referred to old records; after synchronization, final79/100 FAIL against98, categories13/19/15/17/15. Independent suite224 passed in257.990s; local run224 passed in250.318s. The compiled MSVC harness verified startup state before anvil_run. #89 fixed and closed; #123 remains partial; no new implementation finding.",
@@ -501,7 +504,7 @@
   "resolved_critic_issue_86": "Independently verified fixed on3cfb5b9. Ordinary user-defined calls evaluate arguments exactly once, left-to-right through per-scope C temporaries; nested expressions, top-level calls, recursion, display hook expressions, generated-name collision diagnostics, and default/release builds pass. Issue #86 closed after 213-test independent full suite and full50 review; no new finding.",
   "generated_at": "2026-11-02",
   "resolved_critic_issue_87": "Independently verified fixed on base 0e2126ecf01f1815bffef33a7d270f7cf2f3da50 plus source/test diff ddf56f5fe30c6caf138e9fcb7716f0d1e60c84a5e4cd73d92a9f2ecf4036c5d9. MSVC helper and objects use a unique build-owned temporary directory; success executable/sentinel regression and mocked compiler-failure cleanup probe pass. GitHub issue #87 closed.",
-  "reviewed_implementation_commit": "313ab4d760bc70b6706cacb784860b446ace4ca3",
+  "reviewed_implementation_commit": "016fff66a4e4068260f04870ca81da4a75707307",
   "resolved_critic_issue_88": "Fixed and independently verified on base 7b0e921dce5b562c53b042003339f33309983aa1 plus code/test diff 3336f6f1d5e26a0ac09df2662c689743f065819013e8c10810b5a065538cb9ac. `reachable_functions` now seeds Anvil main only when no explicit top-level call exists in a non-graphical program; explicit call, transitive main, and executable harness regressions pass. Full suite224 passed in249.142s. GitHub issue #88 closed.",
   "previous_record_parity_check": {
     "commit": "3cfb5b93d8c1414478bcdcc118f2fdfe464f78b6",
@@ -517,5 +520,6 @@
     "score_unchanged": 78,
     "summary": "Current sync candidate: base 7b0e921dce5b562c53b042003339f33309983aa1, code/test difflib SHA256 3336f6f1d5e26a0ac09df2662c689743f065819013e8c10810b5a065538cb9ac, full review hash 21af08e7e6e5d547d6990bc2558a941a9fa655590bd57180c179b87371fdf832; final78/100 against98 after criterion38 synchronization, categories13/18/15/17/15, 224 tests249.142s, issue #88 fixed/closed, #123 partial. All six records point to #23 and preserve 0.1.4 installed extension. Independent parity recheck pending."
   },
-  "resolved_critic_issue_89": "Fixed and independently verified in generated-C/MSVC harness: graphical top-level initializers execute after setup and before anvil_run; issue #89 is closed with label Codex Bugs."
+  "resolved_critic_issue_89": "Fixed and independently verified in generated-C/MSVC harness: graphical top-level initializers execute after setup and before anvil_run; issue #89 is closed with label Codex Bugs.",
+  "current_commit": "016fff66a4e4068260f04870ca81da4a75707307"
 }
