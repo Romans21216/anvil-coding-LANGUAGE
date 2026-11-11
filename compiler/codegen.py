@@ -536,12 +536,19 @@ def emit_nodes(
         elif n.kind == "seed":
             out.append(f"{indent}anvil_seed((unsigned long long)({lower(n)}));")
         elif n.kind == "net_send":
-            out.append(f"{indent}anvil_net_send({lower(n)});")
+            out.append(
+                f"{indent}anvil_net_ok = (double)anvil_net_send({lower(n)});"
+            )
         elif n.kind == "net_host":
-            out.append(f"{indent}(void)anvil_net_host({n.value});")
+            out.append(
+                f"{indent}anvil_net_ok = (double)anvil_net_host({n.value});"
+            )
         elif n.kind == "net_join":
             address, port = n.value.rsplit(",", 1)
-            out.append(f"{indent}(void)anvil_net_join({address}, {port});")
+            out.append(
+                f"{indent}anvil_net_ok = "
+                f"(double)anvil_net_join({address}, {port});"
+            )
     return out
 
 

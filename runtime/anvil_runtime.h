@@ -115,7 +115,7 @@ double anvil_fbm(double x, double y, double z, int octaves, double lacunarity,
                  double gain);
 int anvil_net_host(int port);
 int anvil_net_join(const char *address, int port);
-void anvil_net_send(double value);
+int anvil_net_send(double value);
 double anvil_net_receive(void);
 void anvil_net_close(void);
 double anvil_body_create(double x, double y, double radius, double mass);

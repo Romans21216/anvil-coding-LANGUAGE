@@ -1365,11 +1365,13 @@ double anvil_net_receive(void) {
   }
   return anvil_net_value;
 }
-void anvil_net_send(double value) {
+int anvil_net_send(double value) {
   if (anvil_net_socket == INVALID_SOCKET || !anvil_net_has_peer)
-    return;
-  (void)sendto(anvil_net_socket, (const char *)&value, (int)sizeof(value), 0,
-               (SOCKADDR *)&anvil_net_peer, sizeof(anvil_net_peer));
+    return 0;
+  int sent = (int)sendto(anvil_net_socket, (const char *)&value,
+                         (int)sizeof(value), 0, (SOCKADDR *)&anvil_net_peer,
+                         sizeof(anvil_net_peer));
+  return sent == (int)sizeof(value);
 }
 void anvil_net_close(void) {
   if (anvil_net_socket != INVALID_SOCKET) {

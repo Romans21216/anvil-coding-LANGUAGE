@@ -551,13 +551,16 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 node = Node("display", line_no, value=line[len("display ") :])
             elif m := re.fullmatch(r"net\s+host\(([0-9]+)\)", line):
                 validate_port(path, line_no, m.group(1))
+                variables.add("net_ok")
                 node = Node("net_host", line_no, value=m.group(1))
             elif m := re.fullmatch(
                 r'net\s+join\(("(?:\\.|[^"\\])*")\s*,\s*([0-9]+)\)', line
             ):
                 validate_port(path, line_no, m.group(2))
+                variables.add("net_ok")
                 node = Node("net_join", line_no, value=m.group(1) + "," + m.group(2))
             elif line.startswith("net send(") and line.endswith(")"):
+                variables.add("net_ok")
                 node = Node("net_send", line_no, value=line[len("net send(") : -1])
             elif line.startswith("seed(") and line.endswith(")"):
                 node = Node("seed", line_no, value=line[5:-1])
