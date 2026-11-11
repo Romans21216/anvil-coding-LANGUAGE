@@ -3,7 +3,7 @@ fn(add-bonus)
   set var(score) = 12
   add var(score) 5
   output var(score)
-  set var(score) = null
+  # anything after output is unreachable, which the compiler reports
 end
 
 fn(main)

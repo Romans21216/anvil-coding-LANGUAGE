@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from __future__ import annotations
-
 import re
 
 from compiler.common import CompileError, MAX_BLOCK_DEPTH, ParsedProgram, RUNTIME_C_NAMES, c_name
-from compiler.expressions import split_amp
+from compiler.expressions import STRING_VARIABLES, split_amp, split_args
 
 
 def _walk_all(nodes):
@@ -36,7 +34,7 @@ def _classify_text_functions(program: ParsedProgram, string_vars: set[str]) -> b
     """Mark functions whose `output` returns text (the C backend returns char*)."""
     var_pattern = re.compile(r"var\(([A-Za-z_][\w-]*)\)")
 
-    def is_text(value: str) -> bool:
+    def is_text(value: str, fn=None) -> bool:
         value = value.strip()
         if not value:
             return False
@@ -49,6 +47,9 @@ def _classify_text_functions(program: ParsedProgram, string_vars: set[str]) -> b
         match = var_pattern.fullmatch(value)
         if match is not None and match.group(1) in string_vars:
             return True
+        if match is not None and fn is not None:
+            if match.group(1) in getattr(fn, "text_params", set()):
+                return True
         return _call_returns_text(program, value)
 
     changed = False
@@ -60,11 +61,182 @@ def _classify_text_functions(program: ParsedProgram, string_vars: set[str]) -> b
         if getattr(fn, "returns_text", False):
             continue
         for node in _walk_all(fn.body):
-            if node.kind == "output" and is_text(node.value):
+            if node.kind == "output" and is_text(node.value, fn):
                 fn.returns_text = True
                 changed = True
                 break
     return changed
+
+
+def _find_calls(value: str):
+    """Yield (function name, argument text) for every `call fn(...)` in a value."""
+    index = 0
+    marker = "call fn("
+    while True:
+        start = value.find(marker, index)
+        if start < 0:
+            return
+        cursor = start + len(marker) - 1
+        depth = 0
+        while cursor < len(value):
+            if value[cursor] == "(":
+                depth += 1
+            elif value[cursor] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            cursor += 1
+        inner = value[start + len(marker):cursor]
+        parts = split_args(inner)
+        if parts:
+            yield parts[0].strip(), parts[1:]
+        index = cursor + 1
+
+
+def _argument_is_text(program: ParsedProgram, raw: str, scope) -> bool:
+    value = raw.strip()
+    if not value:
+        return False
+    if value.startswith('"'):
+        return True
+    if len(split_amp(value)) > 1:
+        return True
+    match = re.fullmatch(r"var\(([A-Za-z_][\w-]*)\)", value)
+    if match is not None:
+        name = match.group(1)
+        if name in STRING_VARIABLES:
+            return True
+        if scope is not None and name in scope.params:
+            return name in getattr(scope, "text_params", set())
+        return False
+    if re.match(r"(?:upper|lower|chr|trim|char|mid|left|right)\s*\(", value):
+        return True
+    target = None
+    for call_name, _args in _find_calls(value):
+        target = program.functions.get(call_name)
+        break
+    return bool(target is not None and getattr(target, "returns_text", False))
+
+
+def _classify_text_params(program: ParsedProgram) -> None:
+    """Decide which parameters are text.
+
+    Two sources agree: a parameter is text when the body forces text (a text
+    builtin argument, a comparison with a text literal, or returning it directly
+    from a text-returning function), and when a call site passes text for it.
+    Call-site evidence runs to a fixpoint so `fn(tag, mark, n)` keeps `n` a
+    number when every caller passes a number.
+    """
+    numeric_use = re.compile(
+        r"(?:var\([A-Za-z_][\w-]*\)\s*[-+*/%]|[-+*/%]\s*var\([A-Za-z_][\w-]*\))"
+    )
+    for fn in program.functions.values():
+        fn.text_params = set()
+        forced_numeric = set()
+        for node in _walk_all(fn.body):
+            value = (node.value or "").strip()
+            if not value:
+                continue
+            for param in fn.params:
+                token = f"var({param})"
+                if token not in value:
+                    continue
+                # Arithmetic involving THIS parameter (not just any arithmetic
+                # elsewhere in the same expression) makes it numeric.
+                pattern = (
+                    rf"var\({param}\)\s*[-+*/%]|[-+*/%]\s*var\({param}\)"
+                )
+                if re.search(pattern, value):
+                    forced_numeric.add(param)
+        fn.numeric_params = forced_numeric
+
+    text_call = re.compile(
+        r"\b(?:upper|lower|trim|len|ord|number|char|mid|left|right|contains|"
+        r"starts_with|ends_with)\s*\(\s*var\(([A-Za-z_][\w-]*)\)"
+    )
+    text_compare = re.compile(r'(?:=|==|!=|<=|>=|<|>)\s*"')
+
+    nodes = list(_walk_all(program.top))
+    for function in program.functions.values():
+        nodes.extend((node, function) for node in _walk_all(function.body))
+
+    changed = True
+    while changed:
+        changed = False
+        for entry in nodes:
+            node, scope = entry if isinstance(entry, tuple) else (entry, None)
+            value = (node.value or "").strip()
+            if not value:
+                continue
+            params = scope.params if scope is not None else []
+            if scope is not None:
+                for param in params:
+                    if getattr(scope, "numeric_params", None) is None:
+                        pass
+                for match in text_call.finditer(value):
+                    if match.group(1) in params and match.group(1) not in scope.text_params:
+                        scope.text_params.add(match.group(1))
+                        changed = True
+                if text_compare.search(value):
+                    for param in params:
+                        if f"var({param})" in value and param not in scope.text_params:
+                            scope.text_params.add(param)
+                            changed = True
+                if getattr(scope, "returns_text", False) and node.kind == "output":
+                    for param in params:
+                        if value == f"var({param})" and param not in scope.text_params:
+                            scope.text_params.add(param)
+                            changed = True
+            for call_name, args in _find_calls(value):
+                target = program.functions.get(call_name)
+                if target is None:
+                    continue
+                for index, argument in enumerate(args):
+                    if index >= len(target.params):
+                        break
+                    param = target.params[index]
+                    if param in target.text_params:
+                        continue
+                    if param in getattr(target, "numeric_params", set()):
+                        continue
+                    if _argument_is_text(program, argument, scope):
+                        target.text_params.add(param)
+                        changed = True
+
+
+def _validate_call_kinds(program: ParsedProgram) -> None:
+    """Report argument/parameter kind mismatches at the call site."""
+    entries = [(node, None) for node in _walk_all(program.top)]
+    for function in program.functions.values():
+        entries.extend((node, function) for node in _walk_all(function.body))
+    for node, scope in entries:
+        value = (node.value or "").strip()
+        if not value:
+            continue
+        for call_name, args in _find_calls(value):
+            target = program.functions.get(call_name)
+            if target is None:
+                continue
+            for index, argument in enumerate(args):
+                if index >= len(target.params):
+                    break
+                param = target.params[index]
+                wants_text = param in getattr(target, "text_params", set())
+                is_text = _argument_is_text(program, argument, scope)
+                if wants_text and not is_text:
+                    raise CompileError(
+                        f"{node.source or program.path}:{node.line}: parameter "
+                        f"{param!r} of {call_name!r} takes text, but this "
+                        "argument is a number"
+                    )
+                if not wants_text and is_text and param not in getattr(
+                    target, "numeric_params", set()
+                ):
+                    raise CompileError(
+                        f"{node.source or program.path}:{node.line}: parameter "
+                        f"{param!r} of {call_name!r} takes a number, but this "
+                        "argument is text"
+                    )
 
 
 def _classify_string_variables(program: ParsedProgram, strict: bool = True) -> set[str]:
@@ -154,13 +326,26 @@ def validate_program(program: ParsedProgram) -> None:
     functions = program.functions
     variables = program.variables
     arrays = program.arrays
-    for _ in range(4):
+    for _ in range(6):
         _classify_string_variables(program, strict=False)
-        changed = _classify_text_functions(program, _classify_string_variables(program, strict=False))
-        if not changed:
+        changed = _classify_text_functions(
+            program, _classify_string_variables(program, strict=False)
+        )
+        before = {
+            name: set(getattr(fn, "text_params", set()))
+            for name, fn in program.functions.items()
+        }
+        _classify_text_params(program)
+        after = {
+            name: set(getattr(fn, "text_params", set()))
+            for name, fn in program.functions.items()
+        }
+        if not changed and before == after:
             break
     string_vars = _classify_string_variables(program, strict=True)
     _classify_text_functions(program, string_vars)
+    _classify_text_params(program)
+    _validate_call_kinds(program)
     if not functions:
         raise CompileError(f"{path}: define at least one fn(name) function")
 
@@ -195,6 +380,15 @@ def validate_program(program: ParsedProgram) -> None:
                 f"declare it with set local({name}) first"
             )
     for fn in functions.values():
+        for node in _walk_all(fn.body):
+            value = node.value or ""
+            for match in re.finditer(r"array\(\s*([A-Za-z_][\w-]*)\s*,", value):
+                name = match.group(1)
+                if name in program.arrays or name in fn.local_arrays:
+                    continue
+                raise CompileError(
+                    f"{node.source or path}:{node.line}: unknown array {name!r}"
+                )
         for name in fn.local_arrays:
             if name in fn.params or name in fn.locals:
                 raise CompileError(

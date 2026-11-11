@@ -18,7 +18,7 @@ message rather than mis-compiling.
 | Text values, `&` joining, escapes | yes | yes | `test_strings.py`, `test_native_x64.py` |
 | Text builtins (`len`, `upper`, `lower`, `trim`, `left`, `right`, `char`, `mid`, `chr`, `ord`, `number`, `contains`, `starts_with`, `ends_with`) | yes | yes | `test_len.py`, `test_mid.py`, `test_trim.py`, `test_number.py`, `test_char.py`, `test_chrorrd.py`, `test_contains.py`, `test_edges.py` |
 | Text-returning functions | yes | yes | `test_text_functions.py` |
-| Text arguments to functions | **no** | **no** | rejected at the call site |
+| Text arguments to functions | yes | yes | `tests/test_text_params.py` |
 | Numeric globals, `set`/`add`/`sub`, top-level init | yes | yes | `test_native_x64.py` |
 | Fixed-size arrays (global and function-local) | yes | yes | `test_native_x64.py`, `test_lists.py` |
 | Growable lists (`list`/`add`/`count`/`array`) | yes | yes | `test_lists.py` |

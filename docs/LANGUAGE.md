@@ -24,7 +24,7 @@ end
 call fn(main)
 ```
 
-Comments begin with `#` outside a quoted string. Names are case-sensitive. Function parameters are numeric; a function's `output` value is numeric unless it returns text (see Text and lists below). `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside an expression. Recursive calls are supported by both backends. `while expression ... end` repeats its body while the numeric condition is nonzero. `for local(name) = start to end [step amount] ... end` iterates over an inclusive numeric range. A top-level `set var(name) = expression` initializes a global before `main` runs, in source order.
+Comments begin with `#` outside a quoted string. Names are case-sensitive. A function parameter is numeric unless the body uses it as text — passing it to a text builtin, joining it with a text literal, comparing it with text, or returning it from a text-returning function — or unless every caller passes text; then it holds text. A function's `output` value is numeric unless it returns text (see Text and lists below). `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside an expression. Recursive calls are supported by both backends. `while expression ... end` repeats its body while the numeric condition is nonzero. `for local(name) = start to end [step amount] ... end` iterates over an inclusive numeric range. A top-level `set var(name) = expression` initializes a global before `main` runs, in source order.
 
 ## Language version
 
@@ -82,7 +82,7 @@ say len(var(name))          # 3
 say upper(var(name))        # ADA
 ```
 
-Results can be stored back into a variable and are capped at 255 bytes; going past that stops with a clear error instead of truncating quietly. `len` counts bytes, so `len("héllo")` is 6. Comparisons work between text values (`=`, `!=`, `<`, `<=`, `>`, `>=`, alphabetically); comparing text with a number is a compile error. The text built-ins are `len`, `upper`, `lower`, `trim`, `left`, `right`, `char`, `mid`, `chr`, `ord`, `number`, and the 1/0 tests `contains`, `starts_with`, `ends_with`. `say expr` prints a line, `write expr` prints without a newline, and `ask "prompt? ", var(x)` reads one line from the console.
+Results can be stored back into a variable and are capped at 255 bytes; going past that stops with a clear error instead of truncating quietly. `len` counts bytes, so `len("héllo")` is 6. Comparisons work between text values (`=`, `!=`, `<`, `<=`, `>`, `>=`, alphabetically); comparing text with a number is a compile error. The text built-ins are `len`, `upper`, `lower`, `trim`, `left`, `right`, `char`, `mid`, `chr`, `ord`, `number`, and the 1/0 tests `contains`, `starts_with`, `ends_with`. Functions accept text parameters: `fn(greet, who)` with `output "hi " & var(who)` is called as `call fn(greet, "Ada")`, and a text argument passed to a numeric parameter is rejected at the call site. `say expr` prints a line, `write expr` prints without a newline, and `ask "prompt? ", var(x)` reads one line from the console.
 
 `list name` declares a growable numeric list at top level, `add name value` appends to it, `count(name)` reports how many values it holds, and `array(name, index)` reads a 0-based slot. A list holds up to 256 values.
 

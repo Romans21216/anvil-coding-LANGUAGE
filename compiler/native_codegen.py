@@ -81,8 +81,13 @@ class _Expression:
         elif kind == "variable":
             name = value[4:-1]
             if name in STRING_VARIABLES:
-                offset = self.owner.reserve_string_buffer(f"var:{name}")
-                self.owner.code.rip_lea_data(0, offset)
+                is_param = self.scope is not None and name in self.scope.params
+                if is_param:
+                    self.owner.load_local(name, self.scope, self.line)
+                    self.owner.code.bytes(b"\x66\x48\x0f\x7e\xc0")  # movq rax, xmm0
+                else:
+                    offset = self.owner.reserve_string_buffer(f"var:{name}")
+                    self.owner.code.rip_lea_data(0, offset)
                 left = _Value("text", name)
             else:
                 self.owner.load_variable(name, self.scope, self.line)
@@ -201,16 +206,24 @@ class _Expression:
                 destination = self.owner.reserve_string_buffer(
                     f"scratch:{self.owner._join_counter}"
                 )
+                right_buffer = self.owner.reserve_string_buffer(
+                    f"joinright:{self.owner._join_counter}"
+                )
                 self.owner._join_counter += 1
-                # copy left into dst, then append right; every call uses the
-                # same argument shape as the proven set-variable copy.
+                # Preserve the right operand first: a recursive call on the right
+                # returns a pointer into this same destination buffer, so copying
+                # left into dst before reading right would truncate the result.
+                self.owner.code.rip_lea_data(1, right_buffer)         # rcx = right copy
+                self.owner.code.bytes(b"\x48\x8b\x95")              # mov rdx,[rbp+d32]
+                self.owner.code.bytes(struct.pack("<i", right_disp))
+                self.owner.code.call("function:anvil_str_copy")
+                # copy left into dst, then append the preserved right operand.
                 self.owner.code.rip_lea_data(1, destination)          # rcx = dst
                 self.owner.code.bytes(b"\x48\x8b\x95")              # mov rdx,[rbp+d32]
                 self.owner.code.bytes(struct.pack("<i", left_disp))
                 self.owner.code.call("function:anvil_str_copy")
                 self.owner.code.rip_lea_data(1, destination)          # rcx = dst
-                self.owner.code.bytes(b"\x48\x8b\x95")              # mov rdx,[rbp+d32]
-                self.owner.code.bytes(struct.pack("<i", right_disp))
+                self.owner.code.rip_lea_data(2, right_buffer)         # rdx = right copy
                 self.owner.code.call("function:anvil_str_append")
                 self.owner.code.rip_lea_data(0, destination)          # rax = dst
                 self.owner.pop_temp()
@@ -1096,16 +1109,25 @@ class NativeCodegen:
             )
         if len(raw_args) > 16:
             raise CompileError(f"{self.path}:{line}: native x64 backend supports at most sixteen parameters")
-        for argument in raw_args:
+        text_params = getattr(target, "text_params", set())
+        for index, argument in enumerate(raw_args):
+            param = target.params[index] if index < len(target.params) else None
+            if param in text_params:
+                continue
             if self._argument_is_text(argument):
                 raise CompileError(
-                    f"{self.path}:{line}: text arguments to functions are not "
-                    "available yet; functions take numbers on both backends"
+                    f"{self.path}:{line}: parameter {param!r} of {name!r} takes a "
+                    "number, but this argument is text"
                 )
         base_depth = self._scratch_depth
         slots = []
-        for argument in raw_args:
-            self.emit_expression(argument, line, scope)
+        for index, argument in enumerate(raw_args):
+            param = target.params[index] if index < len(target.params) else None
+            if param in text_params:
+                self.emit_expression(argument, line, scope, expected="text")
+                self.code.bytes(b"\x66\x48\x0f\x6e\xc0")  # movq xmm0, rax
+            else:
+                self.emit_expression(argument, line, scope)
             slot = self.push_temp()
             self.store_local(slot)
             slots.append(slot)
@@ -1414,9 +1436,13 @@ class NativeCodegen:
     def _emit_function(self, name: str, fn: Node) -> None:
         previous = self.path
         self.path = fn.source or previous
+        # A text parameter types as text inside its own function only.
+        previous_strings = set(STRING_VARIABLES)
+        set_string_variables(previous_strings | getattr(fn, "text_params", set()))
         try:
             self._emit_function_body(name, fn)
         finally:
+            set_string_variables(previous_strings)
             self.path = previous
 
     def _emit_function_body(self, name: str, fn: Node) -> None:

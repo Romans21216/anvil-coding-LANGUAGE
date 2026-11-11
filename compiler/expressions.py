@@ -428,7 +428,15 @@ class ExpressionParser:
         elif kind == "variable":
             name = value[4:-1]
             if name in STRING_VARIABLES:
-                left = (f"anvil_str_{c_name(name)}", "string")
+                # A text parameter holds its pointer directly; a text global
+                # lives in the generated anvil_str_<name> buffer.
+                is_param = self.scope is not None and name in self.scope.params
+                symbol = (
+                    c_name(self.scope.name + "__" + name)
+                    if is_param
+                    else f"anvil_str_{c_name(name)}"
+                )
+                left = (symbol, "string")
             else:
                 left = (variable_code(name, self.scope), "number")
         elif kind == "local":
@@ -486,12 +494,21 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: function {name!r} expects "
                     f"{expected} argument(s), got {len(raw_args)}"
                 )
-            args = [
-                ExpressionParser(
-                    self.path, self.line, arg, self.functions, self.scope, self.arrays
-                ).compile()
-                for arg in raw_args
-            ]
+            target = self.functions[name] if self.functions is not None else None
+            text_params = getattr(target, "text_params", set()) if target else set()
+            args = []
+            for index, arg in enumerate(raw_args):
+                param = (
+                    target.params[index]
+                    if target is not None and index < len(target.params)
+                    else None
+                )
+                expected = "string" if param in text_params else "number"
+                args.append(
+                    ExpressionParser(
+                        self.path, self.line, arg, self.functions, self.scope, self.arrays
+                    ).compile(expected)
+                )
             result_kind = (
                 "string"
                 if getattr(self.functions[name], "returns_text", False)

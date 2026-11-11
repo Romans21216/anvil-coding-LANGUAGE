@@ -19,6 +19,7 @@ from compiler.common import (
 from compiler.expressions import (
     STRING_VARIABLES,
     expr,
+    set_string_variables,
     split_args,
     split_amp,
 )
@@ -596,8 +597,13 @@ def emit_c(
             raise CompileError(
                 f"{fn.source or path}:{fn.line}: engine callback '{name}' cannot have parameters"
             )
+        text_params = getattr(fn, "text_params", set())
         params = (
-            ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
+            ", ".join(
+                f"{'const char *' if param in text_params else 'double'} "
+                f"{c_name(name + '__' + param)}"
+                for param in fn.params
+            )
             or "void"
         )
         result_type = (
@@ -606,8 +612,13 @@ def emit_c(
         lines.append(f"static {result_type} {c_name(name)}({params});")
     lines.append("")
     for name, fn in functions.items():
+        text_params = getattr(fn, "text_params", set())
         params = (
-            ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
+            ", ".join(
+                f"{'const char *' if param in text_params else 'double'} "
+                f"{c_name(name + '__' + param)}"
+                for param in fn.params
+            )
             or "void"
         )
         result_type = (
@@ -624,7 +635,12 @@ def emit_c(
             f"{fn.local_array_lines[local]});"
             for local, size in sorted(fn.local_arrays.items())
         )
-        body = emit_nodes(path, fn.body, functions, "    ", fn, arrays)
+        previous_strings = set(STRING_VARIABLES)
+        set_string_variables(previous_strings | text_params)
+        try:
+            body = emit_nodes(path, fn.body, functions, "    ", fn, arrays)
+        finally:
+            set_string_variables(previous_strings)
         lines.extend(body)
         if not any(n.kind == "output" for n in fn.body):
             lines.extend(local_array_cleanup(fn, "    "))

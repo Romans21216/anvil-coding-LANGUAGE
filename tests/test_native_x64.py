@@ -349,18 +349,24 @@ call fn(main)
                     NativeCodegen(path, functions, top, variables, arrays).generate()
             self.assertIn(expected, str(caught.exception))
 
-    def test_native_rejects_text_arguments_with_a_clear_message(self):
-        source = (
-            "fn(show, n)\n  output var(n) * 2\nend\n\n"
-            'fn(main)\n  say call fn(show, "ada")\nend\ncall fn(main)\n'
+    def test_native_accepts_text_arguments(self) -> None:
+        program = (
+            "fn(greet, who)\n  output \"hi \" & var(who)\nend\n"
+            "fn(main)\n  say call fn(greet, \"ada\")\nend\ncall fn(main)\n"
         )
         with tempfile.TemporaryDirectory() as temp:
-            path = pathlib.Path(temp) / "text-arg.ANVL"
-            path.write_text(source, encoding="utf-8")
-            functions, top, variables, arrays = parse(path, source)
-            with self.assertRaises(CompileError) as caught:
+            path = pathlib.Path(temp) / "text-args.ANVL"
+            path.write_text(program, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, program)
+            executable = pathlib.Path(temp) / "text-args.exe"
+            executable.write_bytes(
                 NativeCodegen(path, functions, top, variables, arrays).generate()
-        self.assertIn("text arguments to functions", str(caught.exception))
+            )
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=20
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.replace("\r\n", "\n"), "hi ada\n")
 
     def test_native_text_overflow_reports_and_exits(self):
         source = (
