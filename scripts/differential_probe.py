@@ -410,16 +410,35 @@ CASES: dict[str, str] = {
     "for_each": 'list nums\nfn(main)\n  add nums 4\n  add nums 7\n  add nums 9\n  set var(total) = 0\n  for each v in nums\n    add var(total) var(v)\n  end\n  say var(total)\n  for each v in nums\n    if var(v) = 7\n      continue\n    end\n    say var(v)\n  end\nend\ncall fn(main)\n',
     "dead_branch": 'fn(main)\n  if 0\n    say "never"\n  else\n    say "otherwise"\n  end\n  while 0\n    say "never"\n  end\n  if 1\n    say "taken"\n  end\nend\ncall fn(main)\n',
     "enum_values": 'enum State idle, playing, paused\nfn(label, s)\n  if var(s) = playing\n    output "playing"\n  end\n  if var(s) = paused\n    output "paused"\n  end\n  output "idle"\nend\nfn(main)\n  set var(now) = playing\n  say call fn(label, var(now))\n  set var(now) = paused\n  say call fn(label, var(now))\n  say var(now)\nend\ncall fn(main)\n',
+    "selective_import": ('include fn(move) -- "lib/player.ANVL"\n\nfn(main)\n  say call fn(move--player, 10)\nend\ncall fn(main)\n', bytes([10]), {"lib/player.ANVL": 'fn(bump, n)\n  output var(n) + 1\nend\nfn(move, n)\n  output call fn(bump, var(n)) * 2\nend\n'}),
 }
 
 
-def run(text: str, backend: str, stdin: bytes = bytes([10])) -> tuple[int, str, str]:
+def run(
+    text: str,
+    backend: str,
+    stdin: bytes = bytes([10]),
+    files: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
     with tempfile.TemporaryDirectory() as temp:
         temp_path = pathlib.Path(temp)
+        for relative, contents in (files or {}).items():
+            target = temp_path / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(contents, encoding="utf-8")
         source = temp_path / "probe.ANVL"
         source.write_text(text, encoding="utf-8")
         try:
-            functions, top, variables, arrays = parse(source, text)
+            if files:
+                from compiler.modules import load_program
+
+                program = load_program(source, text)
+                functions = program.functions
+                top = program.top
+                variables = program.variables
+                arrays = program.arrays
+            else:
+                functions, top, variables, arrays = parse(source, text)
             exe = temp_path / "probe.exe"
             with contextlib.redirect_stdout(open(os.devnull, "w")):
                 if backend == "native":
@@ -456,12 +475,20 @@ def main() -> int:
     for _name, _spec in CASES.items():
         if wanted and not any(part in _name for part in wanted):
             continue
+        _files = None
         if isinstance(_spec, tuple):
             _text = _spec[0]
             _stdin = _spec[1] if len(_spec) > 1 else bytes([10])
+            _files = _spec[2] if len(_spec) > 2 else None
         else:
             _text, _stdin = _spec, bytes([10])
-        rows.append((_name, run(_text, "c", _stdin), run(_text, "native", _stdin)))
+        rows.append(
+            (
+                _name,
+                run(_text, "c", _stdin, _files),
+                run(_text, "native", _stdin, _files),
+            )
+        )
     diffs = 0
     for name, c, n in rows:
         same = c[1] == n[1] and (c[0] == 0) == (n[0] == 0)
