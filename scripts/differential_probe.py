@@ -411,6 +411,7 @@ CASES: dict[str, str] = {
     "dead_branch": 'fn(main)\n  if 0\n    say "never"\n  else\n    say "otherwise"\n  end\n  while 0\n    say "never"\n  end\n  if 1\n    say "taken"\n  end\nend\ncall fn(main)\n',
     "enum_values": 'enum State idle, playing, paused\nfn(label, s)\n  if var(s) = playing\n    output "playing"\n  end\n  if var(s) = paused\n    output "paused"\n  end\n  output "idle"\nend\nfn(main)\n  set var(now) = playing\n  say call fn(label, var(now))\n  set var(now) = paused\n  say call fn(label, var(now))\n  say var(now)\nend\ncall fn(main)\n',
     "selective_import": ('include fn(move) -- "lib/player.ANVL"\n\nfn(main)\n  say call fn(move--player, 10)\nend\ncall fn(main)\n', bytes([10]), {"lib/player.ANVL": 'fn(bump, n)\n  output var(n) + 1\nend\nfn(move, n)\n  output call fn(bump, var(n)) * 2\nend\n'}),
+    "unicode_bytes": 'fn(main)\n  say len("héllo")\n  say mid("héllo", 0, 1)\n  say upper("abc")\n  say len("")\nend\ncall fn(main)\n',
 }
 
 
