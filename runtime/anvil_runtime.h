@@ -105,6 +105,7 @@ double anvil_ask_number(const char *prompt);
 #define ANVIL_STR_CAP 256
 extern char anvil_str_scratch[256][ANVIL_STR_CAP];
 void anvil_print_bool(double value);
+const char *anvil_image_error(void);
 void anvil_text_list_remove(char block[][256], int index, double count);
 const char *anvil_text_list_get(const char block[][256], int index, double count, const char *path, int line);
 void anvil_text_list_set(char block[][256], int index, double count, const char *value, const char *path, int line);

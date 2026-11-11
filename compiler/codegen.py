@@ -359,7 +359,7 @@ def emit_nodes(
                     or _is_text_list_read(part)
                     or _is_text_function_call(part, functions)
                     or re.fullmatch(
-                        r"(upper|lower|chr|trim|char|mid|left|right)\s*\(.*\)", part, re.DOTALL
+                        r"(upper|lower|chr|trim|char|mid|left|right|image_error)\s*\(.*\)", part, re.DOTALL
                     )
                 ):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
@@ -389,7 +389,7 @@ def emit_nodes(
                     or _is_text_list_read(part)
                     or _is_text_function_call(part, functions)
                     or re.fullmatch(
-                        r"(upper|lower|chr|trim|char|mid|left|right)\s*\(.*\)", part, re.DOTALL
+                        r"(upper|lower|chr|trim|char|mid|left|right|image_error)\s*\(.*\)", part, re.DOTALL
                     )
                 ):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)

@@ -692,7 +692,7 @@ class _Expression:
 
 _NATIVE_VAR = __import__("re").compile(r"var\(([A-Za-z_][\w-]*)\)")
 _TEXT_BUILTIN_CALL = __import__("re").compile(
-    r"(upper|lower|chr|trim|char|mid|left|right)\s*\(.*\)", __import__("re").DOTALL
+    r"(upper|lower|chr|trim|char|mid|left|right|image_error)\s*\(.*\)", __import__("re").DOTALL
 )
 
 
@@ -1299,7 +1299,7 @@ class NativeCodegen:
             return False
         if value.startswith('"') or len(split_amp(value)) > 1:
             return True
-        if re.match(r"(upper|lower|chr|trim|char|mid|left|right)\s*\(", value):
+        if re.match(r"(upper|lower|chr|trim|char|mid|left|right|image_error)\s*\(", value):
             return True
         match = re.fullmatch(r"var\(([A-Za-z_][\w-]*)\)", value)
         if match is not None:

@@ -42,7 +42,7 @@ def _classify_text_functions(program: ParsedProgram, string_vars: set[str]) -> b
             return True
         if "&" in value:
             return True
-        if re.match(r"(upper|lower|chr|trim|char|mid|left|right)\s*\(", value):
+        if re.match(r"(upper|lower|chr|trim|char|mid|left|right|image_error)\s*\(", value):
             return True
         match = var_pattern.fullmatch(value)
         if match is not None and match.group(1) in string_vars:
@@ -109,7 +109,7 @@ def _argument_is_text(program: ParsedProgram, raw: str, scope) -> bool:
         if scope is not None and name in scope.params:
             return name in getattr(scope, "text_params", set())
         return False
-    if re.match(r"(?:upper|lower|chr|trim|char|mid|left|right)\s*\(", value):
+    if re.match(r"(?:upper|lower|chr|trim|char|mid|left|right|image_error)\s*\(", value):
         return True
     target = None
     for call_name, _args in _find_calls(value):
@@ -264,7 +264,7 @@ def _declared_kind(program, node, string_vars, bool_vars) -> str:
         return "bool"
     if value.startswith('"') or len(split_amp(value)) > 1:
         return "text"
-    if re.match(r"(?:upper|lower|chr|trim|char|mid|left|right)\s*\(", value):
+    if re.match(r"(?:upper|lower|chr|trim|char|mid|left|right|image_error)\s*\(", value):
         return "text"
     if _call_returns_text(program, value):
         return "text"
@@ -341,7 +341,7 @@ def _classify_string_variables(program: ParsedProgram, strict: bool = True) -> s
         if segment.startswith('"'):
             return True
         if _re.fullmatch(
-            r"(upper|lower|chr|trim|char|mid|left|right)\s*\(.*\)", segment, _re.DOTALL
+            r"(upper|lower|chr|trim|char|mid|left|right|image_error)\s*\(.*\)", segment, _re.DOTALL
         ):
             return True
         match = var_pattern.fullmatch(segment)

@@ -623,9 +623,16 @@ static AnvilImage *anvil_image_from_handle(double handle) {
   AnvilImage *image = &anvil_images[slot];
   return image->pixels && image->generation == generation ? image : NULL;
 }
+static const char *anvil_image_error_text = "";
+
+const char *anvil_image_error(void) { return anvil_image_error_text; }
+
 double anvil_image_load(const char *path) {
-  if (!path || !*path)
+  anvil_image_error_text = "";
+  if (!path || !*path) {
+    anvil_image_error_text = "the path is empty";
     return 0.0;
+  }
   int slot = -1;
   for (int i = 0; i < ANVIL_IMAGES; ++i) {
     if (!anvil_images[i].pixels &&
@@ -634,12 +641,16 @@ double anvil_image_load(const char *path) {
       break;
     }
   }
-  if (slot < 0)
+  if (slot < 0) {
+    anvil_image_error_text = "no free image slot";
     return 0.0;
+  }
 
   FILE *file = fopen(path, "rb");
-  if (!file)
+  if (!file) {
+    anvil_image_error_text = "cannot open the file";
     return 0.0;
+  }
   unsigned char header[54] = {0};
   int ok = fread(header, 1, sizeof(header), file) == sizeof(header) &&
            header[0] == 'B' && header[1] == 'M';
@@ -707,6 +718,8 @@ double anvil_image_load(const char *path) {
   free(row);
   fclose(file);
   if (!ok) {
+    anvil_image_error_text =
+        "the file is not a readable 24- or 32-bit BMP within the limits";
     free(pixels);
     return 0.0;
   }

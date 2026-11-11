@@ -141,6 +141,7 @@ BUILTINS = {
     "mouse_pressed": (1, 1),
     "mouse_held": (1, 1),
     "mouse_wheel": (0, 0),
+    "image_error": (0, 0),
     "image_load": (1, 1),
     "image_width": (1, 1),
     "image_height": (1, 1),
@@ -181,6 +182,7 @@ BUILTIN_C_NAMES = {
     "mouse_pressed": "anvil_mouse_pressed",
     "mouse_held": "anvil_mouse_held",
     "mouse_wheel": "anvil_mouse_wheel",
+    "image_error": "anvil_image_error",
     "image_load": "anvil_image_load",
     "image_width": "anvil_image_width",
     "image_height": "anvil_image_height",
@@ -226,7 +228,17 @@ BUILTIN_C_NAMES = {
     "ray_backend_available": "anvil_ray_backend_available",
 }
 
-BUILTIN_TEXT_RETURNING = {"upper", "lower", "chr", "trim", "char", "mid", "left", "right"}
+BUILTIN_TEXT_RETURNING = {
+    "upper",
+    "lower",
+    "chr",
+    "trim",
+    "char",
+    "mid",
+    "left",
+    "right",
+    "image_error",
+}
 
 # Common names from other languages, mapped to the Anvil spelling. A beginner
 # who types `random(1, 10)` gets a "did you mean rnd" instead of a variable hint.
