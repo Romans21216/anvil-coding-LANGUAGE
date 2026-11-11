@@ -16,6 +16,7 @@ from compiler.common import (
     variable_code,
     decode_string,
 )
+from compiler.common import constant_truth
 from compiler.expressions import (
     LISTS,
     STRING_VARIABLES,
@@ -402,6 +403,20 @@ def emit_nodes(
             values = [lower(n, arg) for arg in args]
             out.append(f"{indent}(void){c_name(n.name)}({', '.join(values)});")
         elif n.kind == "if":
+            truth = constant_truth(n.value)
+            if truth is not None:
+                out.extend(
+                    emit_nodes(
+                        path,
+                        n.body if truth else n.otherwise,
+                        functions,
+                        indent,
+                        scope,
+                        arrays,
+                        loops,
+                    )
+                )
+                continue
             out.append(f"{indent}if ({lower(n)} != 0.0) {{")
             out.extend(
                 emit_nodes(path, n.body, functions, indent + "    ", scope, arrays, loops)
@@ -415,6 +430,9 @@ def emit_nodes(
                 )
             out.append(f"{indent}}}")
         elif n.kind == "while":
+            truth = constant_truth(n.value)
+            if truth is False:
+                continue
             out.append(f"{indent}while ({lower(n)} != 0.0) {{")
             loops.append({})
             try:

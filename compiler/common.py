@@ -71,6 +71,18 @@ class CompileError(Exception):
     pass
 
 
+def constant_truth(value: str) -> bool | None:
+    """True/False when the text is a bare numeric literal, else None.
+
+    Only literals qualify: anything with an operator or a name can have effects
+    or depend on runtime state, so those keep their runtime evaluation.
+    """
+    text = (value or "").strip()
+    if not re.fullmatch(r"[-+]?[0-9]+(?:\.[0-9]+)?", text):
+        return None
+    return float(text) != 0.0
+
+
 def c_name(name: str) -> str:
     return "anvil_" + re.sub(r"[^A-Za-z0-9_]", "_", name)
 

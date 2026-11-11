@@ -9,6 +9,7 @@ import struct
 from dataclasses import dataclass
 
 from compiler.common import CompileError, KEY_CODES, Node, decode_string
+from compiler.common import constant_truth
 from compiler.expressions import (
     BUILTINS,
     LISTS,
@@ -1224,6 +1225,10 @@ class NativeCodegen:
                     self.emit_expression(node.value, node.line, scope)
                 self.code.bytes(b"\xc9\xc3")  # leave; ret
             elif node.kind == "if":
+                truth = constant_truth(node.value)
+                if truth is not None:
+                    self.emit_nodes(node.body if truth else node.otherwise, scope)
+                    continue
                 else_label = self.label("else")
                 end_label = self.label("endif")
                 self.emit_expression(node.value, node.line, scope)
@@ -1237,6 +1242,8 @@ class NativeCodegen:
                     self.emit_nodes(node.otherwise, scope)
                     self.code.label(end_label)
             elif node.kind == "while":
+                if constant_truth(node.value) is False:
+                    continue
                 start = self.label("while_start")
                 end = self.label("while_end")
                 self.code.label(start)

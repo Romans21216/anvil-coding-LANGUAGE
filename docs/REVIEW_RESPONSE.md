@@ -33,6 +33,8 @@ runs the same program on both backends and compares output.
 | big_trim (40 helpers, none called) | native | 0.002 s | 2,560 |
 | big_trim (40 helpers, none called) | C | 1.691 s | 143,360 |
 
+Statically dead branches are dropped at code generation: with a literal condition the taken side is emitted and the other side is not, so `if 0` with 20 statements produces the 2,560-byte baseline image instead of 3,584 bytes (native, this machine), and `while 0` emits nothing. `tests/test_dead_branches.py` pins the output, the size, the `else` behaviour and the diagnostics boundary.
+
 The CLI caches built executables in `<output dir>/.anvil-cache`, keyed by a SHA-256 of the generated C, the runtime sources, the compiler's own Python files and the release flag, so a repeated build of unchanged source reuses the executable: measured 2.06 s cold against 0.11 s warm for the same program, with byte-identical output. Editing either the source or the generated C changes the key and rebuilds.
 
 The C timings are dominated by `cl.exe`, not by Anvil. The `big` and `big_trim`
