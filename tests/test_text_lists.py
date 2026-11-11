@@ -88,6 +88,31 @@ class TextListTests(unittest.TestCase):
         result = compile_and_run(source, "native")
         self.assertEqual(result.returncode, 2)
 
+    def test_remove_shifts_the_tail_down(self) -> None:
+        source = (
+            "list names: text\nfn(main)\n  add names \"ada\"\n"
+            "  add names \"grace\"\n  add names \"alan\"\n"
+            "  remove names 1\n  say count(names)\n"
+            '  say array(names, 0) & "/" & array(names, 1)\n'
+            "  remove names 9\n  say count(names)\nend\ncall fn(main)\n"
+        )
+        result = compile_and_run(source, "c")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.replace("\r\n", "\n"), "2\nada/alan\n2\n")
+
+    def test_native_names_the_removal_limitation(self) -> None:
+        source = (
+            "list names: text\nfn(main)\n  add names \"ada\"\n"
+            "  remove names 0\nend\ncall fn(main)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "sample.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as caught:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        self.assertIn("not available in the native x64 backend", str(caught.exception))
+
     def test_unknown_list_type_is_rejected(self) -> None:
         source = "list names: mystery\nfn(main)\n  say 1\nend\ncall fn(main)\n"
         with tempfile.TemporaryDirectory() as temp:

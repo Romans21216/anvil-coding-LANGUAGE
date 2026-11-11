@@ -239,6 +239,12 @@ def emit_nodes(
                 out.append(f"{indent}{variable_code(n.name, scope)} = {lower(n)};")
         elif n.kind == "local_set":
             out.append(f"{indent}{c_name(scope.name + '__' + n.name)} = {lower(n)};")
+        elif n.kind == "text_list_remove":
+            out.append(
+                f"{indent}anvil_text_list_remove({c_name(n.name)}__text, "
+                f"(int)({lower(n)}), "
+                f"{variable_code(n.name + '__count', scope)});"
+            )
         elif n.kind == "text_list_add":
             out.append(
                 f"{indent}anvil_text_list_set({c_name(n.name)}__text, "

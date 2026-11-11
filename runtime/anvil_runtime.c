@@ -811,6 +811,17 @@ void anvil_print_bool(double value) {
   fputs(value != 0.0 ? "true" : "false", stdout);
 }
 
+void anvil_text_list_remove(char block[][256], int index, double count) {
+  int total = (int)count;
+  if (index < 0 || index >= total) {
+    return;
+  }
+  for (int slot = index; slot + 1 < total; slot++) {
+    memcpy(block[slot], block[slot + 1], 256);
+  }
+  block[total - 1][0] = '\0';
+}
+
 const char *anvil_text_list_get(const char block[][256], int index, double count,
                                 const char *path, int line) {
   if (index < 0 || index >= (int)count) {

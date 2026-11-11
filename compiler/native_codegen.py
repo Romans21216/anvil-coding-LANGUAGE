@@ -1312,6 +1312,12 @@ class NativeCodegen:
                 self.emit_expression(node.value, node.line, scope)
                 self.emit_finite_check(node.line)
                 self._math.seed(node.line)
+            elif node.kind == "text_list_remove":
+                raise CompileError(
+                    f"{self.path}:{node.line}: removing from a text list is "
+                    "not available in the native x64 backend yet; build with "
+                    "--backend c"
+                )
             elif node.kind == "text_list_add":
                 self.emit_text_list_add(node.name, node.value, node.line, scope)
             elif node.kind == "set":

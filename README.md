@@ -46,7 +46,7 @@ hello, Ada
 - Fixed-size arrays work on both backends, at the top of the file or inside a function (`array scores(5)`): reads and writes are bounds-checked, and a function's own array is private to each call, so recursion keeps separate copies. The native backend limits a function's local arrays to 4 KB of stack until stack probing lands.
 - Runtime errors (numeric overflow, array bounds, text range) go to stderr with the source location on both backends, so program output stays clean.
 - Numbers print the same way on both backends: up to six fractional digits, trailing zeros trimmed, no exponent notation (`1 / 3` prints `0.333333`, `0.000001` stays `0.000001`). The native backend prints whole parts up to 9.2e18 and then stops with `Anvil output out of range`; the C backend keeps going to about 1e63.
-- Text lists (`list names: text`) store up to 256 text values on both backends, with `add`, `array` reads, `count` and `for each`.
+- Text lists (`list names: text`) store up to 256 text values on both backends, with `add`, `array` reads, `count` and `for each`; `remove` works on the C backend and names its limitation on native.
 - Growable lists support `add`, `count`, `array`, `remove` and `for each item in list` (removal shifts the tail down; an out-of-range index is a no-op).
 - Selective imports pull one function from a library: `include fn(move) -- "lib/player.ANVL"` then `call fn(move--player, 10)` (the qualifier is the file name unless `as alias` says otherwise); its helpers come along, its unused functions do not, and its globals stay private.
 - Enums give named states: `enum State idle, playing, paused` declares constants 0, 1, 2 that work in comparisons and assignments on both backends (they print as their number for now).

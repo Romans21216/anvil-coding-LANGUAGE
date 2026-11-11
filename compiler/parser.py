@@ -468,6 +468,28 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 )
         if node is None:
             match = re.fullmatch(r"remove\s+([A-Za-z_][\w-]*)\s+(.+)", line)
+            if match and match.group(1) in text_lists:
+                if current_function is None:
+                    raise CompileError(
+                        f"{path}:{line_no}: list writes must be inside a function"
+                    )
+                name = match.group(1)
+                index_expr = match.group(2)
+                counter = f"{name}__count"
+                cursor = f"{name}__textrm{line_no}"
+                variables.add(cursor)
+                guard = Node(
+                    "if",
+                    line_no,
+                    f"var({cursor}) >= 0 and var({cursor}) < var({counter})",
+                    body=[
+                        Node("text_list_remove", line_no, f"var({cursor})", name),
+                        Node("sub", line_no, "1", counter),
+                    ],
+                )
+                stack[-1][0].append(Node("set", line_no, index_expr, cursor))
+                stack[-1][0].append(guard)
+                continue
             if match and match.group(1) in lists:
                 if current_function is None:
                     raise CompileError(
