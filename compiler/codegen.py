@@ -19,6 +19,7 @@ from compiler.common import (
 from compiler.common import constant_truth
 from compiler.expressions import (
     LISTS,
+    BOOL_VARIABLES,
     STRING_VARIABLES,
     TEXT_LISTS,
     TEXT_LIST_CAP,
@@ -43,6 +44,11 @@ def _walk_nodes(top, functions):
 
 
 _VAR_PATTERN = __import__("re").compile(r"var\(([A-Za-z_][\w-]*)\)")
+
+
+def _is_bool_variable(part: str) -> bool:
+    match = _VAR_PATTERN.fullmatch(part.strip())
+    return match is not None and match.group(1) in BOOL_VARIABLES
 
 
 def _is_string_variable(part: str) -> bool:
@@ -355,6 +361,8 @@ def emit_nodes(
                 elif part.startswith('"'):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
                     out.append(f'{indent}printf("%s", "{say_string(rendered)}");')
+                elif _is_bool_variable(part):
+                    out.append(f"{indent}anvil_print_bool({lower(n, part)});")
                 elif _is_string_variable(part):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
                     out.append(f'{indent}printf("%s", {rendered});')
@@ -383,6 +391,8 @@ def emit_nodes(
                 elif part.startswith('"'):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
                     out.append(f'{indent}printf("%s", "{say_string(rendered)}");')
+                elif _is_bool_variable(part):
+                    out.append(f"{indent}anvil_print_bool({lower(n, part)});")
                 elif _is_string_variable(part):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
                     out.append(f'{indent}printf("%s", {rendered});')

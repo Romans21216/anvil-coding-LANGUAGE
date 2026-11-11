@@ -807,6 +807,10 @@ static void anvil_camera_update(void) {
 #define ANVIL_STR_SLOTS 256
 char anvil_str_scratch[ANVIL_STR_SLOTS][ANVIL_STR_CAP];
 
+void anvil_print_bool(double value) {
+  fputs(value != 0.0 ? "true" : "false", stdout);
+}
+
 const char *anvil_text_list_get(const char block[][256], int index, double count,
                                 const char *path, int line) {
   if (index < 0 || index >= (int)count) {

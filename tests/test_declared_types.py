@@ -29,7 +29,7 @@ PROGRAM = (
     "end\n"
     "call fn(main)\n"
 )
-EXPECTED = "6\n3\n1\n1\n"
+EXPECTED = "6\n3\ntrue\ntrue\n"
 
 
 def _parse(source: str, temp: pathlib.Path):
@@ -109,8 +109,8 @@ class AnnotationTests(unittest.TestCase):
             "fn(main)\n  set var(ok): bool = 2 > 1\n  say var(ok)\nend\n"
             "call fn(main)\n"
         )
-        self.assertEqual(run_c(source), "1\n")
-        self.assertEqual(run_native(source), "1\n")
+        self.assertEqual(run_c(source), "true\n")
+        self.assertEqual(run_native(source), "true\n")
 
 
 if __name__ == "__main__":

@@ -44,6 +44,13 @@ TEXT_LISTS: set[str] = set()
 TEXT_LIST_CAP = 256
 # Enum values are plain numbers; the names are constants.
 ENUM_VALUES: dict[str, float] = {}
+# Variables declared `: bool` print as true/false.
+BOOL_VARIABLES: set[str] = set()
+
+
+def set_bool_variables(names) -> None:
+    BOOL_VARIABLES.clear()
+    BOOL_VARIABLES.update(names)
 
 
 def set_string_variables(names) -> None:

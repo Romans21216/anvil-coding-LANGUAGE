@@ -37,6 +37,9 @@ def load_program(path, source, *, include_root=None):
     from compiler.expressions import ENUM_VALUES
 
     ENUM_VALUES.clear()
+    from compiler.expressions import set_bool_variables
+
+    set_bool_variables(set())
     path = Path(path)
     root = Path(include_root).resolve() if include_root is not None else path.resolve().parent
     result = ParsedProgram(path, {}, [], set(), ArrayDeclarations(), [], [])

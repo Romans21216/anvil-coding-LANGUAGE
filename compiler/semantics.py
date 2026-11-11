@@ -426,6 +426,9 @@ def validate_program(program: ParsedProgram) -> None:
     _classify_text_params(program)
     _validate_call_kinds(program)
     program.bool_variables = _validate_declared_types(program, string_vars)
+    from compiler.expressions import set_bool_variables
+
+    set_bool_variables(program.bool_variables)
     if not functions:
         raise CompileError(f"{path}: define at least one fn(name) function")
 

@@ -15,6 +15,7 @@ from compiler.expressions import (
     ENUM_VALUES,
     LISTS,
     NAME_SUGGESTIONS,
+    BOOL_VARIABLES,
     STRING_VARIABLES,
     TEXT_LISTS,
     set_string_variables,
@@ -722,6 +723,19 @@ def _is_native_text_list_read(part: str) -> bool:
     return match is not None and match.group(1) in TEXT_LISTS
 
 
+def _is_native_bool_var(part: str) -> bool:
+    match = _VAR_PATTERN.fullmatch(part.strip()) if "_VAR_PATTERN" in globals() else None
+    return match is not None and match.group(1) in BOOL_VARIABLES
+
+
+_BOOL_VAR_PATTERN = __import__("re").compile(r"var\(([A-Za-z_][\w-]*)\)")
+
+
+def _is_native_bool_var(part: str) -> bool:
+    match = _BOOL_VAR_PATTERN.fullmatch(part.strip())
+    return match is not None and match.group(1) in BOOL_VARIABLES
+
+
 def _is_native_string_var(part: str) -> bool:
     match = _NATIVE_VAR.fullmatch(part.strip())
     return match is not None and match.group(1) in STRING_VARIABLES
@@ -947,6 +961,28 @@ class NativeCodegen:
             b"Anvil text list is full (256 values)\n".decode("unicode_escape")
         )
         self.code.label(good)
+
+    def emit_print_bool(self) -> None:
+        """Print xmm0 as true/false without a newline."""
+        if b"true" not in self._text_cache:
+            self._text_cache[b"true"] = self.reserve_data(b"true")
+        if b"false" not in self._text_cache:
+            self._text_cache[b"false"] = self.reserve_data(b"false")
+        false_label = self.label("bool_false")
+        end_label = self.label("bool_end")
+        self.code.bytes(b"\x66\x0f\xef\xc9")                # xorpd xmm1, xmm1
+        self.code.bytes(b"\x66\x0f\x2e\xc1")                # ucomisd xmm1, xmm0
+        self.code.conditional_jump(0x84, false_label)          # je false
+        self.code.rip_lea_data(1, self._text_cache[b"true"])   # rcx = "true"
+        self.code.mov_imm(2, 4)                                # rdx = 4
+        self._needs_text_helper = True
+        self.code.call("function:anvil_print_text")
+        self.code.jump(end_label)
+        self.code.label(false_label)
+        self.code.rip_lea_data(1, self._text_cache[b"false"])  # rcx = "false"
+        self.code.mov_imm(2, 5)                                 # rdx = 5
+        self.code.call("function:anvil_print_text")
+        self.code.label(end_label)
 
     def emit_text_list_add(self, name: str, value: str, line: int, scope) -> None:
         block = self._text_list_block(name)
@@ -1418,6 +1454,9 @@ class NativeCodegen:
                         self.emit_expression(part, node.line, scope)
                         self.code.mov_imm(1, 0)  # no newline mid-line
                         self.code.call("function:anvil_print_number")
+                    elif _is_native_bool_var(part):
+                        self.emit_expression(part, node.line, scope)
+                        self.emit_print_bool()
                     elif (
                         len(split_amp(part)) > 1
                         or _is_native_text_list_read(part)

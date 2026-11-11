@@ -413,6 +413,7 @@ CASES: dict[str, str] = {
     "selective_import": ('include fn(move) -- "lib/player.ANVL"\n\nfn(main)\n  say call fn(move--player, 10)\nend\ncall fn(main)\n', bytes([10]), {"lib/player.ANVL": 'fn(bump, n)\n  output var(n) + 1\nend\nfn(move, n)\n  output call fn(bump, var(n)) * 2\nend\n'}),
     "unicode_bytes": 'fn(main)\n  say len("héllo")\n  say mid("héllo", 0, 1)\n  say upper("abc")\n  say len("")\nend\ncall fn(main)\n',
     "text_list": 'list names: text\nfn(main)\n  add names "ada"\n  add names "grace"\n  say count(names)\n  say array(names, 0)\n  say array(names, 0) & "/" & array(names, 1)\n  for each n in names\n    say var(n)\n  end\nend\ncall fn(main)\n',
+    "bool_values": 'fn(main)\n  set var(alive): bool = true\n  set var(dead): bool = false\n  set var(score): number = 7\n  say var(alive)\n  say var(dead)\n  say var(score)\n  say 1 = 1\nend\ncall fn(main)\n',
 }
 
 
