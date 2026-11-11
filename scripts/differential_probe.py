@@ -407,6 +407,7 @@ CASES: dict[str, str] = {
     "text_parameters": 'fn(greet, who)\n  output "hi " & var(who)\nend\n\nfn(shout, s)\n  output upper(var(s)) & "!"\nend\n\nfn(tag, mark, n)\n  output "[" & var(mark) & "]" & var(n)\nend\n\nfn(is_hi, s)\n  if var(s) = "hi"\n    output 1\n  end\n  output 0\nend\n\nfn(echo, s)\n  output var(s)\nend\n\nfn(repeat_text, s, n)\n  if var(n) <= 0\n    output ""\n  end\n  output var(s) & call fn(repeat_text, var(s), var(n) - 1)\nend\n\nfn(main)\n  set var(name) = "Bob"\n  say call fn(greet, var(name))\n  say call fn(shout, "quiet")\n  say call fn(tag, "x", 7)\n  say call fn(is_hi, "hi")\n  say call fn(is_hi, "ho")\n  say call fn(echo, call fn(greet, "ada"))\n  say len(call fn(repeat_text, "ab", 3))\nend\ncall fn(main)\n',
     "type_annotations": 'fn(main)\n  set var(score): number = 5\n  set var(name): text = "ada"\n  set var(alive): bool = true\n  set var(grown): bool = var(score) > 3\n  say var(score) + 1\n  say len(var(name))\n  say var(alive)\n  say var(grown)\nend\ncall fn(main)\n',
     "list_remove": 'list nums\nfn(main)\n  add nums 10\n  add nums 20\n  add nums 30\n  remove nums 1\n  say count(nums)\n  say array(nums, 0) + array(nums, 1)\n  remove nums 7\n  say count(nums)\nend\ncall fn(main)\n',
+    "for_each": 'list nums\nfn(main)\n  add nums 4\n  add nums 7\n  add nums 9\n  set var(total) = 0\n  for each v in nums\n    add var(total) var(v)\n  end\n  say var(total)\n  for each v in nums\n    if var(v) = 7\n      continue\n    end\n    say var(v)\n  end\nend\ncall fn(main)\n',
 }
 
 

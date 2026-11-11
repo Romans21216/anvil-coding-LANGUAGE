@@ -250,6 +250,44 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             stack[-1][0].append(node)
             stack.append((node.body, "for", node))
             continue
+        each_loop = re.fullmatch(
+            r"for\s+each\s+([A-Za-z_][\w-]*)\s+in\s+([A-Za-z_][\w-]*)", line
+        )
+        if each_loop:
+            if current_function is None:
+                raise CompileError(
+                    f"{path}:{line_no}: for each loops must be inside a function"
+                )
+            item_name, list_name = each_loop.groups()
+            if list_name not in lists:
+                raise CompileError(
+                    f"{path}:{line_no}: unknown list {list_name!r}; declare it "
+                    f"with `list {list_name}` at the top of the file"
+                )
+            if item_name in arrays:
+                raise CompileError(
+                    f"{path}:{line_no}: for each variable {item_name!r} is already "
+                    "an array or list"
+                )
+            cursor = f"{list_name}__each{line_no}"
+            # Both the element and the cursor are plain globals so `var(item)`
+            # reads like any other variable; that is what keeps the desugar
+            # backend-free.
+            variables.add(item_name)
+            current_function.locals.add(cursor)
+            seed = Node(
+                "set", line_no, f"array({list_name}, local({cursor}))", item_name
+            )
+            node = Node(
+                "for",
+                line_no,
+                name=cursor,
+                params=["0", f"count({list_name}) - 1", "1"],
+                body=[seed],
+            )
+            stack[-1][0].append(node)
+            stack.append((node.body, "for", node))
+            continue
         for_loop = re.fullmatch(r"for\s+local\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
         if for_loop:
             if current_function is None:
