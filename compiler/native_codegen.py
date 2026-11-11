@@ -161,8 +161,16 @@ class _Expression:
                 raise CompileError(
                     f"{self.owner.path}:{self.line}: array access expects array(name, index)"
                 )
-            self.owner.emit_array_read(parts[0], parts[1], self.line, self.scope)
-            left = _Value("number", "array")
+            if parts[0] in TEXT_LISTS:
+                self.owner.emit_text_list_read(
+                    parts[0], parts[1], self.line, self.scope
+                )
+                left = _Value("text", "text-array")
+            else:
+                self.owner.emit_array_read(
+                    parts[0], parts[1], self.line, self.scope
+                )
+                left = _Value("number", "array")
         elif kind == "string":
             payload = decode_string(value).encode("utf-8")
             if payload not in self.owner._text_cache:
@@ -706,6 +714,14 @@ def _has_comparison(part: str) -> bool:
     return _COMPARISON.search(stripped) is not None
 
 
+_TEXT_LIST_READ = __import__("re").compile(r"array\(\s*([A-Za-z_][\w-]*)\s*,")
+
+
+def _is_native_text_list_read(part: str) -> bool:
+    match = _TEXT_LIST_READ.match(part.strip())
+    return match is not None and match.group(1) in TEXT_LISTS
+
+
 def _is_native_string_var(part: str) -> bool:
     match = _NATIVE_VAR.fullmatch(part.strip())
     return match is not None and match.group(1) in STRING_VARIABLES
@@ -891,6 +907,73 @@ class NativeCodegen:
         else:
             displacement = -self._frame_slots[name]
         self.code.bytes(self._memory_operand(0, 5, displacement))
+
+    def _text_list_block(self, name: str) -> int:
+        """Reserve (once) the 256 x 256-byte block that backs a text list."""
+        if not hasattr(self, "_text_list_blocks"):
+            self._text_list_blocks: dict[str, int] = {}
+        if name not in self._text_list_blocks:
+            self._text_list_blocks[name] = self.reserve_data(bytes(256 * 256))
+        return self._text_list_blocks[name]
+
+    def _slot_displacement(self, slot: str) -> int:
+        return -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
+
+    def _store_rax_rbp(self, displacement: int) -> None:
+        self.code.bytes(b"\x48\x89\x85" + struct.pack("<i", displacement))
+
+    def _guard_read_index(self, name: str, line: int) -> None:
+        """rax is an index: refuse a negative one or one past the count."""
+        bad = self.label("textlist_bad")
+        good = self.label("textlist_ok")
+        self.code.bytes(b"\x48\x85\xc0")                    # test rax, rax
+        self.code.conditional_jump(0x88, bad)                 # js bad
+        self.load_variable(f"{name}__count", None, line)      # xmm0 = count
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc8")           # cvttsd2si rcx,xmm0
+        self.code.bytes(b"\x48\x39\xc8")                    # cmp rax, rcx
+        self.code.conditional_jump(0x82, good)                # jb good
+        self.code.label(bad)
+        self.emit_runtime_error(
+            b"Anvil list index is outside the list\n".decode("unicode_escape")
+        )
+        self.code.label(good)
+
+    def _guard_append_index(self, line: int) -> None:
+        """rax is the append slot: stop at the 256-entry capacity."""
+        good = self.label("textlist_room")
+        self.code.bytes(b"\x48\x3d\x00\x01\x00\x00")      # cmp rax, 256
+        self.code.conditional_jump(0x82, good)                # jb good
+        self.emit_runtime_error(
+            b"Anvil text list is full (256 values)\n".decode("unicode_escape")
+        )
+        self.code.label(good)
+
+    def emit_text_list_add(self, name: str, value: str, line: int, scope) -> None:
+        block = self._text_list_block(name)
+        self.load_variable(f"{name}__count", scope, line)      # xmm0 = count
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")           # cvttsd2si rax,xmm0
+        self._guard_append_index(line)
+        self.code.bytes(b"\x48\xc1\xe0\x08")               # shl rax, 8
+        self.code.rip_lea_data(2, block)                      # lea rdx,[block]
+        self.code.bytes(b"\x48\x01\xd0")                    # add rax, rdx
+        slot = self.push_temp()
+        displacement = self._slot_displacement(slot)
+        self._store_rax_rbp(displacement)                     # dst -> frame slot
+        self.emit_expression(value, line, scope, expected="text")  # rax = source
+        self.code.bytes(b"\x48\x89\xc2")                    # mov rdx, rax
+        self._load_rax_rbp(displacement)                      # rax = dst
+        self.code.bytes(b"\x48\x89\xc1")                    # mov rcx, rax
+        self.code.call("function:anvil_str_copy")
+        self.pop_temp()
+
+    def emit_text_list_read(self, name: str, raw_index: str, line: int, scope) -> None:
+        block = self._text_list_block(name)
+        self.emit_expression(raw_index, line, scope)          # xmm0 = index
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")           # cvttsd2si rax,xmm0
+        self._guard_read_index(name, line)
+        self.code.bytes(b"\x48\xc1\xe0\x08")               # shl rax, 8
+        self.code.rip_lea_data(2, block)                      # lea rdx,[block]
+        self.code.bytes(b"\x48\x01\xd0")                    # add rax, rdx -> text
 
     def store_local(self, name: str) -> None:
         if name.startswith("_temporary_"):
@@ -1193,6 +1276,8 @@ class NativeCodegen:
                 self.emit_expression(node.value, node.line, scope)
                 self.emit_finite_check(node.line)
                 self._math.seed(node.line)
+            elif node.kind == "text_list_add":
+                self.emit_text_list_add(node.name, node.value, node.line, scope)
             elif node.kind == "set":
                 if node.string:
                     self._needs_string_helpers = True
@@ -1335,6 +1420,7 @@ class NativeCodegen:
                         self.code.call("function:anvil_print_number")
                     elif (
                         len(split_amp(part)) > 1
+                        or _is_native_text_list_read(part)
                         or _is_native_string_var(part)
                         or _is_native_text_call(part, self.functions)
                         or _TEXT_BUILTIN_CALL.fullmatch(part)
@@ -2475,12 +2561,6 @@ class NativeCodegen:
         self.code.bytes(b"\x48\x83\xc4\x58\xc3")        # add rsp,0x58; ret
 
     def generate(self) -> bytes:
-        if TEXT_LISTS:
-            name = sorted(TEXT_LISTS)[0]
-            raise CompileError(
-                f"text list {name!r} is not available in the native x64 backend "
-                "yet; build with --backend c"
-            )
         if any(node.kind == "scene" for node in self.top):
             return self._generate_window()
         calls = [node for node in self.top if node.kind == "call"]
