@@ -1,0 +1,137 @@
+GOAL PROMPT FOR THE NEXT AI AGENT
+=================================
+
+GOAL
+----
+
+Continue Anvil development by completing the implementation work described in
+both of these documents:
+
+1. docs/REVIEW_2F0AC68.txt
+2. docs/LANGUAGE_FEATURE_ROADMAP.txt
+
+Treat GitHub issue #23 and its comments as the master requirements inventory.
+The two documents above are the focused review and language-feature plan for
+this work; they do not replace issue #23.
+
+PROJECT AND STARTING STATE
+--------------------------
+
+The Anvil repository is an embedded Git repository at:
+
+  C:\Users\power\Documents\buld\os\toolchain\anvil
+
+Remote:
+
+  https://github.com/Romans21216/anvil-coding-LANGUAGE
+
+The reviewed feature branch is:
+
+  codex/anvil-user-updates-2f0ac68
+
+Latest handoff commit when this prompt was written:
+
+  2b1c1527a0fb55d6e8d9d646c8e0b24984f0b994
+
+That branch contains the language implementation batch plus the review and
+language-feature roadmap. GitHub main has newer commits than the original
+Anvil snapshot used by the batch. A previous rebase attempt found conflicts in
+core compiler, runtime, documentation, and test files. Fetch and inspect the
+current remote state before editing. Preserve the user's changes and all
+current main history. Never force-push or replace main with the older snapshot.
+Use a work branch or worktree and integrate carefully.
+
+OBJECTIVE
+---------
+
+Implement the language improvements in LANGUAGE_FEATURE_ROADMAP.txt and fix
+the concrete issues in REVIEW_2F0AC68.txt. Preserve Anvil's easy BASIC/Lua-like
+style. Keep version-1 behavior compatible; introduce incompatible syntax or
+semantics only under an explicit language-version change.
+
+REQUIRED WORK
+-------------
+
+1. Reconcile the feature branch with current GitHub main, keeping both histories
+   and resolving conflicts deliberately.
+2. Correct the REPL's state model. Replaying prior `add`/`sub` operations or
+   losing state changed inside blocks is not acceptable. Use a persistent
+   session or another design with correct variable, list, array, and side-effect
+   behavior across prompts.
+3. Add Anvil-level call-graph dead-code elimination to both C and native
+   backends. Remove unreachable user functions from generated code, retaining
+   every entry point, engine callback, explicit top-level call, transitive
+   call, recursive function, and supported imported/function-reference target.
+   Remove unused runtime modules/helpers where the current architecture allows.
+4. Improve the actual language in the roadmap's order: general typed function
+   arguments and return values; simple `number`, `text`, and `bool` types;
+   reliable documented Unicode/string behavior; typed growable collections;
+   records and enums; checked function references; loop control; selective
+   imports/namespaces using the approved double-dash form; and explicit error
+   or optional-value handling.
+5. Replace fragile duplicated string-based type inference and backend-specific
+   expression parsing with a shared typed representation where feasible. Keep
+   C and direct-native behavior aligned for every feature they both claim.
+6. Correct LANGUAGE_SPEC.md and related docs so they describe implemented
+   syntax, type rules, backend limits, and version compatibility accurately.
+7. Add focused regression tests for each change, run targeted checks followed
+   by the applicable complete suite, and record exact commands and results.
+8. Measure performance and executable size before making efficiency claims.
+   Record the machine, compiler, configurations, sample programs, and results.
+9. Update the review/roadmap status with what is implemented, tested, partial,
+   or still missing. Request an independent full review of the exact final
+   commit. The prior 79/100 score was provisional and static; do not present it
+   as a verified baseline for a rebased commit. Passing requires at least
+   98/100 and verified completion of required functionality, not a green test
+   suite or self-scored rubric alone.
+
+IMPORTANT LANGUAGE DETAILS
+--------------------------
+
+- Preserve the simple `fn(name, parameters...)` and `call fn(...)` mental model.
+- Existing files without a version declaration are version 1.
+- The approved selective-import spelling is:
+
+    include fn(move) -- "lib/player.ANVL"
+    call fn(move -- player, 10)
+
+- Keep whole-file includes working unless a documented versioned migration is
+  necessary. Validate project-root boundaries and report errors at the import
+  site.
+- Do not add arbitrary unsafe pointers, implicit text/number conversions, or
+  a large collection of redundant keywords.
+- Keep documentation and runtime behavior honest about Windows/MSVC, the
+  experimental native backend, GPU/DXR/Embree availability, and network
+  security/reliability.
+- Full project requirements remain in GitHub issue #23. Do not copy its entire
+  backlog into another repository document.
+
+WORKING RULES
+-------------
+
+- Inspect repository instructions and existing implementations before editing.
+- Keep changes focused and preserve unrelated user work.
+- Add tests for changed behavior; never claim a test or hardware check passed
+  unless it was run on the stated commit and configuration.
+- Do not mark incomplete roadmap items complete. Record concrete blockers and
+  remaining acceptance criteria.
+- Keep installed VS Code extension 0.1.4 unchanged; package and automatically
+  validate newer extensions without installing them.
+- Keep physical-machine and network claims separate from emulator/local test
+  evidence.
+- Commit work on the integration branch. Push only the intended branch, and
+  do not force-push.
+
+DEFINITION OF DONE
+------------------
+
+The branch is based on current GitHub main without losing either history; all
+items in both documents are implemented or explicitly recorded with evidence
+and a concrete unresolved acceptance criterion; tests pass on the final
+commit; the language specification and examples match the implementation; the
+dead-code elimination requirement is verified on both backends; a full
+independent review rates the exact final commit at 98/100 or higher; and the
+final report identifies the exact commit, tests, score, remaining gaps, and
+whether the result has been pushed or proposed for merge.
+
+END OF GOAL PROMPT

@@ -61,6 +61,20 @@ def _literal_for(value: str) -> str:
         return value
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
+_BLOCK_START = re.compile(r"^(?:if|while|for|repeat)\b", re.I)
+# A block is remembered between prompts when it only changes state: replaying
+# it must not print again, ask again, or sleep again.
+_NOISY_STATEMENT = re.compile(r"\b(?:say|write|ask|press|display|wait)\b", re.I)
+
+
+def _is_persistable_block(statement: str) -> bool:
+    if chr(10) not in statement:
+        return False
+    if not _BLOCK_START.match(statement.strip()):
+        return False
+    return _NOISY_STATEMENT.search(statement) is None
+
+
 _STATEMENT_START = re.compile(
     r"^(?:set|add|sub|say|write|ask|if|elif|else|end|repeat|while|for|stop|wait|"
     r"press|output|call|list|include|fn|scene|camera|clear|display|seed)\b",
@@ -246,6 +260,9 @@ class Shell:
         ok, output = self._run(self.program(rewritten))
         if not ok:
             raise ReplError(output)
+        if _is_persistable_block(rewritten):
+            self.history.append(rewritten)
+            return output
         if not assignment:
             return output
         target = _ASSIGN_TARGET.match(rewritten)

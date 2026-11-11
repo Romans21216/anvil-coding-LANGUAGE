@@ -771,6 +771,7 @@ class NativeCodegen:
         self._frame_size = 0
         self._scope: Node | None = None
         self._local_array_slots: dict[str, tuple[int, int]] = {}
+        self._loop_stack: list[tuple[str, str]] = []
         self._data_offsets = {
             name: index * 8 for index, name in enumerate(sorted(variables))
         }
@@ -1213,7 +1214,11 @@ class NativeCodegen:
                 self.emit_expression(node.value, node.line, scope)
                 self.code.bytes(b"\x66\x0f\xef\xc9\x66\x0f\x2e\xc1")
                 self.code.conditional_jump(0x84, end)
-                self.emit_nodes(node.body, scope)
+                self._loop_stack.append((start, end))
+                try:
+                    self.emit_nodes(node.body, scope)
+                finally:
+                    self._loop_stack.pop()
                 self.code.jump(start)
                 self.code.label(end)
             elif node.kind == "for":
@@ -1248,7 +1253,13 @@ class NativeCodegen:
                 self.code.bytes(b"\x66\x0f\x2e\xc1")
                 self.code.conditional_jump(0x87, end)  # current > end for positive step
                 self.code.label(body)
-                self.emit_nodes(node.body, scope)
+                continue_at = self.label("for_continue")
+                self._loop_stack.append((continue_at, end))
+                try:
+                    self.emit_nodes(node.body, scope)
+                finally:
+                    self._loop_stack.pop()
+                self.code.label(continue_at)
                 self.load_local(node.name, scope, node.line)
                 self.store_local(start_slot)
                 self.load_local(step_slot, scope, node.line)
@@ -1259,6 +1270,13 @@ class NativeCodegen:
                 self.pop_temp()
                 self.pop_temp()
                 self.pop_temp()
+            elif node.kind in ("break", "continue"):
+                if not self._loop_stack:
+                    raise CompileError(
+                        f"{self.path}:{node.line}: {node.kind} must be inside a loop"
+                    )
+                target = self._loop_stack[-1][1 if node.kind == "break" else 0]
+                self.code.jump(target)
             elif node.kind == "stop":
                 self.code.mov_imm(1, 0)                    # exit code 0
                 self.code.rip_call_import("ExitProcess")

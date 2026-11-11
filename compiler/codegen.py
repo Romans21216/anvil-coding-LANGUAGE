@@ -187,8 +187,10 @@ def emit_nodes(
     indent: str,
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
+    loops: list[dict] | None = None,
 ) -> list[str]:
     arrays = arrays or {}
+    loops = loops if loops is not None else []
     out = []
 
     def lower(node: Node, value: str | None = None, expected: str = "number") -> str:
@@ -373,7 +375,7 @@ def emit_nodes(
         elif n.kind == "if":
             out.append(f"{indent}if ({lower(n)} != 0.0) {{")
             out.extend(
-                emit_nodes(path, n.body, functions, indent + "    ", scope, arrays)
+                emit_nodes(path, n.body, functions, indent + "    ", scope, arrays, loops)
             )
             if n.otherwise:
                 out.append(f"{indent}}} else {{")
@@ -385,9 +387,13 @@ def emit_nodes(
             out.append(f"{indent}}}")
         elif n.kind == "while":
             out.append(f"{indent}while ({lower(n)} != 0.0) {{")
-            out.extend(
-                emit_nodes(path, n.body, functions, indent + "    ", scope, arrays)
-            )
+            loops.append({})
+            try:
+                out.extend(
+                    emit_nodes(path, n.body, functions, indent + "    ", scope, arrays, loops)
+                )
+            finally:
+                loops.pop()
             out.append(f"{indent}}}")
         elif n.kind == "for":
             if scope is None:
@@ -412,9 +418,20 @@ def emit_nodes(
                 f"|| ({step_var} < 0.0 && {loop_var} >= {end_var}))"
             )
             out.append(f"{inner}    while ({condition}) {{")
-            out.extend(
-                emit_nodes(path, n.body, functions, inner + "        ", scope, arrays)
-            )
+            loops.append({
+                "for_increment": (
+                    f"{loop_var} = anvil_check_number("
+                    f"({loop_var} + {step_var}), {source_path}, {n.line});"
+                )
+            })
+            try:
+                out.extend(
+                    emit_nodes(
+                        path, n.body, functions, inner + "        ", scope, arrays, loops
+                    )
+                )
+            finally:
+                loops.pop()
             out.append(
                 f"{inner}        {loop_var} = anvil_check_number("
                 f"({loop_var} + {step_var}), {source_path}, {n.line});"
@@ -422,6 +439,18 @@ def emit_nodes(
             out.append(f"{inner}    }}")
             out.append(f"{inner}}}")
             out.append(f"{indent}}}")
+        elif n.kind in ("break", "continue"):
+            if not loops:
+                raise CompileError(
+                    f"{path}:{n.line}: {n.kind} must be inside a loop"
+                )
+            if n.kind == "continue":
+                increment = loops[-1].get("for_increment")
+                if increment:
+                    # A C `continue` would skip the for-loop increment entirely,
+                    # so apply it first and then continue.
+                    out.append(f"{indent}{increment}")
+            out.append(f"{indent}{n.kind};")
         elif n.kind == "scene":
             out.append(f"{indent}anvil_set_scene3d({1 if n.value == '3d' else 0});")
         elif n.kind == "camera":
@@ -494,6 +523,17 @@ def emit_c(
     project_name: str = "Anvil Game",
 ) -> str:
     arrays = arrays or {}
+    # Emit only functions reachable from the real entry points (top-level calls,
+    # main, and active engine callbacks), exactly like the native backend. A
+    # helper that is never called should not reach the generated C at all.
+    from compiler.modules import reachable_functions
+
+    graphical = (
+        "draw" in functions
+        or "update" in functions
+        or any(node.kind == "scene" for node in top)
+    )
+    functions = dict(reachable_functions(functions, top, graphical=graphical))
     string_variables = set(STRING_VARIABLES)
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",

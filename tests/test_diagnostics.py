@@ -170,6 +170,16 @@ class CheckModeTests(unittest.TestCase):
             emit_c(path, functions, top, variables, arrays)
         self.assertIn("variables are written var(mystery)", str(caught.exception))
 
+    def test_null_assignment_is_an_explicit_error(self) -> None:
+        # `= null` used to be dropped silently, leaving the variable undefined.
+        path = self.root / "null.ANVL"
+        source = ("fn(main)" + chr(10) + "  set var(x) = null" + chr(10) + "end" + chr(10) + "call fn(main)" + chr(10)
+        )
+        path.write_text(source, encoding="utf-8")
+        with self.assertRaises(CompileError) as caught:
+            parse(path, source)
+        self.assertIn("null is not a value", str(caught.exception))
+
     def test_local_variable_used_as_global_names_the_real_fix(self) -> None:
         path = self.root / "local-mixup.ANVL"
         source = "fn(main)\n  for local(i) = 0 to 1\n    say var(i)\n  end\nend\ncall fn(main)\n"

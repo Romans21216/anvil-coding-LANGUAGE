@@ -229,6 +229,13 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             node = Node("stop", line_no)
             stack[-1][0].append(node)
             continue
+        if line in ("break", "continue"):
+            if not any(entry[1] in ("while", "for", "repeat") for entry in stack):
+                raise CompileError(
+                    f"{path}:{line_no}: {line} must be inside a loop"
+                )
+            stack[-1][0].append(Node(line, line_no))
+            continue
         if line == "repeat" or line.startswith("repeat "):
             count = line[len("repeat "):].strip() if line != "repeat" else ""
             if not count:
@@ -287,8 +294,12 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             continue
         node = None
         if re.fullmatch(r"set\s+var\([A-Za-z_][\w-]*\)\s*=\s*null", line):
-            # Cleanup after output is syntactic sugar; scalar values live in globals.
-            continue
+            # `null` used to be a silent no-op, which left the variable undefined
+            # and produced a confusing error later. Say what is wrong instead.
+            raise CompileError(
+                f"{path}:{line_no}: null is not a value in Anvil; assign a "
+                "number or text"
+            )
         match = re.fullmatch(r"set\s+local\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
         if match:
             if current_function is None:

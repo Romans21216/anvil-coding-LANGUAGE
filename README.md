@@ -34,7 +34,9 @@ hello, Ada
 - Text functions count bytes, not letters: `len("héllo")` is 6 and `char("héllo", 1)` returns the second byte of `é`. Plain ASCII behaves exactly as you would expect; both backends agree byte for byte.
 - Text literals understand four escapes — newline, tab, a double quote, and a backslash itself — written as backslash-n, backslash-t, backslash-quote and a doubled backslash. Any other backslash sequence stays as written, so Windows paths need doubled backslashes.
 - `repeat <count>` runs a block that many times (`repeat 3` … `end`), accepting any expression; zero or negative counts run nothing. Both backends.
+- Unused functions are absent from generated code: the compiler emits only functions reachable from the top-level calls, `main`, and active `draw`/`update` callbacks. Both backends.
 - `stop` ends the program immediately with exit code 0 (statements after it never run); a skipped `stop` lets the program finish. Both backends.
+- `break` leaves the innermost `for`, `while` or `repeat` loop; `continue` skips to the next iteration (a `for` loop still applies its step). Both backends, including nested loops.
 - Text ordering: `<`, `<=`, `>`, `>=` compare text alphabetically (`if var(name) < "m"`), matching text against text only. Both backends.
 - `starts_with(text, prefix)` / `ends_with(text, suffix)` report 1 when the text begins or ends with the given text; a suffix longer than the text never matches. Both backends.
 - `contains(text, needle)` reports 1 when the needle occurs in the text, else 0; an empty needle always counts as contained. Both backends.
@@ -136,6 +138,9 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 
 - [Language guide](docs/LANGUAGE.md)
 - [Formal language specification](docs/LANGUAGE_SPEC.md)
+- [Backend capability matrix](docs/BACKENDS.md)
+- [Versioning and stability policy](docs/VERSIONING.md)
+- [Response to the commit review and language roadmap](docs/REVIEW_RESPONSE.md)
 - [Engine runtime](docs/ENGINE.md)
 - [Completion matrix](docs/COMPLETION_MATRIX.md)
 - [Audited implementation status](docs/IMPLEMENTATION_STATUS.md)

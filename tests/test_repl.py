@@ -86,6 +86,33 @@ class ReplLoopTests(unittest.TestCase):
         self.assertEqual(repl_main(stdin=io.StringIO(""), stdout=stdout), 0)
         self.assertIn("Anvil shell", stdout.getvalue())
 
+    def test_block_mutations_persist_between_prompts(self) -> None:
+        stdin = io.StringIO(
+            "x = 0" + chr(10) + "repeat 3" + chr(10) + "set var(x) = var(x) + 1" + chr(10) + "end" + chr(10)
+            + "say var(x)" + chr(10) + ":quit" + chr(10)
+        )
+        stdout = io.StringIO()
+        repl_main(stdin=stdin, stdout=stdout)
+        self.assertIn("3", stdout.getvalue())
+
+    def test_repeated_mutations_are_not_applied_twice(self) -> None:
+        stdin = io.StringIO(
+            "x = 0" + chr(10) + "add var(x) 5" + chr(10) + "add var(x) 5" + chr(10)
+            + "say var(x)" + chr(10) + ":quit" + chr(10)
+        )
+        stdout = io.StringIO()
+        repl_main(stdin=stdin, stdout=stdout)
+        self.assertIn("10", stdout.getvalue())
+
+    def test_noisy_blocks_are_not_replayed(self) -> None:
+        stdin = io.StringIO(
+            "repeat 2" + chr(10) + 'say "noise"' + chr(10) + "end" + chr(10)
+            + "say 1" + chr(10) + ":quit" + chr(10)
+        )
+        stdout = io.StringIO()
+        repl_main(stdin=stdin, stdout=stdout)
+        self.assertEqual(stdout.getvalue().count("noise"), 2)
+
     def test_ask_remembers_the_answer(self) -> None:
         stdin = io.StringIO(
             'ask var(name)\nAda\nsay "hello, " & var(name)\n'

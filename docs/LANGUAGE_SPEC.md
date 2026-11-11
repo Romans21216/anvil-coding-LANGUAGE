@@ -48,7 +48,7 @@ top_level_statement = global_assignment | cleanup_statement | engine_statement |
                     | "net host(", INTEGER, ")" | "net join(", STRING, ",", INTEGER, ")"
                     | function_call_statement ;
 global_assignment = "set var(", IDENT, ") =", expression ;
-cleanup_statement = "set var(", IDENT, ") = null" ;
+# `set var(x) = null` is a compile error: null is not a value.
 line_end         = physical_newline | end_of_file ;
 ```
 
@@ -63,9 +63,10 @@ Scalar globals are introduced by `set var(name) = expression`. Globals begin at 
 Every statement below occupies a single source line, except that a block statement owns the following lines up to its matching `end`.
 
 ```ebnf
-statement        = assignment | cleanup_statement | accumulation | array_write | function_call_statement | net_send_statement
-                 | return_statement | if_statement | while_statement
+statement        = assignment | accumulation | array_write | function_call_statement | net_send_statement
+                 | return_statement | if_statement | while_statement | loop_control
                  | for_statement | engine_statement | display_statement ;
+loop_control     = "break" | "continue" ;  # innermost for/while/repeat
 assignment       = "set var(", IDENT, ") =", expression
                  | "set local(", IDENT, ") =", expression ;
 accumulation     = ("add" | "sub"), whitespace, "var(", IDENT, ")", whitespace, expression
