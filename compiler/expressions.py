@@ -42,6 +42,8 @@ LISTS: set[str] = set()
 # Text lists keep their values in 256-byte slots, not doubles.
 TEXT_LISTS: set[str] = set()
 TEXT_LIST_CAP = 256
+# Enum values are plain numbers; the names are constants.
+ENUM_VALUES: dict[str, float] = {}
 
 
 def set_string_variables(names) -> None:
@@ -538,6 +540,8 @@ class ExpressionParser:
             # "a is not equal to b", but tighter than and/or.
             operand = self.require_number(self.parse(3))
             left = (f"((double)(!({self.checked_number(operand)})))", "number")
+        elif kind == "word" and value in ENUM_VALUES:
+            left = (repr(ENUM_VALUES[value]), "number")
         elif kind == "word" and value in ("true", "false"):
             left = ("1.0" if value == "true" else "0.0", "number")
         elif kind == "word" and value in ("and", "or"):

@@ -29,6 +29,7 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
     arrays = ArrayDeclarations()
     lists: set[str] = set()
     text_lists: set[str] = set()
+    enum_values: dict[str, float] = {}
     variable_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     local_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
@@ -142,6 +143,34 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     )
                 current_function.local_arrays[name] = size
                 current_function.local_array_lines[name] = line_no
+            continue
+        enum_decl = re.fullmatch(
+            r"enum\s+([A-Za-z_][\w-]*)\s+(.+)", line
+        )
+        if enum_decl:
+            if current_function is not None or len(stack) != 1:
+                raise CompileError(
+                    f"{path}:{line_no}: enums must be declared at top level"
+                )
+            type_name, values_text = enum_decl.groups()
+            values = [part.strip() for part in split_args(values_text)]
+            if not values or any(not re.fullmatch(r"[A-Za-z_][\w-]*", part) for part in values):
+                raise CompileError(
+                    f"{path}:{line_no}: enum {type_name} expects value names, "
+                    "for example: enum State idle, playing, paused"
+                )
+            for index, value_name in enumerate(values):
+                if value_name in enum_values:
+                    raise CompileError(
+                        f"{path}:{line_no}: enum value {value_name!r} is already "
+                        "declared"
+                    )
+                if value_name in functions or value_name in variables:
+                    raise CompileError(
+                        f"{path}:{line_no}: enum value {value_name!r} conflicts "
+                        "with a function or variable"
+                    )
+                enum_values[value_name] = float(index)
             continue
         list_decl = re.fullmatch(
             r"list\s+([A-Za-z_][\w-]*)(?:\s*:\s*([A-Za-z]+))?", line
@@ -580,12 +609,19 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             pending.extend(node.body)
             pending.extend(node.otherwise)
 
-    from compiler.expressions import LISTS, TEXT_LISTS
+    from compiler.expressions import ENUM_VALUES, LISTS, TEXT_LISTS
 
     # Accumulate: a program may include several files, each declaring lists.
     # load_program clears the registry once per program.
     LISTS.update(lists)
     TEXT_LISTS.update(text_lists)
+    for value_name in enum_values:
+        if value_name in variables:
+            raise CompileError(
+                f"{path}: enum value {value_name!r} conflicts with a function "
+                "or variable"
+            )
+    ENUM_VALUES.update(enum_values)
     mark_source(top)
     for function in functions.values():
         function.source = path

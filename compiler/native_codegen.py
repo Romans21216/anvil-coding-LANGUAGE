@@ -12,6 +12,7 @@ from compiler.common import CompileError, KEY_CODES, Node, decode_string
 from compiler.common import constant_truth
 from compiler.expressions import (
     BUILTINS,
+    ENUM_VALUES,
     LISTS,
     NAME_SUGGESTIONS,
     STRING_VARIABLES,
@@ -124,6 +125,9 @@ class _Expression:
             self.owner.code.bytes(b"\x0f\xb6\xc0")            # movzx eax, al
             self.owner.code.bytes(b"\xf2\x48\x0f\x2a\xc0")    # cvtsi2sd xmm0, rax
             left = _Value("number", "not")
+        elif kind == "word" and value in ENUM_VALUES:
+            self.owner.emit_float(ENUM_VALUES[value])
+            left = _Value("number", value)
         elif kind == "word" and value in ("true", "false"):
             self.owner.emit_float(1.0 if value == "true" else 0.0)
             left = _Value("number", value)

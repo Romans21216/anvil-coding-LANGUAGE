@@ -409,6 +409,7 @@ CASES: dict[str, str] = {
     "list_remove": 'list nums\nfn(main)\n  add nums 10\n  add nums 20\n  add nums 30\n  remove nums 1\n  say count(nums)\n  say array(nums, 0) + array(nums, 1)\n  remove nums 7\n  say count(nums)\nend\ncall fn(main)\n',
     "for_each": 'list nums\nfn(main)\n  add nums 4\n  add nums 7\n  add nums 9\n  set var(total) = 0\n  for each v in nums\n    add var(total) var(v)\n  end\n  say var(total)\n  for each v in nums\n    if var(v) = 7\n      continue\n    end\n    say var(v)\n  end\nend\ncall fn(main)\n',
     "dead_branch": 'fn(main)\n  if 0\n    say "never"\n  else\n    say "otherwise"\n  end\n  while 0\n    say "never"\n  end\n  if 1\n    say "taken"\n  end\nend\ncall fn(main)\n',
+    "enum_values": 'enum State idle, playing, paused\nfn(label, s)\n  if var(s) = playing\n    output "playing"\n  end\n  if var(s) = paused\n    output "paused"\n  end\n  output "idle"\nend\nfn(main)\n  set var(now) = playing\n  say call fn(label, var(now))\n  set var(now) = paused\n  say call fn(label, var(now))\n  say var(now)\nend\ncall fn(main)\n',
 }
 
 
