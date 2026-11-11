@@ -51,9 +51,27 @@ end
 call fn(main)
 """
 
-BIG = TINY + "\n".join(
-    f"fn(helper{i}, n)\n  output var(n) + {i}\nend\n" for i in range(40)
-) + "\nfn(unused_extra)\n  output 0\nend\n"
+# Every helper here is CALLED, so the row measures real code volume rather than
+# the reachability filter. `unused_extra` stays unreachable on purpose: comparing
+# this row with BIG_TRIMMED proves dead functions cost nothing in either backend.
+BIG = (
+    "\n".join(f"fn(helper{i}, n)\n  output var(n) + {i}\nend\n" for i in range(40))
+    + "\nfn(main)\n  set var(total) = 0\n"
+    + "".join(f"  add var(total) call fn(helper{i}, 1)\n" for i in range(40))
+    + "  say var(total)\nend\ncall fn(main)\n"
+)
+
+BIG_TRIMMED = TINY + "\n".join(
+    f"fn(unused{i}, n)\n  output var(n) + {i}\nend\n" for i in range(40)
+)
+
+
+CASES = (
+    ("tiny", TINY),
+    ("texty", TEXTY),
+    ("big", BIG),
+    ("big_trim", BIG_TRIMMED),
+)
 
 
 def measure_native(source: str, repeats: int = 5) -> tuple[float, int]:
@@ -96,7 +114,7 @@ def measure_c(source: str, repeats: int = 3) -> tuple[float, int] | None:
 
 def main() -> int:
     print(f"{'program':<10} {'backend':<8} {'compile s':>10} {'exe bytes':>10}")
-    for name, source in (("tiny", TINY), ("texty", TEXTY), ("big", BIG)):
+    for name, source in CASES:
         native_time, native_size = measure_native(source)
         print(f"{name:<10} {'native':<8} {native_time:>10.3f} {native_size:>10}")
         measured = measure_c(source)
