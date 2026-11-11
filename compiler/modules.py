@@ -90,7 +90,66 @@ def load_program(path, source, *, include_root=None):
         result.variable_references.extend(unit.variable_references)
         result.local_references.extend(unit.local_references)
         for node in unit.top:
-            if node.kind == "include":
+            if node.kind == "include_fn":
+                relative = include_name(node.value, unit_path, node.line)
+                target = (canonical.parent / relative).resolve()
+                try:
+                    target.relative_to(root)
+                except ValueError as error:
+                    raise CompileError(
+                        f"{unit_path}:{node.line}: include must resolve inside {root}"
+                    ) from error
+                qualifier = node.params[0] if node.params and node.params[0] else target.stem
+                try:
+                    payload = target.read_bytes()
+                    if len(payload) + total_bytes > MAX_SOURCE_BYTES:
+                        raise CompileError(
+                            f"{unit_path}:{node.line}: include source exceeds the 4 MiB budget"
+                        )
+                    target_text = payload.decode("utf-8-sig")
+                except (OSError, UnicodeError) as error:
+                    raise CompileError(
+                        f"{unit_path}:{node.line}: cannot read include {target}: {error}"
+                    ) from error
+                module = parse_syntax(target, target_text)
+                seen.add(target)
+                wanted = {node.name}
+                pending = [node.name]
+                while pending:
+                    current = pending.pop()
+                    function = module.functions.get(current)
+                    if function is None:
+                        continue
+                    for dependency in called_functions(function.body) - wanted:
+                        if dependency in module.functions:
+                            wanted.add(dependency)
+                            pending.append(dependency)
+                for function_name in sorted(wanted):
+                    function = module.functions.get(function_name)
+                    if function is None:
+                        raise CompileError(
+                            f"{unit_path}:{node.line}: {target.name} has no function {node.name!r}; add it or import a different name"
+                        )
+                    for body_node in [function, *list(_walk(function.body))]:
+                        for text_value in [body_node.value] + body_node.params:
+                            for reference in re.findall(
+                                r"var\(([A-Za-z_][\w-]*)\)|local\(([A-Za-z_][\w-]*)\)",
+                                text_value or "",
+                            ):
+                                global_name = reference[0]
+                                if global_name and global_name not in function.params:
+                                    raise CompileError(
+                                        f"{function.source}:{function.line}: selectively "
+                                        f"imported function {function_name!r} uses the "
+                                        f"global {global_name!r}; pass values as parameters"
+                                    )
+                    qualified = f"{function_name}--{qualifier}"
+                    if qualified in result.functions:
+                        raise CompileError(
+                            f"{unit_path}:{node.line}: duplicate function {qualified!r}"
+                        )
+                    result.functions[qualified] = _requalify(function, wanted, qualifier)
+            elif node.kind == "include":
                 relative = include_name(node.value, unit_path, node.line)
                 target = (canonical.parent / relative).resolve()
                 try:
@@ -104,6 +163,41 @@ def load_program(path, source, *, include_root=None):
 
     visit(path, source)
     return result
+
+
+def _walk(nodes):
+    for node in nodes:
+        yield node
+        yield from _walk(node.body)
+        yield from _walk(node.otherwise)
+
+
+def _requalify(function, names, qualifier):
+    """Rewrite `call fn(x)` for imported callees to the qualified name."""
+    import copy
+
+    clone = copy.deepcopy(function)
+    clone.name = f"{function.name}--{qualifier}"
+    for node in _walk([clone]):
+        for attribute in ("value", "params"):
+            current = getattr(node, attribute)
+            if isinstance(current, list):
+                node.params = [_requalify_text(item, names, qualifier) for item in current]
+            else:
+                setattr(node, attribute, _requalify_text(current, names, qualifier))
+    return clone
+
+
+def _requalify_text(text, names, qualifier):
+    import re as _re
+
+    def replace(match):
+        name = match.group(1)
+        if name in names:
+            return f"call fn({name}--{qualifier}"
+        return match.group(0)
+
+    return _re.sub(r"call\s+fn\(\s*([A-Za-z_][\w-]*)", replace, text or "")
 
 
 def called_functions(nodes):

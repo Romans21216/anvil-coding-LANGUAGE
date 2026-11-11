@@ -62,6 +62,7 @@ are single-machine observations, not a performance claim.
 
 | Priority | Status | Notes |
 |---|---|---|
+| Selective imports | **Done (first cut)** | `include fn(move) -- "lib.ANVL"` imports one function plus its callees under a `name--qualifier` binding, on both backends; globals stay private and are rejected with a clear message, and nested selective includes are not supported yet. |
 | Records and enums | **Partial** | Enums ship on both backends (`enum State idle, playing, paused`, numeric values, collision checks). Records are not started. |
 | 8. Useful failure results | **Partial** | `net host`, `net join` and `net send` now store their status (1 success, 0 failure) in `net_ok`, and the runtime's send returns a status instead of void. File and image calls still need the same treatment. |
 | 2. Simple types and real booleans | **Partial** | `number`, `text` and `bool` annotations are enforced with source-located errors and inference stays the default; `true`/`false` exist on both backends. Booleans are still stored and printed as 1/0, so real bool values, bool-typed function parameters and `and`/`or`/`not` returning bool are the remaining slice. |

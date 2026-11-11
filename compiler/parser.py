@@ -71,6 +71,30 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
         current_function = next(
             (frame[2] for frame in reversed(stack) if frame[1] == "function"), None
         )
+        selective = re.fullmatch(
+            r"include\s+fn\(([A-Za-z_][\w-]*)\)\s*(?:--|-)\s*(\".*\")(?:\s+as\s+([A-Za-z_][\w-]*))?",
+            line,
+        )
+        if selective:
+            if len(stack) != 1:
+                raise CompileError(
+                    f"{path}:{line_no}: include must be at top level"
+                )
+            name, raw_path, alias = selective.groups()
+            from compiler.modules import include_name
+
+            include_name(raw_path, path, line_no)
+            top.append(
+                Node(
+                    "include_fn",
+                    line_no,
+                    value=raw_path,
+                    name=name,
+                    params=[alias or ""],
+                    source=path,
+                )
+            )
+            continue
         if re.match(r"include\b", line):
             if len(stack) != 1:
                 raise CompileError(f"{path}:{line_no}: include must be at top level")
