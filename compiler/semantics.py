@@ -239,6 +239,12 @@ def _validate_call_kinds(program: ParsedProgram) -> None:
                     )
 
 
+def _text_lists() -> set[str]:
+    from compiler.expressions import TEXT_LISTS
+
+    return TEXT_LISTS
+
+
 def _declared_kind(program, node, string_vars, bool_vars) -> str:
     """The kind a `set` value has, for annotation checking."""
     value = (node.value or "").strip()
@@ -329,6 +335,9 @@ def _classify_string_variables(program: ParsedProgram, strict: bool = True) -> s
         segment = segment.strip()
         if not segment:
             return False
+        read = _re.match(r"array\(\s*([A-Za-z_][\w-]*)\s*,", segment)
+        if read is not None and read.group(1) in _text_lists():
+            return True
         if segment.startswith('"'):
             return True
         if _re.fullmatch(
@@ -456,6 +465,8 @@ def validate_program(program: ParsedProgram) -> None:
             for match in re.finditer(r"array\(\s*([A-Za-z_][\w-]*)\s*,", value):
                 name = match.group(1)
                 if name in program.arrays or name in fn.local_arrays:
+                    continue
+                if name in _text_lists():
                     continue
                 raise CompileError(
                     f"{node.source or path}:{node.line}: unknown array {name!r}"

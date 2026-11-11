@@ -39,6 +39,9 @@ _PARSE_DEPTH = ContextVar("anvil_expression_parse_depth", default=0)
 STRING_VARIABLES: set[str] = set()
 # List names declared with `list <name>`; `count(name)` reads their counter.
 LISTS: set[str] = set()
+# Text lists keep their values in 256-byte slots, not doubles.
+TEXT_LISTS: set[str] = set()
+TEXT_LIST_CAP = 256
 
 
 def set_string_variables(names) -> None:
@@ -452,7 +455,7 @@ class ExpressionParser:
                 raise CompileError(
                     f"{self.path}:{self.line}: count() expects a list name"
                 )
-            if contents not in LISTS:
+            if contents not in LISTS and contents not in TEXT_LISTS:
                 raise CompileError(
                     f"{self.path}:{self.line}: unknown list {contents!r}; "
                     f"declare it with list {contents}"
@@ -466,18 +469,28 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: array access expects array(name, index)"
                 )
             name = parts[0]
-            size = array_size(name, self.scope, self.arrays)
-            if size is None:
-                raise CompileError(f"{self.path}:{self.line}: unknown array {name!r}")
             index_expr = ExpressionParser(
                 self.path, self.line, parts[1], self.functions, self.scope, self.arrays
             ).compile()
-            left = (
-                f"anvil_array_get({array_code(name, self.scope)}, {size}, "
-                f"{index_expr}, "
-                f"{json.dumps(str(self.path))}, {self.line})",
-                "number",
-            )
+            if name in TEXT_LISTS:
+                left = (
+                    f"anvil_text_list_get({c_name(name)}__text, (int)({index_expr}), "
+                    f"{c_name(name)}__count, "
+                    f"{json.dumps(str(self.path))}, {self.line})",
+                    "string",
+                )
+            else:
+                size = array_size(name, self.scope, self.arrays)
+                if size is None:
+                    raise CompileError(
+                        f"{self.path}:{self.line}: unknown array {name!r}"
+                    )
+                left = (
+                    f"anvil_array_get({array_code(name, self.scope)}, {size}, "
+                    f"{index_expr}, "
+                    f"{json.dumps(str(self.path))}, {self.line})",
+                    "number",
+                )
         elif kind == "call":
             contents = value[value.index("fn(") + 3 : -1]
             parts = split_args(contents)

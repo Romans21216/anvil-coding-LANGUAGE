@@ -28,6 +28,7 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
     variables: set[str] = set()
     arrays = ArrayDeclarations()
     lists: set[str] = set()
+    text_lists: set[str] = set()
     variable_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     local_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
@@ -142,7 +143,9 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 current_function.local_arrays[name] = size
                 current_function.local_array_lines[name] = line_no
             continue
-        list_decl = re.fullmatch(r"list\s+([A-Za-z_][\w-]*)", line)
+        list_decl = re.fullmatch(
+            r"list\s+([A-Za-z_][\w-]*)(?:\s*:\s*([A-Za-z]+))?", line
+        )
         if list_decl:
             name = list_decl.group(1)
             if current_function is not None or len(stack) != 1:
@@ -153,9 +156,18 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 raise CompileError(
                     f"{path}:{line_no}: duplicate array or list '{name}'"
                 )
-            arrays[name] = LIST_CAPACITY
-            arrays.locations[name] = (path, line_no)
-            lists.add(name)
+            declared = list_decl.group(2)
+            if declared is not None and declared not in ("number", "text"):
+                raise CompileError(
+                    f"{path}:{line_no}: unknown list type {declared!r}; write "
+                    "number or text"
+                )
+            if declared == "text":
+                text_lists.add(name)
+            else:
+                arrays[name] = LIST_CAPACITY
+                arrays.locations[name] = (path, line_no)
+                lists.add(name)
             # The counter is a normal global; both backends zero-initialise
             # globals, so no top-level `set` node is needed (native rejects
             # top-level statements in console programs).
@@ -259,7 +271,7 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     f"{path}:{line_no}: for each loops must be inside a function"
                 )
             item_name, list_name = each_loop.groups()
-            if list_name not in lists:
+            if list_name not in lists and list_name not in text_lists:
                 raise CompileError(
                     f"{path}:{line_no}: unknown list {list_name!r}; declare it "
                     f"with `list {list_name}` at the top of the file"
@@ -441,13 +453,19 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 continue
         if node is None:
             match = re.fullmatch(r"add\s+([A-Za-z_][\w-]*)\s+(.+)", line)
-            if match and match.group(1) in lists:
+            if match and (match.group(1) in lists or match.group(1) in text_lists):
                 if current_function is None:
                     raise CompileError(
                         f"{path}:{line_no}: list writes must be inside a function"
                     )
                 list_name, value_expr = match.group(1), match.group(2)
                 counter = f"{list_name}__count"
+                if list_name in text_lists:
+                    stack[-1][0].append(
+                        Node("text_list_add", line_no, value_expr, list_name)
+                    )
+                    stack[-1][0].append(Node("add", line_no, "1", counter))
+                    continue
                 stack[-1][0].append(
                     Node(
                         "array_set",
@@ -559,11 +577,12 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             pending.extend(node.body)
             pending.extend(node.otherwise)
 
-    from compiler.expressions import LISTS
+    from compiler.expressions import LISTS, TEXT_LISTS
 
     # Accumulate: a program may include several files, each declaring lists.
     # load_program clears the registry once per program.
     LISTS.update(lists)
+    TEXT_LISTS.update(text_lists)
     mark_source(top)
     for function in functions.values():
         function.source = path

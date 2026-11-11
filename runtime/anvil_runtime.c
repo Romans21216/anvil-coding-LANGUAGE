@@ -807,6 +807,27 @@ static void anvil_camera_update(void) {
 #define ANVIL_STR_SLOTS 256
 char anvil_str_scratch[ANVIL_STR_SLOTS][ANVIL_STR_CAP];
 
+const char *anvil_text_list_get(const char block[][256], int index, double count,
+                                const char *path, int line) {
+  if (index < 0 || index >= (int)count) {
+    fprintf(stderr, "%s:%d: list index %d is outside 0..%d\n", path,
+            line, index, (int)count - 1);
+    exit(2);
+  }
+  return block[index];
+}
+
+void anvil_text_list_set(char block[][256], int index, double count,
+                         const char *value, const char *path, int line) {
+  (void)count;
+  if (index < 0 || index >= 256) {
+    fprintf(stderr, "%s:%d: text list is full (256 values)\n", path, line);
+    exit(2);
+  }
+  anvil_str_set(block[index], value, path, line);
+}
+
+
 static void anvil_str_overflow(const char *path, int line) {
   fprintf(stderr, "%s:%d: text is limited to %d characters\n", path ? path : "<Anvil>",
           line, ANVIL_STR_CAP - 1);

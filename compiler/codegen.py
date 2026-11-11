@@ -17,7 +17,10 @@ from compiler.common import (
     decode_string,
 )
 from compiler.expressions import (
+    LISTS,
     STRING_VARIABLES,
+    TEXT_LISTS,
+    TEXT_LIST_CAP,
     expr,
     set_string_variables,
     split_args,
@@ -44,6 +47,14 @@ _VAR_PATTERN = __import__("re").compile(r"var\(([A-Za-z_][\w-]*)\)")
 def _is_string_variable(part: str) -> bool:
     match = _VAR_PATTERN.fullmatch(part.strip())
     return match is not None and match.group(1) in STRING_VARIABLES
+
+
+_TEXT_LIST_READ = __import__("re").compile(r"array\(\s*([A-Za-z_][\w-]*)\s*,")
+
+
+def _is_text_list_read(part: str) -> bool:
+    match = _TEXT_LIST_READ.match(part.strip())
+    return match is not None and match.group(1) in TEXT_LISTS
 
 
 def rgb_style(
@@ -221,6 +232,21 @@ def emit_nodes(
                 out.append(f"{indent}{variable_code(n.name, scope)} = {lower(n)};")
         elif n.kind == "local_set":
             out.append(f"{indent}{c_name(scope.name + '__' + n.name)} = {lower(n)};")
+        elif n.kind == "text_list_add":
+            out.append(
+                f"{indent}anvil_text_list_set({c_name(n.name)}__text, "
+                f"(int){variable_code(n.name + '__count', scope)}, "
+                f"{variable_code(n.name + '__count', scope)}, "
+                f"{expr(path, n.line, n.value, functions, 'string', scope, arrays)}, "
+                f"{source_path}, {n.line});"
+            )
+        elif n.kind == "array_set" and n.name in TEXT_LISTS:
+            out.append(
+                f"{indent}anvil_text_list_set({c_name(n.name)}__text, "
+                f"(int)({lower(n, n.params[0])}), 0.0, "
+                f"{expr(path, n.line, n.value, functions, 'string', scope, arrays)}, "
+                f"{source_path}, {n.line});"
+            )
         elif n.kind == "array_set":
             size = array_size(n.name, scope, arrays)
             if size is None:
@@ -317,6 +343,7 @@ def emit_nodes(
                     out.append(f'{indent}printf("%s", anvil_format_number({lower(n, part)}));')
                 elif (
                     len(split_amp(part)) > 1
+                    or _is_text_list_read(part)
                     or _is_text_function_call(part, functions)
                     or re.fullmatch(
                         r"(upper|lower|chr|trim|char|mid|left|right)\s*\(.*\)", part, re.DOTALL
@@ -344,6 +371,7 @@ def emit_nodes(
                     out.append(f'{indent}printf("%s", anvil_format_number({lower(n, part)}));')
                 elif (
                     len(split_amp(part)) > 1
+                    or _is_text_list_read(part)
                     or _is_text_function_call(part, functions)
                     or re.fullmatch(
                         r"(upper|lower|chr|trim|char|mid|left|right)\s*\(.*\)", part, re.DOTALL
@@ -553,6 +581,10 @@ def emit_c(
     lines += [
         f"static char anvil_str_{c_name(name)}[256];"
         for name in sorted(string_variables)
+    ]
+    lines += [
+        f"static char {c_name(name)}__text[{TEXT_LIST_CAP}][256];"
+        for name in sorted(TEXT_LISTS)
     ]
     lines += [
         f"static double {c_name(name)}[{size}];"

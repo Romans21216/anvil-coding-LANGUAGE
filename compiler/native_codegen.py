@@ -9,7 +9,14 @@ import struct
 from dataclasses import dataclass
 
 from compiler.common import CompileError, KEY_CODES, Node, decode_string
-from compiler.expressions import BUILTINS, LISTS, NAME_SUGGESTIONS, STRING_VARIABLES, set_string_variables
+from compiler.expressions import (
+    BUILTINS,
+    LISTS,
+    NAME_SUGGESTIONS,
+    STRING_VARIABLES,
+    TEXT_LISTS,
+    set_string_variables,
+)
 from compiler.expressions import ExpressionParser, MAX_EXPRESSION_DEPTH, split_amp, split_args
 from compiler.lexer import strip_comment
 from compiler.native_x64 import Pe32Plus, X64Code
@@ -135,7 +142,7 @@ class _Expression:
             left = _Value(self._emit_builtin(value), value)
         elif kind == "count":
             contents = value[value.index("count(") + 6:-1].strip()
-            if contents not in LISTS:
+            if contents not in LISTS and contents not in TEXT_LISTS:
                 raise CompileError(
                     f"{self.owner.path}:{self.line}: unknown list {contents!r}; "
                     f"declare it with list {contents}"
@@ -2457,6 +2464,12 @@ class NativeCodegen:
         self.code.bytes(b"\x48\x83\xc4\x58\xc3")        # add rsp,0x58; ret
 
     def generate(self) -> bytes:
+        if TEXT_LISTS:
+            name = sorted(TEXT_LISTS)[0]
+            raise CompileError(
+                f"text list {name!r} is not available in the native x64 backend "
+                "yet; build with --backend c"
+            )
         if any(node.kind == "scene" for node in self.top):
             return self._generate_window()
         calls = [node for node in self.top if node.kind == "call"]

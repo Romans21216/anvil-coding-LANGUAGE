@@ -31,6 +31,9 @@ def load_program(path, source, *, include_root=None):
     from compiler.parser import parse_syntax
 
     LISTS.clear()
+    from compiler.expressions import TEXT_LISTS
+
+    TEXT_LISTS.clear()
     path = Path(path)
     root = Path(include_root).resolve() if include_root is not None else path.resolve().parent
     result = ParsedProgram(path, {}, [], set(), ArrayDeclarations(), [], [])
