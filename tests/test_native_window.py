@@ -213,7 +213,8 @@ end
             executable.write_bytes(image)
             result = subprocess.run([str(executable)], capture_output=True, timeout=5)
             self.assertEqual(result.returncode, 2)
-            self.assertEqual(result.stdout, b"Anvil native painting error\n")
+            self.assertEqual(result.stdout, b"")
+            self.assertEqual(result.stderr, b"Anvil native painting error\n")
 
     def test_unsupported_native_graphics_have_compile_diagnostics(self):
         cases = [

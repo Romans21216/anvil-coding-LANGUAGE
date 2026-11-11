@@ -5,12 +5,15 @@ import sys
 import tempfile
 import unittest
 
+from compiler.common import CompileError
 from compiler.native_x64 import minimal_exit_exe
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
 
-class NativeX64Tests(unittest.TestCase):
+class NativeRunMixin:
+    """Compiles a snippet with the native backend and runs the EXE."""
+
     def _run_source(self, source: str) -> str:
         with tempfile.TemporaryDirectory() as temp:
             path = pathlib.Path(temp) / "sample.ANVL"
@@ -20,12 +23,23 @@ class NativeX64Tests(unittest.TestCase):
             executable.write_bytes(
                 NativeCodegen(path, functions, top, variables, arrays).generate()
             )
-            result = subprocess.run(
-                [str(executable)], capture_output=True, text=True, timeout=5
-            )
+            try:
+                result = subprocess.run(
+                    [str(executable)], capture_output=True, text=True, timeout=5
+                )
+            except OSError as error:
+                # Defender sometimes quarantines a freshly written tiny PE
+                # (WinError 225). That is the scanner, not the compiler.
+                if getattr(error, "winerror", None) == 225:
+                    raise unittest.SkipTest(
+                        "Windows Defender quarantined the generated EXE"
+                    )
+                raise
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout
 
+
+class NativeX64Tests(NativeRunMixin, unittest.TestCase):
     def test_native_backend_compiles_functions_and_multiple_arguments(self):
         source = """\
 fn(combine, left, right)
@@ -84,7 +98,10 @@ call fn(main)
                     [str(executable)], capture_output=True, text=True, timeout=5
                 )
             self.assertEqual(result.returncode, 2)
-            self.assertEqual(result.stdout, "Anvil output out of range\n")
+            self.assertEqual(
+                result.stdout,
+                "Anvil output out of range (the native backend prints up to 9.2e18)\n",
+            )
 
     def test_native_backend_reports_nonfinite_arithmetic_with_source_line(self):
         for expression in ("0 / 0", "1 / 0"):
@@ -101,7 +118,10 @@ call fn(main)
                     [str(executable)], capture_output=True, text=True, timeout=5
                 )
             self.assertEqual(result.returncode, 2)
-            self.assertEqual(result.stdout, f"Anvil numeric error at line 2 ({path})\n")
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(
+                result.stderr, f"Anvil numeric error at line 2 ({path})\n"
+            )
 
     def test_native_backend_compiles_loop_and_boolean_operators(self):
         source = """\
@@ -142,6 +162,134 @@ call fn(main)
 """
         self.assertEqual(self._run_source(source), "1\n")
 
+    def test_native_backend_handles_string_escapes(self):
+        bs = chr(92)
+        source = (
+            "fn(main)\n"
+            '  say "a' + bs + 'nb"\n'
+            '  say "q' + bs + '"!"\n'
+            '  say "p' + bs + bs + 'x"\n'
+            '  say len("a' + bs + 'nb")\n'
+            "end\ncall fn(main)\n"
+        )
+        self.assertEqual(
+            self._run_source(source).replace("\r\n", "\n"), 'a\nb\nq"!\np\\x\n3\n'
+        )
+
+    def test_native_backend_runs_several_top_level_calls(self):
+        source = """\
+fn(first)
+  say "a"
+end
+
+fn(second)
+  say "b"
+end
+
+call fn(first)
+call fn(second)
+"""
+        self.assertEqual(self._run_source(source).replace("\r\n", "\n"), "a\nb\n")
+
+    def test_native_backend_runs_top_level_set_statements(self):
+        source = """\
+set var(base) = 10
+set var(total) = var(base) * 2 + 1
+set var(label) = "total="
+seed(3)
+
+fn(bump)
+  set var(total) = var(total) + 1
+end
+
+fn(main)
+  say var(label) & var(total)
+  call fn(bump)
+  say var(total)
+  say rnd(1, 100)
+end
+call fn(main)
+"""
+        self.assertEqual(
+            self._run_source(source).replace("\r\n", "\n"), "total=21\n22\n96\n"
+        )
+
+    def test_native_backend_supports_function_local_arrays(self):
+        source = """\
+fn(fill, n)
+  array slots(3)
+  for local(i) = 0 to 2
+    set array(slots, local(i)) = var(n) + local(i)
+  end
+  array extra(2)
+  set array(extra, 0) = array(slots, 0) * 10
+  set array(extra, 1) = array(slots, 2)
+  output array(extra, 0) + array(extra, 1)
+end
+fn(main)
+  say call fn(fill, 1)
+  say call fn(fill, 5)
+end
+call fn(main)
+"""
+        self.assertEqual(self._run_source(source).replace("\r\n", "\n"), "13\n57\n")
+
+    def test_native_local_arrays_are_per_call(self):
+        source = """\
+fn(depth, n)
+  array box(2)
+  set array(box, 0) = var(n)
+  if var(n) <= 0
+    output array(box, 0)
+  end
+  set array(box, 1) = call fn(depth, var(n) - 1)
+  output array(box, 0) + array(box, 1)
+end
+fn(main)
+  say call fn(depth, 3)
+end
+call fn(main)
+"""
+        self.assertEqual(self._run_source(source).replace("\r\n", "\n"), "6\n")
+
+    def test_native_local_array_bounds_error_reports_and_exits(self):
+        source = """\
+fn(bad)
+  array tiny(2)
+  set array(tiny, 5) = 1
+end
+fn(main)
+  call fn(bad)
+end
+call fn(main)
+"""
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "local-bounds.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            executable = pathlib.Path(temp) / "local-bounds.exe"
+            executable.write_bytes(
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+            )
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=5
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Anvil array index error at line 3", result.stderr)
+
+    def test_native_rejects_local_arrays_bigger_than_the_frame(self):
+        source = (
+            "fn(big)\n  array huge(600)\n  set array(huge, 0) = 1\nend\n"
+            "fn(main)\n  call fn(big)\nend\ncall fn(main)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "local-big.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as caught:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        self.assertIn("native local arrays", str(caught.exception))
+
     def test_native_backend_supports_checked_global_array_reads_and_writes(self):
         source = """\
 array values(4)
@@ -180,9 +328,59 @@ call fn(main)
                     [str(executable)], capture_output=True, text=True, timeout=5
                 )
             self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, "")
             self.assertEqual(
-                result.stdout, f"Anvil array index error at line 3 ({path})\n"
+                result.stderr, f"Anvil array index error at line 3 ({path})\n"
             )
+
+    def test_native_names_unsupported_builtins_and_suggests_spellings(self):
+        cases = {
+            'fn(main)\n  say image_load("a.bmp")\nend\ncall fn(main)\n':
+                "image_load() is not available in the native x64 backend yet",
+            "fn(main)\n  say random(1, 10)\nend\ncall fn(main)\n":
+                "did you mean rnd(low, high)?",
+        }
+        for source, expected in cases.items():
+            with tempfile.TemporaryDirectory() as temp:
+                path = pathlib.Path(temp) / "unsupported.ANVL"
+                path.write_text(source, encoding="utf-8")
+                functions, top, variables, arrays = parse(path, source)
+                with self.assertRaises(CompileError) as caught:
+                    NativeCodegen(path, functions, top, variables, arrays).generate()
+            self.assertIn(expected, str(caught.exception))
+
+    def test_native_rejects_text_arguments_with_a_clear_message(self):
+        source = (
+            "fn(show, n)\n  output var(n) * 2\nend\n\n"
+            'fn(main)\n  say call fn(show, "ada")\nend\ncall fn(main)\n'
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "text-arg.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as caught:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        self.assertIn("text arguments to functions", str(caught.exception))
+
+    def test_native_text_overflow_reports_and_exits(self):
+        source = (
+            'fn(main)\n  set var(w) = "' + "a" * 300 + '"\n  say len(var(w))\n'
+            "end\ncall fn(main)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "text-overflow.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            executable = pathlib.Path(temp) / "text-overflow.exe"
+            executable.write_bytes(
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+            )
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=5
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("text is limited to 255 characters", result.stderr)
 
     def test_native_backend_rejects_aggregate_array_data_before_pe_allocation(self):
         root = pathlib.Path(__file__).resolve().parents[1]

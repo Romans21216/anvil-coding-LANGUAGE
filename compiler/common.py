@@ -25,6 +25,7 @@ class Node:
     local_arrays: dict[str, int] = field(default_factory=dict)
     local_array_lines: dict[str, int] = field(default_factory=dict)
     source: pathlib.Path | None = None
+    string: bool = False
 
 
 class ArrayDeclarations(dict):
@@ -46,6 +47,23 @@ class ParsedProgram:
     arrays: dict[str, int]
     variable_references: list[tuple[str, int, str | None, pathlib.Path]]
     local_references: list[tuple[str, int, str | None, pathlib.Path]]
+
+
+def decode_string(raw: str) -> str:
+    """Decode an Anvil string literal token (including quotes) into text."""
+    inner = raw[1:-1]
+    decoded = []
+    index = 0
+    escapes = {"n": "\n", "t": "\t", '"': '"', "\\": "\\"}
+    while index < len(inner):
+        char = inner[index]
+        if char == "\\" and index + 1 < len(inner):
+            decoded.append(escapes.get(inner[index + 1], char + inner[index + 1]))
+            index += 2
+        else:
+            decoded.append(char)
+            index += 1
+    return "".join(decoded)
 
 
 class CompileError(Exception):

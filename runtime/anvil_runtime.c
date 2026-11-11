@@ -803,6 +803,91 @@ static void anvil_camera_update(void) {
   anvil_camera_z += (anvil_keys['D'] - anvil_keys['A']) * right_z * distance;
   anvil_camera_y += (anvil_keys['E'] - anvil_keys['Q']) * distance;
 }
+#define ANVIL_STR_CAP 256
+#define ANVIL_STR_SLOTS 256
+char anvil_str_scratch[ANVIL_STR_SLOTS][ANVIL_STR_CAP];
+
+static void anvil_str_overflow(const char *path, int line) {
+  fprintf(stderr, "%s:%d: text is limited to %d characters\n", path ? path : "<Anvil>",
+          line, ANVIL_STR_CAP - 1);
+  exit(2);
+}
+
+void anvil_str_set(char *dest, const char *value, const char *path, int line) {
+  size_t len = strlen(value);
+  if (len >= ANVIL_STR_CAP) {
+    anvil_str_overflow(path, line);
+  }
+  memcpy(dest, value, len + 1);
+}
+
+char *anvil_str_cat(char *dest, const char *a, const char *b,
+                    const char *path, int line) {
+  size_t la = strlen(a), lb = strlen(b);
+  if (la + lb >= ANVIL_STR_CAP) {
+    anvil_str_overflow(path, line);
+  }
+  memcpy(dest, a, la);
+  memcpy(dest + la, b, lb + 1);
+  return dest;
+}
+
+char *anvil_str_from_number(int slot, double value) {
+  if (slot < 0 || slot >= ANVIL_STR_SLOTS) {
+    anvil_str_overflow(NULL, 0);
+  }
+  _snprintf_s(anvil_str_scratch[slot], ANVIL_STR_CAP, _TRUNCATE, "%s",
+              anvil_format_number(value));
+  return anvil_str_scratch[slot];
+}
+
+void anvil_ask(const char *prompt, char *dest) {
+  if (prompt && *prompt) {
+    printf("%s", prompt);
+    fflush(stdout);
+  }
+  if (fgets(dest, 256, stdin)) {
+    size_t len = strlen(dest);
+    while (len && (dest[len - 1] == '\n' || dest[len - 1] == '\r')) {
+      dest[--len] = 0;
+    }
+  } else {
+    dest[0] = 0;
+  }
+}
+
+double anvil_ask_number(const char *prompt) {
+  char buffer[256];
+  if (prompt && *prompt) {
+    printf("%s", prompt);
+    fflush(stdout);
+  }
+  if (!fgets(buffer, sizeof(buffer), stdin)) {
+    return 0.0;
+  }
+  /* strtod reads the leading number; anything unread stays in the buffer. */
+  return strtod(buffer, NULL);
+}
+
+void anvil_press_enter(void) {
+  printf("Press Enter to continue...\n");
+  fflush(stdout);
+  int ch;
+  while ((ch = getchar()) != '\n' && ch != EOF) {
+  }
+}
+
+void anvil_wait(double seconds) {
+  /* Pause the console program; negative and non-finite values do not sleep. */
+  if (!(seconds > 0.0)) {
+    return;
+  }
+  if (seconds > 86400.0) {
+    seconds = 86400.0;
+  }
+  Sleep((DWORD)(seconds * 1000.0));
+}
+
 void anvil_seed(unsigned long long seed) {
   anvil_rng_state = seed ? seed : 0x9e3779b97f4a7c15ULL;
 }
@@ -1947,3 +2032,253 @@ void anvil_array_set(double *values, int size, double index, double value,
   values[anvil_array_checked_index(values, size, index, source, line)] = value;
 }
 
+
+
+#define ANVIL_TEXT_BUFFERS 64
+static char anvil_text_buffers[ANVIL_TEXT_BUFFERS][256];
+static int anvil_text_buffer_index = 0;
+
+static char *anvil_text_buffer(void) {
+    char *destination = anvil_text_buffers[anvil_text_buffer_index & (ANVIL_TEXT_BUFFERS - 1)];
+    anvil_text_buffer_index += 1;
+    return destination;
+}
+
+static char *anvil_text_case(const char *source, int to_lower) {
+    char *destination = anvil_text_buffer();
+    size_t index = 0;
+    for (; source[index] != '\0' && index < 255; ++index) {
+        char letter = source[index];
+        if (to_lower) {
+            if (letter >= 'A' && letter <= 'Z') {
+                letter = (char)(letter + 32);
+            }
+        } else {
+            if (letter >= 'a' && letter <= 'z') {
+                letter = (char)(letter - 32);
+            }
+        }
+        destination[index] = letter;
+    }
+    destination[index] = '\0';
+    return destination;
+}
+
+char *anvil_text_upper(const char *source) {
+    return anvil_text_case(source, 0);
+}
+
+char *anvil_text_lower(const char *source) {
+    return anvil_text_case(source, 1);
+}
+
+char *anvil_text_chr(double code) {
+    char *destination = anvil_text_buffer();
+    int value = (int)code;
+    if (value < 0 || value > 255) {
+        fprintf(stderr, "Anvil chr out of range\n");
+        exit(1);
+    }
+    destination[0] = (char)value;
+    destination[1] = '\0';
+    return destination;
+}
+
+double anvil_text_ord(const char *source) {
+    return (double)(unsigned char)source[0];
+}
+
+char *anvil_text_trim(const char *source) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    size_t start = 0;
+    size_t end = length;
+    while (start < end && (source[start] == ' ' || source[start] == '\t')) {
+        start += 1;
+    }
+    while (end > start && (source[end - 1] == ' ' || source[end - 1] == '\t')) {
+        end -= 1;
+    }
+    memcpy(destination, source + start, end - start);
+    destination[end - start] = '\0';
+    return destination;
+}
+
+double anvil_text_to_number(const char *source) {
+    /* Decimal only, matching the native backend: optional whitespace and sign,
+       digits, an optional fraction, an optional exponent. Hex, "inf" and "nan"
+       read as 0 instead of strtod's surprises. */
+    const char *cursor = source;
+    while (*cursor == ' ' || *cursor == '\t') {
+        cursor++;
+    }
+    int negative = 0;
+    if (*cursor == '-') {
+        negative = 1;
+        cursor++;
+    } else if (*cursor == '+') {
+        cursor++;
+    }
+    double value = 0.0;
+    int digits = 0;
+    while (*cursor >= '0' && *cursor <= '9') {
+        value = value * 10.0 + (double)(*cursor - '0');
+        cursor++;
+        digits++;
+    }
+    if (*cursor == '.') {
+        cursor++;
+        long long fraction = 0;
+        long long scale = 1;
+        while (*cursor >= '0' && *cursor <= '9') {
+            fraction = fraction * 10 + (*cursor - '0');
+            scale *= 10;
+            cursor++;
+            digits++;
+        }
+        if (scale > 1) {
+            value += (double)fraction / (double)scale;
+        }
+    }
+    if (digits == 0) {
+        return 0.0;
+    }
+    if (*cursor == 'e' || *cursor == 'E') {
+        const char *mark = cursor;
+        cursor++;
+        int exponent_negative = 0;
+        if (*cursor == '-') {
+            exponent_negative = 1;
+            cursor++;
+        } else if (*cursor == '+') {
+            cursor++;
+        }
+        int exponent = 0;
+        int exponent_digits = 0;
+        while (*cursor >= '0' && *cursor <= '9' && exponent < 1000) {
+            exponent = exponent * 10 + (*cursor - '0');
+            cursor++;
+            exponent_digits++;
+        }
+        if (exponent_digits == 0) {
+            cursor = mark;
+        } else {
+            while (exponent-- > 0) {
+                value = exponent_negative ? value / 10.0 : value * 10.0;
+            }
+        }
+    }
+    return negative ? -value : value;
+}
+
+char *anvil_text_char(const char *source, double index) {
+    char *destination = anvil_text_buffer();
+    int position = (int)index;
+    size_t length = strlen(source);
+    if (position < 0 || (size_t)position >= length) {
+        destination[0] = '\0';
+        return destination;
+    }
+    destination[0] = source[position];
+    destination[1] = '\0';
+    return destination;
+}
+
+int anvil_str_contains(const char *source, const char *needle) {
+    return strstr(source, needle) != NULL;
+}
+
+char *anvil_text_mid(const char *source, double start, double count) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    int from = (int)start;
+    int take = (int)count;
+    if (from < 0) {
+        from = 0;
+    }
+    if (take < 0) {
+        take = 0;
+    }
+    if (from > (int)length) {
+        from = (int)length;
+    }
+    if (from + take > (int)length) {
+        take = (int)length - from;
+    }
+    memcpy(destination, source + from, (size_t)take);
+    destination[take] = '\0';
+    return destination;
+}
+
+char *anvil_text_left(const char *source, double count) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    int take = (int)count;
+    if (take < 0) {
+        take = 0;
+    }
+    if (take > (int)length) {
+        take = (int)length;
+    }
+    memcpy(destination, source, (size_t)take);
+    destination[take] = '\0';
+    return destination;
+}
+
+char *anvil_text_right(const char *source, double count) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    int take = (int)count;
+    if (take < 0) {
+        take = 0;
+    }
+    if (take > (int)length) {
+        take = (int)length;
+    }
+    memcpy(destination, source + (length - (size_t)take), (size_t)take);
+    destination[take] = '\0';
+    return destination;
+}
+
+double anvil_zero_clean(double value) {
+    /* printf renders negative zero as "-0", which reads as a bug to beginners. */
+    return value == 0.0 ? 0.0 : value;
+}
+
+const char *anvil_format_number(double value) {
+    /* Matches the native backend: up to six fractional digits, no trailing
+       zeros, and no exponent notation for ordinary magnitudes. */
+    static char buffers[4][64];
+    static unsigned index = 0;
+    char *text = buffers[index++ & 3u];
+    if (value == 0.0) {
+        strcpy(text, "0");
+        return text;
+    }
+    _snprintf_s(text, 64, _TRUNCATE, "%.6f", value);
+    size_t length = strlen(text);
+    while (length > 0 && text[length - 1] == '0') {
+        length--;
+    }
+    if (length > 0 && text[length - 1] == '.') {
+        length--;
+    }
+    text[length] = '\0';
+    if (strcmp(text, "-0") == 0) {
+        strcpy(text, "0");
+    }
+    return text;
+}
+
+int anvil_str_starts(const char *source, const char *prefix) {
+    return strncmp(source, prefix, strlen(prefix)) == 0;
+}
+
+int anvil_str_ends(const char *source, const char *suffix) {
+    size_t source_length = strlen(source);
+    size_t suffix_length = strlen(suffix);
+    if (suffix_length > source_length) {
+        return 0;
+    }
+    return strcmp(source + source_length - suffix_length, suffix) == 0;
+}

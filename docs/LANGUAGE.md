@@ -24,7 +24,7 @@ end
 call fn(main)
 ```
 
-Comments begin with `#` outside a quoted string. Names are case-sensitive. Function parameters and return values are numeric. `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside a numeric expression. Recursive calls are supported by the generated C functions. `while expression ... end` repeats its body while the numeric condition is nonzero. `for local(name) = start to end [step amount] ... end` iterates over an inclusive numeric range.
+Comments begin with `#` outside a quoted string. Names are case-sensitive. Function parameters are numeric; a function's `output` value is numeric unless it returns text (see Text and lists below). `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside an expression. Recursive calls are supported by both backends. `while expression ... end` repeats its body while the numeric condition is nonzero. `for local(name) = start to end [step amount] ... end` iterates over an inclusive numeric range. A top-level `set var(name) = expression` initializes a global before `main` runs, in source order.
 
 ## Language version
 
@@ -42,7 +42,7 @@ Arithmetic uses `+`, `-`, `*`, `/`, and `%`; division by a value equal to zero (
 
 ## Fixed-size numeric arrays
 
-Declare a global numeric array at top level, or a function-local numeric array inside a function, using `array name(size)`. Both kinds are fixed-size and start with every element set to zero. A local array belongs to the current function call, so recursive calls and separate invocations get independent storage. Local arrays use checked heap allocation and are freed on every function return; each function call may declare up to 8,192 local elements, and all active local arrays in the process are limited to 16 MiB. Allocation failure or budget exhaustion prints the source path and line and exits with code 2. Globals may contain up to 1,048,576 elements each. Read an element using `array(name, index)` in any numeric expression and write it inside a function with `set array(name, index) = expression`. A local array is visible only inside its declaring function and cannot share a name with that function's parameter or scalar local. Indexes are zero-based and must be finite whole numbers from zero through `size - 1`; an invalid runtime index prints the source path and line and exits with code 2. Resizing, strings, and structures are not supported yet.
+Declare a global numeric array at top level, or a function-local numeric array inside a function, using `array name(size)`. Both kinds are fixed-size and start with every element set to zero. A local array belongs to the current function call, so recursive calls and separate invocations get independent storage. Local arrays use checked heap allocation and are freed on every function return; each function call may declare up to 8,192 local elements, and all active local arrays in the process are limited to 16 MiB. Allocation failure or budget exhaustion prints the source path and line and exits with code 2. Globals may contain up to 1,048,576 elements each. Read an element using `array(name, index)` in any numeric expression and write it inside a function with `set array(name, index) = expression`. A local array is visible only inside its declaring function and cannot share a name with that function's parameter or scalar local. Indexes are zero-based and must be finite whole numbers from zero through `size - 1`; an invalid runtime index prints the source path and line and exits with code 2. Resizing and structures are not supported yet; text and growable lists are covered in the next section.
 
 ```anv
 array scores(4)
@@ -71,9 +71,32 @@ end
 
 The runnable example is `examples/local_arrays.ANVL`; it prints `27`.
 
+## Text and lists
+
+Text literals are double-quoted and understand four backslash escapes: backslash-n adds a newline, backslash-t a tab, backslash-quote a double quote, and a doubled backslash one backslash. Any other backslash sequence stays as written, so a Windows path needs its backslashes doubled. A text value lives in a variable like a number, and `&` joins text and numbers:
+
+```anv
+set var(name) = "Ada"
+say "Hello, " & var(name)   # Hello, Ada
+say len(var(name))          # 3
+say upper(var(name))        # ADA
+```
+
+Results can be stored back into a variable and are capped at 255 bytes; going past that stops with a clear error instead of truncating quietly. `len` counts bytes, so `len("héllo")` is 6. Comparisons work between text values (`=`, `!=`, `<`, `<=`, `>`, `>=`, alphabetically); comparing text with a number is a compile error. The text built-ins are `len`, `upper`, `lower`, `trim`, `left`, `right`, `char`, `mid`, `chr`, `ord`, `number`, and the 1/0 tests `contains`, `starts_with`, `ends_with`. `say expr` prints a line, `write expr` prints without a newline, and `ask "prompt? ", var(x)` reads one line from the console.
+
+`list name` declares a growable numeric list at top level, `add name value` appends to it, `count(name)` reports how many values it holds, and `array(name, index)` reads a 0-based slot. A list holds up to 256 values.
+
+```anv
+list scores
+add scores 10
+add scores 20
+say count(scores)      # 2
+say array(scores, 1)   # 20
+```
+
 ## Expressions
 
-Supported arithmetic operators are `+`, `-`, `*`, `/`, and `%`; comparison operators are `=`, `==`, `!=`, `<`, `<=`, `>`, and `>=`; conditions can use `and` and `or`. Both logical operators short-circuit: `false and right` skips `right`, and `true or right` skips `right`, including calls with side effects. Arithmetic binds more tightly than comparisons, then `and`, then `or`. Numeric literals may be integers or decimals. `var(name)` reads a global or shadowing parameter; `local(name)` reads function-local state; `call fn(name, arguments...)` calls a function and evaluates to its numeric return value.
+Supported arithmetic operators are `+`, `-`, `*`, `/`, and `%`; comparison operators are `=`, `==`, `!=`, `<`, `<=`, `>`, and `>=`; conditions can use `and` and `or`. Both logical operators short-circuit: `false and right` skips `right`, and `true or right` skips `right`, including calls with side effects. Arithmetic binds more tightly than comparisons, then `and`, then `or`. Numeric literals may be integers or decimals. `var(name)` reads a global or shadowing parameter; `local(name)` reads function-local state; `call fn(name, arguments...)` calls a function and evaluates to its return value (a number, or text when the function returns text).
 
 `while condition` begins a loop and `end` closes it. The condition is checked before each iteration. Ensure the loop body changes state used by its condition so the loop can finish. Loops can be nested inside functions, branches, or other loops.
 
@@ -103,7 +126,7 @@ fn(count-down)
 end
 ```
 
-Built-ins currently include `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held("left"|"right"|"middle")`, `mouse_wheel()`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, and `max`. The implemented key names include letters, `SPACE`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, and `ESCAPE`. Mouse coordinates use the fixed 960×600 virtual game frame and return `-1` when the pointer is in a letterbox bar or outside the window. Mouse pressed state is an edge held until the next fixed update; held state persists until button release or window focus loss. `mouse_wheel()` returns the signed wheel detents received during the current fixed update. The string-taking ray backend built-ins are described in the drawing section below.
+Built-ins currently include `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held("left"|"right"|"middle")`, `mouse_wheel()`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `round`, `sqrt`, `sin`, `cos`, `abs`, `min`, `max`, and the text built-ins listed above. The implemented key names include letters, `SPACE`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, and `ESCAPE`. Mouse coordinates use the fixed 960×600 virtual game frame and return `-1` when the pointer is in a letterbox bar or outside the window. Mouse pressed state is an edge held until the next fixed update; held state persists until button release or window focus loss. `mouse_wheel()` returns the signed wheel detents received during the current fixed update. The string-taking ray backend built-ins are described in the drawing section below.
 
 The image/sprite built-ins are `image_load(path)`, `image_width(handle)`, `image_height(handle)`, `image_draw(handle,x,y)`, `image_draw_scaled(handle,x,y,width,height)`, and `image_destroy(handle)`. `image_load` accepts a quoted path relative to the process working directory and returns a positive numeric generational handle, or `0` if the file is missing/unsupported, limits are exceeded, or no slot is available. The first allocations use handles 1 through 64; reusing a released slot gets a new value, so a stale handle cannot alias a later image. The loader supports uncompressed 24-bit and 32-bit BMP files; PNG, JPEG, compressed BMP, and other formats are not supported. If a 32-bit BMP has all alpha bytes clear, it is treated as opaque to support files written with an unused reserved byte. Images are limited to 8,192 pixels per side, 16,777,216 total pixels per image, and 128 MiB combined decoded image data. `image_width` and `image_height` return 0 for invalid handles. Draw calls alpha-blend onto the software framebuffer using nearest-neighbor scaling and return 1 for a valid draw request or 0 for an invalid handle/arguments; draws outside the 960×600 viewport are clipped. `image_destroy(handle)` frees that resource and returns 1, or returns 0 for an invalid or already-released handle. The runtime releases all remaining images when the game closes. See `examples/image_sprite.ANVL` and its BMP asset.
 

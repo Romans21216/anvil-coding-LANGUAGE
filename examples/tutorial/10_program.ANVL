@@ -1,0 +1,20 @@
+# Lesson 10: a small complete program.
+# Functions return numbers, so pass a flag back and decide outside.
+fn(is_even, n)
+  if var(n) % 2 = 0
+    output 1
+  end
+  output 0
+end
+
+fn(main)
+  for local(index) = 1 to 4
+    set var(flag) = call fn(is_even, local(index))
+    if var(flag) = 1
+      say local(index) & " is even"
+    else
+      say local(index) & " is odd"
+    end
+  end
+end
+call fn(main)

@@ -2,7 +2,7 @@
 
 The master backlog is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23): its original 450-item inventory and the later additions remain there. This compact ledger records evidence only for audited items and does not duplicate the backlog. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
 
-Updated2026-10-28. Latest full review exact `edfbe86252deb5af39504161f6e8571ae917fbb9`:71/100—FAIL against98;125tests pass. Source includes work;#64 provenance and#65 compiler recursion were independently found. Follow-up fixes are pending review. #63 remains open; all full backlog additions stay only in issue23/comments.
+Updated 2026-10-28. Latest full review exact `edfbe86252deb5af39504161f6e8571ae917fbb9`: 71/100 — FAIL against 98; 125 tests pass. Source includes work; #64 provenance and #65 compiler recursion were independently found. Follow-up fixes are pending review. #63 remains open; all full backlog additions stay only in issue 23 comments.
 
 Latest reviewed native follow-up: direct AMD64/PE compilation supports numeric programs, checked global arrays and an initial Win32 2D runtime with fixed updates, buffered presentation and keyboard and mouse input. C remains default pending broader parity. Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
 
@@ -10,7 +10,7 @@ Verified flicker fix: persistent offscreen bitmap/DC resources compose each fram
 
 Historical keyboard milestone (21fc960, 73/100, 99 tests): held/pressed, repeat/focus/system-key handling, numeric key bounds and edge lifetimes were independently verified. Those regressions also passed in the later 111-test reviewed snapshot; the unreviewed include candidate now passes 125 tests.
 
-Historical verified mouse milestone900106e:72/100 with102tests. Pointer/buttons/wheel/capture functionality remains verified; current coordinate coverage explicitly uses test instrumentation (#63).
+Historical verified mouse milestone 900106e: 72/100 with 102 tests. Pointer/buttons/wheel/capture functionality remains verified; current coordinate coverage explicitly uses test instrumentation (#63).
 
 Verified procedural milestone: basic math/RNG/noise/fBm, Anvil-written runtime helpers, sixteen-argument calls and larger locals pass. The completed 111-test review verified explicit-main values/side effects/arity and the test-race correction. The newer include candidate below is still awaiting a full review.
 

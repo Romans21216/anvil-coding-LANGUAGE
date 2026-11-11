@@ -1,0 +1,6 @@
+# Lesson 8: ask reads a line the player types, then we greet them.
+fn(main)
+  ask "What is your name? ", var(name)
+  say "Hello, " & trim(var(name)) & "!"
+end
+call fn(main)

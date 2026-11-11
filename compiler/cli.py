@@ -12,6 +12,7 @@ import tomllib
 from compiler.build import build_c, find_compiler
 from compiler.codegen import emit_c
 from compiler.common import CompileError
+from compiler.diagnostics import render
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
@@ -24,8 +25,9 @@ def main() -> int:
     )
     ap.add_argument(
         "source",
+        nargs="?",
         type=pathlib.Path,
-        help="input .ANVL source or .ANVLproj project manifest",
+        help="input .ANVL source or .ANVLproj project manifest (omit with --repl)",
     )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
     ap.add_argument("--generated-c", type=pathlib.Path, help="choose generated C path")
@@ -39,12 +41,43 @@ def main() -> int:
     )
     ap.add_argument("--release", action="store_true", help="enable native optimization")
     ap.add_argument(
+        "--check",
+        action="store_true",
+        help="parse and validate only; report problems without building an output",
+    )
+    ap.add_argument(
         "--backend",
         choices=("c", "native"),
         default="c",
         help="select the C toolchain or experimental Anvil-owned x64 PE backend",
     )
+    ap.add_argument(
+        "--repl",
+        action="store_true",
+        help="start the interactive Anvil shell instead of compiling a file",
+    )
+    ap.add_argument(
+        "--hello",
+        action="store_true",
+        help="build and run a greeting program, so the first command always works",
+    )
+    ap.add_argument(
+        "--repl-backend",
+        choices=("native", "c"),
+        default="native",
+        help="backend the interactive shell uses (default: native)",
+    )
     args = ap.parse_args()
+    if args.hello:
+        from compiler.repl import hello_main
+
+        return hello_main(backend=args.repl_backend)
+    if args.repl:
+        from compiler.repl import repl_main
+
+        return repl_main(backend=args.repl_backend)
+    if args.source is None:
+        ap.error("a source file is required unless --repl is used")
     try:
         source_path = args.source
         include_root = None
@@ -107,8 +140,27 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: entry must resolve inside the project folder"
                 ) from exc
-        source = source_path.read_text(encoding="utf-8")
+        try:
+            source = source_path.read_text(encoding="utf-8")
+        except OSError as error:
+            raise CompileError(f"cannot read {source_path}: {error.strerror or error}") from error
+        except UnicodeDecodeError as error:
+            raise CompileError(
+                f"cannot read {source_path}: the file is not valid UTF-8 ({error.reason} at byte {error.start})"
+            ) from error
         funcs, top, variables, arrays = parse(source_path, source, include_root=include_root)
+        if args.check:
+            # Lowering (type) errors only surface in code generation, so a
+            # parse-only check reported "ok" for programs that cannot build.
+            # --check must never write files, whichever backend is selected.
+            if args.backend == "native":
+                NativeCodegen(source_path, funcs, top, variables, arrays).generate()
+            else:
+                emit_c(
+                    source_path, funcs, top, variables, arrays, fixed_hz, project_name
+                )
+            print(f"{source_path}: ok")
+            return 0
         if args.backend == "native":
             if args.emit_c or args.generated_c or args.cc or args.release:
                 raise CompileError(
@@ -150,5 +202,5 @@ def main() -> int:
         print(f"{args.source}: {e}", file=sys.stderr)
         return 1
     except (CompileError, OSError, UnicodeError, subprocess.CalledProcessError) as e:
-        print(str(e), file=sys.stderr)
+        print(render(str(e)), file=sys.stderr)
         return 1

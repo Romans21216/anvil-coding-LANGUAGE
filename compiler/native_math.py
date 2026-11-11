@@ -8,7 +8,7 @@ from compiler.common import CompileError
 
 
 class NativeMath:
-    ARITY = {"abs": 1, "sqrt": 1, "floor": 1, "ceil": 1,
+    ARITY = {"abs": 1, "sqrt": 1, "floor": 1, "ceil": 1, "round": 1, "sin": 1, "cos": 1,
              "min": 2, "max": 2, "rnd": 2, "noise": 3, "fbm": 6,
              "_anvil_native_hash": 3}
     PREFIX = "_anvil_native_"
@@ -54,6 +54,43 @@ class NativeMath:
         c.bytes(b"\x66\x0f\x28\xc1")
         self.constant(1, 1)
         c.bytes(b"\xf2\x0f\x58\xc1" if ceiling else b"\xf2\x0f\x5c\xc1")
+        c.label(done)
+
+    def nearest(self):
+        """SSE2 round-to-nearest with halves away from zero, matching C round()."""
+        c = self.code
+        done = self.owner.label("rounded")
+        c.bytes(b"\x66\x48\x0f\x7e\xc0")  # bits -> rax
+        c.mov_imm(1, 0x7FFFFFFFFFFFFFFF)
+        c.bytes(b"\x48\x21\xc8")
+        c.mov_imm(1, 0x4330000000000000)  # all finite |x| >= 2^52 are integral
+        c.bytes(b"\x48\x39\xc8")
+        c.conditional_jump(0x83, done)
+        c.bytes(b"\xf2\x48\x0f\x2c\xc0\xf2\x48\x0f\x2a\xc8")  # xmm1 = trunc
+        c.bytes(b"\x66\x0f\x28\xd1")   # movapd xmm2, xmm1
+        c.bytes(b"\x66\x0f\x5c\xd0")   # subsd xmm2, xmm0  (xmm2 = trunc - orig)
+        c.bytes(b"\x66\x48\x0f\x7e\xd2")  # movq rdx, xmm2
+        c.bytes(b"\x48\xc1\xea\x3f")   # shr rdx, 63 (1 iff the fraction is negative)
+        self.constant(3, struct.unpack("<d", struct.pack("<Q", 0x7FFFFFFFFFFFFFFF))[0])
+        c.bytes(b"\x66\x0f\x54\xd3")   # andpd xmm2, xmm3  (xmm2 = |fraction|)
+        self.constant(3, 0.5)
+        c.bytes(b"\x66\x0f\x2e\xd3")   # ucomisd xmm2, xmm3
+        no_adjust = self.owner.label("round_exact")
+        c.conditional_jump(0x82, no_adjust)  # jb: fraction < .5 -> trunc stands
+        down = self.owner.label("round_down_nearest")
+        c.bytes(b"\x48\x85\xd2")       # test rdx, rdx
+        c.conditional_jump(0x84, down)   # je: negative fraction -> round down
+        self.constant(2, 1.0)
+        c.bytes(b"\xf2\x0f\x58\xca")  # addsd xmm1, xmm2  (trunc + 1)
+        c.bytes(b"\x66\x0f\x28\xc1")  # movapd xmm0, xmm1
+        c.jump(done)
+        c.label(down)
+        self.constant(2, 1.0)
+        c.bytes(b"\xf2\x0f\x5c\xca")  # subsd xmm1, xmm2  (trunc - 1)
+        c.bytes(b"\x66\x0f\x28\xc1")  # movapd xmm0, xmm1
+        c.jump(done)
+        c.label(no_adjust)
+        c.bytes(b"\x66\x0f\x28\xc1")  # movapd xmm0, xmm1
         c.label(done)
 
     def seed(self, line):
@@ -182,6 +219,8 @@ class NativeMath:
                 c.bytes(b"\xf2\x0f\x5d\xc1" if name == "min" else b"\xf2\x0f\x5f\xc1")
             elif name in ("floor", "ceil"):
                 self.round(name == "ceil")
+            elif name == "round":
+                self.nearest()
             elif name == "sqrt":
                 c.bytes(b"\xf2\x0f\x51\xc0")
                 owner.emit_finite_check(parser.line)
@@ -189,6 +228,9 @@ class NativeMath:
                 c.bytes(b"\x66\x48\x0f\x7e\xc0")
                 c.mov_imm(0x1, 0x7FFFFFFFFFFFFFFF)
                 c.bytes(b"\x48\x21\xc8\x66\x48\x0f\x6e\xc0")
+            elif name in ("sin", "cos"):
+                offset = -(owner._scratch_base + int(slots[0].rsplit("_", 1)[1]) * 8)
+                self.trig(name == "cos", offset)
             else:
                 if parser.scope is None or not parser.scope.name.startswith(self.PREFIX):
                     raise CompileError(f"{owner.path}:{parser.line}: reserved native runtime intrinsic")
@@ -196,6 +238,33 @@ class NativeMath:
                     load(index, index)
                 self.hash()
         owner._scratch_depth = base
+
+    def trig(self, cosine: bool, offset: int) -> None:
+        """x87 sin/cos with exact fprem1 range reduction.
+
+        A bare fsin is only defined for |x| < 2^63; reducing the argument
+        modulo 2*pi first keeps large inputs (animation phases, angles
+        accumulated over time) correct, matching the C backend's libm sin.
+        """
+        c = self.code
+        # st0 = argument
+        c.bytes(b"\xdd\x85" + struct.pack("<i", offset))      # fld qword [rbp+off]
+        c.bytes(b"\xd9\xc0")                                  # fld st(0)
+        c.bytes(b"\xd9\xeb")                                  # fldpi
+        c.bytes(b"\xd8\xc0")                                  # fadd st(0), st(0) -> 2*pi
+        c.bytes(b"\xd9\xc9")                                  # fxch st(1): st0=x st1=2pi st2=x
+        reduce_loop = self.owner.label("trig_reduce")
+        c.label(reduce_loop)
+        c.bytes(b"\xd9\xf5")                                  # fprem1
+        c.bytes(b"\x9b\xdf\xe0")                              # fstsw ax
+        c.bytes(b"\x9e")                                       # sahf
+        c.conditional_jump(0x8A, reduce_loop)                   # jp: C2 still set
+        c.bytes(b"\xd9\xca")                                  # fxch st(2): st0=orig
+        c.bytes(b"\xdd\xd8")                                  # fstp st(0): drop original
+        c.bytes(b"\xdd\xd8")                                  # fstp st(0): drop 2*pi
+        c.bytes(b"\xd9\xff" if cosine else b"\xd9\xfe")      # fcos / fsin
+        c.bytes(b"\xdd\x9d" + struct.pack("<i", offset))      # fstp qword [rbp+off]
+        c.bytes(self.owner._memory_operand(0, 5, offset))       # movsd xmm0, [rbp+off]
 
     def hash(self):
         c = self.code

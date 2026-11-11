@@ -1,0 +1,6 @@
+# Lesson 1: say prints a line of text.
+fn(main)
+  say "Hello, world!"
+  say "This is Anvil."
+end
+call fn(main)

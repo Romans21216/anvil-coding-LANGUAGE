@@ -51,6 +51,8 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title);
 double anvil_divide(double numerator, double denominator, const char *path,
                     int line);
 double anvil_check_number(double value, const char *path, int line);
+double anvil_zero_clean(double value);
+const char *anvil_format_number(double value);
 void anvil_set_fixed_hz(int hz);
 void anvil_set_scene3d(int enabled);
 void anvil_camera_perspective(double x, double y, double z);
@@ -96,6 +98,16 @@ double anvil_pressed(int key);
 double anvil_held(int key);
 double anvil_rnd(double min_value, double max_value);
 void anvil_seed(unsigned long long seed);
+void anvil_wait(double seconds);
+void anvil_press_enter(void);
+void anvil_ask(const char *prompt, char *dest);
+double anvil_ask_number(const char *prompt);
+#define ANVIL_STR_CAP 256
+extern char anvil_str_scratch[256][ANVIL_STR_CAP];
+void anvil_str_set(char *dest, const char *value, const char *path, int line);
+char *anvil_str_cat(char *dest, const char *a, const char *b,
+                    const char *path, int line);
+char *anvil_str_from_number(int slot, double value);
 double anvil_noise(double x, double y, double z);
 double anvil_fbm(double x, double y, double z, int octaves, double lacunarity,
                  double gain);
@@ -125,6 +137,19 @@ double anvil_array_get(const double *values, int size, double index,
                        const char *source, int line);
 void anvil_array_set(double *values, int size, double index, double value,
                      const char *source, int line);
+char *anvil_text_upper(const char *source);
+char *anvil_text_lower(const char *source);
+char *anvil_text_chr(double code);
+double anvil_text_ord(const char *source);
+char *anvil_text_trim(const char *source);
+double anvil_text_to_number(const char *source);
+char *anvil_text_char(const char *source, double index);
+int anvil_str_contains(const char *source, const char *needle);
+char *anvil_text_mid(const char *source, double start, double count);
+char *anvil_text_left(const char *source, double count);
+char *anvil_text_right(const char *source, double count);
+int anvil_str_starts(const char *source, const char *prefix);
+int anvil_str_ends(const char *source, const char *suffix);
 
 #endif
 

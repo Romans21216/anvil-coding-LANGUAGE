@@ -1,0 +1,15 @@
+# Lesson 4: if / elif / else and not.
+fn(main)
+  set var(age) = 15
+  if var(age) >= 18
+    say "adult"
+  elif var(age) >= 13
+    say "teen"
+  else
+    say "child"
+  end
+  if not var(age) = 15
+    say "unexpected"
+  end
+end
+call fn(main)

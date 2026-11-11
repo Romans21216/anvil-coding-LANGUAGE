@@ -2,6 +2,8 @@
 #include "anvil_runtime.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 static double anvil_local_count;
 static double anvil_peer_count;
@@ -9,11 +11,11 @@ static double anvil_update(void);
 static double anvil_draw(void);
 
 static double anvil_update(void) {
-    if (anvil_pressed ( ANVIL_KEY_SPACE ) != 0.0) {
-        anvil_local_count += 1.0;
+    if (anvil_check_number((anvil_pressed ( ANVIL_KEY_SPACE )), "examples\\network_counter.ANVL", 10) != 0.0) {
+        anvil_local_count = anvil_check_number((anvil_local_count + 1.0), "examples\\network_counter.ANVL", 11);
     }
     anvil_net_send(anvil_local_count);
-    anvil_peer_count = anvil_net_receive ( );
+    anvil_peer_count = anvil_check_number((anvil_net_receive ( )), "examples\\network_counter.ANVL", 14);
     return 0.0;
 }
 
@@ -38,4 +40,3 @@ int main(void) {
     anvil_net_close();
     return 0;
 }
-

@@ -52,7 +52,7 @@ class NativeProceduralTests(unittest.TestCase):
             exe.write_bytes(image)
             result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, code, result.stdout + result.stderr)
-        return result.stdout
+        return result.stdout + result.stderr
 
     def test_math_primitives_bounds_and_once_only_arguments(self):
         checks = ['floor(-1.25) = -2', 'ceil(-1.25) = -1', 'floor(1.25) = 1',

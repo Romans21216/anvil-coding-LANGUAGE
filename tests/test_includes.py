@@ -98,7 +98,7 @@ class IncludeTests(IncludeFixture):
 
     def test_included_configuration_and_callback_errors_keep_location(self):
         cases = [
-            ('set var(x) = 7\n', 'fn(main)\n output var(x)\nend\n'),
+            ('net host(9000)\n', 'fn(main)\n output 1\nend\n'),
             ('scene 3d\n', 'fn(draw)\n display rect(0,0,1,1)\nend\n'),
             ('clear rgba(1,2,3,4)\n', 'scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n'),
             ('fn(update, dt)\n output 0\nend\n', 'scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n'),
@@ -172,8 +172,8 @@ class IncludeExecutionTests(IncludeFixture):
         exe.write_bytes(NativeCodegen(path, *program).generate())
         result = subprocess.run([str(exe)], capture_output=True, timeout=5)
         self.assertEqual(result.returncode, 2)
-        self.assertIn(str(library).encode('utf-8'), result.stdout)
-        self.assertGreater(len(result.stdout), 200)
+        self.assertIn(str(library).encode('utf-8'), result.stderr)
+        self.assertGreater(len(result.stderr), 200)
 
     def test_native_include_entry_and_original_runtime_error_location(self):
         library = self.write('lib/helper.ANVL', 'fn(value, number)\n output var(number) + 1\nend\n')
@@ -188,8 +188,8 @@ class IncludeExecutionTests(IncludeFixture):
         exe.write_bytes(NativeCodegen(path, *program).generate())
         result = subprocess.run([str(exe)], capture_output=True, timeout=5)
         self.assertEqual(result.returncode, 2)
-        self.assertIn(str(library).encode('utf-8'), result.stdout)
-        self.assertIn(b'line 2', result.stdout)
+        self.assertIn(str(library).encode('utf-8'), result.stderr)
+        self.assertIn(b'line 2', result.stderr)
 
     def test_included_graphical_callbacks_initialize_once(self):
         self.write('lib.ANVL', 'array shared(2)\nset var(initialized) = 0\nadd var(initialized) 1\nfn(value)\n output 42\nend\n')

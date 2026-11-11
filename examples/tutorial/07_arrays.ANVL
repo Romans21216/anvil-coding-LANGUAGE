@@ -1,0 +1,14 @@
+# Lesson 7: arrays hold many numbers under one name.
+array scores(3)
+
+fn(main)
+  set array(scores, 0) = 10
+  set array(scores, 1) = 20
+  set array(scores, 2) = 30
+  set var(total) = 0
+  for local(index) = 0 to 2
+    add var(total) array(scores, local(index))
+  end
+  say "Total: " & var(total)
+end
+call fn(main)

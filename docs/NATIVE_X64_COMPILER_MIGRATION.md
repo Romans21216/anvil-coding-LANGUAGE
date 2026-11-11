@@ -12,7 +12,7 @@ An experimental direct backend is available with `python -m compiler.anvil <file
 
 The direct backend now has an initial Windows 2D runtime: `scene 2d`, literal opaque `clear rgba`, top-level numeric initialization, `fn(draw)`, `display rect(...) -rgb(...)`, and optional `fn(update)` with `time()`, `delta()`, `compute()`, `held(key)`, `pressed(key)` and the mouse queries below. Runtime instructions and the PE are emitted by Anvil; USER32/GDI32 functions are imported directly from Windows. No C/Rust source, compiler, linker, or runtime shim is used.
 
-The regular build still defaults to the C backend. The native backend does **not** yet support function-local arrays, the full language, project manifests, other shapes, text, alpha blending, 3D, assets, audio, physics, trigonometry, or networking. Full no-C engine parity remains unfinished.
+The regular build still defaults to the C backend. The native backend does **not** yet support the full language, project manifests, shapes beyond rectangles, on-screen text, alpha blending, 3D, assets, audio, physics, networking, or package plugins. Text values, `&` joining, console `say`/`write`/`ask`, growable lists, function-local arrays and `sin`/`cos` all work natively. Full no-C engine parity remains unfinished.
 
 ## Native 2D scene
 
@@ -59,9 +59,9 @@ The direct backend implements `abs(x)`, `sqrt(x)`, `floor(x)`, `ceil(x)`, `min(a
 
 Gradient selection, fade, interpolation, noise and fBm are written in [Anvil runtime source](../runtime/native/procedural.ANVL). Only requested routines and their dependencies are compiled into the PE. Numeric primitives, integer hash and RNG state transitions use Anvil-owned machine-code emission. This is a built-in runtime library. Local source `include` composition is described in [INCLUDES.md](INCLUDES.md); package registries and binary plugins remain unfinished. A program using only `sqrt` does not bundle the noise library. The native function prefix `_anvil_native_` is reserved and the private hash intrinsic cannot be called by user code.
 
-Calls pass the first four numeric arguments in XMM0–3 and later arguments in aligned Win64 stack slots. Up to sixteen arguments are supported within the existing sixteen-temporary expression budget. Scalar locals and compiler temporaries now support disp32 offsets. Each function frame is limited to 4096 bytes with a compiler diagnostic above that limit; unbounded recursion and native local arrays remain unsupported. The frame limit avoids silently permitting large unprobed Win64 allocations while broader stack-budget work is pending.
+Calls pass the first four numeric arguments in XMM0–3 and later arguments in aligned Win64 stack slots. Up to sixteen arguments are supported within the existing sixteen-temporary expression budget. Scalar locals and compiler temporaries now support disp32 offsets. Each function frame is limited to 4096 bytes with a compiler diagnostic above that limit; function-local arrays live in that same frame (up to 4 KB of array bytes per function) and unbounded recursion remains unsupported. The frame limit avoids silently permitting large unprobed Win64 allocations while broader stack-budget work is pending.
 
-Build `examples/native_procedural.ANVL` with `--backend native` for generated terrain. Space or left click regenerates it from a new seed. Generated-PE tests cover reference noise/fBm values, RNG sequence/reseeding, math domains, nested argument side effects, sixteen-argument calls, large local offsets, library selection, and graphical use. Independent review of3270998 passed111tests and scored72/100; explicit-main/Wiki/test-race corrections are verified, while untouched coordinate OS-dispatch coverage remains partial (#63).
+Build `examples/native_procedural.ANVL` with `--backend native` for generated terrain. Space or left click regenerates it from a new seed. Generated-PE tests cover reference noise/fBm values, RNG sequence/reseeding, math domains, nested argument side effects, sixteen-argument calls, large local offsets, library selection, and graphical use. Independent review scored 72/100: explicit-main, Wiki and test-race corrections are verified, while untouched coordinate OS-dispatch coverage remains partial (#63).
 
 ## Troubleshooting the direct backend
 
@@ -74,7 +74,7 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 | Output EXE cannot be overwritten | Close the running generated window, then rebuild. |
 | GUI test cannot read window pixels | Run it in an interactive Windows x64 desktop; it samples a visible test window and closes that process afterward. |
 | Native seed/random/noise range error | Use the numeric ranges above; reduce fBm coordinates/lacunarity if later octaves exceed the lattice range. |
-| Native function frame exceeds 4096 bytes | Split large scalar-local functions into smaller functions; native local arrays and general stack budgets are still pending. |
+| Native function frame exceeds 4096 bytes | Split large scalar-local functions into smaller functions; function-local arrays count against the same 4 KB frame, and general stack budgets are still pending. |
 | Older native sample flickers | Rebuild with the buffered-presentation fix for issue #57. The regression checks visible pixels during slow drawing and verifies that the old unbuffered implementation fails that check. |
 
 ## Architecture

@@ -14,8 +14,35 @@ from compiler.common import (
     array_size,
     c_name,
     variable_code,
+    decode_string,
 )
-from compiler.expressions import expr, split_args
+from compiler.expressions import (
+    STRING_VARIABLES,
+    expr,
+    split_args,
+    split_amp,
+)
+
+
+def _walk_statement_nodes(nodes):
+    for node in nodes:
+        yield node
+        yield from _walk_statement_nodes(node.body)
+        yield from _walk_statement_nodes(node.otherwise)
+
+
+def _walk_nodes(top, functions):
+    yield from _walk_statement_nodes(top)
+    for function in functions.values():
+        yield from _walk_statement_nodes(function.body)
+
+
+_VAR_PATTERN = __import__("re").compile(r"var\(([A-Za-z_][\w-]*)\)")
+
+
+def _is_string_variable(part: str) -> bool:
+    match = _VAR_PATTERN.fullmatch(part.strip())
+    return match is not None and match.group(1) in STRING_VARIABLES
 
 
 def rgb_style(
@@ -39,6 +66,21 @@ def rgb_style(
             color.append("255")
     raw = re.sub(r"\s+-rgba?\([^)]*\)", "", raw)
     return color, raw
+
+
+def say_string(raw: str) -> str:
+    """Convert an Anvil string literal token into a C string literal body.
+
+    Anvil escapes (\\n, \\t, \\\\, \\") are decoded first, then the result is
+    re-escaped for C so printf receives exactly the characters the author wrote.
+    """
+    text = decode_string(raw)
+    return (
+        text.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\t", "\\t")
+    )
 
 
 def emit_display(
@@ -117,6 +159,27 @@ def emit_display(
     raise CompileError(f"{path}:{node.line}: invalid arguments for display {shape}")
 
 
+_TEXT_CALL = re.compile(r"call\s+fn\(([^,)]*)")
+
+
+def _is_text_function_call(part: str, functions: dict[str, "Node"] | None) -> bool:
+    """True when `part` is a call to a function whose output is text."""
+    match = _TEXT_CALL.match(part.strip())
+    if match is None or not functions:
+        return False
+    target = functions.get(match.group(1).strip())
+    return bool(target is not None and getattr(target, "returns_text", False))
+
+
+_COMPARISON = re.compile(r"<=|>=|!=|==|[<>=]")
+
+
+def _has_comparison(part: str) -> bool:
+    """True when the part compares values, which yields a number, not text."""
+    stripped = re.sub(r'"(?:[^"\\]|\\.)*"', '""', part)
+    return _COMPARISON.search(stripped) is not None
+
+
 def emit_nodes(
     path: pathlib.Path,
     nodes: list[Node],
@@ -144,7 +207,15 @@ def emit_nodes(
         path = n.source or original_path
         source_path = json.dumps(str(path))
         if n.kind == "set":
-            out.append(f"{indent}{variable_code(n.name, scope)} = {lower(n)};")
+            if n.string:
+                buffer = f"anvil_str_{c_name(n.name)}"
+                out.append(
+                    f"{indent}anvil_str_set({buffer}, "
+                    f"{expr(path, n.line, n.value, functions, 'string', scope, arrays)}, "
+                    f"{source_path}, {n.line});"
+                )
+            else:
+                out.append(f"{indent}{variable_code(n.name, scope)} = {lower(n)};")
         elif n.kind == "local_set":
             out.append(f"{indent}{c_name(scope.name + '__' + n.name)} = {lower(n)};")
         elif n.kind == "array_set":
@@ -183,6 +254,17 @@ def emit_nodes(
                 f"{source_path}, {n.line});"
             )
         elif n.kind == "output":
+            if scope is not None and getattr(scope, "returns_text", False):
+                value = lower(n, expected="string")
+                if scope.local_arrays:
+                    out.append(f"{indent}{{")
+                    out.append(f"{indent}    const char *_anvil_return_text = {value};")
+                    out.extend(local_array_cleanup(scope, indent + "    "))
+                    out.append(f"{indent}    return _anvil_return_text;")
+                    out.append(f"{indent}}}")
+                else:
+                    out.append(f"{indent}return {value};")
+                continue
             value = lower(n)
             if scope is not None and scope.local_arrays:
                 out.append(f"{indent}{{")
@@ -192,6 +274,91 @@ def emit_nodes(
                 out.append(f"{indent}}}")
             else:
                 out.append(f"{indent}return {value};")
+        elif n.kind == "wait":
+            out.append(f"{indent}anvil_wait({lower(n)});")
+        elif n.kind == "press_enter":
+            out.append(f"{indent}anvil_press_enter();")
+        elif n.kind == "ask":
+            prompt = n.value.strip()
+            if n.string:
+                buffer = f"anvil_str_{c_name(n.params[0])}"
+                if prompt:
+                    rendered = expr(path, n.line, prompt, functions, "string", scope, arrays)
+                    out.append(
+                        f"{indent}anvil_ask({rendered}, {buffer});"
+                    )
+                else:
+                    out.append(f"{indent}anvil_ask(0, {buffer});")
+            else:
+                target = variable_code(n.params[0], scope)
+                if prompt:
+                    rendered = expr(path, n.line, prompt, functions, "string", scope, arrays)
+                    out.append(
+                        f"{indent}{target} = anvil_check_number("
+                        f"anvil_ask_number({rendered}), {source_path}, {n.line});"
+                    )
+                else:
+                    out.append(
+                        f"{indent}{target} = anvil_check_number("
+                        f"anvil_ask_number(0), {source_path}, {n.line});"
+                    )
+        elif n.kind == "write":
+            parts = split_args(n.value)
+            if not parts:
+                raise CompileError(f"{path}:{n.line}: write expects text or a value")
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    raise CompileError(f"{path}:{n.line}: write has an empty part")
+                if _has_comparison(part):
+                    out.append(f'{indent}printf("%s", anvil_format_number({lower(n, part)}));')
+                elif (
+                    len(split_amp(part)) > 1
+                    or _is_text_function_call(part, functions)
+                    or re.fullmatch(
+                        r"(upper|lower|chr|trim|char|mid|left|right)\s*\(.*\)", part, re.DOTALL
+                    )
+                ):
+                    rendered = expr(path, n.line, part, functions, "string", scope, arrays)
+                    out.append(f'{indent}printf("%s", {rendered});')
+                elif part.startswith('"'):
+                    rendered = expr(path, n.line, part, functions, "string", scope, arrays)
+                    out.append(f'{indent}printf("%s", "{say_string(rendered)}");')
+                elif _is_string_variable(part):
+                    rendered = expr(path, n.line, part, functions, "string", scope, arrays)
+                    out.append(f'{indent}printf("%s", {rendered});')
+                else:
+                    out.append(f'{indent}printf("%s", anvil_format_number({lower(n, part)}));')
+        elif n.kind == "say":
+            parts = split_args(n.value)
+            if not parts:
+                raise CompileError(f"{path}:{n.line}: say expects text or a value")
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    raise CompileError(f"{path}:{n.line}: say has an empty part")
+                if _has_comparison(part):
+                    out.append(f'{indent}printf("%s", anvil_format_number({lower(n, part)}));')
+                elif (
+                    len(split_amp(part)) > 1
+                    or _is_text_function_call(part, functions)
+                    or re.fullmatch(
+                        r"(upper|lower|chr|trim|char|mid|left|right)\s*\(.*\)", part, re.DOTALL
+                    )
+                ):
+                    rendered = expr(path, n.line, part, functions, "string", scope, arrays)
+                    out.append(f'{indent}printf("%s", {rendered});')
+                elif part.startswith('"'):
+                    rendered = expr(path, n.line, part, functions, "string", scope, arrays)
+                    out.append(f'{indent}printf("%s", "{say_string(rendered)}");')
+                elif _is_string_variable(part):
+                    rendered = expr(path, n.line, part, functions, "string", scope, arrays)
+                    out.append(f'{indent}printf("%s", {rendered});')
+                else:
+                    out.append(f'{indent}printf("%s", anvil_format_number({lower(n, part)}));')
+            out.append(f'{indent}printf("\\n");')
+        elif n.kind == "stop":
+            out.append(f"{indent}exit(0);")
         elif n.kind == "call":
             if n.name not in functions:
                 raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
@@ -309,6 +476,14 @@ def local_array_cleanup(scope: Node, indent: str) -> list[str]:
     ]
 
 
+def _walk_kinds(nodes):
+    for node in nodes:
+        yield node.kind
+        for branch in (node.body, node.otherwise):
+            if branch:
+                yield from _walk_kinds(branch)
+
+
 def emit_c(
     path: pathlib.Path,
     functions: dict[str, Node],
@@ -319,15 +494,25 @@ def emit_c(
     project_name: str = "Anvil Game",
 ) -> str:
     arrays = arrays or {}
+    string_variables = set(STRING_VARIABLES)
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",
         '#include "anvil_runtime.h"',
         "#include <math.h>",
         "#include <stdio.h>",
+        "#include <string.h>",
         "#include <stdlib.h>",
         "",
     ]
-    lines += [f"static double {c_name(name)};" for name in sorted(variables)]
+    lines += [
+        f"static double {c_name(name)};"
+        for name in sorted(variables - string_variables)
+    ]
+
+    lines += [
+        f"static char anvil_str_{c_name(name)}[256];"
+        for name in sorted(string_variables)
+    ]
     lines += [
         f"static double {c_name(name)}[{size}];"
         for name, size in sorted(arrays.items())
@@ -375,14 +560,20 @@ def emit_c(
             ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
             or "void"
         )
-        lines.append(f"static double {c_name(name)}({params});")
+        result_type = (
+            "const char *" if getattr(fn, "returns_text", False) else "double"
+        )
+        lines.append(f"static {result_type} {c_name(name)}({params});")
     lines.append("")
     for name, fn in functions.items():
         params = (
             ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
             or "void"
         )
-        lines.append(f"static double {c_name(name)}({params}) {{")
+        result_type = (
+            "const char *" if getattr(fn, "returns_text", False) else "double"
+        )
+        lines.append(f"static {result_type} {c_name(name)}({params}) {{")
         lines.extend(
             f"    double {c_name(name + '__' + local)} = 0.0;"
             for local in sorted(fn.locals)
@@ -397,7 +588,9 @@ def emit_c(
         lines.extend(body)
         if not any(n.kind == "output" for n in fn.body):
             lines.extend(local_array_cleanup(fn, "    "))
-            lines.append("    return 0.0;")
+            lines.append(
+                '    return "";' if getattr(fn, "returns_text", False) else "    return 0.0;"
+            )
         lines.extend(["}", ""])
     # Setup commands and initial values run before callbacks.
     setup = [
@@ -406,6 +599,11 @@ def emit_c(
         if n.kind
         in (
             "set",
+            "say",
+            "write",
+            "wait",
+            "press_enter",
+            "ask",
             "scene",
             "camera",
             "camera_fov",
@@ -423,6 +621,11 @@ def emit_c(
         if n.kind
         not in (
             "set",
+            "say",
+            "write",
+            "wait",
+            "press_enter",
+            "ask",
             "scene",
             "camera",
             "camera_fov",
@@ -474,8 +677,12 @@ def emit_c(
         for n in calls:
             values = [expr(n.source or path, n.line, arg, functions) for arg in split_args(n.value)]
             call = f"{c_name(n.name)}({', '.join(values)})"
-            if n.name == "main":
-                lines.append(f'    printf("%.15g\\n", {call});')
+            kinds = set(_walk_kinds(functions["main"].body)) if n.name == "main" else set()
+            if n.name == "main" and ("say" in kinds or "write" in kinds or "ask" in kinds) and "output" not in kinds:
+                # A main that only talks must not trail a stray "0" return value.
+                lines.append(f"    (void){call};")
+            elif n.name == "main":
+                lines.append(f'    printf("%s\\n", anvil_format_number({call}));')
             else:
                 lines.append(f"    (void){call};")
     elif "main" in functions:
@@ -484,7 +691,12 @@ def emit_c(
                 f"{functions['main'].source or path}:{functions['main'].line}: main function parameters "
                 "require an explicit call with arguments"
             )
-        lines.append(f'    printf("%.15g\\n", {c_name("main")}());')
+        kinds = set(_walk_kinds(functions["main"].body))
+        if ("say" in kinds or "write" in kinds or "ask" in kinds) and "output" not in kinds:
+            # Implicit entry follows the same rule as `call fn(main)`.
+            lines.append(f"    (void){c_name('main')}();")
+        else:
+            lines.append(f'    printf("%s\\n", anvil_format_number({c_name("main")}()));')
     lines.append("    anvil_net_close();")
     lines.extend(["    return 0;", "}", ""])
     return "\n".join(lines)

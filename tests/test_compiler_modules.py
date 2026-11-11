@@ -24,7 +24,7 @@ class CompilerModuleTests(unittest.TestCase):
         self.assertIn("static double anvil_answer;", generated)
         self.assertIn("return anvil_check_number(", generated)
         self.assertIn("anvil_answer", generated)
-        self.assertIn('printf("%.15g\\n", anvil_main());', generated)
+        self.assertIn('printf("%s\\n", anvil_format_number(anvil_main()));', generated)
 
     def test_semantic_phase_rejects_unresolved_variable_before_codegen(self):
         source_path = pathlib.Path("unresolved.ANVL")

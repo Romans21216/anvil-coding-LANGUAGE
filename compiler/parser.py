@@ -18,12 +18,16 @@ from compiler.expressions import split_args
 from compiler.lexer import split_keyword, strip_comment, validate_port
 from compiler.semantics import validate_program
 
+# `list <name>` reserves this many slots; `add` appends until it is full.
+LIST_CAPACITY = 256
+
 
 def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
     functions: dict[str, Node] = {}
     top: list[Node] = []
     variables: set[str] = set()
     arrays = ArrayDeclarations()
+    lists: set[str] = set()
     variable_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     local_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
@@ -138,6 +142,25 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 current_function.local_arrays[name] = size
                 current_function.local_array_lines[name] = line_no
             continue
+        list_decl = re.fullmatch(r"list\s+([A-Za-z_][\w-]*)", line)
+        if list_decl:
+            name = list_decl.group(1)
+            if current_function is not None or len(stack) != 1:
+                raise CompileError(
+                    f"{path}:{line_no}: lists must be declared at top level"
+                )
+            if name in arrays:
+                raise CompileError(
+                    f"{path}:{line_no}: duplicate array or list '{name}'"
+                )
+            arrays[name] = LIST_CAPACITY
+            arrays.locations[name] = (path, line_no)
+            lists.add(name)
+            # The counter is a normal global; both backends zero-initialise
+            # globals, so no top-level `set` node is needed (native rejects
+            # top-level statements in console programs).
+            variables.add(f"{name}__count")
+            continue
         fn = re.fullmatch(r"fn\(([A-Za-z_][\w-]*)(?:\s*,\s*(.*))?\)", line)
         if fn:
             name = fn.group(1)
@@ -165,6 +188,23 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             assert block is not None
             stack[-1] = (block.otherwise, "else", block)
             continue
+        elif_match = re.fullmatch(r"elif\s+(.+)", line)
+        if elif_match:
+            # `elif` chains read as one decision; compile as a nested if in the
+            # previous if's else branch, so both backends need no new node kind.
+            if stack[-1][1] != "if":
+                raise CompileError(
+                    f"{path}:{line_no}: 'elif' must directly follow an 'if' body"
+                )
+            chain = stack[-1][2]
+            assert chain is not None
+            condition = elif_match.group(1).strip()
+            if not condition:
+                raise CompileError(f"{path}:{line_no}: elif needs a condition")
+            node = Node("if", line_no, value=condition)
+            chain.otherwise.append(node)
+            stack[-1] = (node.body, "if", node)
+            continue
         if line == "end":
             if len(stack) == 1:
                 raise CompileError(f"{path}:{line_no}: unexpected 'end'")
@@ -184,6 +224,24 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             node = Node("while", line_no, value=condition)
             stack[-1][0].append(node)
             stack.append((node.body, "while", node))
+            continue
+        if line == "stop":
+            node = Node("stop", line_no)
+            stack[-1][0].append(node)
+            continue
+        if line == "repeat" or line.startswith("repeat "):
+            count = line[len("repeat "):].strip() if line != "repeat" else ""
+            if not count:
+                raise CompileError(f"{path}:{line_no}: repeat needs a count")
+            if current_function is None:
+                raise CompileError(
+                    f"{path}:{line_no}: repeat loops must be inside a function"
+                )
+            loop_name = f"repeat{line_no}"
+            current_function.locals.add(loop_name)
+            node = Node("for", line_no, name=loop_name, params=["1", count, "1"])
+            stack[-1][0].append(node)
+            stack.append((node.body, "for", node))
             continue
         for_loop = re.fullmatch(r"for\s+local\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
         if for_loop:
@@ -284,6 +342,26 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     "local_" + match.group(1), line_no, match.group(3), match.group(2)
                 )
         if node is None:
+            match = re.fullmatch(r"add\s+([A-Za-z_][\w-]*)\s+(.+)", line)
+            if match and match.group(1) in lists:
+                if current_function is None:
+                    raise CompileError(
+                        f"{path}:{line_no}: list writes must be inside a function"
+                    )
+                list_name, value_expr = match.group(1), match.group(2)
+                counter = f"{list_name}__count"
+                stack[-1][0].append(
+                    Node(
+                        "array_set",
+                        line_no,
+                        value_expr,
+                        list_name,
+                        params=[f"var({counter})"],
+                    )
+                )
+                stack[-1][0].append(Node("add", line_no, "1", counter))
+                continue
+        if node is None:
             match = re.fullmatch(r"(add|sub)\s+var\(([A-Za-z_][\w-]*)\)\s+(.+)", line)
             if match:
                 node = Node(match.group(1), line_no, match.group(3), match.group(2))
@@ -296,6 +374,39 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             match = re.fullmatch(r"output\s+(.+)", line)
             if match:
                 node = Node("output", line_no, match.group(1))
+        if node is None:
+            if line == "write" or line.startswith("write "):
+                parts = line[len("write "):].strip() if line != "write" else ""
+                if not parts:
+                    raise CompileError(f"{path}:{line_no}: write expects text or a value")
+                node = Node("write", line_no, parts)
+                stack[-1][0].append(node)
+                continue
+            match = re.fullmatch(r"say\s+(.+)", line)
+            if match:
+                node = Node("say", line_no, match.group(1))
+        if node is None:
+            match = re.fullmatch(r"wait\s+(.+)", line)
+            if match:
+                node = Node("wait", line_no, match.group(1))
+        if node is None and line == "press enter":
+            node = Node("press_enter", line_no)
+        if node is None:
+            match = re.fullmatch(r"ask\s+(.+)", line)
+            if match:
+                parts = split_args(match.group(1))
+                target = None
+                if parts and re.fullmatch(r"var\([A-Za-z_][\w-]*\)", parts[-1].strip()):
+                    target = parts[-1].strip()[4:-1]
+                    parts = parts[:-1]
+                if target is None:
+                    raise CompileError(
+                        f"{path}:{line_no}: ask needs a variable to store the answer, "
+                        "like ask \"Name? \", var(name)"
+                    )
+                if target not in variables:
+                    variables.add(target)
+                node = Node("ask", line_no, ", ".join(parts), target, params=[target])
         if node is None:
             match = re.fullmatch(r"call\s+fn\((.*)\)", line)
             if match:
@@ -350,6 +461,11 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             pending.extend(node.body)
             pending.extend(node.otherwise)
 
+    from compiler.expressions import LISTS
+
+    # Accumulate: a program may include several files, each declaring lists.
+    # load_program clears the registry once per program.
+    LISTS.update(lists)
     mark_source(top)
     for function in functions.values():
         function.source = path

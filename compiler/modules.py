@@ -27,8 +27,10 @@ def include_name(raw, path, line):
 
 
 def load_program(path, source, *, include_root=None):
+    from compiler.expressions import LISTS
     from compiler.parser import parse_syntax
 
+    LISTS.clear()
     path = Path(path)
     root = Path(include_root).resolve() if include_root is not None else path.resolve().parent
     result = ParsedProgram(path, {}, [], set(), ArrayDeclarations(), [], [])

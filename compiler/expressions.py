@@ -19,7 +19,54 @@ from compiler.common import (
 )
 
 MAX_EXPRESSION_DEPTH = 64
+MAX_STRINGS_PER_EXPRESSION = 200
+
+# Join sites need distinct scratch buffers across the WHOLE program: a function
+# that returns `a & b` and its caller's `"[" & call fn(..) & "]"` used to share
+# anvil_str_scratch[0] and clobbered each other. Number slots live in the upper
+# half (128..255) so they never collide with a cat slot (0..127).
+_CAT_SLOT_COUNTER = 0
+
+
+def _next_join_slots() -> tuple[int, int, int]:
+    global _CAT_SLOT_COUNTER
+    slot = _CAT_SLOT_COUNTER
+    _CAT_SLOT_COUNTER += 1
+    return slot % 128, 128 + (slot * 2) % 126, 128 + (slot * 2 + 1) % 126
 _PARSE_DEPTH = ContextVar("anvil_expression_parse_depth", default=0)
+# Which variables hold text. Set by the code generators before lowering; the
+# compiler is single-threaded, so a module-level registry is safe.
+STRING_VARIABLES: set[str] = set()
+# List names declared with `list <name>`; `count(name)` reads their counter.
+LISTS: set[str] = set()
+
+
+def set_string_variables(names) -> None:
+    STRING_VARIABLES.clear()
+    STRING_VARIABLES.update(names)
+
+
+def split_amp(text: str) -> list[str]:
+    """Split on top-level ampersands, respecting quotes and parentheses."""
+    result, start, depth, quoted, escaped = [], 0, 0, False, False
+    for i, ch in enumerate(text):
+        if escaped:
+            escaped = False
+        elif ch == "\\" and quoted:
+            escaped = True
+        elif ch == '"':
+            quoted = not quoted
+        elif not quoted and ch == "(":
+            depth += 1
+        elif not quoted and ch == ")":
+            depth -= 1
+        elif not quoted and depth == 0 and ch == "&":
+            result.append(text[start:i].strip())
+            start = i + 1
+    tail = text[start:].strip()
+    if tail or result:
+        result.append(tail)
+    return result
 
 
 def validate_expression_depth(source, path, line):
@@ -43,7 +90,7 @@ def validate_expression_depth(source, path, line):
 TOKEN = re.compile(
     r"""\s*(?:([0-9]+(?:\.[0-9]*)?(?:[eE][+-]?[0-9]+)?)|("(?:\\.|[^"\\])*")|"""
     r"""(var\([A-Za-z_][\w-]*\))|(local\([A-Za-z_][\w-]*\))|"""
-    r"""(<=|>=|!=|==|[(),+\-*/%=<>])|([A-Za-z_][\w-]*))"""
+    r"""(<=|>=|!=|==|[(),+\-*/%&=<>])|([A-Za-z_][\w-]*))"""
 )
 
 BUILTINS = {
@@ -53,11 +100,26 @@ BUILTINS = {
     "noise": (3, 3),
     "fbm": (6, 6),
     "floor": (1, 1),
+    "round": (1, 1),
     "ceil": (1, 1),
     "sqrt": (1, 1),
     "sin": (1, 1),
     "cos": (1, 1),
     "abs": (1, 1),
+    "len": (1, 1),
+    "upper": (1, 1),
+    "lower": (1, 1),
+    "ord": (1, 1),
+    "chr": (1, 1),
+    "trim": (1, 1),
+    "number": (1, 1),
+    "char": (2, 2),
+    "contains": (2, 2),
+    "mid": (3, 3),
+    "left": (2, 2),
+    "right": (2, 2),
+    "starts_with": (2, 2),
+    "ends_with": (2, 2),
     "min": (2, 2),
     "max": (2, 2),
     "pressed": (1, 1),
@@ -115,6 +177,21 @@ BUILTIN_C_NAMES = {
     "image_draw_scaled": "anvil_image_draw_scaled",
     "receive": "anvil_net_receive",
     "abs": "fabs",
+    "round": "round",
+    "len": "(double)strlen",
+    "upper": "anvil_text_upper",
+    "lower": "anvil_text_lower",
+    "chr": "anvil_text_chr",
+    "ord": "anvil_text_ord",
+    "trim": "anvil_text_trim",
+    "number": "anvil_text_to_number",
+    "char": "anvil_text_char",
+    "contains": "anvil_str_contains",
+    "mid": "anvil_text_mid",
+    "left": "anvil_text_left",
+    "right": "anvil_text_right",
+    "starts_with": "anvil_str_starts",
+    "ends_with": "anvil_str_ends",
     "min": "fmin",
     "max": "fmax",
     "body_create": "anvil_body_create",
@@ -137,7 +214,44 @@ BUILTIN_C_NAMES = {
     "ray_backend_available": "anvil_ray_backend_available",
 }
 
+BUILTIN_TEXT_RETURNING = {"upper", "lower", "chr", "trim", "char", "mid", "left", "right"}
+
+# Common names from other languages, mapped to the Anvil spelling. A beginner
+# who types `random(1, 10)` gets a "did you mean rnd" instead of a variable hint.
+NAME_SUGGESTIONS = {
+    "random": "rnd(low, high)",
+    "rand": "rnd(low, high)",
+    "print": "say",
+    "println": "say",
+    "puts": "say",
+    "length": "len(text)",
+    "str": "text(value) or use & to join",
+    "int": "round(value) or floor(value)",
+    "float": "a plain number, e.g. 1.5",
+    "string": "text, written with double quotes",
+    "input": "ask var(x)",
+    "readline": "ask var(x)",
+    "toupper": "upper(text)",
+    "tolower": "lower(text)",
+}
+
+BUILTIN_ARG_KINDS = {
+    "char": ("string", "number"),
+    "mid": ("string", "number", "number"),
+    "left": ("string", "number"),
+    "right": ("string", "number"),
+}
+
 BUILTIN_STRING_ARGUMENTS = {
+    "contains",
+    "starts_with",
+    "ends_with",
+    "number",
+    "trim",
+    "ord",
+    "upper",
+    "lower",
+    "len",
     "ray_backend",
     "ray_backend_available",
     "mouse_pressed",
@@ -161,6 +275,7 @@ class ExpressionParser:
         ">=": 4,
         "+": 5,
         "-": 5,
+        "&": 5,
         "*": 6,
         "/": 6,
         "%": 6,
@@ -183,13 +298,15 @@ class ExpressionParser:
         )
         self.scope = scope
         self.arrays = arrays or {}
+        self._cat_index = 0
         validate_expression_depth(source, path, line)
         self.tokens: list[tuple[str, str]] = []
         pos = 0
         while pos < len(source):
-            call_prefix = re.match(r"\s*call\s+fn\(|\s*array\(", source[pos:])
+            call_prefix = re.match(r"\s*call\s+fn\(|\s*array\(|\s*count\(", source[pos:])
             if call_prefix:
                 is_call = "call" in call_prefix.group(0)
+                is_count = "count(" in call_prefix.group(0)
                 call_start = pos + call_prefix.start()
                 scan = pos + call_prefix.end()
                 depth, quoted, escaped = 1, False, False
@@ -207,11 +324,14 @@ class ExpressionParser:
                         depth -= 1
                     scan += 1
                 if depth:
-                    token_name = "function call" if is_call else "array access"
+                    token_name = (
+                        "function call"
+                        if is_call
+                        else ("count()" if is_count else "array access")
+                    )
                     raise CompileError(f"{path}:{line}: unclosed {token_name}")
-                self.tokens.append(
-                    ("call" if is_call else "array", source[call_start:scan])
-                )
+                token_kind = "call" if is_call else ("count" if is_count else "array")
+                self.tokens.append((token_kind, source[call_start:scan]))
                 pos = scan
                 continue
             match = TOKEN.match(source, pos)
@@ -307,7 +427,10 @@ class ExpressionParser:
             left = (value, "string")
         elif kind == "variable":
             name = value[4:-1]
-            left = (variable_code(name, self.scope), "number")
+            if name in STRING_VARIABLES:
+                left = (f"anvil_str_{c_name(name)}", "string")
+            else:
+                left = (variable_code(name, self.scope), "number")
         elif kind == "local":
             name = value[6:-1]
             if not self.scope or name not in self.scope.locals:
@@ -315,6 +438,18 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: unknown local variable {name!r}"
                 )
             left = (c_name(self.scope.name + "__" + name), "number")
+        elif kind == "count":
+            contents = value[value.index("count(") + 6 : -1].strip()
+            if not re.fullmatch(r"[A-Za-z_][\w-]*", contents):
+                raise CompileError(
+                    f"{self.path}:{self.line}: count() expects a list name"
+                )
+            if contents not in LISTS:
+                raise CompileError(
+                    f"{self.path}:{self.line}: unknown list {contents!r}; "
+                    f"declare it with list {contents}"
+                )
+            left = (variable_code(f"{contents}__count", self.scope), "number")
         elif kind == "array":
             contents = value[value.index("array(") + 6 : -1]
             parts = split_args(contents)
@@ -357,12 +492,22 @@ class ExpressionParser:
                 ).compile()
                 for arg in raw_args
             ]
-            left = (c_name(name) + "(" + ", ".join(args) + ")", "number")
+            result_kind = (
+                "string"
+                if getattr(self.functions[name], "returns_text", False)
+                else "number"
+            )
+            left = (c_name(name) + "(" + ", ".join(args) + ")", result_kind)
         elif kind == "op" and value in ("+", "-"):
             left = (f"({value}{self.require_number(self.parse(7))})", "number")
         elif kind == "op" and value == "(":
             left = self.parse()
             self.expect(")")
+        elif kind == "word" and value == "not":
+            # Prefix `not` binds looser than comparisons so `not a = b` reads as
+            # "a is not equal to b", but tighter than and/or.
+            operand = self.require_number(self.parse(3))
+            left = (f"((double)(!({self.checked_number(operand)})))", "number")
         elif kind == "word" and value in ("true", "false"):
             left = ("1.0" if value == "true" else "0.0", "number")
         elif kind == "word" and value in ("and", "or"):
@@ -374,10 +519,17 @@ class ExpressionParser:
         elif kind == "word" and value in BUILTINS:
             self.expect("(")
             args = []
+            arg_kinds = BUILTIN_ARG_KINDS.get(value)
             if not self.peek(")"):
                 while True:
                     argument = self.parse()
-                    if value in BUILTIN_STRING_ARGUMENTS:
+                    if arg_kinds is not None:
+                        kind = arg_kinds[min(len(args), len(arg_kinds) - 1)]
+                        if kind == "string":
+                            args.append(self.require_string(argument))
+                        else:
+                            args.append(self.require_number(argument))
+                    elif value in BUILTIN_STRING_ARGUMENTS:
                         args.append(self.require_string(argument))
                     else:
                         args.append(self.require_number(argument))
@@ -394,11 +546,22 @@ class ExpressionParser:
                 )
             name = BUILTIN_C_NAMES.get(value, value)
             call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"
-            if value in BUILTINS:
+            if value in BUILTIN_TEXT_RETURNING:
+                left = (call, "string")
+            else:
                 call = self.checked_number(call)
-            left = (call, "number")
+                left = (call, "number")
         elif kind == "word":
-            raise CompileError(f"{self.path}:{self.line}: unknown name {value!r}")
+            hint = NAME_SUGGESTIONS.get(value.lower())
+            if hint is not None:
+                raise CompileError(
+                    f"{self.path}:{self.line}: unknown name {value!r}; "
+                    f"did you mean {hint}?"
+                )
+            raise CompileError(
+                f"{self.path}:{self.line}: unknown name {value!r} "
+                f"(variables are written var({value}))"
+            )
         else:
             raise CompileError(
                 f"{self.path}:{self.line}: unexpected token {value!r} in expression"
@@ -415,6 +578,48 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: operator {operator!r} needs "
                     "a right operand"
                 )
+            if operator == "&":
+                # Text joining: either side may be a string or a number; the
+                # buffer index keeps every intermediate value in its own slot.
+                def as_text(operand, slot):
+                    code, kind = operand
+                    if kind == "string":
+                        return code
+                    return f"anvil_str_from_number({slot}, {self.checked_number(code)})"
+
+                if self._cat_index + 2 > MAX_STRINGS_PER_EXPRESSION:
+                    raise CompileError(
+                        f"{self.path}:{self.line}: an expression may join at most "
+                        f"{MAX_STRINGS_PER_EXPRESSION} values with &"
+                    )
+                cat_slot, left_slot, right_slot = _next_join_slots()
+                left_text = as_text(left, left_slot)
+                right_text = as_text(self.parse(precedence + 1), right_slot)
+                left = (
+                    f"anvil_str_cat(anvil_str_scratch[{cat_slot}], "
+                    f"{left_text}, {right_text}, "
+                    f"{json.dumps(str(self.path))}, {self.line})",
+                    "string",
+                )
+                self._cat_index += 1
+                continue
+            if operator in ("=", "==", "!=", "<", "<=", ">", ">=") and left[1] == "string":
+                right = self.parse(precedence + 1)
+                right_code, right_kind = right
+                if right_kind != "string":
+                    raise CompileError(
+                        f"{self.path}:{self.line}: cannot compare text with a number"
+                    )
+                c_operator = {
+                    "=": "==", "==": "==", "!=": "!=",
+                    "<": "<", "<=": "<=", ">": ">", ">=": ">=",
+                }[operator]
+                left = (
+                    f"((strcmp({left[0]}, {right_code}) {c_operator} 0) "
+                    f"? 1.0 : 0.0)",
+                    "number",
+                )
+                continue
             left_code = self.checked_number(self.require_number(left))
             right = self.require_number(self.parse(precedence + 1))
             if operator == "/":
@@ -432,14 +637,19 @@ class ExpressionParser:
                 )
             elif operator in ("and", "or"):
                 c_operator = "&&" if operator == "and" else "||"
+                # C's &&/|| yield int; the double cast keeps printed and stored
+                # values numeric instead of an int reinterpreted as a double.
                 left = (
-                    f"({left_code} {c_operator} {self.checked_number(right)})",
+                    f"(((double)(({left_code}) {c_operator} "
+                    f"({self.checked_number(right)})) == 1.0) ? 1.0 : 0.0)",
                     "number",
                 )
             elif operator in ("=", "==", "!=", "<", "<=", ">", ">="):
                 c_operator = "==" if operator == "=" else operator
+                # Comparisons are int in C; force the documented 1.0/0.0 doubles.
                 left = (
-                    f"({left_code} {c_operator} {self.checked_number(right)})",
+                    f"(((double)(({left_code}) {c_operator} "
+                    f"({self.checked_number(right)})) == 1.0) ? 1.0 : 0.0)",
                     "number",
                 )
             else:

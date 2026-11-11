@@ -1,0 +1,8 @@
+# Lesson 3: text and the text functions.
+fn(main)
+  set var(name) = "ada"
+  say "Hello, " & upper(var(name)) & "!"
+  say len(var(name))
+  say lower("LOUD")
+end
+call fn(main)
