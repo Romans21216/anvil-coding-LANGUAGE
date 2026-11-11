@@ -1,0 +1,147 @@
+ANVIL COMMIT REVIEW
+===================
+
+Reviewed commit: 2f0ac684c13dca31502a9d5215219674bb8bcc54
+Branch: codex/anvil-user-updates-2f0ac68
+Review date: 2026-11-11
+Review type: Static source and documentation review. The test suite was not run
+for this review, so the rating is provisional and is not independent test
+evidence or a release certification.
+
+OVERALL RATING: 79/100
+
+This is a substantial improvement to Anvil as a beginner-friendly language
+prototype. It is not a 79/100 game engine or a 79/100 production compiler. The
+score weighs the features and code organization visible in this commit. The
+existing 100/100 score in docs/GRADE.md measures a narrow beginner-language
+rubric; it should not be read as a complete engine, compiler, or quality score.
+
+CATEGORY SCORES
+---------------
+
+Language usability and core features:          17/20
+Compiler correctness and architecture:         14/20
+Native executable backend and parity:           12/20
+Runtime and engine capability:                  13/20
+Diagnostics and developer experience:           15/20
+Documentation and verification evidence:         8/10
+                                                ------
+Total:                                          79/100
+
+WHAT THIS COMMIT DOES WELL
+--------------------------
+
+1. It makes first contact easier with a greeting command, an interactive shell,
+   a tutorial, beginner-oriented diagnostics, and a published scorecard.
+2. It adds useful text operations, list support, additional language examples,
+   and more tests around compiler and runtime behavior.
+3. The compiler reports source locations for many errors and has explicit
+   limits for nesting, arrays, includes, and native stack frames.
+4. The direct x64 backend emits a PE executable itself and already uses
+   reachable-function discovery. The project is clear that this backend is
+   experimental and has a smaller feature set than the C backend.
+5. The README is relatively candid about Windows/MSVC dependence, software
+   rendering, incomplete networking, image-format limits, and unmeasured
+   performance.
+
+CHANGES TO PRIORITIZE
+--------------------
+
+P0 - Integrate against current GitHub main
+
+This commit was made from an Anvil snapshot whose parent is 148363296d51de59e3b92db3bf768d19ad5d2ee2. GitHub main is newer, and rebasing this commit produced conflicts in core compiler, runtime, documentation, and test files. Review and forward-port the changes against current main before treating this branch as integrated. Do not replace current main with this older snapshot.
+
+P1 - Make REPL state persistent and correct
+
+compiler/repl.py recompiles a program made from all remembered history for each
+new command. That makes history replay observable: an earlier `add` or `sub`
+can be applied again each time a later command runs. Also, a multi-line control
+block beginning with `if`, `while`, or `for` is not recorded as an assignment
+even if it changes a variable, so that variable may not remain available to the
+next prompt. Use a persistent execution session or an explicit state snapshot
+and add regressions for repeated mutations, block assignments, arrays/lists,
+errors, and commands with side effects.
+
+P1 - Remove unreachable functions from every generated target
+
+The native backend calls reachable_functions, but compiler/codegen.py emits
+prototypes and bodies for every parsed function in the C backend. Add
+Anvil-level call-graph dead-code elimination before both backends generate
+output. Start from the actual entry points: implicit or explicit main calls,
+top-level calls, and draw/update callbacks when the engine uses them. Preserve
+transitive calls and any functions referenced by supported callback or plugin
+mechanisms. Remove unused Anvil functions from generated C and native code
+without relying on the host C compiler to discard them. Also select only the
+runtime modules and helper functions needed by the reachable program. Verify
+with programs containing unused functions, transitive calls, recursion,
+callbacks, includes, and both backends; inspect generated output and executable
+size.
+
+P1 - Build one typed intermediate representation
+
+The parser stores many expressions as raw strings. Semantic checks infer text
+and function return types with regular expressions, while code generation
+parses and lowers expressions separately. Some semantic state is shared in
+module-level STRING_VARIABLES and LISTS sets. Replace these parallel guesses
+with a typed expression/statement representation created once after parsing.
+Have both C and x64 backends lower that shared representation. This should
+reduce feature mismatches and make type errors, include resolution, dead-code
+analysis, and future backends easier to reason about.
+
+P1 - Define and verify backend parity
+
+The C/MSVC backend remains the default and has wider runtime coverage. The
+direct x64 backend supports a narrower subset and rejects .ANVLproj manifests.
+Publish a capability matrix generated from actual tests. For each feature,
+either provide parity tests, document a backend-specific limitation, or issue
+a source-located unsupported-feature error. Add representative tests for
+functions, recursion, strings, arrays/lists, diagnostics, includes, graphics,
+and project settings on each backend that claims support.
+
+P1 - Measure performance and executable size
+
+The commit adds a grading tool, not compiler/runtime performance benchmarks.
+Measure clean compile time, incremental iteration time, executable size,
+startup, memory use, frame time, and generated runtime size on named machines
+and representative programs. Compare C and direct x64 results. Use the
+measurements to guide optimization and avoid claiming hyper-efficiency without
+evidence.
+
+P2 - Reconcile the language specification with the implementation
+
+Compare README.md, docs/LANGUAGE_SPEC.md, docs/LANGUAGE.md, and the compiler.
+The current specification still describes general strings, concatenation,
+mutation, and text-returning functions as absent from version 1, while other
+project documentation and tests describe several of these as implemented.
+Make the normative versioned specification match the actual accepted language
+and state backend-specific differences clearly.
+
+P2 - Strengthen what the 100/100 grade means
+
+Keep the beginner scorecard, but label it consistently as a narrow score for
+the listed beginner workflows. A perfect result on that rubric does not
+evaluate engine completeness, portability, security, compiler architecture,
+performance, or all 450 project requirements. Keep full-suite and independent
+review evidence separate from the self-scored grade, and identify the exact
+commit each result covers.
+
+P2 - Add language/version and stability policy
+
+Document which syntax and runtime behavior are stable, how incompatible
+changes are versioned, and which features are experimental. Add compatibility
+tests for old examples whenever syntax or code generation changes.
+
+RECOMMENDED NEXT BATCH
+---------------------
+
+1. Forward-port this branch onto current GitHub main and resolve conflicts
+   while preserving both histories.
+2. Fix REPL state behavior and add focused regressions.
+3. Add C-backend call-graph reachability and tests proving unused functions
+   are absent from generated C; preserve the native backend's current
+   reachability behavior.
+4. Correct the language specification and clarify the scorecard scope.
+5. Run targeted regressions and the complete applicable suite on the final
+   integrated commit, then request an independent review of that exact commit.
+
+END OF REVIEW
