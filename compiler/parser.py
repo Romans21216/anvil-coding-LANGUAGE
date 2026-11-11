@@ -364,6 +364,44 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     "local_" + match.group(1), line_no, match.group(3), match.group(2)
                 )
         if node is None:
+            match = re.fullmatch(r"remove\s+([A-Za-z_][\w-]*)\s+(.+)", line)
+            if match and match.group(1) in lists:
+                if current_function is None:
+                    raise CompileError(
+                        f"{path}:{line_no}: list writes must be inside a function"
+                    )
+                name = match.group(1)
+                index_expr = match.group(2)
+                counter = f"{name}__count"
+                cursor = f"{name}__cursor{line_no}"
+                variables.add(cursor)
+                shift = Node(
+                    "array_set",
+                    line_no,
+                    f"array({name}, var({cursor}) + 1)",
+                    name,
+                    params=[f"var({cursor})"],
+                )
+                body = [
+                    shift,
+                    Node("add", line_no, "1", cursor),
+                ]
+                loop = Node(
+                    "while",
+                    line_no,
+                    f"var({cursor}) < var({counter}) - 1",
+                    body=body,
+                )
+                guard = Node(
+                    "if",
+                    line_no,
+                    f"var({cursor}) >= 0 and var({cursor}) < var({counter})",
+                    body=[loop, Node("sub", line_no, "1", counter)],
+                )
+                stack[-1][0].append(Node("set", line_no, index_expr, cursor))
+                stack[-1][0].append(guard)
+                continue
+        if node is None:
             match = re.fullmatch(r"add\s+([A-Za-z_][\w-]*)\s+(.+)", line)
             if match and match.group(1) in lists:
                 if current_function is None:

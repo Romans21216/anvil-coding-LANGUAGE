@@ -86,7 +86,7 @@ say upper(var(name))        # ADA
 
 Results can be stored back into a variable and are capped at 255 bytes; going past that stops with a clear error instead of truncating quietly. `len` counts bytes, so `len("héllo")` is 6. Comparisons work between text values (`=`, `!=`, `<`, `<=`, `>`, `>=`, alphabetically); comparing text with a number is a compile error. The text built-ins are `len`, `upper`, `lower`, `trim`, `left`, `right`, `char`, `mid`, `chr`, `ord`, `number`, and the 1/0 tests `contains`, `starts_with`, `ends_with`. Functions accept text parameters: `fn(greet, who)` with `output "hi " & var(who)` is called as `call fn(greet, "Ada")`, and a text argument passed to a numeric parameter is rejected at the call site. `say expr` prints a line, `write expr` prints without a newline, and `ask "prompt? ", var(x)` reads one line from the console.
 
-`list name` declares a growable numeric list at top level, `add name value` appends to it, `count(name)` reports how many values it holds, and `array(name, index)` reads a 0-based slot. A list holds up to 256 values.
+`list name` declares a growable numeric list at top level, `add name value` appends to it, and `count(name)` reports how many values it holds. `array(name, index)` reads a 0-based slot and `remove name index` deletes one value, shifting the rest down and shrinking the count; removing an index that is not in the list changes nothing. A list holds up to 256 values.
 
 ```anv
 list scores

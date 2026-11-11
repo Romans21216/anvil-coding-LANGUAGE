@@ -58,7 +58,7 @@ performance claim.
 | 0. Integrate against GitHub main | **Blocked, scoped** | `main` is a parallel lineage (73 commits, modular compiler + selective imports + image/network). Measured conflict map and porting order: `docs/FORWARD_PORT.md`. |
 | 1. General function arguments (text in/out) | **Done** | Text parameters work on both backends, including recursion, mixed text/number parameters, text comparisons and nested text-returning calls. A parameter's kind is inferred from the body (text builtin, join with a literal, text comparison, text-returning output) plus call-site evidence, with a call-site error on a mismatch. `tests/test_text_params.py` covers both backends; a recursive join in the native backend needed a preserved right operand so the result is not truncated. |
 | 3. Complete the string model | **Documented, not changed** | Bytes are the defined unit (`len("héllo")` is 6) and this is now stated in the spec, guide and README. Unicode code-point indexing is not implemented. |
-| 4. Growable, typed collections | **Not started** | `list` holds numbers only, capped at 256 entries with a clear error. |
+| 4. Growable, typed collections | **Partial** | `list` now supports `remove` (tail shift, out-of-range is a no-op) on both backends. Still numeric-only, capped at 256 entries, and text lists plus `for each` remain. |
 | 5. Records and enumerations | **Not started** | |
 | 6. Explicit function references | **Not started** | |
 | 7. Control-flow completeness | **Done for break/continue** | Both commands work in nested `for`/`while`/`repeat` on both backends (`continue` applies the `for` step). `match`/`case` is not started and should follow enums. |
