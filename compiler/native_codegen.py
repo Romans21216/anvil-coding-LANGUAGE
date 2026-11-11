@@ -1002,6 +1002,33 @@ class NativeCodegen:
         self.code.call("function:anvil_str_copy")
         self.pop_temp()
 
+    def emit_text_list_remove(self, name: str, index_expr: str, line: int, scope) -> None:
+        """Shift slots down with one rep movsb; the caller guards the range."""
+        block = self._text_list_block(name)
+        self.emit_expression(index_expr, line, scope)      # xmm0 = index
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")        # cvttsd2si rax,xmm0
+        self.code.bytes(b"\x57\x56")                      # push rdi; push rsi
+        self.code.bytes(b"\x49\x89\xc1")                 # mov r9, rax
+        self.code.bytes(b"\x48\xc1\xe0\x08")            # shl rax, 8
+        self.code.rip_lea_data(2, block)                   # lea rdx,[block]
+        self.code.bytes(b"\x48\x01\xd0")                 # add rax, rdx
+        self.code.bytes(b"\x48\x89\xc7")                 # mov rdi, rax
+        self.code.bytes(b"\x48\x8d\xb0\x00\x01\x00\x00")  # lea rsi,[rax+256]
+        self.load_variable(f"{name}__count", None, line)   # xmm0 = count
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc8")        # cvttsd2si rcx, xmm0
+        self.code.bytes(b"\x48\x83\xe9\x01")            # sub rcx, 1
+        self.code.bytes(b"\x4c\x29\xc9")                 # sub rcx, r9
+        self.code.bytes(b"\x48\xc1\xe1\x08")            # shl rcx, 8
+        self.code.bytes(b"\xf3\xa4")                      # rep movsb
+        self.load_variable(f"{name}__count", None, line)   # xmm0 = count
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")        # cvttsd2si rax, xmm0
+        self.code.bytes(b"\x48\x83\xe8\x01")            # sub rax, 1
+        self.code.bytes(b"\x48\xc1\xe0\x08")            # shl rax, 8
+        self.code.rip_lea_data(2, block)
+        self.code.bytes(b"\x48\x01\xd0")                 # add rax, rdx
+        self.code.bytes(b"\xc6\x00\x00")                 # mov byte [rax], 0
+        self.code.bytes(b"\x5e\x5f")                      # pop rsi; pop rdi
+
     def emit_text_list_read(self, name: str, raw_index: str, line: int, scope) -> None:
         block = self._text_list_block(name)
         self.emit_expression(raw_index, line, scope)          # xmm0 = index
@@ -1313,10 +1340,8 @@ class NativeCodegen:
                 self.emit_finite_check(node.line)
                 self._math.seed(node.line)
             elif node.kind == "text_list_remove":
-                raise CompileError(
-                    f"{self.path}:{node.line}: removing from a text list is "
-                    "not available in the native x64 backend yet; build with "
-                    "--backend c"
+                self.emit_text_list_remove(
+                    node.name, node.value, node.line, scope
                 )
             elif node.kind == "text_list_add":
                 self.emit_text_list_add(node.name, node.value, node.line, scope)

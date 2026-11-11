@@ -100,18 +100,21 @@ class TextListTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.replace("\r\n", "\n"), "2\nada/alan\n2\n")
 
-    def test_native_names_the_removal_limitation(self) -> None:
+    def test_remove_works_on_both_backends(self) -> None:
         source = (
             "list names: text\nfn(main)\n  add names \"ada\"\n"
-            "  remove names 0\nend\ncall fn(main)\n"
+            "  add names \"grace\"\n  add names \"alan\"\n"
+            "  remove names 1\n  say count(names)\n"
+            '  say array(names, 0) & "/" & array(names, 1)\n'
+            "  remove names 9\n  say count(names)\nend\ncall fn(main)\n"
         )
-        with tempfile.TemporaryDirectory() as temp:
-            path = pathlib.Path(temp) / "sample.ANVL"
-            path.write_text(source, encoding="utf-8")
-            functions, top, variables, arrays = parse(path, source)
-            with self.assertRaises(CompileError) as caught:
-                NativeCodegen(path, functions, top, variables, arrays).generate()
-        self.assertIn("not available in the native x64 backend", str(caught.exception))
+        for backend in ("c", "native"):
+            with self.subTest(backend=backend):
+                result = compile_and_run(source, backend)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(
+                    result.stdout.replace("\r\n", "\n"), "2\nada/alan\n2\n"
+                )
 
     def test_unknown_list_type_is_rejected(self) -> None:
         source = "list names: mystery\nfn(main)\n  say 1\nend\ncall fn(main)\n"
