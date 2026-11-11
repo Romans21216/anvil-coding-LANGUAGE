@@ -24,6 +24,8 @@ end
 call fn(main)
 ```
 
+A variable may carry an optional type: `set var(score): number = 0`, `set var(name): text = "Ada"`, `set var(alive): bool = true`. The three types are `number`, `text` and `bool`; `true` and `false` are the bool values, and a comparison (such as `2 > 1`) also counts as a bool. An annotated value must match, or the compiler reports `declared text but this value is a number` at that line before emitting anything. Unannotated variables keep inferring their type exactly as before, so existing programs are unchanged. `bool` values print as `1` and `0` for now.
+
 Comments begin with `#` outside a quoted string. Names are case-sensitive. A function parameter is numeric unless the body uses it as text — passing it to a text builtin, joining it with a text literal, comparing it with text, or returning it from a text-returning function — or unless every caller passes text; then it holds text. A function's `output` value is numeric unless it returns text (see Text and lists below). `output expression` returns a value from the current function; functions without an `output` return `0`. `call fn(name, arguments...)` can be used as a statement or inside an expression. Recursive calls are supported by both backends. `while expression ... end` repeats its body while the numeric condition is nonzero. `for local(name) = start to end [step amount] ... end` iterates over an inclusive numeric range. A top-level `set var(name) = expression` initializes a global before `main` runs, in source order.
 
 ## Language version

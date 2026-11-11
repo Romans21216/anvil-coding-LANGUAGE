@@ -26,6 +26,7 @@ class Node:
     local_array_lines: dict[str, int] = field(default_factory=dict)
     source: pathlib.Path | None = None
     string: bool = False
+    declared_type: str | None = None
 
 
 class ArrayDeclarations(dict):

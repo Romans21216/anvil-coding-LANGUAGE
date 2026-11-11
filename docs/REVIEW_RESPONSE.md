@@ -54,9 +54,9 @@ performance claim.
 
 | Priority | Status | Notes |
 |---|---|---|
+| 2. Simple types and real booleans | **Partial** | `number`, `text` and `bool` annotations are enforced with source-located errors and inference stays the default; `true`/`false` exist on both backends. Booleans are still stored and printed as 1/0, so real bool values, bool-typed function parameters and `and`/`or`/`not` returning bool are the remaining slice. |
 | 0. Integrate against GitHub main | **Blocked, scoped** | `main` is a parallel lineage (73 commits, modular compiler + selective imports + image/network). Measured conflict map and porting order: `docs/FORWARD_PORT.md`. |
 | 1. General function arguments (text in/out) | **Done** | Text parameters work on both backends, including recursion, mixed text/number parameters, text comparisons and nested text-returning calls. A parameter's kind is inferred from the body (text builtin, join with a literal, text comparison, text-returning output) plus call-site evidence, with a call-site error on a mismatch. `tests/test_text_params.py` covers both backends; a recursive join in the native backend needed a preserved right operand so the result is not truncated. |
-| 2. Simple types and real booleans | **Not started** | `true`/`false` remain numeric aliases; no annotations or version 2 syntax. |
 | 3. Complete the string model | **Documented, not changed** | Bytes are the defined unit (`len("héllo")` is 6) and this is now stated in the spec, guide and README. Unicode code-point indexing is not implemented. |
 | 4. Growable, typed collections | **Not started** | `list` holds numbers only, capped at 256 entries with a clear error. |
 | 5. Records and enumerations | **Not started** | |

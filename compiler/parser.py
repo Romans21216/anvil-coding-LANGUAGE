@@ -327,9 +327,20 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 node = Node(
                     "array_set", line_no, value_expr, array_name, params=[index_expr]
                 )
-        match = re.fullmatch(r"set\s+var\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
+        match = re.fullmatch(
+            r"set\s+var\(([A-Za-z_][\w-]*)\)(?:\s*:\s*([A-Za-z]+))?\s*=\s*(.+)",
+            line,
+        )
         if node is None and match:
-            node = Node("set", line_no, match.group(2), match.group(1))
+            declared = match.group(2)
+            if declared is not None:
+                if declared not in ("number", "text", "bool"):
+                    raise CompileError(
+                        f"{path}:{line_no}: unknown type {declared!r}; write "
+                        "number, text or bool"
+                    )
+            node = Node("set", line_no, match.group(3), match.group(1))
+            node.declared_type = declared
             if (
                 current_function is None
                 or match.group(1) not in current_function.params

@@ -239,6 +239,76 @@ def _validate_call_kinds(program: ParsedProgram) -> None:
                     )
 
 
+def _declared_kind(program, node, string_vars, bool_vars) -> str:
+    """The kind a `set` value has, for annotation checking."""
+    value = (node.value or "").strip()
+    if not value:
+        return "number"
+    if value in ("true", "false"):
+        return "bool"
+    match = re.fullmatch(r"var\(([A-Za-z_][\w-]*)\)", value)
+    if match is not None:
+        name = match.group(1)
+        if name in bool_vars:
+            return "bool"
+        if name in string_vars:
+            return "text"
+        return "number"
+    if _has_compare(value):
+        return "bool"
+    if value.startswith('"') or len(split_amp(value)) > 1:
+        return "text"
+    if re.match(r"(?:upper|lower|chr|trim|char|mid|left|right)\s*\(", value):
+        return "text"
+    if _call_returns_text(program, value):
+        return "text"
+    return "number"
+
+
+def _has_compare(value: str) -> bool:
+    stripped = re.sub(r'"(?:[^"\\]|\\.)*"', '""', value)
+    return re.search(r"(?<![<>=!])(?:<=|>=|!=|==|=|<|>)(?![=])", stripped) is not None
+
+
+def _validate_declared_types(program, string_vars: set[str]) -> set[str]:
+    """Check `set var(x): type = value` annotations and collect bool variables."""
+    entries = [(node, None) for node in _walk_all(program.top)]
+    for function in program.functions.values():
+        entries.extend((node, function) for node in _walk_all(function.body))
+
+    bool_vars: set[str] = set()
+    for _pass in range(4):
+        changed = False
+        for node, _scope in entries:
+            declared = getattr(node, "declared_type", None)
+            if node.kind not in ("set", "local_set") or declared is None:
+                continue
+            kind = _declared_kind(program, node, string_vars, bool_vars)
+            shown = {"number": "a number", "text": "text", "bool": "a bool"}[kind]
+            if declared == "bool" and kind != "bool":
+                raise CompileError(
+                    f"{node.source or program.path}:{node.line}: declared bool "
+                    f"but this value is {shown}; a bool is true, false or a "
+                    "comparison"
+                )
+            if declared == "number" and kind != "number":
+                raise CompileError(
+                    f"{node.source or program.path}:{node.line}: declared number "
+                    f"but this value is {shown}"
+                )
+            if declared == "text" and kind != "text":
+                raise CompileError(
+                    f"{node.source or program.path}:{node.line}: declared text "
+                    f"but this value is {shown}"
+                )
+            if declared == "bool" and node.name not in bool_vars:
+                bool_vars.add(node.name)
+                changed = True
+        if not changed:
+            break
+    return bool_vars
+
+
 def _classify_string_variables(program: ParsedProgram, strict: bool = True) -> set[str]:
     """Mark `set` nodes that assign text and return the variable names.
 
@@ -346,6 +416,7 @@ def validate_program(program: ParsedProgram) -> None:
     _classify_text_functions(program, string_vars)
     _classify_text_params(program)
     _validate_call_kinds(program)
+    program.bool_variables = _validate_declared_types(program, string_vars)
     if not functions:
         raise CompileError(f"{path}: define at least one fn(name) function")
 
