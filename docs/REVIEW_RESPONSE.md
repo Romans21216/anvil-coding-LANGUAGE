@@ -28,13 +28,17 @@ runs the same program on both backends and compares output.
 | tiny (hello) | C | 2.265 s | 143,360 |
 | texty (text + loop + calls) | native | 0.002 s | 6,144 |
 | texty (text + loop + calls) | C | 2.000 s | 148,992 |
-| big (40 helpers, 1 unused) | native | 0.002 s | 2,560 |
-| big (40 helpers, 1 unused) | C | 1.815 s | 143,360 |
+| big (40 helpers, all called) | native | 0.005 s | 25,600 |
+| big (40 helpers, all called) | C | 1.776 s | 153,088 |
+| big_trim (40 helpers, none called) | native | 0.002 s | 2,560 |
+| big_trim (40 helpers, none called) | C | 1.691 s | 143,360 |
 
-The C timings are dominated by `cl.exe`, not by Anvil. The `big` row shows
-reachability at work: the 41 helper functions are unreachable, so both backends
-emit the same tiny program. These are single-machine observations, not a
-performance claim.
+The C timings are dominated by `cl.exe`, not by Anvil. The `big` and `big_trim`
+pair measures reachability instead of asserting it: calling the helpers grows the
+native image from 2,560 to 25,600 bytes and the C executable from 143,360 to
+153,088, while the same helpers unreachable produce byte-identical output to the
+hello program on both backends. `tests/test_bench.py` pins both properties. These
+are single-machine observations, not a performance claim.
 
 ## Commit review findings
 
@@ -45,7 +49,7 @@ performance claim.
 | **P1** C backend emits every function | **Done** | `emit_c` now filters with the same `reachable_functions` the native backend uses, rooted at top-level calls, `main`, and active `draw`/`update`. `tests/test_deadcode.py` asserts the unused helper is absent from generated C and from the native image. |
 | **P1** one typed intermediate representation | **Not started** | Large architectural change. The two string-classification heuristics that motivated it were fixed directly this cycle (`&` is a top-level join operator, joins of builtins are text), which removed the visible mismatches. |
 | **P1** define and verify backend parity | **Done (documented)** | `docs/BACKENDS.md` is a capability matrix where each row names the test that proves it, and every native gap is a source-located error rather than a mis-compile. |
-| **P1** measure performance and executable size | **Done (first pass)** | `tools/bench_anvil.py` reports compile time and exe size for three programs on both backends; numbers above. No optimization work was done off the back of it. |
+| **P1** measure performance and executable size | **Done (first pass)** | `tools/bench_anvil.py` reports compile time and exe size for four programs on both backends; numbers above. No optimization work was done off the back of it. |
 | **P2** reconcile the language specification | **Done** | Text, joining, escapes, lists, arrays, text-returning functions and break/continue are documented as present; the "unfinished" list now names only what is genuinely missing; native limits are listed in both the spec and the migration guide. |
 | **P2** strengthen what 100/100 means | **Done** | `docs/GRADE.md` states that the scorecard covers a narrow beginner workflow set and points to `docs/QA_REPORT.md` as a separate historical review. |
 | **P2** language/version and stability policy | **Done** | `docs/VERSIONING.md`: what version 1 promises, what is experimental, how breaking changes become version 2, and which tests enforce compatibility. |
