@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import hashlib
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -15,6 +17,47 @@ from compiler.common import CompileError
 from compiler.diagnostics import render
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
+
+
+CACHE_DIR_NAME = ".anvil-cache"
+
+
+def _cache_key(generated: str, compiler: str, release: bool) -> str:
+    """Hash everything that decides the executable's bytes."""
+    digest = hashlib.sha256()
+    digest.update(generated.encode("utf-8"))
+    digest.update(b"\0release" if release else b"\0debug")
+    digest.update(str(pathlib.Path(compiler)).encode("utf-8", "replace"))
+    runtime = pathlib.Path(__file__).resolve().parents[1] / "runtime"
+    for name in ("anvil_runtime.c", "anvil_runtime.h"):
+        file = runtime / name
+        if file.exists():
+            digest.update(file.read_bytes())
+    for source_file in sorted((pathlib.Path(__file__).resolve().parent).glob("*.py")):
+        digest.update(source_file.read_bytes())
+    return digest.hexdigest()
+
+
+def _cache_path(out: pathlib.Path, key: str) -> pathlib.Path:
+    return out.parent / CACHE_DIR_NAME / f"{key}.exe"
+
+
+def cached_build(generated: str, compiler: str, out: pathlib.Path, release: bool) -> bool:
+    """Copy a cached executable into place; True when the cache answered."""
+    entry = _cache_path(out, _cache_key(generated, compiler, release))
+    if not entry.exists():
+        return False
+    out.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(entry, out)
+    return True
+
+
+def store_build(generated: str, compiler: str, out: pathlib.Path, release: bool) -> None:
+    if not out.exists():
+        return
+    entry = _cache_path(out, _cache_key(generated, compiler, release))
+    entry.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(out, entry)
 
 
 def main() -> int:
@@ -195,8 +238,13 @@ def main() -> int:
             )
             return 2
         out = args.output or source_path.with_suffix(".exe")
-        build_c(compiler[1], c_path, out, args.release)
-        print(f"Built {out} using {compiler[0]}")
+        cached = cached_build(generated, compiler[1], out, args.release)
+        if cached:
+            print(f"Built {out} using {compiler[0]} (reused build cache)")
+        else:
+            build_c(compiler[1], c_path, out, args.release)
+            store_build(generated, compiler[1], out, args.release)
+            print(f"Built {out} using {compiler[0]}")
         return 0
     except tomllib.TOMLDecodeError as e:
         print(f"{args.source}: {e}", file=sys.stderr)

@@ -48,6 +48,7 @@ hello, Ada
 - Numbers print the same way on both backends: up to six fractional digits, trailing zeros trimmed, no exponent notation (`1 / 3` prints `0.333333`, `0.000001` stays `0.000001`). The native backend prints whole parts up to 9.2e18 and then stops with `Anvil output out of range`; the C backend keeps going to about 1e63.
 - Text lists (`list names: text`) store up to 256 text values on the C backend; the native backend reports the limitation clearly.
 - Growable lists support `add`, `count`, `array`, `remove` and `for each item in list` (removal shifts the tail down; an out-of-range index is a no-op).
+- Repeated C-backend builds reuse a cache keyed by the generated C, the runtime files and the compiler sources: a rebuild drops from ~2 s to ~0.1 s and produces the same executable.
 - Variables take optional `number`, `text` and `bool` annotations (`set var(alive): bool = true`); a mismatch is a source-located error, and unannotated variables still infer their type.
 - Functions both take and return text on both backends: `fn(greet, who) output "hi " & var(who) end` called as `call fn(greet, "Ada")`. A parameter is text when the body uses it as text (a join with a literal, a text builtin, a text comparison, or returning it from a text-returning function) or when every caller passes text; otherwise it stays a number, and a mismatch is reported at the call site.
 - `mid(text, start, count)` extracts a bounded slice: the count clamps to the text's end, a start past the end or a negative count gives empty text. Both backends.
