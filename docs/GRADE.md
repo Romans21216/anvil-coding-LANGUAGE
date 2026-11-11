@@ -14,20 +14,20 @@ page and `tools/grade_anvil.py` describe the language as it is today.
 
 ## How the score works
 
-The rubric holds 26 checks, weighted to 100 points. A check passes only when the
+The rubric holds 28 checks, weighted to 100 points. A check passes only when the
 program compiles and its exact stdout matches on **both** backends, unless the
 check is marked otherwise (C-only, native-only, or a compiler diagnostic). Open
 gaps are included on purpose, so the score cannot inflate itself.
 
 | Area | Points | What it tests |
 |---|---|---|
-| First contact | 15 | The first minute: hello world, the ask-name greeting program, variables and joins |
-| Core syntax | 20 | Precedence, `%`, `if`/`elif`/`else`, `repeat`/`for`/`while`, functions returning values |
+| First contact | 14 | The first minute: hello world, the ask-name greeting program, variables and joins |
+| Core syntax | 21 | Precedence, `%`, `if`/`elif`/`else`, `repeat`/`for`/`while`, functions returning values, enums |
 | Text toolkit | 20 | Join, `len`, case, `left`/`right`, `mid`/`char`, `trim`/`number`, `chr`/`ord`, `contains` family, text ordering |
-| Data | 15 | Fixed arrays; text-returning functions; growable lists |
-| Diagnostics | 15 | Caret diagnostics with the source line; bare names hint at `var(...)`; text returns on native |
-| Shell | 8 | Assignment echo and reuse; blocks spanning lines |
-| Learning path | 7 | Ten tutorial lessons present and runnable |
+| Data | 18 | Fixed arrays; text-returning functions; growable lists; text lists; `for each` |
+| Diagnostics | 14 | Caret diagnostics with the source line; bare names hint at `var(...)`; text returns on native |
+| Shell | 7 | Assignment echo and reuse; blocks spanning lines |
+| Learning path | 6 | Ten tutorial lessons present and runnable |
 
 ## Current result
 
@@ -41,13 +41,12 @@ counted (text returns on native, growable lists) were implemented instead.
 
 ## What this score does not cover
 
-The rubric predates several shipped features and does not exercise them, so the
-10.0/10 is not evidence for them: **enums**, **selective imports**, **bool
-variables printing as `true`/`false`**, **text lists on the native backend**,
-**`net_ok` network status**, **dead-branch elimination** and **the build cache**.
-Each is covered by its own test file and, where both backends are involved, by a
-case in `scripts/differential_probe.py`. Extending the rubric is the next piece of
-work here; until then this page states the gap instead of implying coverage.
+The rubric still does not exercise everything, so the 10.0/10 is not evidence
+for: **bool variables printing as `true`/`false`**, **selective imports** (the
+runner writes one file per check), **`net_ok` network status**, and the compiler
+work — **dead-branch elimination** and **the build cache**. Each is covered by its
+own test file and, where both backends are involved, by a case in
+`scripts/differential_probe.py`.
 
 ## Why these weights
 

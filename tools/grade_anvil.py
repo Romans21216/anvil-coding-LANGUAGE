@@ -42,7 +42,7 @@ check("first contact", 5, "the greeting program greets the player",
       'fn(main)\n  ask "What is your name? ", var(name)\n'
       '  say "Hello, " & trim(var(name)) & "!"\nend\ncall fn(main)\n',
       "What is your name? Hello, Ada!\n")
-check("first contact", 5, "names, joins and arithmetic in the first minute",
+check("first contact", 4, "names, joins and arithmetic in the first minute",
       'fn(main)\n  set var(score) = 10\n  add var(score) 5\n'
       '  say "Score: " & var(score)\nend\ncall fn(main)\n', "Score: 15\n")
 
@@ -51,7 +51,7 @@ check("core syntax", 4, "arithmetic respects precedence",
       "fn(main)\n  say 3 + 4 * 2\nend\ncall fn(main)\n", "11\n")
 check("core syntax", 4, "remainder works",
       "fn(main)\n  say 7 % 3\n  say 7.5 % 2\nend\ncall fn(main)\n", "1\n1.5\n")
-check("core syntax", 4, "if / elif / else",
+check("core syntax", 3, "if / elif / else",
       "fn(main)\n  set var(age) = 15\n  if var(age) >= 18\n    say \"adult\"\n"
       '  elif var(age) >= 13\n    say "teen"\n  else\n    say "child"\n  end\n'
       "end\ncall fn(main)\n", "teen\n")
@@ -100,14 +100,39 @@ check("data", 5, "arrays store and read",
 check("data", 5, "text-returning functions",
       'fn(greet)\n  output "hello"\nend\nfn(main)\n  say call fn(greet)\n'
       "end\ncall fn(main)\n", "__C__hello\n")
-check("data", 5, "growable lists",
+check("data", 4, "growable lists",
       "list nums\nfn(main)\n  add nums 5\n  add nums 7\n  say count(nums)\n"
       "  say array(nums, 1)\nend\ncall fn(main)\n", "2\n7\n")
 
 # --- 5. Diagnostics (15) ----------------------------------------------------
-check("diagnostics", 5, "undefined variable points at the line",
+check("diagnostics", 4, "undefined variable points at the line",
       'fn(main)\n  set var(total) = 1\n  say missing\nend\ncall fn(main)\n',
       "__DIAG__missing")
+check("core syntax", 2, "enums name states",
+      "enum State idle, playing, paused\n"
+      "fn(main)\n"
+      "  set var(now) = playing\n"
+      "  say var(now)\n"
+      "  if var(now) = playing\n"
+      '    say "on"\n'
+      "  end\n"
+      "end\ncall fn(main)\n", "1\non\n")
+
+check("data", 2, "text lists hold text",
+      "list names: text\n"
+      "fn(main)\n"
+      '  add names "ada"\n  add names "grace"\n'
+      "  say array(names, 1)\n"
+      '  say array(names, 0) & "/" & array(names, 1)\n'
+      "end\ncall fn(main)\n", "grace\nada/grace\n")
+
+check("data", 2, "for each walks a list",
+      "list nums\n"
+      "fn(main)\n  add nums 2\n  add nums 3\n"
+      "  set var(total) = 0\n"
+      "  for each v in nums\n    add var(total) var(v)\n  end\n"
+      "  say var(total)\nend\ncall fn(main)\n", "5\n")
+
 check("diagnostics", 5, "bare name offers the var(...) spelling",
       'fn(main)\n  set var(total) = 1\n  say total\nend\ncall fn(main)\n',
       "__DIAG__var(")
@@ -118,11 +143,11 @@ check("diagnostics", 5, "text returns also work on the native backend",
 # --- 6. Shell (8) -----------------------------------------------------------
 check("shell", 4, "assignment echo and reuse",
       "__REPL__x = 2\nsay x * 3\n:quit\n", "x = 2|6")
-check("shell", 4, "blocks run in the shell",
+check("shell", 3, "blocks run in the shell",
       '__REPL__repeat 2\nsay "ho"\nend\n:quit\n', "ho|ho")
 
 # --- 7. Learning path (7) ---------------------------------------------------
-check("learning path", 7, "ten tutorial lessons exist", "__TUTORIAL__", "__TUTORIAL__")
+check("learning path", 6, "ten tutorial lessons exist", "__TUTORIAL__", "__TUTORIAL__")
 
 WEIGHT_TOTAL = sum(entry[1] for entry in RUBRIC)
 assert WEIGHT_TOTAL == 100, WEIGHT_TOTAL
