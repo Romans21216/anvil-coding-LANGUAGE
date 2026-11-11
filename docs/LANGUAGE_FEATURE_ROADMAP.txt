@@ -1,0 +1,273 @@
+ANVIL LANGUAGE FEATURE ROADMAP
+==============================
+
+Basis: commit 2f0ac684c13dca31502a9d5215219674bb8bcc54
+Current review rating: 79/100, provisional static review
+Focus: additions to the Anvil programming language itself
+
+This document focuses on what programmers can express in Anvil. It does not
+score the game engine, renderer, operating-system work, editor extension, or
+compiler architecture as separate products. The 79/100 review is a broad
+provisional commit rating, not a measured language-feature score. These
+recommendations aim to make everyday programs clearer and more capable while
+keeping Anvil's short BASIC/Lua-inspired style.
+
+CURRENT LANGUAGE STRENGTHS
+-------------------------
+
+Anvil already has named functions, numeric parameters, return values, local and
+global numeric variables, conditionals, loops, arrays, numeric lists, text
+operations, input/output, includes, and useful diagnostics. It can compile
+programs through the C backend and a smaller direct x64 backend. The next step
+should deepen the language's core data and function model, instead of adding a
+large number of unrelated keywords.
+
+PRIORITY 1 - GENERAL FUNCTION ARGUMENTS AND RETURN VALUES
+--------------------------------------------------------
+
+Current limitation: function parameters are numeric. Text-returning functions
+exist in the C backend, but text cannot be passed as a regular function
+argument. This forces programmers to pass text through global variables.
+
+Add a small set of value types that functions can accept and return:
+number, text, boolean, and later record/list values. Preserve inferred types
+for simple programs, while allowing optional annotations when they improve
+clarity. Reject mismatched arguments and return values before code generation.
+
+Possible version-2 style:
+
+  fn(greet, name: text) -> text
+    output "Hello, " & name
+  end
+
+  fn(main)
+    say call fn(greet, "Ada")
+  end
+
+If this syntax is too large a departure, keep `fn(name, args...)` and put
+optional parameter and return declarations on a separate line. Do not change
+version-1 meaning silently.
+
+Acceptance goals:
+- Pass text into and return it from functions on every supported backend.
+- Support recursion and nested calls without shared scratch-buffer corruption.
+- Diagnose wrong argument counts and value types at the call site.
+- Add examples for numeric, text, and boolean parameters and results.
+
+PRIORITY 2 - SIMPLE TYPES AND REAL BOOLEANS
+------------------------------------------
+
+Current limitation: most values are doubles; `true` and `false` are numeric
+aliases, and text/numeric classification is inferred from expression strings.
+This makes mistakes harder to catch and limits future data types.
+
+Add a deliberately small type set: `number`, `text`, and `bool`. Keep type
+inference as the easy path; let programmers annotate values when they want
+stronger checking. Booleans should have a clear conversion rule and should not
+silently accept arbitrary text or numbers when used in typed declarations.
+
+Possible form:
+
+  set var(score): number = 0
+  set var(player_name): text = "Ada"
+  set var(alive): bool = true
+
+Acceptance goals:
+- Existing version-1 files retain their existing behavior.
+- Version 2 reports source-located type errors before emitting output.
+- Comparisons and logical operations consistently produce bool values.
+- Conversions such as number(text) remain explicit and documented.
+
+PRIORITY 3 - COMPLETE THE STRING MODEL
+--------------------------------------
+
+Current limitation: strings are capped at 255 bytes, `len` counts bytes, and
+many text operations use byte offsets. That is predictable for ASCII but
+surprising for Unicode text.
+
+Define Anvil strings as UTF-8 and define indexing consistently. Prefer
+character/code-point indexing for beginner-facing `len`, `char`, and `mid`,
+or keep byte functions but name and document them explicitly and add separate
+Unicode-aware functions. Support multiline text literals only if they have a
+clear escaping and indentation rule. Avoid silent truncation.
+
+Acceptance goals:
+- Document whether indexes count bytes, Unicode code points, or grapheme
+  clusters; use one policy consistently.
+- Test accented text, emoji, empty strings, embedded NUL policy, and boundary
+  indexes on both backends.
+- Make maximum text size configurable or dynamically bounded with clear errors.
+- Keep formatting and joining behavior identical on all backends.
+
+PRIORITY 4 - GROWABLE, TYPED COLLECTIONS
+----------------------------------------
+
+Current limitation: `list name` is numeric-only and fixed at 256 entries.
+Arrays are fixed-size numeric storage.
+
+Extend lists to hold one declared value type and grow within a documented
+memory limit. Add a simple `for each` loop and safe append/remove operations.
+Add maps only after list ownership and memory rules are stable.
+
+Possible form:
+
+  list names: text
+  add names "Ada"
+  for each name in names
+    say name
+  end
+
+Acceptance goals:
+- Bounds, allocation failures, and invalid indexes produce clear diagnostics.
+- Collection values have defined copy/ownership behavior.
+- Iteration behavior is specified when the collection changes in the loop.
+- C and direct-native backends agree on order and results.
+
+PRIORITY 5 - RECORDS AND ENUMERATIONS
+------------------------------------
+
+Current limitation: related values must be stored in separate variables and
+represented with numbers or strings. Game entities, settings, and messages
+become difficult to manage this way.
+
+Add lightweight records and enums before adding classes or inheritance. Keep
+the syntax data-first and avoid hidden dynamic dispatch.
+
+Possible form:
+
+  record Player
+    name: text
+    x: number
+    y: number
+  end
+
+  enum State
+    menu
+    playing
+    paused
+  end
+
+Acceptance goals:
+- Field names and enum values are checked at compile time.
+- Record layout and memory costs are documented.
+- Records can be passed to functions and stored in collections.
+- Serialization is explicit; do not serialize arbitrary memory layouts.
+
+PRIORITY 6 - EXPLICIT FUNCTION REFERENCES
+-----------------------------------------
+
+The language roadmap has called for variables that hold function pointers.
+Add this only after function types and typed values are defined. Make function
+references explicit and checked; do not infer function-valued variables from
+ambiguous names.
+
+Possible form:
+
+  set local(handler): fn(number) = ref fn(on_key)
+  call local(handler)(SPACE)
+
+Acceptance goals:
+- Validate the referenced function's argument and return types.
+- Define whether references can cross module or plugin boundaries.
+- Avoid arbitrary native addresses or unsafe calls in ordinary Anvil code.
+- Add a safe callback example before exposing this in the engine API.
+
+PRIORITY 7 - CONTROL-FLOW COMPLETENESS
+-------------------------------------
+
+Add `break` and `continue` with clear behavior for nested `while`, `for`, and
+`repeat` loops. Consider a simple `match`/`case` statement after enums arrive.
+Keep `if`/`elif`/`else` and existing loops as the primary beginner forms.
+
+Acceptance goals:
+- Specify which loop the command affects when loops are nested.
+- Test skipped, nested, and repeated control-flow paths.
+- Ensure both backends generate equivalent behavior.
+- Avoid adding multiple competing spellings for the same operation.
+
+PRIORITY 8 - MODULE AND PACKAGE SYNTAX
+-------------------------------------
+
+Current includes combine files, but whole-file imports can create duplicate
+function names. Add selective imports and namespaces so a project can reuse
+one function without copying an entire file into the global function table.
+
+Proposed selective-import form from the user-approved syntax:
+
+  include fn(move) -- "lib/player.ANVL"
+  call fn(move -- player, 10)
+
+Acceptance goals:
+- Preserve the existing whole-file include form.
+- Resolve paths within an explicit project/package root.
+- Report duplicate names, missing exports, cycles, and invalid aliases at the
+  import site.
+- Keep the dependency lock/version story reproducible before adding a remote
+  package registry.
+
+PRIORITY 9 - CLEAR ERROR AND OPTIONAL-VALUE HANDLING
+---------------------------------------------------
+
+Current `null` compatibility syntax is a no-op, which is confusing. Define
+error results and missing values before making `null` a real value. A simple
+`result`/`option` type or explicit success/error return is safer than hidden
+exceptions or magic numbers.
+
+Acceptance goals:
+- Remove or deprecate no-op `null` syntax under an explicit language version.
+- Let file, image, and network operations report success or a useful error.
+- Make callers handle failure visibly.
+- Keep bounds and runtime safety errors source-located.
+
+COMPILER FEATURE REQUIRED FOR SMALL PROGRAMS
+--------------------------------------------
+
+The compiler should remove Anvil functions that cannot be reached from the
+program's entry points. This should work for both C output and direct-native
+output. Roots include `main`, explicit top-level calls, and active engine
+callbacks such as `draw` and `update`; all functions reachable through calls
+must remain. Unused included functions should not be emitted. When function
+references or plugins are added, their possible targets must be included in
+reachability analysis.
+
+Acceptance goals:
+- An unused function is absent from generated C and native code.
+- Functions reachable through multiple calls or recursion are retained.
+- Callback and imported-function roots are retained when required.
+- Small programs link only runtime helpers they actually use where practical.
+- Tests compare generated output and resulting executable sizes.
+
+IMPLEMENTATION ORDER
+--------------------
+
+1. Keep version-1 behavior stable; correct the version-1 specification first.
+2. Introduce typed function arguments and returns with backward-compatible
+   version-2 syntax.
+3. Make string semantics reliable and unify backend behavior.
+4. Upgrade lists and add records/enums only after memory/ownership rules exist.
+5. Add checked function references and selective imports.
+6. Complete loop control and explicit error-result handling.
+7. Apply reachability-based function/runtime elimination across backends.
+8. Measure compiler speed, program size, and runtime behavior after every
+   optimization; do not claim efficiency without reproducible measurements.
+
+WHAT NOT TO ADD YET
+-------------------
+
+- Classes, inheritance, reflection, or a complex macro system.
+- Implicit conversions between text, numbers, and booleans.
+- Unbounded dynamic allocation without limits or error behavior.
+- More syntax aliases before the core forms have stable semantics.
+- A remote package registry before local imports and version pinning work.
+- Unsafe native pointers in beginner-facing code.
+
+SUCCESS CRITERIA
+----------------
+
+The next language milestone should make text usable as a normal function
+argument, provide optional checking for number/text/bool, fix the REPL's
+stateful programming model, and keep C/native behavior aligned for those
+features. After that, lists and module imports should scale beyond toy examples
+without forcing beginners to learn a large language all at once.
+
+END OF ROADMAP
