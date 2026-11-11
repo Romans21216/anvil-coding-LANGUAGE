@@ -408,6 +408,7 @@ CASES: dict[str, str] = {
     "type_annotations": 'fn(main)\n  set var(score): number = 5\n  set var(name): text = "ada"\n  set var(alive): bool = true\n  set var(grown): bool = var(score) > 3\n  say var(score) + 1\n  say len(var(name))\n  say var(alive)\n  say var(grown)\nend\ncall fn(main)\n',
     "list_remove": 'list nums\nfn(main)\n  add nums 10\n  add nums 20\n  add nums 30\n  remove nums 1\n  say count(nums)\n  say array(nums, 0) + array(nums, 1)\n  remove nums 7\n  say count(nums)\nend\ncall fn(main)\n',
     "for_each": 'list nums\nfn(main)\n  add nums 4\n  add nums 7\n  add nums 9\n  set var(total) = 0\n  for each v in nums\n    add var(total) var(v)\n  end\n  say var(total)\n  for each v in nums\n    if var(v) = 7\n      continue\n    end\n    say var(v)\n  end\nend\ncall fn(main)\n',
+    "dead_branch": 'fn(main)\n  if 0\n    say "never"\n  else\n    say "otherwise"\n  end\n  while 0\n    say "never"\n  end\n  if 1\n    say "taken"\n  end\nend\ncall fn(main)\n',
 }
 
 
@@ -449,8 +450,11 @@ def run(text: str, backend: str, stdin: bytes = bytes([10])) -> tuple[int, str, 
 
 
 def main() -> int:
+    wanted = [part for part in sys.argv[1:] if not part.startswith("-")]
     rows = []
     for _name, _spec in CASES.items():
+        if wanted and not any(part in _name for part in wanted):
+            continue
         if isinstance(_spec, tuple):
             _text = _spec[0]
             _stdin = _spec[1] if len(_spec) > 1 else bytes([10])
@@ -467,6 +471,8 @@ def main() -> int:
             print(f"      C  rc={c[0]} out={c[1]!r} err={c[2][:90]!r}")
             print(f"      N  rc={n[0]} out={n[1]!r} err={n[2][:90]!r}")
     print(f"\n{len(rows)} cases, {diffs} differences")
+    if wanted:
+        print(f"(filtered to {', '.join(wanted)})")
     return 0
 
 
