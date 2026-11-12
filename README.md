@@ -49,6 +49,7 @@ hello, Ada
 - Text lists (`list names: text`) store up to 256 text values on both backends, with `add`, `array` reads, `count`, `remove` and `for each`.
 - Growable lists support `add`, `count`, `array`, `remove` and `for each item in list` (removal shifts the tail down; an out-of-range index is a no-op).
 - Selective imports pull one function from a library: `include fn(move) -- "lib/player.ANVL"` then `call fn(move--player, 10)` (the qualifier is the file name unless `as alias` says otherwise); its helpers come along, its unused functions do not, and its globals stay private.
+- `stdlib/random_pipeline.ANVL` ships the 32-stage mixer: `include "random_pipeline.ANVL"` then `call fn(random-pipeline, seed)` returns a 32-bit value on both backends. It is a reproducible mixer, not a statistically validated RNG — measured slice counts vary about 25% across the 32-bit range, so `rnd` remains the default source.
 - `clock()` (milliseconds since the machine started) works in console programs, so `seed(clock())` makes `rnd` differ per run; `rnd(low, high)` returns whole numbers, inclusive.
 - `image_load` failures explain themselves: `image_error()` returns a short reason (`cannot open the file`, `the path is empty`, an unsupported-format message) instead of leaving a bare `0`.
 - Enums give named states: `enum State idle, playing, paused` declares constants 0, 1, 2 that work in comparisons and assignments on both backends (they print as their number for now).

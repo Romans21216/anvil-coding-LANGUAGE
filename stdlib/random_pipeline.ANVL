@@ -1,0 +1,501 @@
+language version 1
+
+# One function, one seed: 32-stage deterministic 32-bit mixer.
+# Combines the original 20-stage pipeline with 12 full-width stages.
+# Inspired by RNG/hash mixing families, not their reference implementations.
+# Not cryptographically secure; not a validated statistical RNG.
+# Input seeds are truncated to 32 bits.
+
+fn(random-pipeline, seed)
+  set local(x) = floor(var(seed)) % 4294967296
+  if local(x) < 0
+    set local(x) = local(x) + 4294967296
+  end
+
+  # 1. LCG
+  set local(a) = 1664525
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+  set local(x) = (local(x) + 1013904223) % 4294967296
+
+  # 2. Park-Miller-inspired modular step
+  set local(p) = (local(x) % 2147483646) + 1
+  set local(hi) = floor(local(p) / 127773)
+  set local(lo) = local(p) % 127773
+  set local(p) = 16807 * local(lo) - 2836 * local(hi)
+  if local(p) <= 0
+    set local(p) = local(p) + 2147483647
+  end
+  set local(x) = local(p)
+
+  # 3. MT-inspired shift temper
+  set local(y) = floor(local(x) / 2048)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 4. PCG-inspired xor and rotate
+  set local(y) = floor(local(x) / 262144)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(x) = ((local(x) * 512) % 4294967296 + floor(local(x) / 8388608)) % 4294967296
+
+  # 5. Xoshiro-inspired rotation/add
+  set local(x) = ((local(x) * 65536) % 4294967296 + floor(local(x) / 65536)) % 4294967296
+  set local(x) = (local(x) + 2654435769) % 4294967296
+
+  # 6. ChaCha-inspired add/rotate/xor
+  set local(x) = (local(x) + 1634760805) % 4294967296
+  set local(y) = local(x)
+  set local(z) = ((local(x) * 65536) % 4294967296 + floor(local(x) / 65536)) % 4294967296
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 7. Xoroshiro-inspired rotation xor
+  set local(y) = local(x)
+  set local(z) = ((local(x) * 128) % 4294967296 + floor(local(x) / 33554432)) % 4294967296
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 8. SplitMix-inspired avalanche
+  set local(x) = (local(x) + 2654435769) % 4294967296
+  set local(y) = floor(local(x) / 65536)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(a) = 2246822507
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  # 9. Keyed-style multiplication
+  set local(x) = (local(x) + 1540483477) % 4294967296
+  set local(a) = 3266489909
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  # 10. SFC-inspired rotate-add
+  set local(x) = ((local(x) * 2097152) % 4294967296 + floor(local(x) / 2048)) % 4294967296
+  set local(x) = (local(x) + 1) % 4294967296
+
+  # 11. Xorshift32-inspired shift
+  set local(y) = (local(x) * 8192) % 4294967296
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(y) = floor(local(x) / 131072)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(y) = (local(x) * 32) % 4294967296
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 12. Murmur-inspired avalanche
+  set local(y) = floor(local(x) / 65536)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(a) = 2246822507
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+  set local(y) = floor(local(x) / 8192)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(a) = 3266489909
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+  set local(y) = floor(local(x) / 65536)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 13. Jenkins-inspired mix
+  set local(x) = (local(x) + 2654435769) % 4294967296
+  set local(y) = (local(x) * 1024) % 4294967296
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(y) = floor(local(x) / 64)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 14. FNV-inspired xor and prime
+  set local(y) = local(x)
+  set local(z) = 2166136261
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(a) = 16777619
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  # 15. Wang-inspired integer hash
+  set local(x) = (local(x) + 61) % 4294967296
+  set local(y) = floor(local(x) / 65536)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(a) = 9
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  # 16. xxHash-inspired avalanche
+  set local(x) = (local(x) + 374761393) % 4294967296
+  set local(a) = 668265263
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+  set local(y) = floor(local(x) / 32768)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 17. Knuth multiplicative hash
+  set local(a) = 2654435761
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  # 18. Lehmer-inspired modular step
+  set local(p) = (local(x) % 2147483646) + 1
+  set local(hi) = floor(local(p) / 44488)
+  set local(lo) = local(p) % 44488
+  set local(p) = 48271 * local(lo) - 3399 * local(hi)
+  if local(p) <= 0
+    set local(p) = local(p) + 2147483647
+  end
+  set local(x) = local(p)
+
+  # 19. SplitMix32-inspired final avalanche
+  set local(x) = (local(x) + 2654435769) % 4294967296
+  set local(y) = floor(local(x) / 65536)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+  set local(a) = 2246822507
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+  set local(y) = floor(local(x) / 8192)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 20. Final diffusion
+  set local(x) = ((local(x) * 2048) % 4294967296 + floor(local(x) / 2097152)) % 4294967296
+  set local(x) = (local(x) + 3266489909) % 4294967296
+
+  # 21. Increment
+  set local(x) = (local(x) + 2654435769) % 4294967296
+
+  # 22. Xor-shift
+  set local(y) = floor(local(x) / 65536)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 23. Odd multiplication
+  set local(a) = 2246822507
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  # 24. Xor-shift
+  set local(y) = floor(local(x) / 8192)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 25. Odd multiplication
+  set local(a) = 3266489909
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  # 26. Xor-shift
+  set local(y) = floor(local(x) / 65536)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 27. Rotate
+  set local(x) = ((local(x) * 2048) % 4294967296 + floor(local(x) / 2097152)) % 4294967296
+
+  # 28. Add
+  set local(x) = (local(x) + 374761393) % 4294967296
+
+  # 29. Odd multiplication
+  set local(a) = 668265263
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  # 30. Xor-shift
+  set local(y) = floor(local(x) / 32768)
+  set local(z) = local(x)
+  set local(v) = 0
+  set local(bit) = 1
+  for local(i) = 0 to 31
+    if local(y) % 2 != local(z) % 2
+      set local(v) = local(v) + local(bit)
+    end
+    set local(y) = floor(local(y) / 2)
+    set local(z) = floor(local(z) / 2)
+    set local(bit) = local(bit) * 2
+  end
+  set local(x) = local(v)
+
+  # 31. Rotate
+  set local(x) = ((local(x) * 128) % 4294967296 + floor(local(x) / 33554432)) % 4294967296
+
+  # 32. Odd multiplication
+  set local(a) = 2654435761
+  set local(b) = local(x)
+  set local(al) = local(a) % 65536
+  set local(ah) = floor(local(a) / 65536)
+  set local(bl) = local(b) % 65536
+  set local(bh) = floor(local(b) / 65536)
+  set local(x) = (local(al) * local(bl) + ((local(al) * local(bh) + local(ah) * local(bl)) % 65536) * 65536) % 4294967296
+
+  output local(x)
+end
+
+call fn(random-pipeline, 12345)
