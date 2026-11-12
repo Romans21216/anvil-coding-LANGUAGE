@@ -414,6 +414,7 @@ CASES: dict[str, str] = {
     "unicode_bytes": 'fn(main)\n  say len("héllo")\n  say mid("héllo", 0, 1)\n  say upper("abc")\n  say len("")\nend\ncall fn(main)\n',
     "text_list": 'list names: text\nfn(main)\n  add names "ada"\n  add names "grace"\n  say count(names)\n  say array(names, 0)\n  say array(names, 0) & "/" & array(names, 1)\n  for each n in names\n    say var(n)\n  end\nend\ncall fn(main)\n',
     "bool_values": 'fn(main)\n  set var(alive): bool = true\n  set var(dead): bool = false\n  set var(score): number = 7\n  say var(alive)\n  say var(dead)\n  say var(score)\n  say 1 = 1\nend\ncall fn(main)\n',
+    "clock_positive": 'fn(main)\n  say clock() > 0\n  set var(a) = clock()\n  wait 0.02\n  say clock() >= var(a)\nend\ncall fn(main)\n',
 }
 
 

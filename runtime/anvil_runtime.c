@@ -532,6 +532,7 @@ void anvil_text_number(double x, double y, const char *format, double value,
 }
 
 double anvil_time(void) { return anvil_elapsed_seconds; }
+double anvil_clock(void) { return (double)GetTickCount64(); }
 double anvil_delta(void) { return anvil_delta_seconds; }
 double anvil_check_number(double value, const char *path, int line) {
   if (!isfinite(value)) {

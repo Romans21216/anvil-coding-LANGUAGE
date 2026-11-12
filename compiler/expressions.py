@@ -107,6 +107,7 @@ TOKEN = re.compile(
 
 BUILTINS = {
     "time": (0, 0),
+    "clock": (0, 0),
     "delta": (0, 0),
     "rnd": (2, 2),
     "noise": (3, 3),
@@ -171,6 +172,7 @@ BUILTINS = {
 
 BUILTIN_C_NAMES = {
     "time": "anvil_time",
+    "clock": "anvil_clock",
     "delta": "anvil_delta",
     "rnd": "anvil_rnd",
     "noise": "anvil_noise",

@@ -668,6 +668,11 @@ class _Expression:
             self.owner._window.emit_key_query(name)
             return "number"
         self._expect(")")
+        if name == "clock":
+            # Milliseconds since the machine started; works in console programs.
+            self.owner.code.rip_call_import("GetTickCount64")
+            self.owner.code.bytes(b"\xf2\x48\x0f\x2a\xc0")   # cvtsi2sd xmm0, rax
+            return "number"
         if self.owner._window is None:
             raise CompileError(f"{self.owner.path}:{self.line}: {name}() requires native scene 2d")
         if name == "delta":
@@ -779,9 +784,10 @@ class NativeCodegen:
     IMPORTS = [("KERNEL32.dll", "GetStdHandle"),
                ("KERNEL32.dll", "WriteFile"),
                ("KERNEL32.dll", "Sleep"),
+               ("KERNEL32.dll", "GetTickCount64"),
                ("KERNEL32.dll", "ReadFile"),
                ("KERNEL32.dll", "ExitProcess")]
-    BUILTIN_NAMES = {"len", "round", "upper", "lower", "ord", "chr", "trim", "number", "char", "contains", "mid", "left", "right", "starts_with", "ends_with", "sin", "cos", "compute", "time", "delta", "held", "pressed",
+    BUILTIN_NAMES = {"len", "round", "upper", "lower", "ord", "chr", "trim", "number", "char", "contains", "mid", "left", "right", "starts_with", "ends_with", "sin", "cos", "compute", "time", "clock", "delta", "held", "pressed",
                      "mouse_x", "mouse_y", "mouse_held", "mouse_pressed", "mouse_wheel",
                      "abs", "sqrt", "floor", "ceil", "min", "max", "rnd", "noise", "fbm",
                      "_anvil_native_hash"}
