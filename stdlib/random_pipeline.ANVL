@@ -498,4 +498,3 @@ fn(random-pipeline, seed)
   output local(x)
 end
 
-call fn(random-pipeline, 12345)
