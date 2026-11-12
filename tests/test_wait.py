@@ -60,7 +60,9 @@ class WaitCRuntimeTests(unittest.TestCase):
             lambda: compile_and_run('fn(main)\n  say "ok"\n  wait -5\nend\ncall fn(main)\n')
         )
         self.assertEqual(output, "ok\n")
-        self.assertLess(elapsed, 2.0)
+        # elapsed covers an MSVC build too, so the bound only has to sit well
+        # below the 5 second sleep this guards against (2.0 flaked under load).
+        self.assertLess(elapsed, 4.0)
 
 
 class WaitNativeRuntimeTests(NativeRunMixin, unittest.TestCase):
@@ -74,7 +76,9 @@ class WaitNativeRuntimeTests(NativeRunMixin, unittest.TestCase):
             lambda: self._run_source('fn(main)\n  say "ok"\n  wait -5\nend\ncall fn(main)\n')
         )
         self.assertEqual(output, "ok\n")
-        self.assertLess(elapsed, 2.0)
+        # elapsed covers an MSVC build too, so the bound only has to sit well
+        # below the 5 second sleep this guards against (2.0 flaked under load).
+        self.assertLess(elapsed, 4.0)
 
 
 if __name__ == "__main__":
