@@ -603,7 +603,9 @@ def emit_c(
         or "update" in functions
         or any(node.kind == "scene" for node in top)
     )
-    functions = dict(reachable_functions(functions, top, graphical=graphical))
+    functions = dict(reachable_functions(
+        functions, top, graphical=graphical, extra=("random-pipeline",)
+    ))
     string_variables = set(STRING_VARIABLES)
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",

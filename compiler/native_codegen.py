@@ -635,6 +635,16 @@ class _Expression:
             self.owner.code.call("function:anvil_str_len")   # rax = length
             self.owner.code.bytes(b"\xf2\x48\x0f\x2a\xc0")  # cvtsi2sd xmm0, rax
             return "number"
+        if name == "random":
+            if "random-pipeline" not in self.owner.functions:
+                raise CompileError(
+                    f"{self.owner.path}:{self.line}: random() needs the standard "
+                    "library mixer; stdlib/random_pipeline.ANVL is missing"
+                )
+            self._require_number(self.emit())
+            self._expect(")")
+            self.owner.code.call("function:random-pipeline")   # xmm0 = mixed value
+            return "number"
         if name in self.owner._math.ARITY:
             self.owner._math.emit_builtin(self, name)
             return "number"
@@ -787,7 +797,7 @@ class NativeCodegen:
                ("KERNEL32.dll", "GetTickCount64"),
                ("KERNEL32.dll", "ReadFile"),
                ("KERNEL32.dll", "ExitProcess")]
-    BUILTIN_NAMES = {"len", "round", "upper", "lower", "ord", "chr", "trim", "number", "char", "contains", "mid", "left", "right", "starts_with", "ends_with", "sin", "cos", "compute", "time", "clock", "delta", "held", "pressed",
+    BUILTIN_NAMES = {"len", "round", "upper", "lower", "ord", "chr", "trim", "number", "char", "contains", "mid", "left", "right", "starts_with", "ends_with", "sin", "cos", "compute", "time", "clock", "random", "delta", "held", "pressed",
                      "mouse_x", "mouse_y", "mouse_held", "mouse_pressed", "mouse_wheel",
                      "abs", "sqrt", "floor", "ceil", "min", "max", "rnd", "noise", "fbm",
                      "_anvil_native_hash"}
@@ -2646,7 +2656,9 @@ class NativeCodegen:
                 f"{unsupported.source or self.path}:{unsupported.line}: top-level configuration is not implemented by the native x64 backend yet"
             )
         from compiler.modules import reachable_functions
-        for name, fn in reachable_functions(self.functions, self.top, graphical=False):
+        for name, fn in reachable_functions(
+            self.functions, self.top, graphical=False, extra=("random-pipeline",)
+        ):
             self._emit_function(name, fn)
         # Top-level `set` statements seed globals before main runs, in source order.
         setup = [node for node in self.top if node.kind in ("seed", "set")]
@@ -2766,7 +2778,9 @@ class NativeCodegen:
                 raise CompileError(f"{node.source or self.path}:{node.line}: native scene setup does not support {node.kind!r}")
         self._window = NativeWindow(self, clear[0] | (clear[1] << 8) | (clear[2] << 16))
         from compiler.modules import reachable_functions
-        for name, function in reachable_functions(self.functions, self.top, graphical=True):
+        for name, function in reachable_functions(
+                self.functions, self.top, graphical=True, extra=("random-pipeline",)
+            ):
             self._emit_function(name, function)
         self.code.label("native:setup")
         self._emit_function("native:setup", Node("function", 1, name="native:setup", body=setup))

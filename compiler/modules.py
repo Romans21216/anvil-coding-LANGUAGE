@@ -165,6 +165,26 @@ def load_program(path, source, *, include_root=None):
         active.pop()
 
     visit(path, source)
+
+    # random(seed) is sugar for the shipped mixer, so the mixer joins the
+    # program whenever it is called and the program does not define its own.
+    if (
+        "random(" in source
+        and "random-pipeline" not in result.functions
+    ):
+        mixer = Path(__file__).resolve().parents[1] / "stdlib" / "random_pipeline.ANVL"
+        if mixer.is_file():
+            mixer_source = mixer.read_text(encoding="utf-8")
+            from compiler.parser import parse as parse_program
+
+            mixer_functions, mixer_top, mixer_variables, mixer_arrays = parse_program(
+                mixer, mixer_source
+            )
+            for name, function in mixer_functions.items():
+                result.functions.setdefault(name, function)
+            result.top.extend(mixer_top)
+            result.variables.update(mixer_variables)
+            result.arrays.update(mixer_arrays)
     return result
 
 
@@ -219,8 +239,9 @@ def called_functions(nodes):
     return result
 
 
-def reachable_functions(functions, top, *, graphical):
+def reachable_functions(functions, top, *, graphical, extra=()):
     needed = called_functions(top)
+    needed.update(name for name in extra if name in functions)
     needed.update(name for name in (("draw", "update") if graphical else ("main",)) if name in functions)
     pending = list(needed)
     while pending:
