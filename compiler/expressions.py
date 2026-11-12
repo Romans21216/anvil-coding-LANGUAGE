@@ -597,9 +597,12 @@ class ExpressionParser:
             low, high = BUILTINS[value]
             if not low <= len(args) <= high:
                 expected = str(low) if low == high else f"{low}..{high}"
+                hint = (
+                    " (did you mean rnd(low, high)?)" if value == "random" else ""
+                )
                 raise CompileError(
                     f"{self.path}:{self.line}: {value}() expects {expected} "
-                    f"argument(s), got {len(args)}"
+                    f"argument(s), got {len(args)}{hint}"
                 )
             name = BUILTIN_C_NAMES.get(value, value)
             call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"

@@ -642,6 +642,11 @@ class _Expression:
                     "library mixer; stdlib/random_pipeline.ANVL is missing"
                 )
             self._require_number(self.emit())
+            if self._peek(","):
+                raise CompileError(
+                    f"{self.owner.path}:{self.line}: random() takes one seed "
+                    "(did you mean rnd(low, high)?)"
+                )
             self._expect(")")
             self.owner.code.call("function:random-pipeline")   # xmm0 = mixed value
             return "number"
