@@ -136,6 +136,13 @@ Top-level `import builtins` states that a program uses builtins; the compiler th
 
 An import that contributes nothing is a warning, not silence: `import math` in a program that never calls a math builtin prints `warning: import 'math' is never used` with the offending line and a caret, and the build continues. `--deny-warnings` turns that into a failed build, so a project can require a clean report.
 
+Beyond imports, two more mistakes are reported rather than executed: a
+statement after `output` in the same block (it can never run) and a `set local`
+that nothing ever reads. Loop counters are exempt, because `for local(i) = ...`
+exists to drive the loop. Both use the same warning channel with the source line
+and a caret, and both fail the build under `--deny-warnings`.
+
+
 Built-ins currently include `clock()`, `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held("left"|"right"|"middle")`, `mouse_wheel()`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `round`, `sqrt`, `sin`, `cos`, `abs`, `min`, `max`, and the text built-ins listed above. `random(seed)` is a builtin that runs the shipped 32-stage mixer without any include and returns a value in 0..4294967295, identical on both backends; `stdlib/random_pipeline.ANVL` holds that mixer, and it is also available as a normal function: `include "random_pipeline.ANVL"` and `call fn(random-pipeline, seed)` returns a value in 0..4294967295, identically on both backends. It is a hash-style mixer for reproducible sequences and checksum-like uses; it is not cryptographically secure, and a 1,000,000-seed measurement binned into 256 slices ranged from 2,982 to 5,139 per 3,906 expected, so it is not used as `rnd`'s source.
 
 `clock()` returns milliseconds since the machine started and works in console programs, so `seed(clock())` gives a different sequence on each run; `time()` and `delta()` are scene-only values. `rnd(low, high)` returns whole numbers in the inclusive range, so a percentage roll uses a wide range such as `rnd(0, 1000000000)`. The implemented key names include letters, `SPACE`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, and `ESCAPE`. Mouse coordinates use the fixed 960×600 virtual game frame and return `-1` when the pointer is in a letterbox bar or outside the window. Mouse pressed state is an edge held until the next fixed update; held state persists until button release or window focus loss. `mouse_wheel()` returns the signed wheel detents received during the current fixed update. The string-taking ray backend built-ins are described in the drawing section below.

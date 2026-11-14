@@ -271,18 +271,23 @@ def main() -> int:
             top = top + provided_top
         from compiler import builtin_usage
 
-        unused = builtin_usage.unused_imports(funcs, top)
-        for node in unused:
+        from compiler import lints
+
+        warnings = []
+        for node in builtin_usage.unused_imports(funcs, top):
+            warnings.append(
+                (node, f"import '{node.value}' is never used")
+            )
+        for message, node in lints.report(funcs):
+            warnings.append((node, message))
+        for node, message in warnings:
             print(
-                render(
-                    f"{node.source or source_path}:{node.line}: warning: "
-                    f"import '{node.value}' is never used"
-                ),
+                render(f"{node.source or source_path}:{node.line}: warning: {message}"),
                 file=sys.stderr,
             )
-        if unused and args.deny_warnings:
+        if warnings and args.deny_warnings:
             print(
-                f"{source_path}: {len(unused)} warning(s) treated as errors",
+                f"{source_path}: {len(warnings)} warning(s) treated as errors",
                 file=sys.stderr,
             )
             return 1
