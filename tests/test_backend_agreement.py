@@ -8,6 +8,7 @@ which the native backend cannot implement yet and refuses with a clear message.
 from __future__ import annotations
 
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from compiler.build import build_c, find_compiler  # noqa: E402
 from compiler.common import CompileError  # noqa: E402
 from compiler.parser import parse  # noqa: E402
 from compiler.codegen import emit_c  # noqa: E402
@@ -98,6 +100,44 @@ class BackendAgreementTests(unittest.TestCase):
                 self.assertIsNotNone(native_error)
                 self.assertIn(expected, native_error)
                 self.assertIn("--backend c", native_error)
+
+
+    def test_both_backends_emit_the_same_bytes(self) -> None:
+        """No newline translation: stdout must match byte for byte."""
+        source = (
+            "fn(main)\n  say 1\n  say \"two\"\n  say 3.5\nend\ncall fn(main)\n"
+        )
+        for label, program_source in (("basic", source),):
+            with self.subTest(case=label):
+                path, _ = self._program(program_source)
+                outputs = {}
+                for backend in ("c", "native"):
+                    executable = self.base / f"bytes_{backend}.exe"
+                    functions, top, variables, arrays = parse(path, program_source)
+                    if backend == "native":
+                        executable.write_bytes(
+                            NativeCodegen(
+                                path, functions, top, variables, arrays
+                            ).generate()
+                        )
+                    else:
+                        compiler = find_compiler(None)
+                        if compiler is None:
+                            raise unittest.SkipTest("MSVC is not available")
+                        import tempfile as _tempfile
+
+                        with _tempfile.TemporaryDirectory() as temp:
+                            c_file = pathlib.Path(temp) / "program.c"
+                            c_file.write_text(
+                                emit_c(path, functions, top, variables, arrays),
+                                encoding="utf-8",
+                            )
+                            build_c(compiler[1], c_file, executable, True)
+                    result = subprocess.run(
+                        [str(executable)], capture_output=True, text=True, timeout=60
+                    )
+                    outputs[backend] = result.stdout
+                self.assertEqual(outputs["c"], outputs["native"])
 
 
 if __name__ == "__main__":

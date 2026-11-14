@@ -618,6 +618,8 @@ def emit_c(
         "#include <stdio.h>",
         "#include <string.h>",
         "#include <stdlib.h>",
+        "#include <io.h>",
+        "#include <fcntl.h>",
         "",
     ]
     from compiler import extensions as _extensions
@@ -804,6 +806,11 @@ def emit_c(
             "when used as an engine callback program"
         )
     lines.append("int main(void) {")
+    # Binary stdout keeps the bytes identical to the native backend (which writes
+    # through WriteFile and never translates newlines) and to a redirected file.
+    lines.append("#ifdef _WIN32")
+    lines.append("    _setmode(_fileno(stdout), _O_BINARY);")
+    lines.append("#endif")
     lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
     lines.extend(emit_nodes(path, setup, functions, "    ", arrays=arrays))
     if has_engine:
