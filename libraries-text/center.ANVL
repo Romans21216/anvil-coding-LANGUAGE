@@ -1,11 +1,11 @@
 fn(center, text, width)
-  set var(center-acc) = ""
-  set var(center-acc) = var(center-acc) & var(text)
-  while len(var(center-acc)) + 2 <= floor(var(width))
-    set var(center-acc) = " " & var(center-acc) & " "
+  # Adds one space each side until it will not fit, then pads the right.
+  # Recursive rather than a global accumulator, so it is reentrant.
+  if len(var(text)) + 2 > floor(var(width))
+    if len(var(text)) < floor(var(width))
+      output call fn(pad-right, var(text), var(width))
+    end
+    output var(text)
   end
-  while len(var(center-acc)) < floor(var(width))
-    set var(center-acc) = var(center-acc) & " "
-  end
-  output var(center-acc)
+  output call fn(center, " " & var(text) & " ", var(width))
 end

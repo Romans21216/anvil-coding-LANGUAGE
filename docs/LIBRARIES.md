@@ -100,10 +100,11 @@ Three things worth knowing:
 - **`cube` is not included**: a function of that name collides with the runtime's
   `anvil_cube` symbol, so use `power(x, 3)`.
 - **`starts_with` / `ends_with` are builtins**, so the library does not repeat them.
-- **Five text helpers are not reentrant.** A local can hold a number but not
-  text, so `text-repeat`, `pad-left`, `text-reverse`, `pad-right` and `center`
-  accumulate in a global; calling one while it is still running would mix the
-  results. `is-palindrome` compares mirrored characters and needs no global.
+- **One text helper is not reentrant.** A local can hold a number but not text,
+  so `text-reverse` accumulates in a global; calling it while it is already
+  running would mix the results. `text-repeat`, `pad-left`, `pad-right` and
+  `center` recurse instead (depth is bounded by the 256-character text limit),
+  and `is-palindrome` compares mirrored characters.
 
 ## Other shipped libraries
 
@@ -119,9 +120,10 @@ Seven folders ship beside the compiler, imported the same way:
 | `library import geometry` | `libraries-geometry/` | area-rect, perimeter-rect, area-triangle, area-triangle-sides, circumference, point-in-rect, normalize-angle, distance-squared |
 | `library import vector` | `libraries-vector/` | dot, length, normalize-x, normalize-y, rotate-x, rotate-y, reflect-x, reflect-y |
 
-Each folder has its own README listing every function and its caveats. The text
-helpers across all three libraries keep their accumulators in globals, because a
-local can hold a number but not text, and are therefore not reentrant.
+Each folder has its own README listing every function and its caveats. Only
+`text-reverse` keeps an accumulator in a global (a local can hold a number but
+not text), so it is the one text helper that is not reentrant; the rest recurse
+or compare in place.
 
 ## Layout
 

@@ -51,8 +51,8 @@ calls are compiled, so importing all 23 costs nothing for the ones you skip.
   `contains` are **builtins**, not library functions.
 - A function named `cube` is refused: the runtime already owns `anvil_cube`.
   Use `power(x, 3)`.
-- The three text helpers keep their accumulator in a global, because a local can
-  hold a number but not text. **They are not reentrant** — don't call one while
-  another is running.
+- `text-repeat` and `pad-left` recurse and are reentrant. `text-reverse` still
+  keeps its accumulator in a global (a local can hold a number but not text),
+  so **it is not reentrant**.
 - Functions call each other freely (`lcm` uses `gcd`, `round-to` uses `power`,
   `random-range` uses the mixer). Only what you call gets compiled.

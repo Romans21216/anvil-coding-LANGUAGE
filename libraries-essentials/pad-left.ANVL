@@ -1,9 +1,8 @@
-# Not reentrant: the accumulator is a global (locals hold numbers only).
 fn(pad-left, text, width)
-  set var(pad-left-acc) = ""
-  set var(pad-left-acc) = var(pad-left-acc) & var(text)
-  while len(var(pad-left-acc)) < floor(var(width))
-    set var(pad-left-acc) = " " & var(pad-left-acc)
+  # Recursive rather than a global accumulator, so it is reentrant. Depth is
+  # bounded by the 256-character text limit, so it cannot run away.
+  if len(var(text)) >= floor(var(width))
+    output var(text)
   end
-  output var(pad-left-acc)
+  output call fn(pad-left, " " & var(text), var(width))
 end
