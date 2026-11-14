@@ -189,7 +189,7 @@ class IncludeExecutionTests(IncludeFixture):
         result = subprocess.run([str(exe)], capture_output=True, timeout=5)
         self.assertEqual(result.returncode, 2)
         self.assertIn(str(library).encode('utf-8'), result.stderr)
-        self.assertIn(b'line 2', result.stderr)
+        self.assertIn(b':2:', result.stderr)
 
     def test_included_graphical_callbacks_initialize_once(self):
         self.write('lib.ANVL', 'array shared(2)\nset var(initialized) = 0\nadd var(initialized) 1\nfn(value)\n output 42\nend\n')
