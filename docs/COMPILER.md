@@ -52,3 +52,20 @@ Ahead-of-time compilation removes VM dispatch from generated function calls. MSV
 
 The direct backend currently handles simple numeric functions, up to four numeric parameters, arithmetic except remainder, comparisons, short-circuit Boolean operators, `if`, `while`, inclusive ascending/descending `for` loops, numeric locals/globals, and console output rounded to six fractional digits. It does not yet include arrays, project files, 2D/3D graphics, camera/input, ray tracing, physics, noise, multiplayer, or the engine runtime. The fractional-output change was independently reviewed in commit `f330d4b`; the current unreviewed candidate also rejects output values outside its signed 64-bit formatting range with a controlled error. The backend is not the default until the remaining features are ported and verified.
 
+## Output size
+
+The C backend builds optimized by default: `anvil program.ANVL` links a release
+image, and `--debug` opts back into `/Od`. A hello-world measures:
+
+| build | bytes |
+|---|---|
+| default (release, static CRT) | 143,360 |
+| `--debug` | 263,680 |
+| `--dynamic-runtime` (`/MD`) | 9,728 |
+| `--backend native` | 2,560 |
+
+`--dynamic-runtime` links the system VC++ runtime instead of baking the static
+CRT into the image — about 15x smaller, but the machine that runs the executable
+must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
+`/OPT:REF /OPT:ICF`, and the gcc path gets `-ffunction-sections
+-fdata-sections -Wl,--gc-sections`, so unused code never reaches the image.

@@ -26,7 +26,12 @@ def _cache_key(generated: str, compiler: str, release: bool) -> str:
     """Hash everything that decides the executable's bytes."""
     digest = hashlib.sha256()
     digest.update(generated.encode("utf-8"))
-    digest.update(b"\0release" if release else b"\0debug")
+    tag = (
+        release.encode("utf-8")
+        if isinstance(release, str)
+        else (b"release" if release else b"debug")
+    )
+    digest.update(chr(0).encode("utf-8") + tag)
     digest.update(str(pathlib.Path(compiler)).encode("utf-8", "replace"))
     runtime = pathlib.Path(__file__).resolve().parents[1] / "runtime"
     for name in ("anvil_runtime.c", "anvil_runtime.h"):
@@ -94,7 +99,24 @@ def main() -> int:
             "(MSVC is verified)"
         ),
     )
-    ap.add_argument("--release", action="store_true", help="enable native optimization")
+    ap.add_argument(
+        "--release",
+        action="store_true",
+        help="optimize the C build (now the default; kept for existing scripts)",
+    )
+    ap.add_argument(
+        "--debug",
+        action="store_true",
+        help="build the C output unoptimized (/Od) instead of the default release build",
+    )
+    ap.add_argument(
+        "--dynamic-runtime",
+        action="store_true",
+        help=(
+            "link the C build against the system VC++ runtime (/MD): about 15x "
+            "smaller, but the target machine must have that runtime installed"
+        ),
+    )
     ap.add_argument(
         "--check",
         action="store_true",
@@ -142,6 +164,10 @@ def main() -> int:
         help="backend the interactive shell uses (default: native)",
     )
     args = ap.parse_args()
+    if args.debug and args.release:
+        print("--debug and --release contradict each other", file=sys.stderr)
+        return 2
+    args.release = not args.debug
     from compiler import extensions as extension_api
 
     extension_api.reset()
@@ -279,7 +305,7 @@ def main() -> int:
             print(f"{source_path}: ok")
             return 0
         if args.backend == "native":
-            if args.emit_c or args.generated_c or args.cc or args.release:
+            if args.emit_c or args.generated_c or args.cc or args.release or args.dynamic_runtime:
                 raise CompileError(
                     "--emit-c, --generated-c, --cc, and --release apply only to --backend c"
                 )
@@ -322,15 +348,32 @@ def main() -> int:
         if libraries:
             # The generated C only names the extension symbols, so the cache key
             # would miss a rebuilt DLL; always link when extensions are present.
-            build_c(compiler[1], c_path, out, args.release, libraries)
+            build_c(
+                compiler[1],
+                c_path,
+                out,
+                args.release,
+                libraries,
+                args.dynamic_runtime,
+            )
             print(f"Built {out} using {compiler[0]}")
         else:
-            cached = cached_build(generated, compiler[1], out, args.release)
+            cached = cached_build(
+                generated,
+                compiler[1],
+                out,
+                f"r{int(args.release)}d{int(args.dynamic_runtime)}",
+            )
             if cached:
                 print(f"Built {out} using {compiler[0]} (reused build cache)")
             else:
-                build_c(compiler[1], c_path, out, args.release)
-                store_build(generated, compiler[1], out, args.release)
+                build_c(compiler[1], c_path, out, args.release, (), args.dynamic_runtime)
+                store_build(
+                    generated,
+                    compiler[1],
+                    out,
+                    f"r{int(args.release)}d{int(args.dynamic_runtime)}",
+                )
                 print(f"Built {out} using {compiler[0]}")
         _place_extension_dlls(out)
         return 0

@@ -49,6 +49,7 @@ hello, Ada
 - Text lists (`list names: text`) store up to 256 text values on both backends, with `add`, `array` reads, `count`, `remove` and `for each`.
 - Growable lists support `add`, `count`, `array`, `remove` and `for each item in list` (removal shifts the tail down; an out-of-range index is a no-op).
 - Selective imports pull one function from a library: `include fn(move) -- "lib/player.ANVL"` then `call fn(move--player, 10)` (the qualifier is the file name unless `as alias` says otherwise); its helpers come along, its unused functions do not, and its globals stay private.
+- C builds are optimized and thin by default (143 KB hello-world); `--debug` for `/Od`, `--dynamic-runtime` for a ~10 KB image that uses the system VC++ runtime.
 - Unused imports are warnings with source carets, and `--deny-warnings` makes them fail the build.
 - `import builtins` is accepted, and the compiler resolves which builtins a program actually uses (reachable code only) — `--print-imports` prints the set.
 - Extension functions: `anvil program.ANVL --extension mathx.json` makes C++ (DLL), C# (NativeAOT) and Anvil functions callable like builtins on both backends — see `docs/EXTENSIONS.md`.

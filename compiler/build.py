@@ -33,6 +33,7 @@ def build_c(
     output: pathlib.Path,
     release: bool,
     libraries=(),
+    dynamic_runtime: bool = False,
 ):
     output.parent.mkdir(parents=True, exist_ok=True)
     if pathlib.Path(compiler).name.lower() == "cl.exe":
@@ -49,8 +50,19 @@ def build_c(
             "/Fo:" + str(obj_dir) + "\\",
             "/O2" if release else "/Od",
         ]
-        if libraries:
+        # /MD links against the system VC++ runtime instead of baking the static
+        # CRT into the image: ~15x smaller, but the target machine must have the
+        # runtime installed, so it stays opt-in.
+        if dynamic_runtime:
+            args.append("/MD")
+        # Thin release binaries: function-level linking plus link-time removal of
+        # everything the program never reaches (and folding of identical bodies).
+        if release:
+            args.append("/Gy")
+        if release or libraries:
             args.append("/link")
+            if release:
+                args.extend(["/OPT:REF", "/OPT:ICF"])
             args.extend(str(library) for library in libraries)
         install_root = pathlib.Path(compiler).parents[7]
         devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
@@ -84,5 +96,8 @@ def build_c(
             "-luser32",
             "-lws2_32",
         ]
-        args += ["-O3", "-DNDEBUG"] if release else ["-O0", "-g"]
+        if release:
+            args += ["-O3", "-DNDEBUG", "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections"]
+        else:
+            args += ["-O0", "-g"]
         subprocess.run(args, check=True)
