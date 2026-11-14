@@ -147,5 +147,36 @@ class LintTests(unittest.TestCase):
         self.assertEqual(report(functions, top), [])
 
 
+    def test_an_unused_function_in_the_entry_file_is_reported(self) -> None:
+        source = (
+            "fn(spare, a)\n  output var(a)\nend\n"
+            "fn(main)\n  say 1\nend\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        messages = [message for message, _ in report(functions, top, path)]
+        self.assertIn("function 'spare' is never called", messages)
+
+    def test_an_unused_function_in_an_included_file_is_not_reported(self) -> None:
+        library = self.base / "lib.ANVL"
+        library.write_text(
+            "fn(helper, a)\n  output var(a)\nend\n", encoding="utf-8"
+        )
+        source = (
+            'include "lib.ANVL"\n\nfn(main)\n  say 1\nend\ncall fn(main)\n'
+        )
+        path, functions, top = parse_source(source, self.base)
+        messages = [message for message, _ in report(functions, top, path)]
+        self.assertEqual(messages, [])
+
+    def test_an_unused_parameter_is_reported(self) -> None:
+        source = (
+            "fn(f, a, b)\n  output var(a)\nend\n"
+            "fn(main)\n  say call fn(f, 1, 2)\nend\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        messages = [message for message, _ in report(functions, top, path)]
+        self.assertIn("parameter 'b' of 'f' is never used", messages)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -121,7 +121,51 @@ def silent_zero_calls(functions, top):
     return warnings
 
 
-def report(functions, top=()) -> list[tuple[str, object]]:
+def _body_text(body) -> str:
+    return "\n".join(_text_of(node) for node in _walk(body))
+
+
+ENTRY_POINTS = ("main", "draw", "update")
+
+
+def unused_functions(functions, top, entry=None):
+    """Functions nothing calls (the engine callbacks and main excepted).
+
+    Only the entry file is checked: an include or the stdlib is shared code, and
+    a function there may be meant for a caller that lives elsewhere.
+    """
+    from compiler.modules import called_functions
+
+    called = set(called_functions(top))
+    for function in functions.values():
+        called |= called_functions(function.body)
+    return [
+        function
+        for name, function in functions.items()
+        if name not in called
+        and name not in ENTRY_POINTS
+        and (entry is None or getattr(function, "source", None) == entry)
+    ]
+
+
+def unused_parameters(functions, entry=None):
+    """(function, parameter) pairs the body never reads."""
+    found = []
+    for name, function in functions.items():
+        if name in ENTRY_POINTS:
+            continue   # callbacks keep their signature by contract
+        if entry is not None and getattr(function, "source", None) != entry:
+            continue
+        text = _body_text(function.body)
+        for index, parameter in enumerate(function.params):
+            if index == 0 and parameter == "main":
+                continue
+            if not re.search(r"var\(\s*" + re.escape(parameter) + r"\s*\)", text):
+                found.append((function, parameter))
+    return found
+
+
+def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
     for node in unreachable(functions):
@@ -132,4 +176,10 @@ def report(functions, top=()) -> list[tuple[str, object]]:
         what = "division by zero" if operator == "/" else "remainder by zero"
         warnings.append((what, node))
     warnings.extend(silent_zero_calls(functions, top))
+    for function in unused_functions(functions, top, entry):
+        warnings.append((f"function '{function.name}' is never called", function))
+    for function, parameter in unused_parameters(functions, entry):
+        warnings.append(
+            (f"parameter '{parameter}' of '{function.name}' is never used", function)
+        )
     return warnings
