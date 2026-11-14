@@ -96,6 +96,14 @@ REFUSED = {
         "fn(main)\n  say 1\nend\ncall fn(main)\nlibrary import math.v2\n",
         "a library is written library import <name>",
     ),
+    "add to an undeclared list": (
+        "fn(main)\n  add nums 5\nend\ncall fn(main)\n",
+        "unknown list 'nums'",
+    ),
+    "remove from an undeclared list": (
+        "fn(main)\n  remove nums 0\nend\ncall fn(main)\n",
+        "unknown list 'nums'",
+    ),
     "unterminated string": (
         'fn(main)\n  say "abc\nend\ncall fn(main)\n',
         'unterminated string: no closing "',

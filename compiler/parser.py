@@ -708,6 +708,15 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     "where <name> uses letters, digits, _ and - "
                     "(the folder is libraries-<name> or libraries/<name>)"
                 )
+            # add/remove on a name nobody declared: say which list is missing
+            # rather than "unsupported statement", matching count() and array().
+            list_write = re.fullmatch(r"(?:add|remove)\s+([A-Za-z_][\w-]*)(?:\s+.*)?", line)
+            if list_write:
+                missing_name = list_write.group(1)
+                raise CompileError(
+                    f"{path}:{line_no}: unknown list {missing_name!r}; "
+                    f"declare it with list {missing_name}"
+                )
             raise CompileError(f"{path}:{line_no}: unsupported statement: {line}")
         stack[-1][0].append(node)
     if len(stack) != 1:
