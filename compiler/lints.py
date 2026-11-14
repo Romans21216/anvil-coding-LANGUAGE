@@ -217,6 +217,31 @@ def bad_number_literals(functions, top):
     return warnings
 
 
+_VAR_READ = __import__("re").compile(r"var\(\s*([A-Za-z_][\w-]*)\s*\)")
+
+
+def unused_globals(functions, top):
+    """Globals that are assigned but never read anywhere in the program."""
+    nodes = list(top)
+    for function in functions.values():
+        nodes.extend(_walk(function.body))
+    writes = {}
+    reads = set()
+    for node in nodes:
+        if node.kind == "set" and getattr(node, "name", ""):
+            writes.setdefault(node.name, node)
+        for match in _VAR_READ.finditer(_text_of(node)):
+            reads.add(match.group(1))
+    return [
+        (node, name)
+        for name, node in writes.items()
+        if name not in reads
+        # Anvil has no expression statements, so `set var(x) = some_call()` is the
+        # only way to call for effect; a discarded result there is intentional.
+        and "(" not in str(getattr(node, "value", ""))
+    ]
+
+
 def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
@@ -230,6 +255,8 @@ def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     warnings.extend(silent_zero_calls(functions, top))
     warnings.extend(empty_for_loops(functions, top))
     warnings.extend(bad_number_literals(functions, top))
+    for node, name in unused_globals(functions, top):
+        warnings.append((f"global '{name}' is never read", node))
     for function in unused_functions(functions, top, entry):
         warnings.append((f"function '{function.name}' is never called", function))
     for function, parameter in unused_parameters(functions, entry):

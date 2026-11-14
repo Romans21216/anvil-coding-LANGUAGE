@@ -235,5 +235,25 @@ class LintTests(unittest.TestCase):
         )
 
 
+    def test_a_global_that_is_written_and_never_read_is_reported(self) -> None:
+        source = (
+            "set var(dead) = 1\n\n"
+            "fn(main)\n  set var(live) = 2\n  say var(live)\nend\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        messages = [m for m, _ in report(functions, top, path)]
+        self.assertIn("global 'dead' is never read", messages)
+        self.assertNotIn("global 'live' is never read", messages)
+
+    def test_a_discarded_call_result_is_not_reported(self) -> None:
+        # `set var(x) = some_call()` is how a value-less call is written.
+        source = (
+            "fn(main)\n  set var(ignored) = image_width()\n  say 1\nend\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        messages = [m for m, _ in report(functions, top, path)]
+        self.assertEqual([m for m in messages if m.startswith("global")], [])
+
+
 if __name__ == "__main__":
     unittest.main()
