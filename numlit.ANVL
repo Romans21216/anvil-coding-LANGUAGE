@@ -1,0 +1,7 @@
+fn(main)
+  say number("abc")
+  say number("42")
+  set var(t) = "7"
+  say number(var(t))
+end
+call fn(main)

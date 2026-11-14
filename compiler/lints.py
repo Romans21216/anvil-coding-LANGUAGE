@@ -196,6 +196,27 @@ def empty_for_loops(functions, top):
     return warnings
 
 
+_NUMBER_LITERAL = __import__("re").compile(r'number\(\s*"([^"]*)"\s*\)')
+
+
+def bad_number_literals(functions, top):
+    """``number("...")`` calls whose literal argument is not a number."""
+    warnings = []
+    nodes = list(top)
+    for function in functions.values():
+        nodes.extend(_walk(function.body))
+    for node in nodes:
+        for match in _NUMBER_LITERAL.finditer(_text_of(node)):
+            text = match.group(1)
+            try:
+                float(text.strip())
+            except ValueError:
+                warnings.append(
+                    (f'number("{text}") is not a number, so it evaluates to 0', node)
+                )
+    return warnings
+
+
 def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
@@ -208,6 +229,7 @@ def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
         warnings.append((what, node))
     warnings.extend(silent_zero_calls(functions, top))
     warnings.extend(empty_for_loops(functions, top))
+    warnings.extend(bad_number_literals(functions, top))
     for function in unused_functions(functions, top, entry):
         warnings.append((f"function '{function.name}' is never called", function))
     for function, parameter in unused_parameters(functions, entry):

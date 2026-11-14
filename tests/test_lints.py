@@ -218,5 +218,22 @@ class LintTests(unittest.TestCase):
         self.assertEqual(report(functions, top, path), [])
 
 
+    def test_number_of_a_non_numeric_literal_is_reported(self) -> None:
+        source = (
+            "fn(main)\n"
+            '  say number("abc")\n'
+            '  say number("42")\n'
+            '  set var(t) = "7"\n'
+            "  say number(var(t))\n"
+            "end\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        messages = [m for m, _ in report(functions, top, path)]
+        self.assertEqual(
+            [m for m in messages if m.startswith("number(")],
+            ['number("abc") is not a number, so it evaluates to 0'],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
