@@ -70,11 +70,31 @@ def unused_locals(functions):
     return found
 
 
-def report(functions) -> list[tuple[str, object]]:
+_DIVIDE_BY_ZERO = re.compile(r"[%/]\s*0+(?:\.0*)?\s*(?=[),;]|$)")
+
+
+def divides_by_zero(functions, top):
+    """(node, operator) where a divisor is the literal constant zero."""
+    found = []
+    nodes = list(top)
+    for function in functions.values():
+        nodes.extend(_walk(function.body))
+    for node in nodes:
+        text = _text_of(node)
+        match = _DIVIDE_BY_ZERO.search(text)
+        if match:
+            found.append((node, match.group(0)[0]))
+    return found
+
+
+def report(functions, top=()) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
     for node in unreachable(functions):
         warnings.append((f"unreachable statement after output", node))
     for node, name in unused_locals(functions):
         warnings.append((f"unused local '{name}'", node))
+    for node, operator in divides_by_zero(functions, top):
+        what = "division by zero" if operator == "/" else "remainder by zero"
+        warnings.append((what, node))
     return warnings

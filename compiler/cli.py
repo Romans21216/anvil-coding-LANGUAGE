@@ -278,7 +278,7 @@ def main() -> int:
             warnings.append(
                 (node, f"import '{node.value}' is never used")
             )
-        for message, node in lints.report(funcs):
+        for message, node in lints.report(funcs, top):
             warnings.append((node, message))
         for node, message in warnings:
             print(
