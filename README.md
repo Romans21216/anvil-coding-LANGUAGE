@@ -58,7 +58,7 @@ hello, Ada
 - Division by a literal zero is a warning rather than silent infinity.
 - Dead code after `output` and locals nobody reads are warnings too — both fatal under `--deny-warnings`.
 - Unused imports are warnings with source carets, and `--deny-warnings` makes them fail the build.
-- `library import essentials` ships with the compiler: random-pipeline (the 32-stage mixer behind `random()`), random-range, random-chance, gcd, lcm, factorial, fib, is-prime, clamp, sign, sum-to, percent-of, round-to, distance — see `docs/LIBRARIES.md`.
+- `library import essentials` ships with the compiler: random-pipeline (the 32-stage mixer behind `random()`), random-range, random-chance, gcd, lcm, factorial, fib, power, sum-to, square, is-even, is-odd, is-prime, clamp, sign, lerp, map-range, percent-of, round-to, distance, text-repeat, pad-left, text-reverse — see `docs/LIBRARIES.md`.
 - `library import math` pulls in `libraries-math/`, one function per file named after the file; only the functions you call are compiled — see `docs/LIBRARIES.md`.
 - `import builtins` is accepted, and the compiler resolves which builtins a program actually uses (reachable code only) — `--print-imports` prints the set.
 - Extension functions: `anvil program.ANVL --extension mathx.json` makes C++ (DLL), C# (NativeAOT) and Anvil functions callable like builtins on both backends — see `docs/EXTENSIONS.md`.

@@ -874,10 +874,23 @@ void anvil_str_set(char *dest, const char *value, const char *path, int line) {
 char *anvil_str_cat(char *dest, const char *a, const char *b,
                     const char *path, int line) {
   size_t la = strlen(a), lb = strlen(b);
+  char tail[ANVIL_STR_CAP];
+  int a_inside = a >= dest && a < dest + ANVIL_STR_CAP;
+  int b_inside = b >= dest && b < dest + ANVIL_STR_CAP;
   if (la + lb >= ANVIL_STR_CAP) {
     anvil_str_overflow(path, line);
   }
-  memcpy(dest, a, la);
+  /* A text-returning function joins into its own return buffer, and a recursive
+     call hands back that same buffer, so `a` or `b` can alias `dest`. Copy the
+     aliased tail aside before dest is rewritten, or the join reads text it just
+     overwrote (a recursive reverse produced "ccb" instead of "cba"). */
+  if (b_inside) {
+    memcpy(tail, b, lb + 1);
+    b = tail;
+  }
+  if (!a_inside) {
+    memcpy(dest, a, la);
+  }
   memcpy(dest + la, b, lb + 1);
   return dest;
 }

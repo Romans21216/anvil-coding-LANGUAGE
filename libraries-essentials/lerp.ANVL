@@ -1,0 +1,3 @@
+fn(lerp, a, b, t)
+  output var(a) + (var(b) - var(a)) * var(t)
+end

@@ -83,14 +83,26 @@ itself, so any program in any directory can use it without copying a folder:
 | `random-chance(percent, seed)` | 1 when a roll lands under `percent` |
 | `gcd(a, b)`, `lcm(a, b)` | greatest common divisor, least common multiple |
 | `factorial(n)`, `fib(n)`, `power(base, exponent)`, `sum-to(n)` | arithmetic |
+| `square(n)`, `is-even(n)`, `is-odd(n)` | arithmetic predicates |
 | `is-prime(n)` | 1 when `n` is prime |
 | `clamp(value, low, high)`, `sign(value)` | bounds and sign |
+| `lerp(a, b, t)`, `map-range(value, inLow, inHigh, outLow, outHigh)` | interpolation |
 | `percent-of(part, whole)`, `round-to(value, places)` | formatting |
 | `distance(x1, y1, x2, y2)` | straight-line distance |
+| `text-repeat(text, times)`, `pad-left(text, width)`, `text-reverse(text)` | text |
 
 A program that calls one of these compiles only that function and whatever it
 calls: `gcd` for `lcm`, the mixer for `random-range`. Both backends print the
 same answers, including the pinned mixer value above.
+
+Three things worth knowing:
+
+- **`cube` is not included**: a function of that name collides with the runtime's
+  `anvil_cube` symbol, so use `power(x, 3)`.
+- **`starts_with` / `ends_with` are builtins**, so the library does not repeat them.
+- **The three text helpers are not reentrant.** A local can hold a number but not
+  text, so they accumulate in a global; calling one while another is still
+  running (from inside a callback, say) would mix the two results.
 
 ## Layout
 

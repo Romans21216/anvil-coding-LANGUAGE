@@ -68,14 +68,35 @@ EXPECTED = [
 ]
 
 
+BATCH2 = NL.join(
+    [
+        "library import essentials",
+        "",
+        "fn(main)",
+        "  say call fn(is-even, 4)",
+        "  say call fn(is-odd, 4)",
+        "  say call fn(square, 7)",
+        "  say call fn(lerp, 0, 10, 0.25)",
+        "  say call fn(map-range, 5, 0, 10, 0, 100)",
+        '  say call fn(text-repeat, "ab", 3)',
+        '  say "[" & call fn(pad-left, "7", 3) & "]"',
+        '  say call fn(text-reverse, "abc")',
+        "end",
+        "call fn(main)",
+        "",
+    ]
+)
+EXPECTED2 = ["1", "0", "49", "2.5", "50", "ababab", "[  7]", "cba"]
+
+
 class EssentialsTests(unittest.TestCase):
-    def _run(self, backend: str) -> list[str]:
+    def _run(self, backend: str, source_text: str = SOURCE) -> list[str]:
         with tempfile.TemporaryDirectory() as temp:
             base = pathlib.Path(temp)
             source = base / "essentials.ANVL"
-            source.write_text(SOURCE, encoding="utf-8")
+            source.write_text(source_text, encoding="utf-8")
             executable = base / "essentials.exe"
-            functions, top, variables, arrays = parse(source, SOURCE)
+            functions, top, variables, arrays = parse(source, source_text)
             if backend == "native":
                 executable.write_bytes(
                     NativeCodegen(source, functions, top, variables, arrays).generate()
@@ -111,6 +132,12 @@ class EssentialsTests(unittest.TestCase):
         ):
             with self.subTest(function=name):
                 self.assertIn(name, present)
+
+    def test_text_and_range_helpers_agree_on_c(self) -> None:
+        self.assertEqual(self._run("c", BATCH2), EXPECTED2)
+
+    def test_text_and_range_helpers_agree_natively(self) -> None:
+        self.assertEqual(self._run("native", BATCH2), EXPECTED2)
 
 
 if __name__ == "__main__":

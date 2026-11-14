@@ -1,0 +1,11 @@
+# Accumulates in a global: text cannot live in a local, and recursion on a
+# text buffer is not safe on the native backend yet. Not reentrant.
+fn(text-repeat, text, times)
+  set var(text-repeat-acc) = ""
+  set local(i) = 0
+  while local(i) < floor(var(times))
+    set var(text-repeat-acc) = var(text-repeat-acc) & var(text)
+    set local(i) = local(i) + 1
+  end
+  output var(text-repeat-acc)
+end

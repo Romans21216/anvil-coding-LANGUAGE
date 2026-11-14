@@ -221,6 +221,18 @@ class _Expression:
                     self.owner._scratch_base + int(left_slot.rsplit("_", 1)[1]) * 8
                 )
                 self.owner._store_rax_rbp(left_disp)
+                # The left operand can be a fresh text buffer (mid, upper, or a
+                # literal from another call). Rendering the right operand can
+                # recurse into this same buffer, so keep a copy of the left side
+                # first - without this, a recursive reverse built "aaa" instead
+                # of "cba".
+                left_buffer = self.owner.reserve_string_buffer(
+                    f"joinleft:{self.owner._join_counter}"
+                )
+                self.owner.code.rip_lea_data(1, left_buffer)         # rcx = left copy
+                self.owner.code.bytes(b"\x48\x8b\x95")              # mov rdx,[rbp+d32]
+                self.owner.code.bytes(struct.pack("<i", left_disp))
+                self.owner.code.call("function:anvil_str_copy")
                 right = self.emit(precedence + 1)
                 if right.kind == "number":
                     _render_number(self.owner)
@@ -245,8 +257,7 @@ class _Expression:
                 self.owner.code.call("function:anvil_str_copy")
                 # copy left into dst, then append the preserved right operand.
                 self.owner.code.rip_lea_data(1, destination)          # rcx = dst
-                self.owner.code.bytes(b"\x48\x8b\x95")              # mov rdx,[rbp+d32]
-                self.owner.code.bytes(struct.pack("<i", left_disp))
+                self.owner.code.rip_lea_data(2, left_buffer)          # rdx = left copy
                 self.owner.code.call("function:anvil_str_copy")
                 self.owner.code.rip_lea_data(1, destination)          # rcx = dst
                 self.owner.code.rip_lea_data(2, right_buffer)         # rdx = right copy

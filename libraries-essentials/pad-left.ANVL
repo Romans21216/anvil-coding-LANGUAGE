@@ -1,0 +1,9 @@
+# Not reentrant: the accumulator is a global (locals hold numbers only).
+fn(pad-left, text, width)
+  set var(pad-left-acc) = ""
+  set var(pad-left-acc) = var(pad-left-acc) & var(text)
+  while len(var(pad-left-acc)) < floor(var(width))
+    set var(pad-left-acc) = " " & var(pad-left-acc)
+  end
+  output var(pad-left-acc)
+end
