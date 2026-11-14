@@ -46,7 +46,22 @@ The current parser checks expression structure and operator precedence, built-in
 
 ## Native performance
 
-Ahead-of-time compilation removes VM dispatch from generated function calls. MSVC release builds use `/O2`. No benchmark suite or cross-language comparison exists yet, so the compiler makes no speed claim. The conventional software rasterizer and CPU BVH ray tracing are both CPU-bound; there is no GPU/DXR backend.
+Ahead-of-time compilation removes VM dispatch from generated function calls. MSVC
+release builds use `/O2`. The conventional software rasterizer and CPU BVH ray
+tracing are both CPU-bound; there is no GPU/DXR backend. A 116-case differential
+probe compares both backends' output on every build.
+
+Measured on the rarity-roll program (one function calling a 500-line mixer), best
+of three runs:
+
+| backend | compile time | executable |
+|---|---|---|
+| native | 0.12 s | 130,048 B |
+| C, `--release` | 1.9 s cold, 0.13 s cached | 182,784 B |
+
+The native build has no external toolchain to start and no cache, so it is steady;
+the C build's first run pays for loading the MSVC environment and later runs reuse
+the build cache.
 
 ## Native backend limits
 
