@@ -120,7 +120,7 @@ call fn(main)
             self.assertEqual(result.returncode, 2)
             self.assertEqual(result.stdout, "")
             self.assertEqual(
-                result.stderr, f"Anvil numeric error at line 2 ({path})\n"
+                result.stderr, f"{path}:2: division by zero\n"
             )
 
     def test_native_backend_compiles_loop_and_boolean_operators(self):

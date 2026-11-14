@@ -1273,14 +1273,14 @@ class NativeCodegen:
         if operator in opcodes:
             self.code.bytes(opcodes[operator])
             if line:
-                self.emit_finite_check(line)
+                self.emit_finite_check(line, operator)
             return
         if operator == "%":
             # fmod(x, y) = x - trunc(x / y) * y, with a non-finite quotient rejected
             self.code.bytes(bytes.fromhex("660f28d0"))        # movapd xmm2, xmm0
             self.code.bytes(bytes.fromhex("f20f5ec1"))        # divsd xmm0, xmm1
             if line:
-                self.emit_finite_check(line)
+                self.emit_finite_check(line, "%")
             self.code.bytes(bytes.fromhex("f2480f2cc0"))      # cvttsd2si rax, xmm0
             self.code.bytes(bytes.fromhex("f2480f2ac0"))      # cvtsi2sd xmm0, rax
             self.code.bytes(bytes.fromhex("f20f59c1"))        # mulsd xmm0, xmm1
@@ -1308,7 +1308,7 @@ class NativeCodegen:
         self.code.bytes(b"\x48\xb9\x00\x00\x00\x00\x00\x00\x00\x80")
         self.code.bytes(b"\x48\x31\xc8\x66\x48\x0f\x6e\xc0")
 
-    def emit_finite_check(self, line: int) -> None:
+    def emit_finite_check(self, line: int, operator: str | None = None) -> None:
         failure = self.label("nonfinite")
         done = self.label("finite")
         self.code.bytes(b"\x66\x48\x0f\x7e\xc0")  # movq rax, xmm0
@@ -1317,7 +1317,14 @@ class NativeCodegen:
         self.code.conditional_jump(0x84, failure)  # je
         self.code.jump(done)
         self.code.label(failure)
-        self.emit_runtime_error(f"Anvil numeric error at line {line} ({self.path})\n")
+        if operator == "/":
+            word = "division by zero"
+        elif operator == "%":
+            word = "remainder by zero"
+        else:
+            word = "numeric overflow or non-finite result"
+        # Same shape as the C runtime: path:line: what went wrong.
+        self.emit_runtime_error(f"{self.path}:{line}: {word}\n")
         self.code.label(done)
 
     def emit_call(self, name: str, raw_args: list[str], scope: Node | None, line: int) -> None:

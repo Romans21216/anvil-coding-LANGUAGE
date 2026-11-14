@@ -140,5 +140,34 @@ class BackendAgreementTests(unittest.TestCase):
                 self.assertEqual(outputs["c"], outputs["native"])
 
 
+    def test_runtime_division_by_zero_reports_the_same_message(self) -> None:
+        source = "fn(main)\n  set var(d) = 0\n  say 1 / var(d)\nend\ncall fn(main)\n"
+        path, _ = self._program(source)
+        messages = {}
+        for backend in ("c", "native"):
+            functions, top, variables, arrays = parse(path, source)
+            executable = self.base / f"rt_{backend}.exe"
+            if backend == "native":
+                executable.write_bytes(
+                    NativeCodegen(path, functions, top, variables, arrays).generate()
+                )
+            else:
+                compiler = find_compiler(None)
+                if compiler is None:
+                    raise unittest.SkipTest("MSVC is not available")
+                c_file = self.base / "rt.c"
+                c_file.write_text(
+                    emit_c(path, functions, top, variables, arrays), encoding="utf-8"
+                )
+                build_c(compiler[1], c_file, executable, True)
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(result.returncode, 2, backend)
+            messages[backend] = result.stderr.replace("\r\n", "\n")
+        self.assertEqual(messages["c"], messages["native"])
+        self.assertIn("division by zero", messages["native"])
+
+
 if __name__ == "__main__":
     unittest.main()
