@@ -1,12 +1,15 @@
 fn(is-palindrome, text)
-  set var(is-palindrome-acc) = ""
-  set local(i) = len(var(text)) - 1
-  while local(i) >= 0
-    set var(is-palindrome-acc) = var(is-palindrome-acc) & mid(var(text), local(i), 1)
-    set local(i) = local(i) - 1
+  # Compares mirrored characters instead of building the reverse, so this one
+  # needs no accumulator and stays reentrant.
+  set local(n) = len(var(text))
+  set local(ok) = 1
+  set local(i) = 0
+  while local(i) < floor(local(n) / 2)
+    if mid(var(text), local(i), 1) != mid(var(text), local(n) - 1 - local(i), 1)
+      set local(ok) = 0
+      set local(i) = local(n)
+    end
+    set local(i) = local(i) + 1
   end
-  if var(is-palindrome-acc) = var(text)
-    output 1
-  end
-  output 0
+  output local(ok)
 end

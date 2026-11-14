@@ -100,9 +100,10 @@ Three things worth knowing:
 - **`cube` is not included**: a function of that name collides with the runtime's
   `anvil_cube` symbol, so use `power(x, 3)`.
 - **`starts_with` / `ends_with` are builtins**, so the library does not repeat them.
-- **The three text helpers are not reentrant.** A local can hold a number but not
-  text, so they accumulate in a global; calling one while another is still
-  running (from inside a callback, say) would mix the two results.
+- **Five text helpers are not reentrant.** A local can hold a number but not
+  text, so `text-repeat`, `pad-left`, `text-reverse`, `pad-right` and `center`
+  accumulate in a global; calling one while it is still running would mix the
+  results. `is-palindrome` compares mirrored characters and needs no global.
 
 ## Other shipped libraries
 

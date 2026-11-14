@@ -22,8 +22,9 @@ Builtins already cover `upper`, `lower`, `trim`, `mid`, `len`, `contains`,
 
 ## Worth knowing
 
-- `pad-right`, `center` and `is-palindrome` keep their result in a **global**
-  because a local can hold a number but not text. They are **not reentrant**.
+- `pad-right` and `center` keep their result in a **global** because a local can
+  hold a number but not text. They are **not reentrant**. `is-palindrome` now
+  compares mirrored characters instead of building the reverse, so it is.
 - `index-of` compares text slices, so it finds substrings, not characters only.
 - `left-of` / `right-of` split on the **first** separator; nothing here parses
   every field.
