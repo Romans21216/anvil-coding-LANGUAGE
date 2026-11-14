@@ -1,4 +1,8 @@
 fn(left-of, text, separator)
+  # len() types both parameters as text; without it, a program that imports
+  # this library but never calls this function fails type inference.
+  set local(sep_width) = len(var(separator))
+  set local(text_width) = len(var(text))
   set local(at) = call fn(index-of, var(text), var(separator))
   if local(at) < 0
     output var(text)

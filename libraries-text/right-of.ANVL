@@ -1,7 +1,9 @@
 fn(right-of, text, separator)
+  set local(sep_width) = len(var(separator))
+  set local(text_width) = len(var(text))
   set local(at) = call fn(index-of, var(text), var(separator))
   if local(at) < 0
     output ""
   end
-  output mid(var(text), local(at) + len(var(separator)), len(var(text)) - local(at) - len(var(separator)))
+  output mid(var(text), local(at) + local(sep_width), local(text_width) - local(at) - local(sep_width))
 end
