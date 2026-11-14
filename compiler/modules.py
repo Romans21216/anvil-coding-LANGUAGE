@@ -173,7 +173,11 @@ def load_program(path, source, *, include_root=None):
     if library_nodes:
         from compiler import libraries as library_loader
 
+        imported: set[str] = set()
         for node in library_nodes:
+            if node.value in imported:
+                continue        # importing the same library twice is harmless
+            imported.add(node.value)
             for name, function in library_loader.load(
                 path, node.value, node.source or path, node.line
             ):

@@ -88,6 +88,10 @@ REFUSED = {
         "scene 2d\n\nfn(draw)\n  camera 10, 10\nend\n",
         "camera is written camera perspective",
     ),
+    "unterminated string": (
+        'fn(main)\n  say "abc\nend\ncall fn(main)\n',
+        'unterminated string: no closing "',
+    ),
 }
 
 WARNED = {

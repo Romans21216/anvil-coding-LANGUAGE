@@ -364,6 +364,10 @@ class ExpressionParser:
                 continue
             match = TOKEN.match(source, pos)
             if not match:
+                if pos < len(source) and source[pos] == '"':
+                    raise CompileError(
+                        f'{path}:{line}: unterminated string: no closing "'
+                    )
                 raise CompileError(
                     f"{path}:{line}: invalid expression near {source[pos:pos+20]!r}"
                 )

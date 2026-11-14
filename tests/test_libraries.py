@@ -147,6 +147,17 @@ class LibraryTests(unittest.TestCase):
         generated = emit_c(path, functions, top, variables, arrays)
         self.assertIn("anvil_twice", generated)
 
+    def test_importing_the_same_library_twice_is_harmless(self) -> None:
+        path = self._write_main(
+            "library import math\nlibrary import math\n\n"
+            "fn(main)\n  say call fn(gcd, 48, 18)\nend\ncall fn(main)\n"
+        )
+        functions, top, variables, arrays = parse(path, path.read_text(encoding="utf-8"))
+        self.assertIn("gcd", functions)
+        generated = emit_c(path, functions, top, variables, arrays)
+        definition = "anvil_gcd(double anvil_gcd__a, double anvil_gcd__b) {"
+        self.assertEqual(generated.count(definition), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
