@@ -69,3 +69,22 @@ CRT into the image — about 15x smaller, but the machine that runs the executab
 must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
 `/OPT:REF /OPT:ICF`, and the gcc path gets `-ffunction-sections
 -fdata-sections -Wl,--gc-sections`, so unused code never reaches the image.
+
+## Command line
+
+| flag | effect |
+|---|---|
+| `--backend c\|native` | pick the C toolchain (default) or the Anvil-owned x64 PE backend |
+| `--output`, `-o` | name the executable |
+| `--debug` | build the C output unoptimized (`/Od`); release is the default |
+| `--dynamic-runtime` | link the system VC++ runtime (`/MD`) instead of the static CRT |
+| `--cc <path>` | use a specific C compiler instead of the one discovery finds |
+| `--emit-c <path>` | write the generated C and stop, without building |
+| `--generated-c <path>` | choose where the generated C is written |
+| `--check` | parse and validate only, with no output written |
+| `--deny-warnings` | treat warnings as build failures |
+| `--print-imports` | print the builtins the program actually uses and stop |
+| `--extension <manifest>` | register an extension (repeatable), see `docs/EXTENSIONS.md` |
+| `--repl-backend c\|native` | backend used by the interactive shell |
+| `--repl` | start the interactive shell instead of compiling a file |
+| `--hello` | build and run a greeting program, so the first command always works |
