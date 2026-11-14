@@ -1,0 +1,7 @@
+fn(normalize-x, ax, ay)
+  set local(len) = call fn(length, var(ax), var(ay))
+  if local(len) = 0
+    output 0
+  end
+  output var(ax) / local(len)
+end

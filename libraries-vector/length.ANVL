@@ -1,0 +1,3 @@
+fn(length, ax, ay)
+  output sqrt(var(ax) * var(ax) + var(ay) * var(ay))
+end

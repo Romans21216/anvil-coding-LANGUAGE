@@ -1,0 +1,4 @@
+fn(reflect-y, x, y, nx, ny)
+  set local(scale) = 2 * call fn(dot, var(x), var(y), var(nx), var(ny))
+  output var(y) - local(scale) * var(ny)
+end

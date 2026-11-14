@@ -60,6 +60,7 @@ hello, Ada
 - Unused imports are warnings with source carets, and `--deny-warnings` makes them fail the build.
 - `library import essentials` ships with the compiler: random-pipeline (the 32-stage mixer behind `random()`), random-range, random-chance, gcd, lcm, factorial, fib, power, sum-to, square, is-even, is-odd, is-prime, clamp, sign, lerp, map-range, percent-of, round-to, distance, text-repeat, pad-left, text-reverse — see `docs/LIBRARIES.md`.
 - `library import text` and `library import math` ship too: string helpers (pad-right, center, capitalize, index-of, count-words, is-palindrome, left-of, right-of) and number theory (nth-prime, primes-below, digits-sum, reverse-number, is-palindrome-number, hypotenuse, area-circle, to-degrees, to-radians).
+- `library import vector` (dot, length, normalize-x/y, rotate-x/y, reflect-x/y) is the seventh shipped library.
 - `library import geometry` (area-rect, perimeter-rect, area-triangle, area-triangle-sides, circumference, point-in-rect, normalize-angle, distance-squared) is the sixth shipped library.
 - `library import units` (ten temperature/distance/mass conversions) and `library import validate` (is-empty, is-digit-text, is-alpha-text, is-number-text, is-space-text, is-upper-text) ship as well.
 - `library import math` pulls in `libraries-math/`, one function per file named after the file; only the functions you call are compiled — see `docs/LIBRARIES.md`.

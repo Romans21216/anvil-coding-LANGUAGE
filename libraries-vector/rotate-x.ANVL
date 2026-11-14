@@ -1,0 +1,4 @@
+fn(rotate-x, x, y, degrees)
+  set local(rad) = var(degrees) * 3.141592653589793 / 180
+  output var(x) * cos(local(rad)) - var(y) * sin(local(rad))
+end
