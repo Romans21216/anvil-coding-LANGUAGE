@@ -18,6 +18,7 @@ message rather than mis-compiling.
 | Text values, `&` joining, escapes | yes | yes | `test_strings.py`, `test_native_x64.py` |
 | Text builtins (`len`, `upper`, `lower`, `trim`, `left`, `right`, `char`, `mid`, `chr`, `ord`, `number`, `contains`, `starts_with`, `ends_with`) | yes | yes | `test_len.py`, `test_mid.py`, `test_trim.py`, `test_number.py`, `test_char.py`, `test_chrorrd.py`, `test_contains.py`, `test_edges.py` |
 | Text-returning functions | yes | yes | `test_text_functions.py` |
+| Recursive text-returning functions | yes | **partial** — see below | `tests/test_text_recursion.py` |
 | Text arguments to functions | yes | yes | `tests/test_text_params.py` |
 | Text lists (`list x: text`, incl. `remove`) | yes | yes | `tests/test_text_lists.py` |
 | Numeric globals, `set`/`add`/`sub`, top-level init | yes | yes | `test_native_x64.py` |
@@ -35,6 +36,26 @@ message rather than mis-compiling.
 | Engine: images, physics, ray backend, 3D shapes, `.ANVLproj` manifests | yes | **no** | native rejects with "not available in the native x64 backend yet" |
 | Networking (`net host`/`net join`/`send`/`receive`) | yes | **no** | native rejects at top level |
 | Console number printing | to ~1e63 | to 9.2e18 (then a range error) | `test_number_format.py` |
+
+### Recursive text on the native backend
+
+Text temporaries are static buffers, one per call site. A text-returning
+function that joins a recursive call into the same expression re-enters that
+call site, and the deeper frame rewrites the buffer the outer frame is still
+pointing at:
+
+```
+fn(reverse-from, text, index)
+  output mid(var(text), var(index), 1) & call fn(reverse-from, var(text), var(index) - 1)
+end
+```
+
+`reverse("abc")` answers `cba` on the C backend and `aaa` on the native one. The
+C backend copies an aliased tail aside before rewriting, which is enough there.
+The fix for native is a per-frame save area rather than a per-call-site buffer;
+until then `tests/test_text_recursion.py` marks the native case as an expected
+failure, and `libraries-essentials/text-reverse` keeps its accumulator in a
+global so it stays correct on both backends.
 
 ## Native-only limits (all source-located compile errors)
 
