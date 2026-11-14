@@ -136,15 +136,28 @@ Top-level `import builtins` states that a program uses builtins; the compiler th
 
 An import that contributes nothing is a warning, not silence: `import math` in a program that never calls a math builtin prints `warning: import 'math' is never used` with the offending line and a caret, and the build continues. `--deny-warnings` turns that into a failed build, so a project can require a clean report.
 
-Beyond imports, two more mistakes are reported rather than executed: a
-statement after `output` in the same block (it can never run) and a `set local`
-that nothing ever reads. Loop counters are exempt, because `for local(i) = ...`
-exists to drive the loop. A global that is assigned a plain value and never read is reported too; `set var(x) = some_call()` is exempt because that is how a result-less call is written. `number("abc")` is 0 at run time, so a literal that is not a number is reported at build time. A `for` loop that can never run — `step 0`, or a start past the end with the wrong direction — is reported instead of silently doing nothing. A function the program never calls, and a parameter its body never reads, are reported the same way. Only the entry file is checked, because an include or the stdlib is shared code whose callers may live elsewhere. A function with no `output` still runs, but its value is 0; using that
-value (as in `say call fn(f, 1)`) is a warning rather than a silent zero.
- Dividing by a literal zero is reported the same way: `1 / 0` yields
-infinity at run time, so the compiler says so at build time instead of
-letting it pass silently. Both use the same warning channel with the source line
-and a caret, and both fail the build under `--deny-warnings`.
+Beyond imports, nine more mistakes are reported rather than executed. Each
+carries the source line and a caret, and each is fatal under `--deny-warnings`:
+
+| warning | triggered by |
+|---|---|
+| `unreachable statement after output` | a statement after `output` in the same block |
+| `unused local 'x'` | a `set local` nothing reads; `for` counters are exempt |
+| `function 'f' is never called` | a function nothing calls |
+| `parameter 'p' of 'f' is never used` | a parameter its body never reads |
+| `global 'g' is never read` | a plain-value assignment nothing reads; `set var(x) = some_call()` is exempt |
+| `function 'f' has no output, so this call yields 0` | using a value-less function as a value |
+| `for loop never runs` | `step 0`, or a start past the end with the wrong direction |
+| `number("abc") is not a number, so it evaluates to 0` | a literal that cannot parse |
+| `division by zero` | a literal divisor of zero (runtime path below) |
+
+The unused-function and unused-parameter rules only look at the entry file:
+an include or the stdlib is shared code whose callers may live elsewhere.
+
+Run-time faults use the same `path:line:` shape and exit code 2, so a crash
+reads like a compile error: `division by zero`, `remainder by zero`,
+`numeric overflow or non-finite result`, `array index out of bounds`,
+`text is limited to 255 characters`.
 
 
 Built-ins currently include `clock()`, `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held("left"|"right"|"middle")`, `mouse_wheel()`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `round`, `sqrt`, `sin`, `cos`, `abs`, `min`, `max`, and the text built-ins listed above. `random(seed)` is a builtin that runs the shipped 32-stage mixer without any include and returns a value in 0..4294967295, identical on both backends; `stdlib/random_pipeline.ANVL` holds that mixer, and it is also available as a normal function: `include "random_pipeline.ANVL"` and `call fn(random-pipeline, seed)` returns a value in 0..4294967295, identically on both backends. It is a hash-style mixer for reproducible sequences and checksum-like uses; it is not cryptographically secure, and a 1,000,000-seed measurement binned into 256 slices ranged from 2,982 to 5,139 per 3,906 expected, so it is not used as `rnd`'s source.
