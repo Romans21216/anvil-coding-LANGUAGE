@@ -150,6 +150,7 @@ carries the source line and a caret, and each is fatal under `--deny-warnings`:
 | `for loop never runs` | `step 0`, or a start past the end with the wrong direction |
 | `number("abc") is not a number, so it evaluates to 0` | a literal that cannot parse |
 | `division by zero` | a literal divisor of zero (runtime path below) |
+| `display has no effect without a scene 2d program` | drawing or camera statements in a program with no `scene` |
 
 The unused-function and unused-parameter rules only look at the entry file:
 an include or the stdlib is shared code whose callers may live elsewhere.

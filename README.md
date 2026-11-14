@@ -170,6 +170,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Audited implementation status](docs/IMPLEMENTATION_STATUS.md)
 - [Autonomous development progress](docs/AUTONOMOUS_DEVELOPMENT_PROGRESS.md)
 - [Multiplayer prototype](docs/MULTIPLAYER.md)
+- [Libraries](docs/LIBRARIES.md)
 - [Compiler and build](docs/COMPILER.md)
 - [Starter world](examples/first_world.ANVL)
 - [LAN counter sample](examples/network_counter.ANVL)
