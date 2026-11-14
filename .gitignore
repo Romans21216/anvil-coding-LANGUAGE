@@ -4,3 +4,4 @@ __pycache__/
 vscode-extension/node_modules/
 
 *.generated.c
+gate.log
