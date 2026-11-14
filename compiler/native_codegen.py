@@ -1049,6 +1049,10 @@ class NativeCodegen:
         self.code.label(end_label)
 
     def emit_text_list_add(self, name: str, value: str, line: int, scope) -> None:
+        # The copy below calls anvil_str_copy, so the helper must be emitted even
+        # when nothing else in the program asks for the string helpers (a program
+        # that only adds and counts used to fail to link with a KeyError).
+        self._needs_string_helpers = True
         block = self._text_list_block(name)
         self.load_variable(f"{name}__count", scope, line)      # xmm0 = count
         self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")           # cvttsd2si rax,xmm0
