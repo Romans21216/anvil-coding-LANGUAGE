@@ -1,0 +1,18 @@
+library import essentials
+
+# A short tour of the library that ships with the compiler.
+
+fn(main)
+  say "gcd(48, 18) = " & call fn(gcd, 48, 18)
+  say "lcm(4, 6) = " & call fn(lcm, 4, 6)
+  say "factorial(5) = " & call fn(factorial, 5)
+  say "fib(10) = " & call fn(fib, 10)
+  say "is-prime(97) = " & call fn(is-prime, 97)
+  say "clamp(15, 0, 10) = " & call fn(clamp, 15, 0, 10)
+  say "percent-of(25, 200) = " & call fn(percent-of, 25, 200)
+  say "round-to(3.14159, 2) = " & call fn(round-to, 3.14159, 2)
+  say "distance(0,0,3,4) = " & call fn(distance, 0, 0, 3, 4)
+  say "random-range(1, 6, 12345) = " & call fn(random-range, 1, 6, 12345)
+  say "text-reverse(\"abc\") = " & call fn(text-reverse, "abc")
+end
+call fn(main)
