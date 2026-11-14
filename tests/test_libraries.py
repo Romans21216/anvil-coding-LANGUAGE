@@ -202,6 +202,28 @@ class LibraryTests(unittest.TestCase):
         generated = emit_c(path, functions, top, variables, arrays)
         self.assertIn("anvil_g", generated)
 
+    def test_libraries_that_import_each_other_are_a_diagnostic(self) -> None:
+        # x imports y and y imports x. Before this was caught it recursed until
+        # Python raised RecursionError, which is a compiler crash, not a message.
+        (self.base / "libraries-x").mkdir()
+        (self.base / "libraries-y").mkdir()
+        (self.base / "libraries-x" / "xf.ANVL").write_text(
+            "library import y\n\nfn(xf, a)\n  output call fn(yf, var(a))\nend\n",
+            encoding="utf-8",
+        )
+        (self.base / "libraries-y" / "yf.ANVL").write_text(
+            "library import x\n\nfn(yf, a)\n  output var(a) + 1\nend\n",
+            encoding="utf-8",
+        )
+        source = "library import x\n\nfn(main)\n  say call fn(xf, 1)\nend\ncall fn(main)\n"
+        path = self._write_main(source)
+        with self.assertRaises(CompileError) as caught:
+            parse(path, source)
+        message = str(caught.exception)
+        self.assertIn("circular library import", message)
+        self.assertIn("libraries-x", message)
+        self.assertIn("libraries-y", message)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,6 +13,10 @@ import pathlib
 
 from compiler.common import CompileError
 
+# Folders currently being loaded, so a cycle (a imports b, b imports a) is a
+# diagnostic instead of an infinite recursion.
+_LOADING: list[pathlib.Path] = []
+
 
 def folder_for(entry: pathlib.Path, name: str) -> pathlib.Path | None:
     """Where a library named ``name`` lives, if it exists.
@@ -40,11 +44,22 @@ def load(entry: pathlib.Path, name: str, where: str, line: int):
             f"libraries-{name} or libraries/{name} beside {entry.name} or in a "
             "parent folder"
         )
+    if folder in _LOADING:
+        chain = " -> ".join(path.name for path in [*_LOADING[_LOADING.index(folder):], folder])
+        raise CompileError(f"{where}:{line}: circular library import: {chain}")
     files = sorted(folder.glob("*.ANVL"))
     if not files:
         raise CompileError(
             f"{where}:{line}: library {name!r} has no .ANVL files in {folder}"
         )
+    _LOADING.append(folder)
+    try:
+        return _load_files(files, load_program)
+    finally:
+        _LOADING.pop()
+
+
+def _load_files(files, load_program):
     found = []
     seen: set[str] = set()
     for file in files:
