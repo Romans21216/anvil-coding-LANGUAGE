@@ -124,6 +124,29 @@ class LibraryTests(unittest.TestCase):
             parse(path, path.read_text(encoding="utf-8"))
         self.assertIn("must define the function 'gcd'", str(caught.exception))
 
+    def test_a_library_file_may_include_another_file(self) -> None:
+        # The include registers its target under an aliased name; that must not
+        # count as a second function in the library file.
+        library = self.base / "libraries-math"
+        (library / "helper.ANVL").write_text(
+            "fn(helper, a)\n  output var(a) * 2\nend\n", encoding="utf-8"
+        )
+        (library / "twice.ANVL").write_text(
+            'include fn(helper) -- "helper.ANVL"\n\n'
+            "fn(twice, a)\n"
+            "  output call fn(helper, var(a))\n"
+            "end\n",
+            encoding="utf-8",
+        )
+        path = self._write_main(
+            "library import math\n\nfn(main)\n  say call fn(twice, 21)\nend\ncall fn(main)\n"
+        )
+        self.assertEqual(path.exists(), True)
+        functions, top, variables, arrays = parse(path, path.read_text(encoding="utf-8"))
+        self.assertIn("twice", functions)
+        generated = emit_c(path, functions, top, variables, arrays)
+        self.assertIn("anvil_twice", generated)
+
 
 if __name__ == "__main__":
     unittest.main()

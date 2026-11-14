@@ -43,16 +43,19 @@ def load(entry: pathlib.Path, name: str, where: str, line: int):
         source = file.read_text(encoding="utf-8", errors="replace")
         functions, _, _, _ = parse(file, source)
         stem = file.stem
-        if stem not in functions:
+        # An include inside a library file registers its target under an aliased
+        # name (helper--helper); those belong to the included file, not this one.
+        own = {name: node for name, node in functions.items() if "--" not in name}
+        if stem not in own:
             raise CompileError(
                 f"{file}: a library file must define the function {stem!r} "
                 f"(one function per file)"
             )
-        if len(functions) > 1:
-            extra = ", ".join(sorted(set(functions) - {stem}))
+        if len(own) > 1:
+            extra = ", ".join(sorted(set(own) - {stem}))
             raise CompileError(
                 f"{file}: a library file holds one function, but this one also "
                 f"defines {extra}"
             )
-        found.append((stem, functions[stem]))
+        found.append((stem, own[stem]))
     return found
