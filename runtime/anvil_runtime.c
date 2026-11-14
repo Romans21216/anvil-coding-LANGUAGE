@@ -477,12 +477,12 @@ void anvil_plane(double x, double y, double z, double width, double depth,
   uint32_t base = anvil_color(r, g, b);
   for (int i = 0; i <= 10; ++i) {
     double t = (double)i / 10.0;
-    AnvilProjected p0, p1, p2, p3;
+    AnvilProjected p0 = {0}, p1 = {0}, p2 = {0}, p3 = {0};
     AnvilVec3 a0 = {x - width * .5, y, z - depth * .5 + depth * t},
               a1 = {x + width * .5, y, z - depth * .5 + depth * t},
               a2 = {x - width * .5 + width * t, y, z - depth * .5},
               a3 = {x - width * .5 + width * t, y, z + depth * .5};
-    int line0_visible;
+    int line0_visible = 0;
     if (anvil_scene_is_3d) {
       AnvilCameraVertex c0 = anvil_to_camera(a0), c1 = anvil_to_camera(a1);
       line0_visible = anvil_clip_segment_near(&c0, &c1, ANVIL_NEAR_DEPTH) &&
@@ -493,7 +493,7 @@ void anvil_plane(double x, double y, double z, double width, double depth,
     }
     if (line0_visible)
       anvil_line(p0.x, p0.y, p1.x, p1.y, r, g, b, a, 1);
-    int line1_visible;
+    int line1_visible = 0;
     if (anvil_scene_is_3d) {
       AnvilCameraVertex c2 = anvil_to_camera(a2), c3 = anvil_to_camera(a3);
       line1_visible = anvil_clip_segment_near(&c2, &c3, ANVIL_NEAR_DEPTH) &&
@@ -857,7 +857,7 @@ void anvil_text_list_set(char block[][256], int index, double count,
 }
 
 
-static void anvil_str_overflow(const char *path, int line) {
+__declspec(noreturn) static void anvil_str_overflow(const char *path, int line) {
   fprintf(stderr, "%s:%d: text is limited to %d characters\n", path ? path : "<Anvil>",
           line, ANVIL_STR_CAP - 1);
   exit(2);
@@ -1284,10 +1284,10 @@ void anvil_trace_finish(void) {
         int green = (int)(hit->g * brightness + 255.0 * specular);
         int blue = (int)(hit->b * brightness + 255.0 * specular);
         uint32_t color = anvil_color(red, green, blue);
-        double camera_depth = anvil_dot(anvil_sub(point, origin), forward);
+        double pixel_depth = anvil_dot(anvil_sub(point, origin), forward);
         size_t pixel = (size_t)py * ANVIL_WIDTH + (size_t)px;
-        if (camera_depth < anvil_depth_buffer[pixel]) {
-          anvil_depth_buffer[pixel] = camera_depth;
+        if (pixel_depth < anvil_depth_buffer[pixel]) {
+          anvil_depth_buffer[pixel] = pixel_depth;
           anvil_pixel(px, py, color, hit->a);
         }
       }
@@ -1979,11 +1979,11 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   anvil_bitmap =
       CreateDIBSection(anvil_memory_dc, &anvil_bitmap_info, DIB_RGB_COLORS,
                        (void **)&anvil_pixels, NULL, 0);
-  anvil_old_bitmap = SelectObject(anvil_memory_dc, anvil_bitmap);
   anvil_depth_buffer =
       (double *)malloc((size_t)ANVIL_WIDTH * ANVIL_HEIGHT * sizeof(double));
   if (!anvil_bitmap || !anvil_pixels || !anvil_depth_buffer)
     goto failed_startup;
+  anvil_old_bitmap = SelectObject(anvil_memory_dc, anvil_bitmap);
   QueryPerformanceFrequency(&anvil_clock_frequency);
   QueryPerformanceCounter(&anvil_clock_start);
   LARGE_INTEGER prev = anvil_clock_start;
@@ -2304,7 +2304,7 @@ const char *anvil_format_number(double value) {
     static unsigned index = 0;
     char *text = buffers[index++ & 3u];
     if (value == 0.0) {
-        strcpy(text, "0");
+        memcpy(text, "0", 2);
         return text;
     }
     _snprintf_s(text, 64, _TRUNCATE, "%.6f", value);
@@ -2317,7 +2317,7 @@ const char *anvil_format_number(double value) {
     }
     text[length] = '\0';
     if (strcmp(text, "-0") == 0) {
-        strcpy(text, "0");
+        memcpy(text, "0", 2);
     }
     return text;
 }
