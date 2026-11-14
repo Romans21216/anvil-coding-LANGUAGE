@@ -136,10 +136,15 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 )
             )
         array_decl = re.fullmatch(
-            r"array\s+([A-Za-z_][\w-]*)\s*\(\s*([0-9]+)\s*\)", line
+            r"array\s+([A-Za-z_][\w-]*)\s*\(\s*([^()]*)\s*\)", line
         )
         if array_decl:
             name, raw_size = array_decl.groups()
+            if not raw_size.isdigit():
+                raise CompileError(
+                    f"{path}:{line_no}: array size must be a whole number, "
+                    f"got {raw_size.strip()!r}"
+                )
             normalized_size = raw_size.lstrip("0") or "0"
             max_array_text = str(MAX_ARRAY_SIZE)
             if len(normalized_size) > len(max_array_text) or (
@@ -654,6 +659,29 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             elif line.startswith("seed(") and line.endswith(")"):
                 node = Node("seed", line_no, value=line[5:-1])
         if node is None:
+            # The catch-all is the last resort: name the mistake when the shape is
+            # recognisable, so "unsupported statement" is not the whole answer.
+            feature = re.fullmatch(r"(enum|record|union)\s*\(.*\)", line)
+            if feature:
+                what = {"enum": "enums", "record": "records", "union": "unions"}[
+                    feature.group(1)
+                ]
+                raise CompileError(
+                    f"{path}:{line_no}: {what} are not implemented in this language "
+                    "version yet"
+                )
+            if re.fullmatch(r"array\s+[A-Za-z_][\w-]*\s*\[.*\]", line) or re.fullmatch(
+                r"array\s+[A-Za-z_][\w-]*\s*=.*", line
+            ):
+                raise CompileError(
+                    f"{path}:{line_no}: an array is declared as array <name>(size), "
+                    f"for example array scores(4)"
+                )
+            if re.fullmatch(r"list\s+[A-Za-z_][\w-]*\s*\(.*\)", line):
+                raise CompileError(
+                    f"{path}:{line_no}: lists are created with list() and grown with "
+                    "add, for example set local(items) = list()"
+                )
             raise CompileError(f"{path}:{line_no}: unsupported statement: {line}")
         stack[-1][0].append(node)
     if len(stack) != 1:

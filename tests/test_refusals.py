@@ -60,6 +60,30 @@ REFUSED = {
         "fn(main)\n  set var(g) = 1\n  say call fn(var(g), 2)\nend\ncall fn(main)\n",
         "unknown function 'var(g)'",
     ),
+    "negative array size": (
+        "array a(-2)\n\nfn(main)\n  say 1\nend\ncall fn(main)\n",
+        "array size must be a whole number, got '-2'",
+    ),
+    "fractional array size": (
+        "array a(2.5)\n\nfn(main)\n  say 1\nend\ncall fn(main)\n",
+        "array size must be a whole number, got '2.5'",
+    ),
+    "array with brackets": (
+        "array scores[4]\n\nfn(main)\n  say 1\nend\ncall fn(main)\n",
+        "an array is declared as array <name>(size)",
+    ),
+    "enum": (
+        "enum(state, idle)\n\nfn(main)\n  say 1\nend\ncall fn(main)\n",
+        "enums are not implemented in this language version yet",
+    ),
+    "record": (
+        "record(player, hp)\n\nfn(main)\n  say 1\nend\ncall fn(main)\n",
+        "records are not implemented in this language version yet",
+    ),
+    "list declaration": (
+        "list items(4)\n\nfn(main)\n  say 1\nend\ncall fn(main)\n",
+        "lists are created with list()",
+    ),
 }
 
 WARNED = {
