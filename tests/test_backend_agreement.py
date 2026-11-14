@@ -169,5 +169,40 @@ class BackendAgreementTests(unittest.TestCase):
         self.assertIn("division by zero", messages["native"])
 
 
+    def test_runtime_array_bounds_errors_agree_on_location_and_range(self) -> None:
+        source = (
+            "array values(4)\n"
+            "fn(main)\n  set array(values, 9) = 1\nend\ncall fn(main)\n"
+        )
+        path, _ = self._program(source)
+        seen = {}
+        for backend in ("c", "native"):
+            functions, top, variables, arrays = parse(path, source)
+            executable = self.base / f"oob_{backend}.exe"
+            if backend == "native":
+                executable.write_bytes(
+                    NativeCodegen(path, functions, top, variables, arrays).generate()
+                )
+            else:
+                compiler = find_compiler(None)
+                if compiler is None:
+                    raise unittest.SkipTest("MSVC is not available")
+                c_file = self.base / "oob.c"
+                c_file.write_text(
+                    emit_c(path, functions, top, variables, arrays), encoding="utf-8"
+                )
+                build_c(compiler[1], c_file, executable, True)
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(result.returncode, 2, backend)
+            message = result.stderr.replace("\r\n", "\n")
+            self.assertIn(f"{path}:3:", message, backend)
+            self.assertIn("through 3", message, backend)
+            seen[backend] = message
+        self.assertIn("array index", seen["c"])
+        self.assertIn("array index", seen["native"])
+
+
 if __name__ == "__main__":
     unittest.main()

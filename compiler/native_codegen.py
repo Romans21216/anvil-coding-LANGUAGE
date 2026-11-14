@@ -1161,7 +1161,10 @@ class NativeCodegen:
         self._store_rax_rbp(displacement)
         self.code.jump(done)
         self.code.label(failure)
-        self.emit_runtime_error(f"Anvil array index error at line {line} ({self.path})\n")
+        self.emit_runtime_error(
+            f"{self.path}:{line}: array index out of bounds "
+            f"(valid: 0 through {size - 1})\n"
+        )
         self.code.label(done)
         return slot
 

@@ -275,7 +275,7 @@ call fn(main)
                 [str(executable)], capture_output=True, text=True, timeout=5
             )
         self.assertEqual(result.returncode, 2)
-        self.assertIn("Anvil array index error at line 3", result.stderr)
+        self.assertIn(f"{path}:3: array index out of bounds", result.stderr)
 
     def test_native_rejects_local_arrays_bigger_than_the_frame(self):
         source = (
@@ -330,7 +330,7 @@ call fn(main)
             self.assertEqual(result.returncode, 2)
             self.assertEqual(result.stdout, "")
             self.assertEqual(
-                result.stderr, f"Anvil array index error at line 3 ({path})\n"
+                result.stderr, f"{path}:3: array index out of bounds (valid: 0 through 1)\n"
             )
 
     def test_native_names_unsupported_builtins_and_suggests_spellings(self):
