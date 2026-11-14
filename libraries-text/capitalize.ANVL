@@ -1,0 +1,6 @@
+fn(capitalize, text)
+  if len(var(text)) = 0
+    output ""
+  end
+  output upper(mid(var(text), 0, 1)) & mid(var(text), 1, len(var(text)) - 1)
+end

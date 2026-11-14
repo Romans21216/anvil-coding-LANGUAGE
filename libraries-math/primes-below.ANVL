@@ -1,0 +1,21 @@
+fn(primes-below, n)
+  set local(limit) = floor(var(n))
+  set local(count) = 0
+  set local(candidate) = 2
+  while local(candidate) < local(limit)
+    set local(prime) = 1
+    set local(d) = 2
+    while local(d) * local(d) <= local(candidate)
+      if local(candidate) % local(d) = 0
+        set local(prime) = 0
+        set local(d) = local(candidate)
+      end
+      set local(d) = local(d) + 1
+    end
+    if local(prime) = 1
+      set local(count) = local(count) + 1
+    end
+    set local(candidate) = local(candidate) + 1
+  end
+  output local(count)
+end

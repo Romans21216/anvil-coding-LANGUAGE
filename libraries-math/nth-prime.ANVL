@@ -1,0 +1,30 @@
+fn(nth-prime, n)
+  set local(want) = floor(var(n))
+  if local(want) < 1
+    output 0
+  end
+  set local(found) = 0
+  set local(candidate) = 2
+  while local(found) < local(want)
+    set local(prime) = 1
+    if local(candidate) < 2
+      set local(prime) = 0
+    end
+    set local(d) = 2
+    while local(d) * local(d) <= local(candidate)
+      if local(candidate) % local(d) = 0
+        set local(prime) = 0
+        set local(d) = local(candidate)
+      end
+      set local(d) = local(d) + 1
+    end
+    if local(prime) = 1
+      set local(found) = local(found) + 1
+      if local(found) = local(want)
+        output local(candidate)
+      end
+    end
+    set local(candidate) = local(candidate) + 1
+  end
+  output 0
+end

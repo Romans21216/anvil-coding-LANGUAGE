@@ -1,0 +1,18 @@
+fn(count-words, text)
+  set local(count) = 0
+  set local(in_word) = 0
+  set local(i) = 0
+  while local(i) < len(var(text))
+    if mid(var(text), local(i), 1) = " "
+      set local(in_word) = 0
+    end
+    if mid(var(text), local(i), 1) != " "
+      if local(in_word) = 0
+        set local(count) = local(count) + 1
+        set local(in_word) = 1
+      end
+    end
+    set local(i) = local(i) + 1
+  end
+  output local(count)
+end

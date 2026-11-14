@@ -104,6 +104,20 @@ Three things worth knowing:
   text, so they accumulate in a global; calling one while another is still
   running (from inside a callback, say) would mix the two results.
 
+## Other shipped libraries
+
+Three folders ship beside the compiler, imported the same way:
+
+| import | folder | what it holds |
+|---|---|---|
+| `library import essentials` | `libraries-essentials/` | random-pipeline and the seeded helpers, gcd/lcm, factorial, fib, power, primes, clamp, lerp, map-range, percent-of, round-to, distance, three text helpers |
+| `library import text` | `libraries-text/` | pad-right, center, capitalize, index-of, count-words, is-palindrome, left-of, right-of |
+| `library import math` | `libraries-math/` | nth-prime, primes-below, digits-sum, reverse-number, is-palindrome-number, hypotenuse, area-circle, to-degrees, to-radians |
+
+Each folder has its own README listing every function and its caveats. The text
+helpers across all three libraries keep their accumulators in globals, because a
+local can hold a number but not text, and are therefore not reentrant.
+
 ## Layout
 
 ```
