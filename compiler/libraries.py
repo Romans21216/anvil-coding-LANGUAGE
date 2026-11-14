@@ -15,23 +15,30 @@ from compiler.common import CompileError
 
 
 def folder_for(entry: pathlib.Path, name: str) -> pathlib.Path | None:
-    """Where a library named ``name`` lives, if it exists."""
-    base = entry.resolve().parent
-    for candidate in (base / f"libraries-{name}", base / "libraries" / name):
-        if candidate.is_dir():
-            return candidate
+    """Where a library named ``name`` lives, if it exists.
+
+    The file's own folder wins, then each parent up to a few levels: a library
+    file inside ``libraries-a`` should still find ``libraries-b`` at the project
+    root, which is where people put them.
+    """
+    start = entry.resolve().parent
+    for base in [start, *start.parents[:8]]:
+        for candidate in (base / f"libraries-{name}", base / "libraries" / name):
+            if candidate.is_dir():
+                return candidate
     return None
 
 
 def load(entry: pathlib.Path, name: str, where: str, line: int):
     """Parse every file in the library, returning (function name, node) pairs."""
-    from compiler.parser import parse
+    from compiler.modules import load_program
 
     folder = folder_for(entry, name)
     if folder is None:
         raise CompileError(
             f"{where}:{line}: library {name!r} not found; expected a folder named "
-            f"libraries-{name} or libraries/{name} beside {entry.name}"
+            f"libraries-{name} or libraries/{name} beside {entry.name} or in a "
+            "parent folder"
         )
     files = sorted(folder.glob("*.ANVL"))
     if not files:
@@ -39,13 +46,20 @@ def load(entry: pathlib.Path, name: str, where: str, line: int):
             f"{where}:{line}: library {name!r} has no .ANVL files in {folder}"
         )
     found = []
+    seen: set[str] = set()
     for file in files:
         source = file.read_text(encoding="utf-8", errors="replace")
-        functions, _, _, _ = parse(file, source)
+        program = load_program(file, source)
         stem = file.stem
         # An include inside a library file registers its target under an aliased
-        # name (helper--helper); those belong to the included file, not this one.
-        own = {name: node for name, node in functions.items() if "--" not in name}
+        # name (helper--helper), and a library import adds functions from another
+        # folder; neither belongs to this file.
+        own = {
+            function_name: node
+            for function_name, node in program.functions.items()
+            if "--" not in function_name
+            and function_name not in program.library_functions
+        }
         if stem not in own:
             raise CompileError(
                 f"{file}: a library file must define the function {stem!r} "
@@ -57,5 +71,14 @@ def load(entry: pathlib.Path, name: str, where: str, line: int):
                 f"{file}: a library file holds one function, but this one also "
                 f"defines {extra}"
             )
-        found.append((stem, own[stem]))
+        if stem not in seen:
+            seen.add(stem)
+            found.append((stem, own[stem]))
+        # A file may import another library; those functions have to travel with
+        # it or the outer program cannot resolve the call inside this file.
+        for extra_name, extra_node in sorted(program.functions.items()):
+            if extra_name == stem or "--" in extra_name or extra_name in seen:
+                continue
+            seen.add(extra_name)
+            found.append((extra_name, extra_node))
     return found

@@ -48,6 +48,9 @@ class ParsedProgram:
     arrays: dict[str, int]
     variable_references: list[tuple[str, int, str | None, pathlib.Path]]
     local_references: list[tuple[str, int, str | None, pathlib.Path]]
+    # Names that came from `library import`, so a library file can tell its own
+    # functions from the ones it pulled in.
+    library_functions: set[str] = field(default_factory=set)
 
 
 def decode_string(raw: str) -> str:

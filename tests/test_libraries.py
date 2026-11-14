@@ -179,6 +179,29 @@ class LibraryTests(unittest.TestCase):
         self.assertIn("anvil_gcd", generated)
         self.assertIn("anvil_ratio__ratio", generated)
 
+    def test_a_library_can_import_another_library(self) -> None:
+        # libraries-a/f.ANVL says `library import b`; libraries-b sits at the
+        # project root, one level above the library folder.
+        second = self.base / "libraries-b"
+        second.mkdir()
+        (second / "g.ANVL").write_text(
+            "fn(g, a)\n  output var(a) * 3\nend\n", encoding="utf-8"
+        )
+        (self.base / "libraries-math" / "linked.ANVL").write_text(
+            "library import b\n\nfn(linked, a)\n  output call fn(g, var(a))\nend\n",
+            encoding="utf-8",
+        )
+        source = (
+            "library import math\n\nfn(main)\n  say call fn(linked, 7)\nend\n"
+            "call fn(main)\n"
+        )
+        path = self._write_main(source)
+        functions, top, variables, arrays = parse(path, source)
+        self.assertIn("linked", functions)
+        self.assertIn("g", functions)
+        generated = emit_c(path, functions, top, variables, arrays)
+        self.assertIn("anvil_g", generated)
+
 
 if __name__ == "__main__":
     unittest.main()

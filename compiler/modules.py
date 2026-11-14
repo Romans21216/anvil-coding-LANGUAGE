@@ -169,6 +169,7 @@ def load_program(path, source, *, include_root=None):
                                 f"defines {lib_name!r}, which already exists in the program"
                             )
                         result.functions[lib_name] = lib_function
+                        result.library_functions.add(lib_name)
             elif node.kind == "include":
                 relative = include_name(node.value, unit_path, node.line)
                 target = (canonical.parent / relative).resolve()
@@ -204,6 +205,7 @@ def load_program(path, source, *, include_root=None):
                         f"defines {name!r}, which already exists in the program"
                     )
                 result.functions[name] = function
+                result.library_functions.add(name)
 
     # random(seed) is sugar for the shipped mixer, so the mixer joins the
     # program whenever it is called and the program does not define its own.
