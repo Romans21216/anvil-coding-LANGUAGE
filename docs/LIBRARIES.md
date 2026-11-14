@@ -81,6 +81,7 @@ itself, so any program in any directory can use it without copying a folder:
 | `random-pipeline(seed)` | the 32-stage mixer; `random(12345)` is 1245520449 |
 | `random-range(low, high, seed)` | whole number in `low..high` |
 | `random-chance(percent, seed)` | 1 when a roll lands under `percent` |
+| `random-float(low, high, seed)` | uniform in `[low, high)` |
 | `gcd(a, b)`, `lcm(a, b)` | greatest common divisor, least common multiple |
 | `factorial(n)`, `fib(n)`, `power(base, exponent)`, `sum-to(n)` | arithmetic |
 | `square(n)`, `is-even(n)`, `is-odd(n)` | arithmetic predicates |

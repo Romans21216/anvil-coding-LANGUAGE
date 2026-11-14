@@ -1,0 +1,5 @@
+fn(random-float, low, high, seed)
+  # Uniform in [low, high): the mixer gives 0..2^32-1, scaled into the span.
+  set local(v) = call fn(random-pipeline, var(seed))
+  output var(low) + (var(high) - var(low)) * local(v) / 4294967296
+end

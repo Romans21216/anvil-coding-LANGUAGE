@@ -140,5 +140,24 @@ class EssentialsTests(unittest.TestCase):
         self.assertEqual(self._run("native", BATCH2), EXPECTED2)
 
 
+    def test_random_float_stays_in_range_and_follows_its_seed(self) -> None:
+        source = NL.join(
+            [
+                "library import essentials",
+                "",
+                "fn(main)",
+                "  say call fn(random-float, 0, 1, 12345)",
+                "  say call fn(random-float, -1, 1, 12345)",
+                "  say call fn(random-float, 10, 20, 1)",
+                "end",
+                "call fn(main)",
+                "",
+            ]
+        )
+        expected = ["0.289995", "-0.420009", "12.97277"]
+        self.assertEqual(self._run("c", source), expected)
+        self.assertEqual(self._run("native", source), expected)
+
+
 if __name__ == "__main__":
     unittest.main()

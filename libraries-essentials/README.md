@@ -16,6 +16,7 @@ calls are compiled, so importing all 23 costs nothing for the ones you skip.
 | `random-pipeline(seed)` | the 32-stage mixer that backs `random()`; `random-pipeline(12345)` is 1245520449 |
 | `random-range(low, high, seed)` | whole number in `low..high` inclusive |
 | `random-chance(percent, seed)` | `1` when a roll lands under `percent`, else `0` |
+| `random-float(low, high, seed)` | uniform in `[low, high)`; `0, 1, 12345` → 0.289995 |
 
 ## Numbers
 
