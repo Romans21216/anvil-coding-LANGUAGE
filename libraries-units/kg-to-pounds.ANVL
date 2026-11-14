@@ -1,0 +1,3 @@
+fn(kg-to-pounds, kg)
+  output var(kg) * 2.204622622
+end

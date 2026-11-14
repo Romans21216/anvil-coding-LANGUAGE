@@ -1,0 +1,17 @@
+fn(is-digit-text, text)
+  if len(var(text)) = 0
+    output 0
+  end
+  set local(ok) = 1
+  set local(i) = 0
+  while local(i) < len(var(text))
+    if ord(mid(var(text), local(i), 1)) < 48
+      set local(ok) = 0
+    end
+    if ord(mid(var(text), local(i), 1)) > 57
+      set local(ok) = 0
+    end
+    set local(i) = local(i) + 1
+  end
+  output local(ok)
+end

@@ -60,6 +60,7 @@ hello, Ada
 - Unused imports are warnings with source carets, and `--deny-warnings` makes them fail the build.
 - `library import essentials` ships with the compiler: random-pipeline (the 32-stage mixer behind `random()`), random-range, random-chance, gcd, lcm, factorial, fib, power, sum-to, square, is-even, is-odd, is-prime, clamp, sign, lerp, map-range, percent-of, round-to, distance, text-repeat, pad-left, text-reverse — see `docs/LIBRARIES.md`.
 - `library import text` and `library import math` ship too: string helpers (pad-right, center, capitalize, index-of, count-words, is-palindrome, left-of, right-of) and number theory (nth-prime, primes-below, digits-sum, reverse-number, is-palindrome-number, hypotenuse, area-circle, to-degrees, to-radians).
+- `library import units` (ten temperature/distance/mass conversions) and `library import validate` (is-empty, is-digit-text, is-alpha-text, is-number-text, is-space-text, is-upper-text) ship as well.
 - `library import math` pulls in `libraries-math/`, one function per file named after the file; only the functions you call are compiled — see `docs/LIBRARIES.md`.
 - `import builtins` is accepted, and the compiler resolves which builtins a program actually uses (reachable code only) — `--print-imports` prints the set.
 - Extension functions: `anvil program.ANVL --extension mathx.json` makes C++ (DLL), C# (NativeAOT) and Anvil functions callable like builtins on both backends — see `docs/EXTENSIONS.md`.

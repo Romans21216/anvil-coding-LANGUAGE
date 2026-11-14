@@ -1,0 +1,3 @@
+fn(celsius-to-kelvin, c)
+  output var(c) + 273.15
+end

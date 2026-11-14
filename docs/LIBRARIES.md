@@ -106,13 +106,15 @@ Three things worth knowing:
 
 ## Other shipped libraries
 
-Three folders ship beside the compiler, imported the same way:
+Five folders ship beside the compiler, imported the same way:
 
 | import | folder | what it holds |
 |---|---|---|
 | `library import essentials` | `libraries-essentials/` | random-pipeline and the seeded helpers, gcd/lcm, factorial, fib, power, primes, clamp, lerp, map-range, percent-of, round-to, distance, three text helpers |
 | `library import text` | `libraries-text/` | pad-right, center, capitalize, index-of, count-words, is-palindrome, left-of, right-of |
 | `library import math` | `libraries-math/` | nth-prime, primes-below, digits-sum, reverse-number, is-palindrome-number, hypotenuse, area-circle, to-degrees, to-radians |
+| `library import units` | `libraries-units/` | temperature, distance and mass conversions, ten functions |
+| `library import validate` | `libraries-validate/` | is-empty, is-digit-text, is-alpha-text, is-number-text, is-space-text, is-upper-text |
 
 Each folder has its own README listing every function and its caveats. The text
 helpers across all three libraries keep their accumulators in globals, because a

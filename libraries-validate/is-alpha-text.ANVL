@@ -1,0 +1,26 @@
+fn(is-alpha-text, text)
+  if len(var(text)) = 0
+    output 0
+  end
+  set local(ok) = 1
+  set local(i) = 0
+  while local(i) < len(var(text))
+    set local(code) = ord(mid(var(text), local(i), 1))
+    set local(letter) = 0
+    if local(code) >= 65
+      if local(code) <= 90
+        set local(letter) = 1
+      end
+    end
+    if local(code) >= 97
+      if local(code) <= 122
+        set local(letter) = 1
+      end
+    end
+    if local(letter) = 0
+      set local(ok) = 0
+    end
+    set local(i) = local(i) + 1
+  end
+  output local(ok)
+end

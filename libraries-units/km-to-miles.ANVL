@@ -1,0 +1,3 @@
+fn(km-to-miles, km)
+  output var(km) * 0.621371192
+end
