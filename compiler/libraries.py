@@ -1,10 +1,11 @@
 """Libraries on disk: one function per file, one folder per library.
 
 A program says ``library import math``; the compiler looks for a folder named
-``libraries-math`` (or ``libraries/math``) beside the entry file, and treats each
-``<name>.ANVL`` inside it as the function ``<name>``. Only the functions the
-program actually calls reach the output, because reachability already prunes
-everything else.
+``libraries-math`` (or ``libraries/math``), starting beside the file that wrote
+the line and then walking up its parents, and treats each ``<name>.ANVL`` inside
+it as the function ``<name>``. A library file may import another library the same
+way. Only the functions the program calls reach the output, because reachability
+already prunes everything else.
 """
 
 from __future__ import annotations
