@@ -1,0 +1,9 @@
+fn(round-to, value, places)
+  set local(p) = floor(var(places))
+  set local(scale) = call fn(power, 10, local(p))
+  set local(v) = var(value) * local(scale)
+  if local(v) < 0
+    output -floor(-local(v) + 0.5) / local(scale)
+  end
+  output floor(local(v) + 0.5) / local(scale)
+end

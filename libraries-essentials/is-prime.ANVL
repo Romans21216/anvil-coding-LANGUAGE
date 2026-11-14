@@ -1,0 +1,22 @@
+fn(is-prime, n)
+  set local(k) = floor(var(n))
+  if local(k) < 2
+    output 0
+  end
+  if local(k) = 2
+    output 1
+  end
+  if local(k) % 2 = 0
+    output 0
+  end
+  set local(answer) = 1
+  set local(i) = 3
+  while local(i) * local(i) <= local(k)
+    if local(k) % local(i) = 0
+      set local(answer) = 0
+      set local(i) = local(k)
+    end
+    set local(i) = local(i) + 2
+  end
+  output local(answer)
+end

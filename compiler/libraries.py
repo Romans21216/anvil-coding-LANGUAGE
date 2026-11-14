@@ -31,6 +31,12 @@ def folder_for(entry: pathlib.Path, name: str) -> pathlib.Path | None:
         for candidate in (base / f"libraries-{name}", base / "libraries" / name):
             if candidate.is_dir():
                 return candidate
+    # Libraries shipped with the compiler itself, so `library import essentials`
+    # works without copying a folder next to every program.
+    package = pathlib.Path(__file__).resolve().parents[1]
+    for candidate in (package / f"libraries-{name}", package / "libraries" / name):
+        if candidate.is_dir():
+            return candidate
     return None
 
 

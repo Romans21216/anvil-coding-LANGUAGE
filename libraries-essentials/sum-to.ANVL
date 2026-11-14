@@ -1,0 +1,13 @@
+fn(sum-to, n)
+  set local(k) = floor(var(n))
+  if local(k) < 1
+    output 0
+  end
+  set local(total) = 0
+  set local(i) = 1
+  while local(i) <= local(k)
+    set local(total) = local(total) + local(i)
+    set local(i) = local(i) + 1
+  end
+  output local(total)
+end

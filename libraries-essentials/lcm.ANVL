@@ -1,0 +1,7 @@
+fn(lcm, a, b)
+  set local(g) = call fn(gcd, var(a), var(b))
+  if local(g) = 0
+    output 0
+  end
+  output abs(var(a) / local(g) * var(b))
+end

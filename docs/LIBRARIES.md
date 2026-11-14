@@ -71,6 +71,27 @@ A file pulled in with `include fn(ratio) -- "ratio.ANVL"` carries the
 program does not have to repeat the dependency. Whole-file includes
 (`include "ratio.ANVL"`) have always behaved this way.
 
+## What ships with the compiler
+
+`library import essentials` finds `libraries-essentials/` next to the compiler
+itself, so any program in any directory can use it without copying a folder:
+
+| function | answer |
+|---|---|
+| `random-pipeline(seed)` | the 32-stage mixer; `random(12345)` is 1245520449 |
+| `random-range(low, high, seed)` | whole number in `low..high` |
+| `random-chance(percent, seed)` | 1 when a roll lands under `percent` |
+| `gcd(a, b)`, `lcm(a, b)` | greatest common divisor, least common multiple |
+| `factorial(n)`, `fib(n)`, `power(base, exponent)`, `sum-to(n)` | arithmetic |
+| `is-prime(n)` | 1 when `n` is prime |
+| `clamp(value, low, high)`, `sign(value)` | bounds and sign |
+| `percent-of(part, whole)`, `round-to(value, places)` | formatting |
+| `distance(x1, y1, x2, y2)` | straight-line distance |
+
+A program that calls one of these compiles only that function and whatever it
+calls: `gcd` for `lcm`, the mixer for `random-range`. Both backends print the
+same answers, including the pinned mixer value above.
+
 ## Layout
 
 ```

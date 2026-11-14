@@ -1,0 +1,13 @@
+fn(power, base, exponent)
+  set local(e) = floor(var(exponent))
+  if local(e) < 0
+    output 0
+  end
+  set local(result) = 1
+  set local(i) = 0
+  while local(i) < local(e)
+    set local(result) = local(result) * var(base)
+    set local(i) = local(i) + 1
+  end
+  output local(result)
+end

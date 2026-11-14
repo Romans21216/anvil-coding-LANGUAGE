@@ -1,0 +1,10 @@
+fn(gcd, a, b)
+  set local(x) = floor(abs(var(a)))
+  set local(y) = floor(abs(var(b)))
+  while local(y) != 0
+    set local(t) = local(y)
+    set local(y) = local(x) % local(y)
+    set local(x) = local(t)
+  end
+  output local(x)
+end
