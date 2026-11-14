@@ -178,5 +178,45 @@ class LintTests(unittest.TestCase):
         self.assertIn("parameter 'b' of 'f' is never used", messages)
 
 
+    def test_a_for_loop_that_can_never_run_is_reported(self) -> None:
+        cases = {
+            "step 0": "  for local(i) = 0 to 3 step 0\n",
+            "wrong direction": "  for local(i) = 5 to 1\n",
+        }
+        for label, loop in cases.items():
+            with self.subTest(case=label):
+                source = (
+                    "fn(main)\n"
+                    "  set local(total) = 0\n"
+                    + loop
+                    + "    set local(total) = local(total) + 1\n"
+                    "  end\n  say local(total)\nend\ncall fn(main)\n"
+                )
+                path, functions, top = parse_source(source, self.base)
+                messages = [m for m, _ in report(functions, top, path)]
+                self.assertTrue(
+                    any(m.startswith("for loop never runs") for m in messages), messages
+                )
+
+    def test_a_countdown_with_a_negative_step_is_fine(self) -> None:
+        source = (
+            "fn(main)\n  set local(total) = 0\n"
+            "  for local(i) = 5 to 1 step -1\n"
+            "    set local(total) = local(total) + local(i)\n"
+            "  end\n  say local(total)\nend\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        self.assertEqual(report(functions, top, path), [])
+
+    def test_a_loop_with_variable_bounds_is_not_guessed_at(self) -> None:
+        source = (
+            "fn(main)\n  set local(n) = 3\n"
+            "  for local(i) = 0 to local(n)\n    say local(i)\n  end\n"
+            "end\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        self.assertEqual(report(functions, top, path), [])
+
+
 if __name__ == "__main__":
     unittest.main()

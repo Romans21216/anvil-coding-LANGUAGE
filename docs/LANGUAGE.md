@@ -139,7 +139,7 @@ An import that contributes nothing is a warning, not silence: `import math` in a
 Beyond imports, two more mistakes are reported rather than executed: a
 statement after `output` in the same block (it can never run) and a `set local`
 that nothing ever reads. Loop counters are exempt, because `for local(i) = ...`
-exists to drive the loop. A function the program never calls, and a parameter its body never reads, are reported the same way. Only the entry file is checked, because an include or the stdlib is shared code whose callers may live elsewhere. A function with no `output` still runs, but its value is 0; using that
+exists to drive the loop. A `for` loop that can never run — `step 0`, or a start past the end with the wrong direction — is reported instead of silently doing nothing. A function the program never calls, and a parameter its body never reads, are reported the same way. Only the entry file is checked, because an include or the stdlib is shared code whose callers may live elsewhere. A function with no `output` still runs, but its value is 0; using that
 value (as in `say call fn(f, 1)`) is a warning rather than a silent zero.
  Dividing by a literal zero is reported the same way: `1 / 0` yields
 infinity at run time, so the compiler says so at build time instead of

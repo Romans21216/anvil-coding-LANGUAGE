@@ -165,6 +165,37 @@ def unused_parameters(functions, entry=None):
     return found
 
 
+def _literal_number(text: str):
+    value = text.strip()
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def empty_for_loops(functions, top):
+    """``for`` loops whose literal range can never run."""
+    warnings = []
+    nodes = list(top)
+    for function in functions.values():
+        nodes.extend(_walk(function.body))
+    for node in nodes:
+        if node.kind != "for" or len(node.params) < 2:
+            continue
+        start = _literal_number(node.params[0])
+        end = _literal_number(node.params[1])
+        step = _literal_number(node.params[2]) if len(node.params) > 2 else 1.0
+        if start is None or end is None or step is None:
+            continue
+        if step == 0:
+            warnings.append(("for loop never runs: step is 0", node))
+        elif (step > 0 and start > end) or (step < 0 and start < end):
+            warnings.append(
+                (f"for loop never runs: {start:g} to {end:g} step {step:g}", node)
+            )
+    return warnings
+
+
 def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
@@ -176,6 +207,7 @@ def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
         what = "division by zero" if operator == "/" else "remainder by zero"
         warnings.append((what, node))
     warnings.extend(silent_zero_calls(functions, top))
+    warnings.extend(empty_for_loops(functions, top))
     for function in unused_functions(functions, top, entry):
         warnings.append((f"function '{function.name}' is never called", function))
     for function, parameter in unused_parameters(functions, entry):

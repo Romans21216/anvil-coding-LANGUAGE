@@ -50,6 +50,7 @@ hello, Ada
 - Growable lists support `add`, `count`, `array`, `remove` and `for each item in list` (removal shifts the tail down; an out-of-range index is a no-op).
 - Selective imports pull one function from a library: `include fn(move) -- "lib/player.ANVL"` then `call fn(move--player, 10)` (the qualifier is the file name unless `as alias` says otherwise); its helpers come along, its unused functions do not, and its globals stay private.
 - C builds are optimized and thin by default (143 KB hello-world); `--debug` for `/Od`, `--dynamic-runtime` for a ~10 KB image that uses the system VC++ runtime.
+- A `for` loop whose literal range can never run (step 0, wrong direction) is a warning.
 - Unused functions and unused parameters are warned about (entry file only).
 - Using a function that has no `output` as a value is a warning, not a silent 0.
 - Division by a literal zero is a warning rather than silent infinity.
