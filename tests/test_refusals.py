@@ -84,6 +84,10 @@ REFUSED = {
         "list items(4)\n\nfn(main)\n  say 1\nend\ncall fn(main)\n",
         "lists are created with list()",
     ),
+    "camera form": (
+        "scene 2d\n\nfn(draw)\n  camera 10, 10\nend\n",
+        "camera is written camera perspective",
+    ),
 }
 
 WARNED = {

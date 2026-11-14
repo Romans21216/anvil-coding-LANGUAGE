@@ -682,6 +682,11 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     f"{path}:{line_no}: lists are created with list() and grown with "
                     "add, for example set local(items) = list()"
                 )
+            if re.match(r"camera\b", line):
+                raise CompileError(
+                    f"{path}:{line_no}: camera is written camera perspective <x,y,z>, "
+                    "camera fov(<degrees>) or camera control(...)"
+                )
             raise CompileError(f"{path}:{line_no}: unsupported statement: {line}")
         stack[-1][0].append(node)
     if len(stack) != 1:

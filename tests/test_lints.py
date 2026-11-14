@@ -272,5 +272,21 @@ class LintTests(unittest.TestCase):
         self.assertEqual([m for m in messages if m.startswith("global")], [])
 
 
+    def test_a_drawing_statement_without_a_scene_is_reported(self) -> None:
+        source = "fn(main)\n  display rect(1, 2, 3, 4)\nend\ncall fn(main)\n"
+        path, functions, top = parse_source(source, self.base)
+        messages = [m for m, _ in report(functions, top, path)]
+        self.assertIn("display has no effect without a scene 2d program", messages)
+
+    def test_a_drawing_statement_inside_a_scene_program_is_fine(self) -> None:
+        source = (
+            "scene 2d\n\nfn(draw)\n  display rect(1, 2, 3, 4)\nend\n"
+            "fn(main)\n  say 1\nend\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        messages = [m for m, _ in report(functions, top, path)]
+        self.assertEqual([m for m in messages if "scene 2d" in m], [])
+
+
 if __name__ == "__main__":
     unittest.main()

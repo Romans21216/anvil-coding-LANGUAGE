@@ -242,6 +242,23 @@ def unused_globals(functions, top):
     ]
 
 
+_SCENE_STATEMENTS = {"display", "clear", "camera", "camera_fov", "camera_control"}
+
+
+def scene_statements_without_scene(functions, top):
+    """Drawing or camera statements in a program that never declares a scene."""
+    if any(getattr(node, "kind", "") == "scene" for node in top):
+        return []
+    nodes = list(top)
+    for function in functions.values():
+        nodes.extend(_walk(function.body))
+    return [
+        (f"{node.kind} has no effect without a scene 2d program", node)
+        for node in nodes
+        if getattr(node, "kind", "") in _SCENE_STATEMENTS
+    ]
+
+
 def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
@@ -255,6 +272,7 @@ def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     warnings.extend(silent_zero_calls(functions, top))
     warnings.extend(empty_for_loops(functions, top))
     warnings.extend(bad_number_literals(functions, top))
+    warnings.extend(scene_statements_without_scene(functions, top))
     for node, name in unused_globals(functions, top):
         warnings.append((f"global '{name}' is never read", node))
     for function in unused_functions(functions, top, entry):
