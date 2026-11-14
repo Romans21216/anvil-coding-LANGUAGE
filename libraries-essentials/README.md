@@ -47,6 +47,9 @@ calls are compiled, so importing all 23 costs nothing for the ones you skip.
 
 ## Worth knowing
 
+- Text is capped at 255 characters by the language. A helper that would go past
+  it stops with `text is limited to 255 characters` rather than truncating, and
+  because the text helpers recurse, that cap is also what bounds their depth.
 - `starts_with`, `ends_with`, `upper`, `lower`, `trim`, `mid`, `len` and
   `contains` are **builtins**, not library functions.
 - A function named `cube` is refused: the runtime already owns `anvil_cube`.

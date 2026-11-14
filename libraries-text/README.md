@@ -22,9 +22,11 @@ Builtins already cover `upper`, `lower`, `trim`, `mid`, `len`, `contains`,
 
 ## Worth knowing
 
-- Everything here is reentrant: `pad-right` and `center` recurse (bounded by the
-  256-character text limit) instead of accumulating in a global, and
-  `is-palindrome` compares mirrored characters.
+- Text is capped at 255 characters by the language. A helper that would go past
+  it stops with `text is limited to 255 characters` rather than truncating, and
+  because the text helpers recurse, that cap is also what bounds their depth.
+- Everything here is reentrant: `pad-right` and `center` recurse instead of
+  accumulating in a global, and `is-palindrome` compares mirrored characters.
 - `index-of` compares text slices, so it finds substrings, not characters only.
 - `left-of` / `right-of` split on the **first** separator; nothing here parses
   every field.
