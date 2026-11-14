@@ -148,5 +148,18 @@ class RefusalTests(unittest.TestCase):
                 self.assertIn("warning(s) treated as errors", result.stderr)
 
 
+    def test_a_project_manifest_with_a_missing_entry_names_both(self) -> None:
+        manifest = self.base / "game.ANVLproj"
+        manifest.write_text('name = "Demo"\nentry = "nope.ANVL"\n', encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(ANVIL), str(manifest), "--check"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("game.ANVLproj: entry 'nope.ANVL' cannot be read", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

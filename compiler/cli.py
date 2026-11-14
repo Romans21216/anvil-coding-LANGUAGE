@@ -192,6 +192,8 @@ def main() -> int:
         include_root = None
         fixed_hz = 60
         project_name = "Anvil Game"
+        manifest_path = None
+        manifest_entry = None
         if args.source.suffix.lower() == ".anvlproj":
             if args.backend == "native":
                 raise CompileError(
@@ -240,6 +242,8 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: manifest needs a non-empty string 'entry'"
                 )
+            manifest_path = args.source
+            manifest_entry = entry
             project_root = args.source.resolve().parent
             include_root = project_root
             source_path = (project_root / entry).resolve()
@@ -252,6 +256,11 @@ def main() -> int:
         try:
             source = source_path.read_text(encoding="utf-8")
         except OSError as error:
+            if manifest_path is not None:
+                raise CompileError(
+                    f"{manifest_path}: entry {manifest_entry!r} cannot be read: "
+                    f"{error.strerror or error}"
+                ) from error
             raise CompileError(f"cannot read {source_path}: {error.strerror or error}") from error
         except UnicodeDecodeError as error:
             raise CompileError(
