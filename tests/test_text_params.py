@@ -16,6 +16,8 @@ from compiler.common import CompileError  # noqa: E402
 from compiler.parser import parse  # noqa: E402
 from compiler.native_codegen import NativeCodegen  # noqa: E402
 
+NL = chr(10)
+
 PROGRAM = """\
 fn(greet, who)
   output "hi " & var(who)
@@ -144,6 +146,37 @@ class TextParameterNativeTests(unittest.TestCase):
             with self.assertRaises(CompileError) as caught:
                 NativeCodegen(path, functions, top, variables, arrays).generate()
         self.assertIn("takes a number, but this argument is text", str(caught.exception))
+
+
+class TextParameterPropagationTests(unittest.TestCase):
+    """A parameter handed to a text parameter is text, callers or not."""
+
+    UNUSED = NL.join(
+        [
+            "fn(inner, t)",
+            "  output upper(var(t))",
+            "end",
+            "",
+            "fn(wrapper, s)",
+            "  output call fn(inner, var(s))",
+            "end",
+            "",
+            "fn(main)",
+            "  say 1",
+            "end",
+            "call fn(main)",
+            "",
+        ]
+    )
+
+    def test_an_uncalled_wrapper_still_compiles(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "unused.ANVL"
+            path.write_text(self.UNUSED, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, self.UNUSED)
+        self.assertIn("wrapper", functions)
+        self.assertIn("s", functions["wrapper"].text_params)
+
 
 
 if __name__ == "__main__":

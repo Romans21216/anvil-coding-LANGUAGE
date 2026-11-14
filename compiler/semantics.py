@@ -195,6 +195,22 @@ def _classify_text_params(program: ParsedProgram) -> None:
                     if index >= len(target.params):
                         break
                     param = target.params[index]
+                    # A parameter handed to a parameter that is text is text too,
+                    # otherwise a wrapper around a text function has no evidence
+                    # of its own and defaults to a number.
+                    if param in target.text_params and scope is not None:
+                        match = re.fullmatch(
+                            r"var\(([A-Za-z_][\w-]*)\)", argument.strip()
+                        )
+                        if (
+                            match
+                            and match.group(1) in scope.params
+                            and match.group(1) not in scope.text_params
+                            and match.group(1)
+                            not in getattr(scope, "numeric_params", set())
+                        ):
+                            scope.text_params.add(match.group(1))
+                            changed = True
                     if param in target.text_params:
                         continue
                     if param in getattr(target, "numeric_params", set()):
