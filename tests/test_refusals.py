@@ -88,6 +88,14 @@ REFUSED = {
         "scene 2d\n\nfn(draw)\n  camera 10, 10\nend\n",
         "camera is written camera perspective",
     ),
+    "library without a name": (
+        "fn(main)\n  say 1\nend\ncall fn(main)\nlibrary import\n",
+        "a library is written library import <name>",
+    ),
+    "library name with a dot": (
+        "fn(main)\n  say 1\nend\ncall fn(main)\nlibrary import math.v2\n",
+        "a library is written library import <name>",
+    ),
     "unterminated string": (
         'fn(main)\n  say "abc\nend\ncall fn(main)\n',
         'unterminated string: no closing "',

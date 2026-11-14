@@ -702,6 +702,12 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                     f"{path}:{line_no}: camera is written camera perspective <x,y,z>, "
                     "camera fov(<degrees>) or camera control(...)"
                 )
+            if re.match(r"library\b", line):
+                raise CompileError(
+                    f"{path}:{line_no}: a library is written library import <name>, "
+                    "where <name> uses letters, digits, _ and - "
+                    "(the folder is libraries-<name> or libraries/<name>)"
+                )
             raise CompileError(f"{path}:{line_no}: unsupported statement: {line}")
         stack[-1][0].append(node)
     if len(stack) != 1:
