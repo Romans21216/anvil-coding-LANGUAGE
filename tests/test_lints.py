@@ -43,8 +43,25 @@ class LintTests(unittest.TestCase):
         _, functions, _ = parse_source(source, self.base)
         dead = unreachable(functions)
         self.assertEqual(len(dead), 1)
-        self.assertEqual(dead[0].kind, "say")
-        self.assertEqual(dead[0].line, 3)
+        statement, terminator = dead[0]
+        self.assertEqual(statement.kind, "say")
+        self.assertEqual(statement.line, 3)
+        self.assertEqual(terminator, "output")
+
+    def test_code_after_stop_is_unreachable_too(self) -> None:
+        source = (
+            "fn(main)\n"
+            '  say "before"\n'
+            "  stop\n"
+            '  say "after"\n'
+            "end\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        dead = unreachable(functions)
+        self.assertEqual([(statement.kind, terminator) for statement, terminator in dead],
+                         [("say", "stop")])
+        messages = [m for m, _ in report(functions, top, path)]
+        self.assertIn("unreachable statement after stop", messages)
 
     def test_output_at_the_end_is_not_a_warning(self) -> None:
         source = (

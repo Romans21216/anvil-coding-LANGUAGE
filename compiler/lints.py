@@ -35,7 +35,7 @@ def _text_of(node) -> str:
 
 
 def unreachable(functions):
-    """Statements that can never run because the block already returned."""
+    """(dead statement, terminator kind) for code that can never run."""
     found = []
     for function in functions.values():
         found.extend(_unreachable_in(function.body))
@@ -45,8 +45,8 @@ def unreachable(functions):
 def _unreachable_in(nodes) -> list:
     dead = []
     for index, node in enumerate(nodes):
-        if node.kind == "output" and index + 1 < len(nodes):
-            dead.append(nodes[index + 1])
+        if node.kind in ("output", "stop") and index + 1 < len(nodes):
+            dead.append((nodes[index + 1], node.kind))
             break
     for node in nodes:
         dead.extend(_unreachable_in(_children(node)))
@@ -245,8 +245,8 @@ def unused_globals(functions, top):
 def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
-    for node in unreachable(functions):
-        warnings.append((f"unreachable statement after output", node))
+    for node, terminator in unreachable(functions):
+        warnings.append((f"unreachable statement after {terminator}", node))
     for node, name in unused_locals(functions):
         warnings.append((f"unused local '{name}'", node))
     for node, operator in divides_by_zero(functions, top):
