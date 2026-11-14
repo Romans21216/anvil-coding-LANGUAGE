@@ -1,12 +1,28 @@
 fn(count-words, text)
+  # Space, tab, newline and carriage return all separate words, so text read
+  # from a file counts the same as text typed on one line.
   set local(count) = 0
   set local(in_word) = 0
   set local(i) = 0
   while local(i) < len(var(text))
-    if mid(var(text), local(i), 1) = " "
+    set local(code) = ord(mid(var(text), local(i), 1))
+    set local(break) = 0
+    if local(code) = 32
+      set local(break) = 1
+    end
+    if local(code) = 9
+      set local(break) = 1
+    end
+    if local(code) = 10
+      set local(break) = 1
+    end
+    if local(code) = 13
+      set local(break) = 1
+    end
+    if local(break) = 1
       set local(in_word) = 0
     end
-    if mid(var(text), local(i), 1) != " "
+    if local(break) = 0
       if local(in_word) = 0
         set local(count) = local(count) + 1
         set local(in_word) = 1

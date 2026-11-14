@@ -12,7 +12,7 @@ library import text
 | `center(text, width)` | spaces on both sides |
 | `capitalize(text)` | first letter upper, the rest untouched |
 | `index-of(text, needle)` | position of the first match, or `-1` |
-| `count-words(text)` | words separated by single spaces |
+| `count-words(text)` | words separated by spaces, tabs, newlines or carriage returns |
 | `is-palindrome(text)` | `1` when it reads the same backwards |
 | `left-of(text, separator)` | everything before the first separator (the whole text if absent) |
 | `right-of(text, separator)` | everything after it (empty if absent) |

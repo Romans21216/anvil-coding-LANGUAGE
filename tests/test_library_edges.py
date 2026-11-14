@@ -46,6 +46,7 @@ CALLS = [
     ("left-of(abc,x)", 'call fn(left-of, "abc", "x")'),
     ("right-of(abc,x)", 'call fn(right-of, "abc", "x")'),
     ("count-words(spaces)", 'call fn(count-words, "   ")'),
+    ("count-words(tabs)", 'call fn(count-words, "a\\tb\\nc")'),
     ("is-palindrome(empty)", 'call fn(is-palindrome, "")'),
     ("pad-right(long,3)", 'call fn(pad-right, "abcdef", 3)'),
     ("center(ab,3)", 'call fn(center, "ab", 3)'),
@@ -91,6 +92,7 @@ EXPECTED = [
     "[abc]",                    # left-of with no separator
     "[]",                       # right-of with no separator
     "0",                        # count-words of blanks
+    "3",                        # tab and newline separate words too
     "1",                        # the empty text is a palindrome
     "[abcdef]",                 # pad-right never truncates
     "[ab ]",                    # center of an odd width pads right
