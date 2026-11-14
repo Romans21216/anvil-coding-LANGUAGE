@@ -310,9 +310,10 @@ def main() -> int:
             print(f"{source_path}: ok")
             return 0
         if args.backend == "native":
-            if args.emit_c or args.generated_c or args.cc or args.release or args.dynamic_runtime:
+            if args.emit_c or args.generated_c or args.cc or args.debug or args.dynamic_runtime:
                 raise CompileError(
-                    "--emit-c, --generated-c, --cc, and --release apply only to --backend c"
+                    "--emit-c, --generated-c, --cc, --debug and --dynamic-runtime apply only "
+                    "to --backend c"
                 )
             executable = NativeCodegen(
                 source_path, funcs, top, variables, arrays

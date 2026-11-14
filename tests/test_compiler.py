@@ -1188,7 +1188,7 @@ class CompilerTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("type-error.ANVL:2:", result.stderr)
-            self.assertIn("expected number, got string", result.stderr)
+            self.assertIn("expected a number, got a string", result.stderr)
 
     def test_malformed_expression_is_rejected_by_anvil_parser(self):
         with tempfile.TemporaryDirectory() as temp:

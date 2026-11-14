@@ -29,7 +29,7 @@ REFUSED = {
     ),
     "text if condition": (
         'fn(main)\n  if "yes"\n    say 1\n  end\nend\ncall fn(main)\n',
-        "expected number, got string",
+        "expected a number, got a string",
     ),
     "duplicate parameter": (
         "fn(f, a, a)\n  output var(a)\nend\nfn(main)\n  say 1\nend\ncall fn(main)\n",

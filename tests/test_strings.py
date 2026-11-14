@@ -114,7 +114,7 @@ class StringErrorTests(unittest.TestCase):
         # Lowering happens during code generation, not at parse time.
         with self.assertRaises(CompileError) as caught:
             run_c('fn(main)\n  set var(name) = "Ada"\n  output var(name)\nend\ncall fn(main)\n')
-        self.assertIn("expected number", str(caught.exception))
+        self.assertIn("expected a number", str(caught.exception))
 
 class NativeStringRuntimeTests(NativeRunMixin, unittest.TestCase):
     def test_len_of_a_join_and_long_builtin_joins(self) -> None:

@@ -730,8 +730,15 @@ class ExpressionParser:
             )
         code, actual = result
         if actual != expected:
+            article = {
+                "number": "a number",
+                "text": "a string",
+                "string": "a string",
+                "bool": "a bool",
+            }
             raise CompileError(
-                f"{self.path}:{self.line}: expected {expected}, got {actual}"
+                f"{self.path}:{self.line}: expected {article.get(expected, expected)}, "
+                f"got {article.get(actual, actual)}"
             )
         return code
 

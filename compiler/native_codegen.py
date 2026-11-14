@@ -728,7 +728,22 @@ class _Expression:
 
     def _require_number(self, value: _Value) -> None:
         if value.kind != "number":
-            raise CompileError(f"{self.owner.path}:{self.line}: expected a number")
+            got = "a string" if value.kind == "text" else f"a {value.kind}"
+            raise CompileError(
+                f"{self.owner.path}:{self.line}: expected a number, got {got}"
+            )
+
+
+_WHOLE_STRING = __import__("re").compile(r'"(?:[^"\\]|\\.)*"')
+
+
+def _is_whole_string_literal(text: str) -> bool:
+    """True only for a part that is exactly one string literal.
+
+    A part like '"a" + 1' starts with a quote but is an expression; treating it
+    as a literal printed the source text minus its outer characters.
+    """
+    return _WHOLE_STRING.fullmatch(text.strip()) is not None
 
 
 def _EXTENSION_TABLE():
@@ -1561,7 +1576,7 @@ class NativeCodegen:
                         self.code.mov_reg(1, 0)   # rcx = text pointer
                         self.code.call("function:anvil_print_text")
                         self.pop_temp()
-                    elif part.startswith('"'):
+                    elif _is_whole_string_literal(part):
                         payload = decode_string(part).encode("utf-8")
                         if payload not in self._text_cache:
                             self._text_cache[payload] = self.reserve_data(payload)
