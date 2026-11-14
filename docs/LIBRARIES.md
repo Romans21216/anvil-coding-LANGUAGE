@@ -12,9 +12,10 @@ end
 call fn(main)
 ```
 
-`library import math` looks beside the entry file for a folder named
-`libraries-math` (or `libraries/math`), finds `gcd.ANVL`, and that file must
-define `fn(gcd, ...)`.
+`library import math` looks for a folder named `libraries-math` (or
+`libraries/math`), starting beside the file that wrote the line and then walking
+up its parent folders. It finds `gcd.ANVL`, and that file must define
+`fn(gcd, ...)`.
 
 ## What gets compiled
 
@@ -34,14 +35,41 @@ programs that use one of them.
 
 - **One function per file**, named after the file: `lcm.ANVL` must contain
   `fn(lcm, ...)`. A file that defines something else is rejected, and so is a
-  file that defines more than one function.
+  file that defines more than one function. Functions the file *imports* do not
+  count against it.
 - **Functions are called normally**: `call fn(gcd, 48, 18)`. A library function
   is not a builtin; it is an ordinary Anvil function that happens to live on disk.
 - **Names must not collide** with a function the program already defines, or with
   another imported library.
+- **Importing the same library twice is harmless**; the function is registered
+  once.
 - **A missing library says where it looked**:
   `library 'algebra' not found; expected a folder named libraries-algebra or
-  libraries/algebra beside main.ANVL`.
+  libraries/algebra beside main.ANVL or in a parent folder`.
+
+## A library can import another library
+
+A library file may declare its own dependency, and the search starts in that
+file's folder and then walks up, so a folder at the project root is found:
+
+```
+project/
+  main.ANVL                    library import a
+  libraries-a/
+    f.ANVL                     library import b     ← finds libraries-b upward
+  libraries-b/
+    g.ANVL                     fn(g, a) … end
+```
+
+`main` calls `f`, `f` calls `g`, and `main` never mentions `b`. The imported
+functions travel with the file that needs them.
+
+## Included files keep their imports
+
+A file pulled in with `include fn(ratio) -- "ratio.ANVL"` carries the
+`library import` lines at the top of *that* file, resolved beside it. The entry
+program does not have to repeat the dependency. Whole-file includes
+(`include "ratio.ANVL"`) have always behaved this way.
 
 ## Layout
 
