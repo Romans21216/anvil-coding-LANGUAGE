@@ -178,5 +178,62 @@ class ListNativeTests(NativeRunMixin, unittest.TestCase):
         )
 
 
+class ListReadBoundsTests(unittest.TestCase):
+    """Reading past the used count is an error, not a silent zero.
+
+    A list holds 256 slots, but only `count` of them mean anything. Before this
+    test existed, `array(nums, 3)` on a one-element list returned 0 on both
+    backends, which is indistinguishable from a stored 0.
+    """
+
+    PAST = (
+        "list nums\n\nfn(main)\n  add nums 5\n  say array(nums, 3)\nend\n"
+        "call fn(main)\n"
+    )
+    VALID = (
+        "list nums\n\nfn(main)\n  add nums 5\n  add nums 7\n"
+        "  say array(nums, 0)\n  say array(nums, 1)\nend\ncall fn(main)\n"
+    )
+
+    def test_c_refuses_a_slot_past_the_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = pathlib.Path(temp)
+            source = temp_path / "past.ANVL"
+            source.write_text(self.PAST, encoding="utf-8")
+            functions, top, variables, arrays = parse(source, self.PAST)
+            c_file = temp_path / "past.c"
+            c_file.write_text(
+                emit_c(source, functions, top, variables, arrays), encoding="utf-8"
+            )
+            compiler = find_compiler(None)
+            if compiler is None:
+                raise unittest.SkipTest("MSVC is not available")
+            executable = temp_path / "past.exe"
+            build_c(compiler[1], c_file, executable, release=True)
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=15
+            )
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("list index 3 is outside 0..0", result.stderr)
+
+    def test_native_refuses_a_slot_past_the_count(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "past.ANVL"
+            path.write_text(self.PAST, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, self.PAST)
+            executable = pathlib.Path(temp) / "past.exe"
+            executable.write_bytes(
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+            )
+            result = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=5
+            )
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("list index", result.stderr)
+
+    def test_a_valid_slot_still_reads_its_value(self) -> None:
+        self.assertEqual(run_c(self.VALID), "5\n7\n")
+
+
 if __name__ == "__main__":
     unittest.main()

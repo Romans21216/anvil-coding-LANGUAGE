@@ -2084,6 +2084,18 @@ void anvil_array_set(double *values, int size, double index, double value,
   values[anvil_array_checked_index(values, size, index, source, line)] = value;
 }
 
+/* Lists are arrays with a used count. Reading past the count is a mistake even
+   though the slot exists, so it gets the same treatment as text lists. */
+double anvil_list_get(const double *values, int index, double count,
+                      const char *path, int line) {
+  if (!values || index < 0 || index >= (int)count) {
+    fprintf(stderr, "%s:%d: list index %d is outside 0..%d\n", path, line, index,
+            (int)count - 1);
+    exit(2);
+  }
+  return values[index];
+}
+
 
 
 #define ANVIL_TEXT_BUFFERS 64

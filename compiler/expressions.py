@@ -508,6 +508,15 @@ class ExpressionParser:
                     f"{json.dumps(str(self.path))}, {self.line})",
                     "string",
                 )
+            elif name in LISTS:
+                # A list's size is its used count, not the 256-slot capacity: a
+                # slot past the count reads as 0, which hides the mistake.
+                left = (
+                    f"anvil_list_get({array_code(name, self.scope)}, "
+                    f"(int)({index_expr}), {c_name(name)}__count, "
+                    f"{json.dumps(str(self.path))}, {self.line})",
+                    "number",
+                )
             else:
                 size = array_size(name, self.scope, self.arrays)
                 if size is None:

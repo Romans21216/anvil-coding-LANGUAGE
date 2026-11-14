@@ -167,6 +167,11 @@ class _Expression:
                     parts[0], parts[1], self.line, self.scope
                 )
                 left = _Value("text", "text-array")
+            elif parts[0] in LISTS:
+                self.owner.emit_list_read(
+                    parts[0], parts[1], self.line, self.scope
+                )
+                left = _Value("number", "list-array")
             else:
                 self.owner.emit_array_read(
                     parts[0], parts[1], self.line, self.scope
@@ -1105,6 +1110,18 @@ class NativeCodegen:
         self.code.bytes(b"\x48\xc1\xe0\x08")               # shl rax, 8
         self.code.rip_lea_data(2, block)                      # lea rdx,[block]
         self.code.bytes(b"\x48\x01\xd0")                    # add rax, rdx -> text
+
+    def emit_list_read(self, name: str, raw_index: str, line: int, scope) -> None:
+        """array(list, i) on a numeric list: checked against the used count.
+
+        The slot exists up to the 256-entry capacity, so reading past the count
+        would quietly yield 0; the guard makes it the same mistake as text lists.
+        """
+        self.emit_expression(raw_index, line, scope)          # xmm0 = index
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")           # cvttsd2si rax,xmm0
+        self._guard_read_index(name, line)                    # 0 <= rax < count
+        self._lea_array_base(2, name, scope)                  # lea rdx,[values]
+        self.code.bytes(b"\xf2\x0f\x10\x04\xc2")           # movsd xmm0,[rdx+rax*8]
 
     def store_local(self, name: str) -> None:
         if name.startswith("_temporary_"):
