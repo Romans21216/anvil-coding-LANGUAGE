@@ -50,7 +50,22 @@ Ahead-of-time compilation removes VM dispatch from generated function calls. MSV
 
 ## Native backend limits
 
-The direct backend currently handles simple numeric functions, up to four numeric parameters, arithmetic except remainder, comparisons, short-circuit Boolean operators, `if`, `while`, inclusive ascending/descending `for` loops, numeric locals/globals, and console output rounded to six fractional digits. It does not yet include arrays, project files, 2D/3D graphics, camera/input, ray tracing, physics, noise, multiplayer, or the engine runtime. The fractional-output change was independently reviewed in commit `f330d4b`; the current unreviewed candidate also rejects output values outside its signed 64-bit formatting range with a controlled error. The backend is not the default until the remaining features are ported and verified.
+The direct backend handles console programs (numeric functions with up to sixteen
+parameters, arithmetic including remainder, comparisons, short-circuit Boolean
+operators, `if`/`while`/`for`, numeric and text locals and globals, arrays and text
+lists, and output rounded to six fractional digits) and a `scene 2d` window whose
+drawing is limited to `display rect`.
+
+Not ported yet: `scene 3d`, physics, image calls, ray tracing, network receive, and
+`net_host`/`net_join` inside a native scene. Each refusal names the missing feature
+and points at the other backend, for example
+`body_force() is not available in the native x64 backend yet; build with --backend c`
+or `native 2D graphics currently supports display rect only`.
+
+Output values outside its signed 64-bit formatting range (about 9.2e18) stop with a
+controlled error instead of printing; the C backend prints the full decimal
+expansion. The backend is not the default until the remaining features are ported
+and verified.
 
 ## Output size
 
