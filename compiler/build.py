@@ -28,7 +28,11 @@ def find_compiler(requested: str | None):
 
 
 def build_c(
-    compiler: str, generated: pathlib.Path, output: pathlib.Path, release: bool
+    compiler: str,
+    generated: pathlib.Path,
+    output: pathlib.Path,
+    release: bool,
+    libraries=(),
 ):
     output.parent.mkdir(parents=True, exist_ok=True)
     if pathlib.Path(compiler).name.lower() == "cl.exe":
@@ -45,6 +49,9 @@ def build_c(
             "/Fo:" + str(obj_dir) + "\\",
             "/O2" if release else "/Od",
         ]
+        if libraries:
+            args.append("/link")
+            args.extend(str(library) for library in libraries)
         install_root = pathlib.Path(compiler).parents[7]
         devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
         if os.name == "nt" and devcmd.exists():

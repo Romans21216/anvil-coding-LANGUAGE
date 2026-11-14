@@ -650,6 +650,27 @@ class _Expression:
             self._expect(")")
             self.owner.code.call("function:random-pipeline")   # xmm0 = mixed value
             return "number"
+        if name in _EXTENSION_TABLE():
+            owner, function = _EXTENSION_TABLE()[name]
+            if owner.kind != "dll":
+                raise CompileError(
+                    f"{self.owner.path}:{self.line}: {name}() is an Anvil extension; "
+                    "call it with call fn(...) instead"
+                )
+            base_depth = self.owner._scratch_depth
+            slots = []
+            for index in range(function.arity):
+                if index:
+                    self._expect(",")
+                self._require_number(self.emit())
+                slot = self.owner.push_temp()
+                self.owner.store_local(slot)
+                slots.append(slot)
+            self._expect(")")
+            self.owner._extension_imports.append((owner.dll.name, function.symbol))
+            self.owner.emit_saved_call(f"import:{function.symbol}", slots)
+            self.owner._scratch_depth = base_depth
+            return "number"
         if name in self.owner._math.ARITY:
             self.owner._math.emit_builtin(self, name)
             return "number"
@@ -708,6 +729,12 @@ class _Expression:
     def _require_number(self, value: _Value) -> None:
         if value.kind != "number":
             raise CompileError(f"{self.owner.path}:{self.line}: expected a number")
+
+
+def _EXTENSION_TABLE():
+    from compiler import extensions
+
+    return extensions.extension_functions()
 
 
 _NATIVE_VAR = __import__("re").compile(r"var\(([A-Za-z_][\w-]*)\)")
@@ -818,6 +845,7 @@ class NativeCodegen:
         self.variables = variables
         self.arrays = arrays or {}
         self.code = X64Code()
+        self._extension_imports: list[tuple[str, str]] = []
         self._error_messages = {}
         self._text_cache: dict[bytes, int] = {}
         self._needs_text_helper = False
@@ -1337,7 +1365,10 @@ class NativeCodegen:
         for index, slot in enumerate(slots[:4]):
             displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
             self.code.bytes(self._memory_operand(index, 5, displacement))
-        self.code.call(f"function:{name}")
+        if name.startswith("import:"):
+            self.code.rip_call_import(name[len("import:"):])
+        else:
+            self.code.call(f"function:{name}")
         self.code.bytes(b"\x48\x81\xc4" + struct.pack("<I", shadow))
 
     def emit_expression(
@@ -2753,7 +2784,7 @@ class NativeCodegen:
         self.code.bytes(b"\x31\xc9")
         self.code.rip_call_import("ExitProcess")
         self.code.bytes(b"\xcc")
-        return self._build(list(self.IMPORTS))
+        return self._build(list(self.IMPORTS) + list(self._extension_imports))
 
     def _generate_window(self) -> bytes:
         from compiler.native_window import NativeWindow
@@ -2791,7 +2822,9 @@ class NativeCodegen:
         self._emit_function("native:setup", Node("function", 1, name="native:setup", body=setup))
         self._math.emit_pending()
         self._window.emit()
-        return self._build(list(self.IMPORTS) + self._window.imports)
+        return self._build(
+            list(self.IMPORTS) + list(self._extension_imports) + self._window.imports
+        )
 
     def _build(self, imports: list[tuple[str, str]]) -> bytes:
         pe = Pe32Plus(bytes(self.code.code), imports)

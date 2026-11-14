@@ -60,6 +60,18 @@ def store_build(generated: str, compiler: str, out: pathlib.Path, release: bool)
     shutil.copyfile(out, entry)
 
 
+def _place_extension_dlls(output: pathlib.Path) -> None:
+    """Copy each registered DLL beside the executable the loader will start."""
+    import shutil
+
+    from compiler import extensions as extension_api
+
+    for dll in extension_api.dlls():
+        target = output.parent / dll.name
+        if dll.resolve() != target.resolve():
+            shutil.copyfile(dll, target)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=(
@@ -95,6 +107,15 @@ def main() -> int:
         help="select the C toolchain or experimental Anvil-owned x64 PE backend",
     )
     ap.add_argument(
+        "--extension",
+        action="append",
+        metavar="MANIFEST",
+        help=(
+            "register an extension function manifest (repeatable); functions "
+            "become callable like builtins on both backends"
+        ),
+    )
+    ap.add_argument(
         "--repl",
         action="store_true",
         help="start the interactive Anvil shell instead of compiling a file",
@@ -111,6 +132,15 @@ def main() -> int:
         help="backend the interactive shell uses (default: native)",
     )
     args = ap.parse_args()
+    from compiler import extensions as extension_api
+
+    extension_api.reset()
+    if args.extension:
+        try:
+            extension_api.load(args.extension)
+        except extension_api.ExtensionError as error:
+            print(str(error), file=sys.stderr)
+            return 2
     if args.hello:
         from compiler.repl import hello_main
 
@@ -192,6 +222,17 @@ def main() -> int:
                 f"cannot read {source_path}: the file is not valid UTF-8 ({error.reason} at byte {error.start})"
             ) from error
         funcs, top, variables, arrays = parse(source_path, source, include_root=include_root)
+        for provided in extension_api.anvil_sources():
+            provided_source = provided.read_text(encoding="utf-8")
+            provided_functions, provided_top, _, _ = parse(provided, provided_source)
+            for name, function in provided_functions.items():
+                if name in funcs:
+                    raise CompileError(
+                        f"{provided}: extension function {name!r} already exists "
+                        f"in {source_path.name}"
+                    )
+                funcs[name] = function
+            top = top + provided_top
         if args.check:
             # Lowering (type) errors only surface in code generation, so a
             # parse-only check reported "ok" for programs that cannot build.
@@ -215,6 +256,7 @@ def main() -> int:
             out = args.output or source_path.with_suffix(".exe")
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(executable)
+            _place_extension_dlls(out)
             print(f"Built {out} as native AMD64 PE (no C/Rust compiler)")
             return 0
         generated = emit_c(
@@ -238,13 +280,26 @@ def main() -> int:
             )
             return 2
         out = args.output or source_path.with_suffix(".exe")
-        cached = cached_build(generated, compiler[1], out, args.release)
-        if cached:
-            print(f"Built {out} using {compiler[0]} (reused build cache)")
-        else:
-            build_c(compiler[1], c_path, out, args.release)
-            store_build(generated, compiler[1], out, args.release)
+        try:
+            extension_api.ensure_import_libraries(pathlib.Path(compiler[1]))
+        except extension_api.ExtensionError as error:
+            print(str(error), file=sys.stderr)
+            return 2
+        libraries = extension_api.libraries()
+        if libraries:
+            # The generated C only names the extension symbols, so the cache key
+            # would miss a rebuilt DLL; always link when extensions are present.
+            build_c(compiler[1], c_path, out, args.release, libraries)
             print(f"Built {out} using {compiler[0]}")
+        else:
+            cached = cached_build(generated, compiler[1], out, args.release)
+            if cached:
+                print(f"Built {out} using {compiler[0]} (reused build cache)")
+            else:
+                build_c(compiler[1], c_path, out, args.release)
+                store_build(generated, compiler[1], out, args.release)
+                print(f"Built {out} using {compiler[0]}")
+        _place_extension_dlls(out)
         return 0
     except tomllib.TOMLDecodeError as e:
         print(f"{args.source}: {e}", file=sys.stderr)

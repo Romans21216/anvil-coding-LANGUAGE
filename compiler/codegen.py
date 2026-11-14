@@ -616,6 +616,9 @@ def emit_c(
         "#include <stdlib.h>",
         "",
     ]
+    from compiler import extensions as _extensions
+
+    lines += _extensions.c_declarations()
     lines += [
         f"static double {c_name(name)};"
         for name in sorted(variables - string_variables)
