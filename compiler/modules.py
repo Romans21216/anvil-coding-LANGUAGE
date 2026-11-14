@@ -152,6 +152,23 @@ def load_program(path, source, *, include_root=None):
                             f"{unit_path}:{node.line}: duplicate function {qualified!r}"
                         )
                     result.functions[qualified] = _requalify(function, wanted, qualifier)
+                # A selectively included file may declare its own library
+                # imports; carry them, resolved beside the file that wrote them,
+                # so the file can state the dependency it actually has.
+                from compiler import libraries as library_loader
+
+                for extra in module.top:
+                    if getattr(extra, "kind", "") != "library_import":
+                        continue
+                    for lib_name, lib_function in library_loader.load(
+                        target, extra.value, target, extra.line
+                    ):
+                        if lib_name in result.functions:
+                            raise CompileError(
+                                f"{target}:{extra.line}: library {extra.value!r} "
+                                f"defines {lib_name!r}, which already exists in the program"
+                            )
+                        result.functions[lib_name] = lib_function
             elif node.kind == "include":
                 relative = include_name(node.value, unit_path, node.line)
                 target = (canonical.parent / relative).resolve()

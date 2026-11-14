@@ -158,6 +158,27 @@ class LibraryTests(unittest.TestCase):
         definition = "anvil_gcd(double anvil_gcd__a, double anvil_gcd__b) {"
         self.assertEqual(generated.count(definition), 1)
 
+    def test_a_selectively_included_file_keeps_its_own_library_import(self) -> None:
+        # The file states the dependency it has; the entry file should not have to
+        # repeat it.
+        (self.base / "ratio.ANVL").write_text(
+            "library import math\n\n"
+            "fn(ratio, a, b)\n"
+            "  output call fn(gcd, var(a), var(b))\n"
+            "end\n",
+            encoding="utf-8",
+        )
+        source = (
+            'include fn(ratio) -- "ratio.ANVL"\n\n'
+            "fn(main)\n  say call fn(ratio--ratio, 48, 18)\nend\ncall fn(main)\n"
+        )
+        path = self._write_main(source)
+        functions, top, variables, arrays = parse(path, source)
+        self.assertIn("gcd", functions)
+        generated = emit_c(path, functions, top, variables, arrays)
+        self.assertIn("anvil_gcd", generated)
+        self.assertIn("anvil_ratio__ratio", generated)
+
 
 if __name__ == "__main__":
     unittest.main()
