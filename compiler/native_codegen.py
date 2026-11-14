@@ -2686,8 +2686,9 @@ class NativeCodegen:
         if any(node.kind == "scene" for node in self.top):
             return self._generate_window()
         calls = [node for node in self.top if node.kind == "call"]
-        if any(node.kind not in ("call", "seed", "set") for node in self.top):
-            unsupported = next(node for node in self.top if node.kind not in ("call", "seed", "set"))
+        allowed = ("call", "seed", "set", "import")
+        if any(node.kind not in allowed for node in self.top):
+            unsupported = next(node for node in self.top if node.kind not in allowed)
             raise CompileError(
                 f"{unsupported.source or self.path}:{unsupported.line}: top-level configuration is not implemented by the native x64 backend yet"
             )

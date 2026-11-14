@@ -101,6 +101,11 @@ def main() -> int:
         help="parse and validate only; report problems without building an output",
     )
     ap.add_argument(
+        "--print-imports",
+        action="store_true",
+        help="print the builtins this program actually uses and stop",
+    )
+    ap.add_argument(
         "--backend",
         choices=("c", "native"),
         default="c",
@@ -233,6 +238,12 @@ def main() -> int:
                     )
                 funcs[name] = function
             top = top + provided_top
+        if args.print_imports:
+            from compiler.builtin_usage import used_builtins
+
+            resolved = used_builtins(funcs, top)
+            print("builtins: " + (", ".join(resolved) or "none"))
+            return 0
         if args.check:
             # Lowering (type) errors only surface in code generation, so a
             # parse-only check reported "ok" for programs that cannot build.

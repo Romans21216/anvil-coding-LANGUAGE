@@ -607,8 +607,12 @@ def emit_c(
         functions, top, graphical=graphical, extra=("random-pipeline",)
     ))
     string_variables = set(STRING_VARIABLES)
+    from compiler.builtin_usage import used_builtins
+
+    resolved = used_builtins(functions, top)
     lines = [
         "/* Generated from Anvil source. The .ANVL source remains the program. */",
+        "/* builtins used: " + (", ".join(resolved) or "none") + " */",
         '#include "anvil_runtime.h"',
         "#include <math.h>",
         "#include <stdio.h>",
@@ -769,6 +773,7 @@ def emit_c(
             "net_host",
             "net_join",
             "call",
+            "import",
         )
     ]
     if invalid:

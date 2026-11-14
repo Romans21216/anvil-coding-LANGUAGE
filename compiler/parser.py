@@ -103,6 +103,20 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             include_name(raw_name, path, line_no)
             top.append(Node("include", line_no, value=raw_name, source=path))
             continue
+        imported = re.fullmatch(r"import\s+([A-Za-z_][\w-]*)", line)
+        if imported:
+            if len(stack) != 1:
+                raise CompileError(f"{path}:{line_no}: import must be at top level")
+            module = imported.group(1)
+            from compiler.builtin_usage import BUILTIN_MODULES
+
+            if module not in BUILTIN_MODULES:
+                known = ", ".join(sorted(BUILTIN_MODULES))
+                raise CompileError(
+                    f"{path}:{line_no}: unknown import {module!r}; available: {known}"
+                )
+            top.append(Node("import", line_no, value=module, source=path))
+            continue
         for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", line):
             variable_references.append(
                 (
