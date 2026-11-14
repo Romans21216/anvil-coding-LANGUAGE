@@ -1,4 +1,5 @@
 /* Generated from Anvil source. The .ANVL source remains the program. */
+/* builtins used: pressed, receive */
 #include "anvil_runtime.h"
 #include <math.h>
 #include <stdio.h>
@@ -6,16 +7,17 @@
 #include <stdlib.h>
 
 static double anvil_local_count;
+static double anvil_net_ok;
 static double anvil_peer_count;
 static double anvil_update(void);
 static double anvil_draw(void);
 
 static double anvil_update(void) {
-    if (anvil_check_number((anvil_pressed ( ANVIL_KEY_SPACE )), "examples\\network_counter.ANVL", 10) != 0.0) {
-        anvil_local_count = anvil_check_number((anvil_local_count + 1.0), "examples\\network_counter.ANVL", 11);
+    if (anvil_check_number((anvil_pressed ( ANVIL_KEY_SPACE )), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\network_counter.ANVL", 10) != 0.0) {
+        anvil_local_count = anvil_check_number((anvil_local_count + 1.0), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\network_counter.ANVL", 11);
     }
-    anvil_net_send(anvil_local_count);
-    anvil_peer_count = anvil_check_number((anvil_net_receive ( )), "examples\\network_counter.ANVL", 14);
+    anvil_net_ok = (double)anvil_net_send(anvil_local_count);
+    anvil_peer_count = anvil_check_number((anvil_net_receive ( )), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\network_counter.ANVL", 14);
     return 0.0;
 }
 
@@ -33,7 +35,7 @@ int main(void) {
     anvil_set_fixed_hz(60);
     anvil_set_scene3d(0);
     anvil_clear(13.0, 19.0, 31.0, 255.0);
-    (void)anvil_net_host(7777);
+    anvil_net_ok = (double)anvil_net_host(7777);
     anvil_local_count = 0.0;
     anvil_peer_count = 0.0;
     anvil_run(anvil_update, anvil_draw, "Anvil Game");

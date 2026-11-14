@@ -1,4 +1,5 @@
 /* Generated from Anvil source. The .ANVL source remains the program. */
+/* builtins used: delta, pressed */
 #include "anvil_runtime.h"
 #include <math.h>
 #include <stdio.h>
@@ -11,9 +12,9 @@ static double anvil_update(void);
 static double anvil_draw(void);
 
 static double anvil_update(void) {
-    anvil_spin = anvil_check_number(((anvil_check_number((anvil_spin), "examples\\first_world.ANVL", 12) + anvil_check_number((anvil_check_number((anvil_delta ( )), "examples\\first_world.ANVL", 12)), "examples\\first_world.ANVL", 12))), "examples\\first_world.ANVL", 12);
-    if (anvil_check_number((anvil_pressed ( ANVIL_KEY_SPACE )), "examples\\first_world.ANVL", 13) != 0.0) {
-        anvil_score = anvil_check_number((anvil_score + 1.0), "examples\\first_world.ANVL", 14);
+    anvil_spin = anvil_check_number(((anvil_check_number((anvil_spin), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\first_world.ANVL", 12) + anvil_check_number((anvil_check_number((anvil_delta ( )), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\first_world.ANVL", 12)), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\first_world.ANVL", 12))), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\first_world.ANVL", 12);
+    if (anvil_check_number((anvil_pressed ( ANVIL_KEY_SPACE )), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\first_world.ANVL", 13) != 0.0) {
+        anvil_score = anvil_check_number((anvil_score + 1.0), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\first_world.ANVL", 14);
     }
     return 0.0;
 }

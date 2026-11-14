@@ -139,7 +139,9 @@ An import that contributes nothing is a warning, not silence: `import math` in a
 Beyond imports, two more mistakes are reported rather than executed: a
 statement after `output` in the same block (it can never run) and a `set local`
 that nothing ever reads. Loop counters are exempt, because `for local(i) = ...`
-exists to drive the loop. Dividing by a literal zero is reported the same way: `1 / 0` yields
+exists to drive the loop. A function with no `output` still runs, but its value is 0; using that
+value (as in `say call fn(f, 1)`) is a warning rather than a silent zero.
+ Dividing by a literal zero is reported the same way: `1 / 0` yields
 infinity at run time, so the compiler says so at build time instead of
 letting it pass silently. Both use the same warning channel with the source line
 and a caret, and both fail the build under `--deny-warnings`.

@@ -87,6 +87,40 @@ def divides_by_zero(functions, top):
     return found
 
 
+def _has_output(body) -> bool:
+    return any(node.kind == "output" for node in _walk(body))
+
+
+def silent_zero_calls(functions, top):
+    """Calls that use a function with no output as if it returned a value.
+
+    A function without ``output`` still runs, and its value is 0. Using that as
+    a number is almost always a missing ``output`` rather than a zero.
+    """
+    warnings = []
+    silent = {
+        name for name, function in functions.items() if not _has_output(function.body)
+    }
+    if not silent:
+        return warnings
+    nodes = list(top)
+    for function in functions.values():
+        nodes.extend(_walk(function.body))
+    for node in nodes:
+        if getattr(node, "kind", "") == "call":
+            continue   # a bare call statement discards the value on purpose
+        text = _text_of(node)
+        for name in sorted(silent):
+            if re.search(r"call\s+fn\(\s*" + re.escape(name) + r"\b", text):
+                warnings.append(
+                    (
+                        f"function '{name}' has no output, so this call yields 0",
+                        node,
+                    )
+                )
+    return warnings
+
+
 def report(functions, top=()) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
@@ -97,4 +131,5 @@ def report(functions, top=()) -> list[tuple[str, object]]:
     for node, operator in divides_by_zero(functions, top):
         what = "division by zero" if operator == "/" else "remainder by zero"
         warnings.append((what, node))
+    warnings.extend(silent_zero_calls(functions, top))
     return warnings

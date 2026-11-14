@@ -1,4 +1,5 @@
 /* Generated from Anvil source. The .ANVL source remains the program. */
+/* builtins used: none */
 #include "anvil_runtime.h"
 #include <math.h>
 #include <stdio.h>
@@ -19,14 +20,14 @@ static double anvil_main(void) {
             while (((_anvil_for_step_anvil_main_4 > 0.0 && anvil_main__index <= _anvil_for_end_anvil_main_4) || (_anvil_for_step_anvil_main_4 < 0.0 && anvil_main__index >= _anvil_for_end_anvil_main_4))) {
                 {
                     const double _anvil_array_index_anvil_main_5 = anvil_main__index;
-                    const double _anvil_array_value_anvil_main_5 = anvil_check_number(((anvil_check_number((anvil_main__index), "examples\\arrays.ANVL", 5) * anvil_check_number((10.0), "examples\\arrays.ANVL", 5))), "examples\\arrays.ANVL", 5);
-                    anvil_array_set(anvil_scores, 4, _anvil_array_index_anvil_main_5, _anvil_array_value_anvil_main_5, "examples\\arrays.ANVL", 5);
+                    const double _anvil_array_value_anvil_main_5 = anvil_check_number(((anvil_check_number((anvil_main__index), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 5) * anvil_check_number((10.0), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 5))), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 5);
+                    anvil_array_set(anvil_scores, 4, _anvil_array_index_anvil_main_5, _anvil_array_value_anvil_main_5, "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 5);
                 }
-                anvil_main__index = anvil_check_number((anvil_main__index + _anvil_for_step_anvil_main_4), "examples\\arrays.ANVL", 4);
+                anvil_main__index = anvil_check_number((anvil_main__index + _anvil_for_step_anvil_main_4), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 4);
             }
         }
     }
-    return anvil_check_number(((anvil_check_number((anvil_array_get(anvil_scores, 4, 2.0, "examples\\arrays.ANVL", 7)), "examples\\arrays.ANVL", 7) + anvil_check_number((anvil_array_get(anvil_scores, 4, 3.0, "examples\\arrays.ANVL", 7)), "examples\\arrays.ANVL", 7))), "examples\\arrays.ANVL", 7);
+    return anvil_check_number(((anvil_check_number((anvil_array_get(anvil_scores, 4, 2.0, "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 7)), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 7) + anvil_check_number((anvil_array_get(anvil_scores, 4, 3.0, "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 7)), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 7))), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\arrays.ANVL", 7);
 }
 
 int main(void) {

@@ -1,4 +1,5 @@
 /* Generated from Anvil source. The .ANVL source remains the program. */
+/* builtins used: max, min */
 #include "anvil_runtime.h"
 #include <math.h>
 #include <stdio.h>
@@ -7,7 +8,6 @@
 
 static double anvil_main(void);
 static double anvil_scale_value(double anvil_scale_value__value, double anvil_scale_value__factor);
-static double anvil_optional_pointer_x(void);
 static double anvil_clamp_value(double anvil_clamp_value__value, double anvil_clamp_value__minimum, double anvil_clamp_value__maximum);
 
 static double anvil_main(void) {
@@ -16,10 +16,6 @@ static double anvil_main(void) {
 
 static double anvil_scale_value(double anvil_scale_value__value, double anvil_scale_value__factor) {
     return anvil_check_number(((anvil_check_number((anvil_scale_value__value), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\lib\\numbers.ANVL", 3) * anvil_check_number((anvil_scale_value__factor), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\lib\\numbers.ANVL", 3))), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\lib\\numbers.ANVL", 3);
-}
-
-static double anvil_optional_pointer_x(void) {
-    return anvil_check_number((anvil_mouse_x ( )), "C:\\Users\\power\\Documents\\buld\\os\\toolchain\\anvil\\examples\\lib\\numbers.ANVL", 8);
 }
 
 static double anvil_clamp_value(double anvil_clamp_value__value, double anvil_clamp_value__minimum, double anvil_clamp_value__maximum) {

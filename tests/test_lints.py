@@ -121,5 +121,31 @@ class LintTests(unittest.TestCase):
         self.assertIn("1 warning(s) treated as errors", result.stderr)
 
 
+    def test_a_value_call_to_a_function_without_output_is_reported(self) -> None:
+        source = (
+            "fn(f, a)\n  say var(a)\nend\n"
+            "fn(main)\n  say call fn(f, 7)\nend\ncall fn(main)\n"
+        )
+        _, functions, top = parse_source(source, self.base)
+        messages = [message for message, _ in report(functions, top)]
+        self.assertIn("function 'f' has no output, so this call yields 0", messages)
+
+    def test_a_statement_call_to_a_function_without_output_is_fine(self) -> None:
+        source = (
+            "fn(show, a)\n  say var(a)\nend\n"
+            "fn(main)\n  call fn(show, 7)\n  say 1\nend\ncall fn(main)\n"
+        )
+        _, functions, top = parse_source(source, self.base)
+        self.assertEqual(report(functions, top), [])
+
+    def test_output_anywhere_in_the_body_counts(self) -> None:
+        source = (
+            "fn(f, a)\n  if var(a) > 0\n    output 1\n  end\n  output 0\nend\n"
+            "fn(main)\n  say call fn(f, 7)\nend\ncall fn(main)\n"
+        )
+        _, functions, top = parse_source(source, self.base)
+        self.assertEqual(report(functions, top), [])
+
+
 if __name__ == "__main__":
     unittest.main()
