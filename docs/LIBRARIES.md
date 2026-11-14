@@ -106,7 +106,7 @@ Three things worth knowing:
 
 ## Other shipped libraries
 
-Five folders ship beside the compiler, imported the same way:
+Six folders ship beside the compiler, imported the same way:
 
 | import | folder | what it holds |
 |---|---|---|
@@ -115,6 +115,7 @@ Five folders ship beside the compiler, imported the same way:
 | `library import math` | `libraries-math/` | nth-prime, primes-below, digits-sum, reverse-number, is-palindrome-number, hypotenuse, area-circle, to-degrees, to-radians |
 | `library import units` | `libraries-units/` | temperature, distance and mass conversions, ten functions |
 | `library import validate` | `libraries-validate/` | is-empty, is-digit-text, is-alpha-text, is-number-text, is-space-text, is-upper-text |
+| `library import geometry` | `libraries-geometry/` | area-rect, perimeter-rect, area-triangle, area-triangle-sides, circumference, point-in-rect, normalize-angle, distance-squared |
 
 Each folder has its own README listing every function and its caveats. The text
 helpers across all three libraries keep their accumulators in globals, because a

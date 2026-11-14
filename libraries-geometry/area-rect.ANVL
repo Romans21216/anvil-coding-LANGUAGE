@@ -1,0 +1,3 @@
+fn(area-rect, width, height)
+  output var(width) * var(height)
+end

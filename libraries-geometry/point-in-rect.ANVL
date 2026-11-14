@@ -1,0 +1,15 @@
+fn(point-in-rect, x, y, left, top, width, height)
+  if var(x) < var(left)
+    output 0
+  end
+  if var(y) < var(top)
+    output 0
+  end
+  if var(x) > var(left) + var(width)
+    output 0
+  end
+  if var(y) > var(top) + var(height)
+    output 0
+  end
+  output 1
+end
