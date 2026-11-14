@@ -776,6 +776,7 @@ def emit_c(
             "net_join",
             "call",
             "import",
+            "library_import",
         )
     ]
     if invalid:

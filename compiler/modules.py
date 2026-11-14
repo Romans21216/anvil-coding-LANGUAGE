@@ -166,6 +166,24 @@ def load_program(path, source, *, include_root=None):
 
     visit(path, source)
 
+    # `library import name` pulls in a folder of one-function files. Reachability
+    # later drops every function the program never calls, so the output only
+    # carries what is used.
+    library_nodes = [node for node in result.top if node.kind == "library_import"]
+    if library_nodes:
+        from compiler import libraries as library_loader
+
+        for node in library_nodes:
+            for name, function in library_loader.load(
+                path, node.value, node.source or path, node.line
+            ):
+                if name in result.functions:
+                    raise CompileError(
+                        f"{node.source or path}:{node.line}: library {node.value!r} "
+                        f"defines {name!r}, which already exists in the program"
+                    )
+                result.functions[name] = function
+
     # random(seed) is sugar for the shipped mixer, so the mixer joins the
     # program whenever it is called and the program does not define its own.
     if (

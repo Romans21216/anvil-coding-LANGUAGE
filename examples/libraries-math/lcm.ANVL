@@ -1,0 +1,4 @@
+fn(lcm, a, b)
+  set local(g) = call fn(gcd, var(a), var(b))
+  output var(a) / local(g) * var(b)
+end

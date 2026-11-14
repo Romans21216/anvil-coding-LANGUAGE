@@ -2711,7 +2711,7 @@ class NativeCodegen:
         if any(node.kind == "scene" for node in self.top):
             return self._generate_window()
         calls = [node for node in self.top if node.kind == "call"]
-        allowed = ("call", "seed", "set", "import")
+        allowed = ("call", "seed", "set", "import", "library_import")
         if any(node.kind not in allowed for node in self.top):
             unsupported = next(node for node in self.top if node.kind not in allowed)
             raise CompileError(

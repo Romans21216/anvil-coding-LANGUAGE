@@ -95,6 +95,21 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 )
             )
             continue
+        library_import = re.fullmatch(r"library\s+import\s+([A-Za-z_][\w-]*)", line)
+        if library_import:
+            if len(stack) != 1:
+                raise CompileError(
+                    f"{path}:{line_no}: library import must be at top level"
+                )
+            top.append(
+                Node(
+                    "library_import",
+                    line_no,
+                    value=library_import.group(1),
+                    source=path,
+                )
+            )
+            continue
         if re.match(r"include\b", line):
             if len(stack) != 1:
                 raise CompileError(f"{path}:{line_no}: include must be at top level")
