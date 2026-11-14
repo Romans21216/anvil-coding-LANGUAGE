@@ -101,6 +101,11 @@ def main() -> int:
         help="parse and validate only; report problems without building an output",
     )
     ap.add_argument(
+        "--deny-warnings",
+        action="store_true",
+        help="treat compiler warnings (such as an unused import) as errors",
+    )
+    ap.add_argument(
         "--print-imports",
         action="store_true",
         help="print the builtins this program actually uses and stop",
@@ -238,6 +243,23 @@ def main() -> int:
                     )
                 funcs[name] = function
             top = top + provided_top
+        from compiler import builtin_usage
+
+        unused = builtin_usage.unused_imports(funcs, top)
+        for node in unused:
+            print(
+                render(
+                    f"{node.source or source_path}:{node.line}: warning: "
+                    f"import '{node.value}' is never used"
+                ),
+                file=sys.stderr,
+            )
+        if unused and args.deny_warnings:
+            print(
+                f"{source_path}: {len(unused)} warning(s) treated as errors",
+                file=sys.stderr,
+            )
+            return 1
         if args.print_imports:
             from compiler.builtin_usage import used_builtins
 

@@ -11,6 +11,22 @@ from __future__ import annotations
 
 import re
 
+_TEXT_BUILTINS = {
+    "len", "upper", "lower", "ord", "chr", "trim", "number", "char",
+    "contains", "mid", "left", "right", "starts_with", "ends_with",
+}
+_MATH_BUILTINS = {
+    "abs", "sqrt", "floor", "ceil", "min", "max", "round", "sin", "cos",
+    "noise", "fbm",
+}
+_RANDOM_BUILTINS = {"rnd", "random"}
+
+MODULE_MEMBERS = {
+    "math": _MATH_BUILTINS,
+    "text": _TEXT_BUILTINS,
+    "random": _RANDOM_BUILTINS,
+}
+
 BUILTIN_MODULES = {
     "builtins": "every builtin in the language",
     "math": "numeric builtins (abs, floor, ceil, sqrt, sin, cos, min, max, ...)",
@@ -65,3 +81,22 @@ def used_builtins(functions, top) -> list[str]:
 
 def describe(module: str) -> str:
     return BUILTIN_MODULES.get(module, "")
+
+
+def module_is_used(module: str, used) -> bool:
+    """True when the import earns its place in the program."""
+    used = set(used)
+    if module == "builtins":
+        return bool(used)
+    return bool(used & MODULE_MEMBERS.get(module, set()))
+
+
+def unused_imports(functions, top):
+    """The ``import`` nodes whose module contributes nothing to the build."""
+    used = used_builtins(functions, top)
+    return [
+        node
+        for node in top
+        if getattr(node, "kind", "") == "import"
+        and not module_is_used(getattr(node, "value", ""), used)
+    ]
