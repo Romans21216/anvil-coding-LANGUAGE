@@ -188,6 +188,19 @@ def main() -> int:
                 file=sys.stderr,
             )
         if args.check:
+            # Check the same lowering the selected backend would run, so
+            # --check cannot pass a program that the build would reject.
+            if args.backend == "native":
+                NativeCodegen(
+                    source_path, funcs, top, variables, arrays, fixed_hz=fixed_hz,
+                    active_local_array_bytes=active_local_array_bytes,
+                    title=project_name if include_root is not None else "Anvil Native 2D",
+                ).generate()
+            else:
+                emit_c(
+                    source_path, funcs, top, variables, arrays, fixed_hz, project_name,
+                    active_local_array_bytes,
+                )
             print(f"{source_path}: no errors")
             return 0
         if args.backend == "native":

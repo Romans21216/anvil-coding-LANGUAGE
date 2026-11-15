@@ -298,3 +298,52 @@ warnings without invoking a C compiler.
   `display text` stop with an explicit error and a hint to use the C backend.
 - `rnd(low, high)` is still inclusive on both ends and `%` is still C fmod; both
   are documented, and `mod` is the floored alternative.
+
+## Defects B7, B9, B10, B11, B14, B16 closed
+
+### Build-time rejects instead of run-time surprises
+
+`check_literal_array_index` runs for both array reads (`expressions.py`) and
+array writes (`codegen.py`). A literal index that is fractional, negative or
+past the end of the array is now a compile error with the offending number
+underlined, so `array(a, 1.5)` can no longer build and die at run time.
+Computed indexes still take the run-time check.
+
+`display` argument mistakes are diagnostics instead of silent behaviour:
+repeated `-rgb`/`-rgba` (B9), the meaningless trailing integer after a draw
+call (B10), an unknown `-colour(...)`-style modifier named directly (B11), and
+`display text` without `-l(x, y)` explaining what is missing (B14).
+
+### A call stack on fatal errors (B16)
+
+Every Anvil function is emitted as a thin wrapper around `anvil_body_<name>`.
+The wrapper pushes `anvil_frame_enter(name, path, line)` on entry and pops it
+after the body returns, so `anvil_report_call_stack()` prints the chain of
+callers on any fatal run-time error:
+
+```
+t.ANVL:3: division by zero
+call stack (innermost first):
+  in fn(inner), defined at t.ANVL:2
+  in fn(outer), defined at t.ANVL:6
+  in fn(main), defined at t.ANVL:9
+```
+
+The frame functions are part of the reserved runtime names, so user functions
+cannot collide with them.
+
+### Documented behaviour (B3, B8)
+
+`LANGUAGE.md` now states that `rnd(low, high)` is inclusive on both ends and
+that the native backend draws literal text only, with a pointer to build HUDs
+that show numbers with the default C backend.
+
+### `--check` now matches the build
+
+`--check` used to stop after parsing and linting, so the new display and array
+diagnostics were invisible to it: `--check` said "no errors" for a program that
+failed to build. It now runs the selected backend's lowering without writing an
+executable or invoking a C compiler, so check and build agree on every error.
+
+Measured: `python compiler/anvil.py B9.ANVL --check` exits 1 with the repeated
+`-rgb` diagnostic, and a valid program still prints "no errors" and exits 0.

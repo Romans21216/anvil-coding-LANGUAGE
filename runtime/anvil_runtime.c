@@ -50,8 +50,10 @@ void anvil_frame_leave(void) {
 void anvil_report_call_stack(void) {
   int index = anvil_frame_depth < ANVIL_FRAME_DEPTH ? anvil_frame_depth
                                                     : ANVIL_FRAME_DEPTH;
+  if (index > 0)
+    fprintf(stderr, "call stack (innermost first):\n");
   while (index-- > 0)
-    fprintf(stderr, "  in fn(%s) at %s:%d\n", anvil_frames[index].name,
+    fprintf(stderr, "  in fn(%s), defined at %s:%d\n", anvil_frames[index].name,
             anvil_frames[index].path ? anvil_frames[index].path : "<Anvil>",
             anvil_frames[index].line);
 }
@@ -774,37 +776,6 @@ void anvil_print(const char *text) {
   fflush(stdout);
 }
 
-enum { ANVIL_FRAME_DEPTH = 64 };
-typedef struct {
-  const char *name;
-  const char *path;
-  int line;
-} AnvilFrame;
-static AnvilFrame anvil_frames[ANVIL_FRAME_DEPTH];
-static int anvil_frame_depth = 0;
-
-void anvil_frame_enter(const char *name, const char *path, int line) {
-  if (anvil_frame_depth < ANVIL_FRAME_DEPTH) {
-    anvil_frames[anvil_frame_depth].name = name;
-    anvil_frames[anvil_frame_depth].path = path;
-    anvil_frames[anvil_frame_depth].line = line;
-  }
-  anvil_frame_depth++;
-}
-
-void anvil_frame_leave(void) {
-  if (anvil_frame_depth > 0)
-    anvil_frame_depth--;
-}
-
-void anvil_report_call_stack(void) {
-  int index = anvil_frame_depth < ANVIL_FRAME_DEPTH ? anvil_frame_depth
-                                                    : ANVIL_FRAME_DEPTH;
-  while (index-- > 0)
-    fprintf(stderr, "  in fn(%s) at %s:%d\n", anvil_frames[index].name,
-            anvil_frames[index].path ? anvil_frames[index].path : "<Anvil>",
-            anvil_frames[index].line);
-}
 
 double anvil_time(void) { return anvil_elapsed_seconds; }
 double anvil_delta(void) { return anvil_delta_seconds; }

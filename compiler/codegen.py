@@ -574,13 +574,14 @@ def emit_c(
             or "void"
         )
         lines.append(f"static double {c_name(name)}({params});")
+        lines.append(f"static double anvil_body_{c_name(name)}({params});")
     lines.append("")
     for name, fn in emitted_functions:
         params = (
             ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
             or "void"
         )
-        lines.append(f"static double {c_name(name)}({params}) {{")
+        lines.append(f"static double anvil_body_{c_name(name)}({params}) {{")
         lines.extend(
             f"    double {c_name(name + '__' + local)} = 0.0;"
             for local in sorted(fn.locals | fn.c_temporaries)
@@ -596,6 +597,17 @@ def emit_c(
         if not any(n.kind == "output" for n in fn.body):
             lines.extend(local_array_cleanup(fn, "    "))
             lines.append("    return 0.0;")
+        lines.extend(["}", ""])
+        args = ", ".join(c_name(name + '__' + param) for param in fn.params)
+        lines.append(f"static double {c_name(name)}({params}) {{")
+        lines.append("    double _anvil_frame_result;")
+        lines.append(
+            f"    anvil_frame_enter({c_string_literal(name)}, "
+            f"{c_string_literal(str(fn.source or path))}, {fn.line});"
+        )
+        lines.append(f"    _anvil_frame_result = anvil_body_{c_name(name)}({args});")
+        lines.append("    anvil_frame_leave();")
+        lines.append("    return _anvil_frame_result;")
         lines.extend(["}", ""])
     lines.append("int main(void) {")
     if metadata_payload:
