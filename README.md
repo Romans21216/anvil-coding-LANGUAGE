@@ -177,6 +177,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Multiplayer prototype](docs/MULTIPLAYER.md)
 - [Libraries](docs/LIBRARIES.md)
 - [Compiler and build](docs/COMPILER.md)
+- [ANVIL SLOTS - a complete 2D slot machine](examples/slots.ANVL) - drawn entirely from primitives, no image files; controls and design in [docs/SLOTS.md](docs/SLOTS.md)
 - [Starter world](examples/first_world.ANVL)
 - [LAN counter sample](examples/network_counter.ANVL)
 - [LAN client sample](examples/network_client.ANVL)
