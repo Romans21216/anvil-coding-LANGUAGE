@@ -1,0 +1,6 @@
+fn(map-range, value, inLow, inHigh, outLow, outHigh)
+  if var(inHigh) = var(inLow)
+    output var(outLow)
+  end
+  output var(outLow) + (var(value) - var(inLow)) / (var(inHigh) - var(inLow)) * (var(outHigh) - var(outLow))
+end

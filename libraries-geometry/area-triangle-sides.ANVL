@@ -1,0 +1,14 @@
+fn(area-triangle-sides, a, b, c)
+  # Heron's formula; answers 0 when the three sides cannot close a triangle.
+  set local(s) = (var(a) + var(b) + var(c)) / 2
+  if var(a) + var(b) <= var(c)
+    output 0
+  end
+  if var(a) + var(c) <= var(b)
+    output 0
+  end
+  if var(b) + var(c) <= var(a)
+    output 0
+  end
+  output sqrt(local(s) * (local(s) - var(a)) * (local(s) - var(b)) * (local(s) - var(c)))
+end

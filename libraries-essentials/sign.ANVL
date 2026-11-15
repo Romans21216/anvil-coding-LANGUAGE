@@ -1,0 +1,9 @@
+fn(sign, value)
+  if var(value) < 0
+    output -1
+  end
+  if var(value) > 0
+    output 1
+  end
+  output 0
+end

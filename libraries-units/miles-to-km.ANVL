@@ -1,0 +1,3 @@
+fn(miles-to-km, miles)
+  output var(miles) * 1.609344
+end

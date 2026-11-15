@@ -1,0 +1,7 @@
+fn(random-chance, percent, seed)
+  set local(v) = call fn(random-pipeline, var(seed))
+  if local(v) / 4294967296 * 100 < var(percent)
+    output 1
+  end
+  output 0
+end

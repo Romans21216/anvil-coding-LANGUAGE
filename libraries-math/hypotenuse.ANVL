@@ -1,0 +1,3 @@
+fn(hypotenuse, a, b)
+  output sqrt(var(a) * var(a) + var(b) * var(b))
+end

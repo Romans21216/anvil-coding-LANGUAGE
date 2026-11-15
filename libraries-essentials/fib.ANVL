@@ -1,0 +1,16 @@
+fn(fib, n)
+  set local(k) = floor(var(n))
+  if local(k) < 0
+    output 0
+  end
+  set local(a) = 0
+  set local(b) = 1
+  set local(i) = 0
+  while local(i) < local(k)
+    set local(t) = local(a) + local(b)
+    set local(a) = local(b)
+    set local(b) = local(t)
+    set local(i) = local(i) + 1
+  end
+  output local(a)
+end

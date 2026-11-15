@@ -1,0 +1,106 @@
+# Every number on screen is computed by a library function - nothing here is a
+# literal result. Build it, run it, and read the panel:
+#
+#   python compiler/anvil.py examples/libraries_demo.ANVL -o libraries_demo.exe
+#
+# Libraries live in libraries-<name>/ beside this file (or beside the compiler):
+# each file holds one function with the same name as the file. Text joins with
+# "+" against a var(...) reference - a bare number literal is not accepted there.
+#
+# display text prints numbers as whole numbers, so every example below was picked
+# to have an exact integer answer. Fractional results would print rounded.
+
+library import essentials
+library import math
+library import units
+library import geometry
+library import vector
+
+scene 2d
+clear rgba(9, 13, 22, 255)
+
+set var(gcd_value) = 0
+set var(lcm_value) = 0
+set var(factorial_value) = 0
+set var(fib_value) = 0
+set var(prime_value) = 0
+set var(hyp_value) = 0
+set var(degrees_value) = 0
+set var(nth_value) = 0
+set var(primes_value) = 0
+set var(f_value) = 0
+set var(kelvin_value) = 0
+set var(celsius_value) = 0
+set var(rect_value) = 0
+set var(heron_value) = 0
+set var(inside_value) = 0
+set var(angle_value) = 0
+set var(dot_value) = 0
+set var(length_value) = 0
+set var(rot_value) = 0
+set var(reflect_value) = 0
+
+fn(draw)
+  set var(gcd_value) = call fn(gcd, 48, 18)
+  set var(lcm_value) = call fn(lcm, 12, 18)
+  set var(factorial_value) = call fn(factorial, 6)
+  set var(fib_value) = call fn(fib, 10)
+  set var(prime_value) = call fn(is-prime, 97)
+
+  set var(hyp_value) = call fn(hypotenuse, 3, 4)
+  set var(degrees_value) = call fn(to-degrees, 3.14159265)
+  set var(nth_value) = call fn(nth-prime, 10)
+  set var(primes_value) = call fn(primes-below, 30)
+
+  set var(f_value) = call fn(celsius-to-fahrenheit, 100)
+  set var(kelvin_value) = call fn(celsius-to-kelvin, -273.15)
+  set var(celsius_value) = call fn(fahrenheit-to-celsius, 32)
+
+  set var(rect_value) = call fn(area-rect, 6, 7)
+  set var(heron_value) = call fn(area-triangle-sides, 3, 4, 5)
+  set var(inside_value) = call fn(point-in-rect, 5, 5, 0, 0, 10, 10)
+  set var(angle_value) = call fn(normalize-angle, 370)
+
+  set var(dot_value) = call fn(dot, 1, 2, 3, 4)
+  set var(length_value) = call fn(length, 3, 4)
+  set var(rot_value) = call fn(rotate-x, 1, 0, 90)
+  set var(reflect_value) = call fn(reflect-y, 2, 3, 0, 1)
+
+  display rect(0, 0, 960, 70) -rgb(16, 24, 39)
+  display text("ANVIL LIBRARIES") 1 -l(40, 26) -rgb(247, 249, 255)
+  display text("five folders, one function per file, nothing linked that you do not call") 2 -l(40, 46) -rgb(139, 160, 190)
+
+  display text("essentials") 3 -l(40, 96) -rgb(120, 200, 255)
+  display text("gcd(48, 18) = " + var(gcd_value)) 4 -l(40, 122) -rgb(226, 232, 240)
+  display text("lcm(12, 18) = " + var(lcm_value)) 5 -l(40, 144) -rgb(226, 232, 240)
+  display text("factorial(6) = " + var(factorial_value)) 6 -l(40, 166) -rgb(226, 232, 240)
+  display text("fib(10) = " + var(fib_value)) 7 -l(40, 188) -rgb(226, 232, 240)
+  display text("is-prime(97) = " + var(prime_value)) 8 -l(40, 210) -rgb(226, 232, 240)
+
+  display text("math") 9 -l(360, 96) -rgb(120, 200, 255)
+  display text("hypotenuse(3, 4) = " + var(hyp_value)) 10 -l(360, 122) -rgb(226, 232, 240)
+  display text("to-degrees(pi) = " + var(degrees_value)) 11 -l(360, 144) -rgb(226, 232, 240)
+  display text("nth-prime(10) = " + var(nth_value)) 12 -l(360, 166) -rgb(226, 232, 240)
+  display text("primes-below(30) = " + var(primes_value)) 13 -l(360, 188) -rgb(226, 232, 240)
+
+  display text("units") 14 -l(680, 96) -rgb(120, 200, 255)
+  display text("100 C in F = " + var(f_value)) 15 -l(680, 122) -rgb(226, 232, 240)
+  display text("-273.15 C in K = " + var(kelvin_value)) 16 -l(680, 144) -rgb(226, 232, 240)
+  display text("32 F in C = " + var(celsius_value)) 17 -l(680, 166) -rgb(226, 232, 240)
+
+  display text("geometry") 18 -l(40, 268) -rgb(120, 200, 255)
+  display text("area-rect(6, 7) = " + var(rect_value)) 19 -l(40, 294) -rgb(226, 232, 240)
+  display text("heron(3, 4, 5) = " + var(heron_value)) 20 -l(40, 316) -rgb(226, 232, 240)
+  display text("point-in-rect(5, 5, 0, 0, 10, 10) = " + var(inside_value)) 21 -l(40, 338) -rgb(226, 232, 240)
+  display text("normalize-angle(370) = " + var(angle_value)) 22 -l(40, 360) -rgb(226, 232, 240)
+
+  display text("vector") 23 -l(560, 268) -rgb(120, 200, 255)
+  display text("dot(1, 2, 3, 4) = " + var(dot_value)) 24 -l(560, 294) -rgb(226, 232, 240)
+  display text("length(3, 4) = " + var(length_value)) 25 -l(560, 316) -rgb(226, 232, 240)
+  display text("rotate-x(1, 0, 90) = " + var(rot_value)) 26 -l(560, 338) -rgb(226, 232, 240)
+  display text("reflect-y(2, 3, 0, 1) = " + var(reflect_value)) 27 -l(560, 360) -rgb(226, 232, 240)
+
+  display rect(40, 396, 880, 1) -rgb(43, 58, 82)
+  display text("every value above came from libraries-*/ on disk, and every one is exact") 28 -l(40, 418) -rgb(139, 160, 190)
+  display text("library import <name> loads the folder; functions you never call cost nothing") 29 -l(40, 440) -rgb(139, 160, 190)
+end

@@ -1,0 +1,3 @@
+fn(circumference, radius)
+  output 2 * 3.141592653589793 * var(radius)
+end

@@ -80,6 +80,7 @@ class ProgramLoader:
         self.order = []
         self.queue = deque()
         self.bound = {}
+        self.library_files = []
 
     def error(self, node, message):
         raise CompileError(f"{node.source or self.path}:{node.line}: {message}")
@@ -174,6 +175,9 @@ class ProgramLoader:
         scope.variable_references.extend(unit.variable_references)
         scope.local_references.extend(unit.local_references)
         for node in unit.top:
+            if node.kind == "library_import":
+                self.load_library(scope, canonical, node)
+                continue
             if node.kind != "include":
                 if node.kind=='metadata' and origin is not None:
                     continue  # library metadata does not rename its importer
@@ -209,6 +213,21 @@ class ProgramLoader:
             scope.aliases[alias_key][1].add(node.name)
             self.require(module,node.name)
         self.active.pop()
+
+    def load_library(self, scope, importer, node):
+        """Load every function file in libraries-<name>/ into this scope."""
+        from compiler import libraries
+        folder = libraries.folder_for(importer, node.value)
+        if folder is None:
+            raise CompileError(f"{node.source}:{node.line}: "
+                               + libraries.missing_message(importer, node.value))
+        files = libraries.files_in(folder)
+        if not files:
+            raise CompileError(f"{node.source}:{node.line}: "
+                               + libraries.empty_message(folder, node.value))
+        for path in files:
+            self.visit(scope, path, origin=node)
+            self.library_files.append((path, path.stem))
 
     def require(self, scope, name):
         if name not in scope.needed:
@@ -314,6 +333,9 @@ class ProgramLoader:
     def load(self, source):
         from compiler.semantics import validate_program
         self.visit(self.flat,self.path,source)
+        from compiler import libraries as library_rules
+        for path, stem in self.library_files:
+            library_rules.check_file(path, self.flat.functions)
         for name in self.flat.functions:
             self.require(self.flat,name)
         top = [self.bind(node,scope) for scope,node in self.order]

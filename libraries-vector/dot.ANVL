@@ -1,0 +1,3 @@
+fn(dot, ax, ay, bx, by)
+  output var(ax) * var(bx) + var(ay) * var(by)
+end

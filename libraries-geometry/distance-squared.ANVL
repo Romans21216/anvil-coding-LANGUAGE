@@ -1,0 +1,5 @@
+fn(distance-squared, x1, y1, x2, y2)
+  set local(dx) = var(x2) - var(x1)
+  set local(dy) = var(y2) - var(y1)
+  output local(dx) * local(dx) + local(dy) * local(dy)
+end

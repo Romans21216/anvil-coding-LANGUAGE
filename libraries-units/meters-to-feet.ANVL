@@ -1,0 +1,3 @@
+fn(meters-to-feet, meters)
+  output var(meters) * 3.280839895
+end
