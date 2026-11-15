@@ -75,11 +75,11 @@ importing file, in any parent folder, or beside the compiler. Every file in the
 folder is parsed; functions you never call are pruned by reachability, so an
 import costs nothing beyond the parse.
 
-### Shipped in the project folder (56 functions)
+### Shipped in the project folder (54 functions)
 
 | Library | Count | Functions |
 | --- | --- | --- |
-| essentials | 21 | clamp, distance, factorial, fib, gcd, is-even, is-odd, is-prime, lcm, lerp, map-range, percent-of, power, random-chance, random-float, random-pipeline, random-range, round-to, sign, square, sum-to |
+| essentials | 19 | clamp→builtin, distance, factorial, fib, gcd, is-even, is-odd, is-prime, lcm, lerp, map-range, percent-of, power, random-chance, random-float, random-pipeline, random-range, round-to, sign→builtin, square, sum-to |
 | math | 9 | area-circle, digits-sum, hypotenuse, is-palindrome-number, nth-prime, primes-below, reverse-number, to-degrees, to-radians |
 | units | 10 | celsius-to-fahrenheit, celsius-to-kelvin, fahrenheit-to-celsius, feet-to-meters, kelvin-to-celsius, kg-to-pounds, km-to-miles, meters-to-feet, miles-to-km, pounds-to-kg |
 | geometry | 8 | area-rect, area-triangle, area-triangle-sides, circumference, distance-squared, normalize-angle, perimeter-rect, point-in-rect |
@@ -187,8 +187,8 @@ Each of these was found by running code, and each is covered by a test.
    is a real rebase with real conflicts; the library system is already ported and
    working, so the remaining candidates are the runtime fixes (§5) and the linter.
 2. **Text libraries** (17 functions) need `len`/`mid`/`ord` in the project compiler.
-3. **`display text` number formatting** rounds to whole numbers — fractional
-   results cannot be shown exactly yet.
+3. **`display text` number formatting** — fixed in the pass recorded in §9: every
+   output path now uses one format (`%.15g`).
 4. `stdlib/random_pipeline.ANVL` reports `warning: function 'random-pipeline' is
    never called` under `--check` on the branch (entry-file filter needs extending
    to stdlib paths).
@@ -212,3 +212,89 @@ python compiler/anvil.py examples/libraries_demo.ANVL -o libraries_demo.exe
 cd C:/Users/power/Documents/buld/os/toolchain/anvil
 python scripts/differential_probe.py && python -m pytest tests -q
 ```
+
+---
+
+## 9. Text, print, diagnostics and quality-of-life built-ins
+
+Driven by the defect list in `anvil.TXT` (PART 6 order). Everything here was
+verified by compiling and running programs on this machine, and is covered by
+`tests/test_text_and_print.py` (11 tests).
+
+### Text is now a value that can be joined (B2, B13)
+
+- `+` joins text. A number on either side of a text `+` is formatted with the
+  single number format, so `"score " + var(score) + " / " + var(best)` works, as
+  does a local or `call fn(...)` inside the chain. Before this only
+  `"literal" + var(x)` compiled; `"n = " + 6` and `"n = " + local(v)` were
+  rejected with *"expected a number, got a string"*.
+- `print` (alias `say`) writes a line to the console from any function or from
+  the top level; `print` alone writes a blank line. Before this, a program could
+  only ever print `fn(main)`'s return value.
+- Text supports `=`, `==` and `!=`; any other operator on text is a compile error
+  that names the operator.
+- Text built-ins: `len`, `ord`, `find`, `upper`, `lower`, `trim`, `mid`,
+  `replace`, `chr`. Results live in a 256 KiB scratch arena, valid for the
+  statement that consumes them.
+
+### One number format (B1, B15)
+
+Screen text used `%.0f`, so 12.566371 drew as "13" while the console printed
+12.5663706143592. Every output path now formats through `ANVIL_NUMBER_FORMAT`
+(`%.15g`) in the runtime, so console, `display text` and `print` cannot disagree.
+Measured: `display text("area = " + 12.5663706143592)` draws the full value, and
+`print` of the same number prints the identical text.
+
+### Errors read like a modern compiler
+
+`compiler/diagnostics.py` renders every CompileError as message +
+`--> file:line:col` + source line + caret + `= help:`. The caret sits on the
+offending token (an explicit needle, else the quoted token in the message).
+Hints cover the mistakes people actually make: `else if`, text in a numeric
+slot, `^` as power, bitwise operators, unknown name/function (did-you-mean via
+difflib), undeclared local ("varl() reads a global"), missing `end`,
+`display text` without `-l`, bad array index, native-backend gaps.
+
+### Warnings
+
+`compiler/lint.py` reports three non-fatal warnings with the same layout:
+`display`/`clear` with no scene or draw callback (B6), `output` inside a loop
+(B12 — it returns at the first iteration), and statements after `output`.
+
+### `else if` works (B5)
+
+`else if` parses as sugar for a nested `if` inside the `else` block, and one
+`end` closes the whole chain. `else if` with no preceding `if` explains the
+alternative instead of saying "unsupported statement".
+
+### Built-ins that save time
+
+`round(value[,places])`, `clamp`, `sign`, `pow`, `hypot`, `log`, `log10`, `exp`,
+`tan`, `atan2`, and `mod` (floored: `mod(-5,3)` is 1, while `%` keeps C fmod's
+-2). `round(2.715, 2)` is 2.72, `round(1234, -2)` is 1200.
+
+`clamp` and `sign` were already shipped as library functions; the builtins win
+the namespace, so `libraries-essentials/clamp.ANVL` and `sign.ANVL` were removed
+(calling them needs no import, so nothing is lost).
+
+### Version 2 top-level `var()` (usability bug)
+
+In version 2 the parser rewrote every unquoted `var(` to `local(` before parsing
+the statement — including at top level, where a local is illegal. Every
+top-level assignment in a version-2 program therefore failed with "local
+variables must be declared inside a function". The rewrite now applies only
+inside a function; at top level `var()` is always the global.
+
+### `--check`
+
+`python compiler/anvil.py file.ANVL --check` parses, validates and prints
+warnings without invoking a C compiler.
+
+### Still open
+
+- Text variables do not exist: text is built inside the statement that consumes
+  it. String parameters and returns need a typed variable layer.
+- The native x64 backend cannot format text; `print` and dynamic
+  `display text` stop with an explicit error and a hint to use the C backend.
+- `rnd(low, high)` is still inclusive on both ends and `%` is still C fmod; both
+  are documented, and `mod` is the floored alternative.

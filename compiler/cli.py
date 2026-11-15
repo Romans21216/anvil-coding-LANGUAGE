@@ -23,6 +23,11 @@ from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
 
+def _builtin_names() -> list[str]:
+    from compiler.expressions import BUILTINS, TEXT_BUILTINS
+    return list(BUILTINS) + list(TEXT_BUILTINS)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=(
@@ -47,12 +52,18 @@ def main() -> int:
     )
     ap.add_argument("--release", action="store_true", help="enable native optimization")
     ap.add_argument(
+        "--check",
+        action="store_true",
+        help="parse, validate and report warnings without writing an executable",
+    )
+    ap.add_argument(
         "--backend",
         choices=("c", "native"),
         default="c",
         help="select the C toolchain or experimental Anvil-owned x64 PE backend",
     )
     args = ap.parse_args()
+    known_functions: list[str] = []
     try:
         if args.inspect_metadata:
             from compiler.program_metadata import unpack
@@ -164,6 +175,21 @@ def main() -> int:
             local_array_elements=local_array_elements,
             active_local_array_bytes=active_local_array_bytes,
         )
+        known_functions = list(funcs)
+        from compiler import diagnostics
+        from compiler.lint import lint
+        diagnostics.set_hints(_builtin_names(), known_functions)
+        for warning in lint(funcs, top):
+            print(
+                diagnostics.render(
+                    warning.message, hint=warning.hint, needle=warning.needle,
+                    severity="warning",
+                ),
+                file=sys.stderr,
+            )
+        if args.check:
+            print(f"{source_path}: no errors")
+            return 0
         if args.backend == "native":
             if args.emit_c or args.generated_c or args.cc or args.release:
                 raise CompileError(
@@ -219,6 +245,16 @@ def main() -> int:
     except tomllib.TOMLDecodeError as e:
         print(f"{args.source}: {e}", file=sys.stderr)
         return 1
-    except (CompileError, OSError, UnicodeError, subprocess.CalledProcessError) as e:
+    except CompileError as e:
+        from compiler import diagnostics
+        diagnostics.set_hints(_builtin_names(), known_functions)
+        hint = getattr(e, "hint", None)
+        needle = getattr(e, "needle", None)
+        print(
+            diagnostics.render(str(e), hint=hint, needle=needle),
+            file=sys.stderr,
+        )
+        return 1
+    except (OSError, UnicodeError, subprocess.CalledProcessError) as e:
         print(str(e), file=sys.stderr)
         return 1

@@ -278,7 +278,8 @@ call fn(main)
                     timeout=10,
                 )
             self.assertEqual(result.returncode, 1)
-            self.assertIn(f"{source}:3: direct native global data needs", result.stderr)
+            self.assertIn(f"--> {source}:3:", result.stderr)
+            self.assertIn("direct native global data needs", result.stderr)
             self.assertIn("the limit is 16777216 bytes", result.stderr)
             self.assertFalse(executable.exists())
 

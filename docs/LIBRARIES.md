@@ -97,7 +97,6 @@ itself, so any program in any directory can use it without copying a folder:
 | `factorial(n)`, `fib(n)`, `power(base, exponent)`, `sum-to(n)` | arithmetic |
 | `square(n)`, `is-even(n)`, `is-odd(n)` | arithmetic predicates |
 | `is-prime(n)` | 1 when `n` is prime |
-| `clamp(value, low, high)`, `sign(value)` | bounds and sign |
 | `lerp(a, b, t)`, `map-range(value, inLow, inHigh, outLow, outHigh)` | interpolation |
 | `percent-of(part, whole)`, `round-to(value, places)` | formatting |
 | `distance(x1, y1, x2, y2)` | straight-line distance |
@@ -111,6 +110,8 @@ Three things worth knowing:
 
 - **`cube` is not included**: a function of that name collides with the runtime's
   `anvil_cube` symbol, so use `power(x, 3)`.
+- **`clamp` and `sign` are builtins**, so their library files were removed: call
+  them directly, with no import.
 - **`starts_with` / `ends_with` are builtins**, so the library does not repeat them.
 - **One text helper is not reentrant.** A local can hold a number but not text,
   so `text-reverse` accumulates in a global; calling it while it is already
@@ -124,7 +125,7 @@ Seven folders ship beside the compiler, imported the same way:
 
 | import | folder | what it holds |
 |---|---|---|
-| `library import essentials` | `libraries-essentials/` | random-pipeline and the seeded helpers, gcd/lcm, factorial, fib, power, primes, clamp, lerp, map-range, percent-of, round-to, distance, three text helpers |
+| `library import essentials` | `libraries-essentials/` | random-pipeline and the seeded helpers, gcd/lcm, factorial, fib, power, primes, lerp, map-range, percent-of, round-to, distance, three text helpers |
 | `library import text` | `libraries-text/` | pad-right, center, capitalize, index-of, count-words, is-palindrome, left-of, right-of |
 | `library import math` | `libraries-math/` | nth-prime, primes-below, digits-sum, reverse-number, is-palindrome-number, hypotenuse, area-circle, to-degrees, to-radians |
 | `library import units` | `libraries-units/` | temperature, distance and mass conversions, ten functions |

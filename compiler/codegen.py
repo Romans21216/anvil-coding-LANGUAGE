@@ -21,6 +21,7 @@ from compiler.expressions import expr, split_args
 from compiler.display_syntax import take_display_modifiers as _take_display_modifiers
 from compiler.lexer import mask_strings
 from compiler.runtime_modules import MODULES as RUNTIME_MODULES
+from compiler.text_syntax import text_expression
 
 
 
@@ -92,22 +93,12 @@ def _lower_display(
         raise CompileError(f"{path}:{node.line}: malformed display command")
     shape, arg_text = call.groups()
     args = split_args(arg_text)
-    if shape == "text" and loc:
-        dynamic = re.fullmatch(
-            r'\s*("(?:\\.|[^"\\])*")\s*\+\s*(var\([A-Za-z_][\w-]*\))\s*', arg_text
+    if shape == "text" and loc and len(args) == 1:
+        code = text_expression(
+            path, node.line, arg_text, functions, scope, arrays,
+            temporary_owner, temporary_counter,
         )
-        if dynamic:
-            prefix = dynamic.group(1)[:-1].replace("%", "%%")
-            value = expr(
-                path, node.line, dynamic.group(2), functions, scope=scope, arrays=arrays,
-                temporary_owner=temporary_owner, temporary_counter=temporary_counter,
-            )
-            separator = "" if prefix.endswith((" ", "\t")) else " "
-            fmt = prefix + separator + '%.0f"'
-            return shape, (
-                f"{ind}anvil_text_number({', '.join(loc)}, {fmt}, {value}, "
-                f"{', '.join(color)});"
-            )
+        return shape, f"{ind}anvil_text({', '.join(loc)}, {code}, {', '.join(color)});"
     expected = "string" if shape == "text" else "number"
     values = [
         expr(path, node.line, item, functions, expected, scope=scope, arrays=arrays,
@@ -220,6 +211,12 @@ def emit_nodes(
                 out.append(f"{indent}}}")
             else:
                 out.append(f"{indent}return {value};")
+        elif n.kind == "print":
+            code = text_expression(
+                path, n.line, n.value or "", functions, scope, arrays,
+                scope or n, temporary_counter,
+            )
+            out.append(f"{indent}anvil_print({code});")
         elif n.kind == "call":
             if n.name not in functions:
                 raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
@@ -403,6 +400,7 @@ def emit_c(
             "net_ip",
             "net_leave",
             "net_join",
+            "print",
         )
     ]
     calls = [n for n in top if n.kind == "call"]
@@ -423,6 +421,7 @@ def emit_c(
             "net_ip",
             "net_leave",
             "net_join",
+            "print",
             "call",
             "noop",
         )

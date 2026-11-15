@@ -95,8 +95,11 @@ def parse_syntax(
         current_function = next(
             (frame[2] for frame in reversed(stack) if frame[1] == "function"), None
         )
-        if version == "2":
-            # Version1 keeps legacy global var(); version2 uses var() locally.
+        if version == "2" and current_function is not None:
+            # Version1 keeps legacy global var(); version2 uses var() locally
+            # *inside a function*.  At top level there is no local storage, so
+            # var() stays the global there -- otherwise every top-level
+            # assignment would be impossible in version 2.
             # Rewrite only unquoted tokens; varl() always denotes a global.
             for match in reversed(list(re.finditer(r'\bvar\(',mask_strings(line)))):
                 line=line[:match.start()]+"local("+line[match.end():]
@@ -223,8 +226,22 @@ def parse_syntax(
             functions[name] = node
             stack.append((node.body, "function", node))
             continue
+        if line.startswith("else if "):
+            if stack[-1][1] not in ("if", "if-chained"):
+                raise CompileError(
+                    f"{path}:{line_no}: 'else if' must follow an if",
+                    hint="write `else`, then put `if` on its own line inside it",
+                    needle="else if",
+                )
+            parent = stack[-1][2]
+            assert parent is not None
+            stack[-1] = (parent.otherwise, "else", parent)
+            node = Node("if", line_no, value=line[len("else if ") :].strip(), chained=True)
+            parent.otherwise.append(node)
+            stack.append((node.body, "if-chained", node))
+            continue
         if line == "else":
-            if stack[-1][1] != "if":
+            if stack[-1][1] not in ("if", "if-chained"):
                 raise CompileError(f"{path}:{line_no}: 'else' must match an if")
             block = stack[-1][2]
             assert block is not None
@@ -233,8 +250,15 @@ def parse_syntax(
         if line == "end":
             if len(stack) == 1:
                 raise CompileError(f"{path}:{line_no}: unexpected 'end'")
-            _, kind, _ = stack.pop()
-            if kind not in ("function", "if", "else", "while", "for"):
+            frame_nodes, kind, block = stack.pop()
+            if kind == "if-chained" or (
+                kind == "else" and block is not None and block.chained
+            ):
+                # `else if` opens one nested if per link; one `end` closes the
+                # whole chain, so pop the else frames that belong to it too.
+                while len(stack) > 1 and stack[-1][1] == "else":
+                    stack.pop()
+            if kind not in ("function", "if", "if-chained", "else", "while", "for"):
                 raise CompileError(f"{path}:{line_no}: mismatched block end")
             continue
         if line.startswith("if "):
@@ -421,6 +445,10 @@ def parse_syntax(
                 node = Node("clear", line_no, value=line[len("clear rgba") :])
             elif line.startswith("display "):
                 node = Node("display", line_no, value=line[len("display ") :])
+            elif line == "print" or line.startswith("print "):
+                node = Node("print", line_no, value=line[len("print") :].strip())
+            elif line == "say" or line.startswith("say "):
+                node = Node("print", line_no, value=line[len("say") :].strip())
             elif m := re.fullmatch(r"(?:net\s+host|nethost|netHost)\(([0-9]+)\)(?:\s+(--local))?", line):
                 validate_port(path, line_no, m.group(1))
                 node = Node("net_host", line_no, value=m.group(1),params=['local'] if m[2] else [])

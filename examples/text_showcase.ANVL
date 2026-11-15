@@ -1,0 +1,29 @@
+# Text, print and the one number format, on one screen.
+# Build and run: python compiler/anvil.py examples/text_showcase.ANVL -o text_showcase.exe
+scene 2d
+set var(score) = 84
+set var(area) = 12.5663706143592
+
+fn(grade)
+  if var(score) >= 90
+    output 4
+  else if var(score) >= 80
+    output 3
+  else
+    output 1
+  end
+end
+
+fn(draw)
+  clear rgba(12, 16, 24, 255)
+  display text("Anvil text showcase") -l(28, 24) -rgb(237, 243, 255)
+  display text("area = " + var(area)) -l(28, 64) -rgb(157, 199, 255)
+  display text("score " + var(score) + " of 100 gives grade " + call fn(grade)) -l(28, 96) -rgb(157, 199, 255)
+  display text("upper: " + upper("quiet words")) -l(28, 136) -rgb(226, 178, 66)
+  display text("trim: [" + trim("   padded   ") + "]  mid: " + mid("abcdef", 2, 3)) -l(28, 168) -rgb(226, 178, 66)
+  display text("round 2.715 -> " + round(2.715, 2) + "   mod(-5, 3) -> " + mod(-5, 3) + "   len -> " + len("hello")) -l(28, 208) -rgb(150, 232, 180)
+  display text("clamp(15, 0, 10) -> " + clamp(15, 0, 10) + "   hypot(3, 4) -> " + hypot(3, 4)) -l(28, 240) -rgb(150, 232, 180)
+end
+
+print "console: area = " + var(area)
+print "console: grade = " + call fn(grade)

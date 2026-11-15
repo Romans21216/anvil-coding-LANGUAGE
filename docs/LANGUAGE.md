@@ -98,9 +98,69 @@ end
 
 The runnable example is `examples/local_arrays.ANVL`; it prints `27`.
 
+## Text and print
+
+A quoted string is a text value. Text appears in `display text(...)`, `print`, and
+the text built-ins. `+` joins text; a number on either side of a text `+` is
+formatted with the one Anvil number format (`%.15g` — the same output the console
+uses), so one label can mix any number of literal pieces and numeric
+expressions. `=` and `==` compare text and `!=` negates them; no other operator
+applies to text, and using one is a compile error that says so.
+
+```anv
+print "score " + var(score) + " / " + var(best)
+display text("area = " + area-circle(var(radius))) -l(20, 40)
+print "name: " + upper(trim("  anvil  "))
+```
+
+`print <text>` writes one line to the console from anywhere: top level, a
+function, `fn(update)` or `fn(draw)`. `print` alone writes a blank line, and
+`say` is an accepted alias. Nothing else prints — `output` returns a value, and a
+console program prints only `fn(main)`'s return value when it ends.
+
+| Call | Result |
+| --- | --- |
+| `len(text)` | byte length |
+| `ord(text)` | first byte's code, 0 for empty text |
+| `find(text, needle)` | byte index of `needle`, -1 when absent |
+| `upper(text)` / `lower(text)` | ASCII case conversion |
+| `trim(text)` | strips spaces, tabs, CR and LF from both ends |
+| `mid(text, start, count)` | `count` bytes from `start`, clamped to the text |
+| `replace(text, from, to)` | every occurrence replaced |
+| `chr(code)` | one-character text for a code 0..255 |
+
+Text results live in a 256 KiB scratch arena and stay valid until the statement
+that built them finishes, which is all a display call or a `print` needs. There
+is no text variable type yet: build text inside the `display`/`print` expression
+that consumes it. `examples/text_showcase.ANVL` puts all of this on one screen
+(capture: `docs/assets/text_showcase.png`), and prints the same values to the
+console.
+
+## Errors and diagnostics
+
+A compile error is reported the way a modern compiler reports one: the message,
+the exact file, line and column, the source line, a caret under the offending
+token, and a `help:` line that says what to write instead.
+
+```
+error: expected a number, got a string
+  --> build/hud.ANVL:14:22
+   |
+14 |   print "score " + var(score) * "x"
+   |                                ^^^
+   |
+   = help: text appears only in `display text(...)` and `print`; numbers are everywhere else
+```
+
+Unknown names and functions get a did-you-mean list, `else if` misuse explains
+the alternative, and runtime faults keep reporting `path:line:` before exiting
+with code 2. Warnings use the same layout with `warning:` and do not stop the
+build: drawing without a scene, `output` inside a loop (it returns at the first
+iteration), and statements after an `output` (unreachable) are reported.
+
 ## Expressions
 
-Supported arithmetic operators are `+`, `-`, `*`, `/`, and `%`; comparison operators are `=`, `==`, `!=`, `<`, `<=`, `>`, and `>=`; conditions can use `and` and `or`. Both logical operators short-circuit: `false and right` skips `right`, and `true or right` skips `right`, including calls with side effects. Arithmetic binds more tightly than comparisons, then `and`, then `or`. Numeric literals may be integers or decimals. `var(name)` reads a global or shadowing parameter; `local(name)` reads function-local state; `call fn(name, arguments...)` calls a function and evaluates to its numeric return value. Function arguments evaluate exactly once, from left to right, including nested calls; this order is independent of the selected C compiler.
+Supported arithmetic operators are `+`, `-`, `*`, `/`, and `%`; comparison operators are `=`, `==`, `!=`, `<`, `<=`, `>`, and `>=`; conditions can use `and` and `or`. Both logical operators short-circuit: `false and right` skips `right`, and `true or right` skips `right`, including calls with side effects. Arithmetic binds more tightly than comparisons, then `and`, then `or`. Numeric literals may be integers or decimals. `var(name)` reads a global or shadowing parameter; in version 2 inside a function `var(name)` is local storage, and `varl(name)` always reads the global; `local(name)` reads function-local state; `call fn(name, arguments...)` calls a function and evaluates to its numeric return value. Function arguments evaluate exactly once, from left to right, including nested calls; this order is independent of the selected C compiler. At top level `var(name)` is always the global, in both language versions.
 
 `while condition` begins a loop and `end` closes it. The condition is checked before each iteration. Ensure the loop body changes state used by its condition so the loop can finish. Loops can be nested inside functions, branches, or other loops.
 
@@ -130,7 +190,7 @@ fn(count-down)
 end
 ```
 
-Built-ins currently include `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held("left"|"right"|"middle")`, `mouse_wheel()`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `sqrt`, `sin`, `cos`, `abs`, `min`, and `max`. The implemented key names include letters, `SPACE`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, and `ESCAPE`. Mouse coordinates use the fixed 960×600 virtual game frame and return `-1` when the pointer is in a letterbox bar or outside the window. Mouse pressed state is an edge held until the next fixed update; held state persists until button release or window focus loss. `mouse_wheel()` returns the signed wheel detents received during the current fixed update. The string-taking ray backend built-ins are described in the drawing section below.
+Built-ins currently include `time()`, `delta()`, `pressed(KEY)`, `held(KEY)`, `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held("left"|"right"|"middle")`, `mouse_wheel()`, `rnd(low,high)`, `seed(value)`, `noise(x,y,z)`, `fbm(x,y,z,octaves,lacunarity,gain)`, `floor`, `ceil`, `round(value[,places])`, `sqrt`, `sin`, `cos`, `tan`, `abs`, `sign`, `min`, `max`, `clamp(value,low,high)`, `pow(base,exponent)`, `hypot(x,y)`, `log`, `log10`, `exp`, `atan2(y,x)`, and `mod(value,divisor)`. `round` rounds half away from zero; its second argument is the number of decimal places (negative rounds to tens, hundreds, ...). `clamp` returns `low` when `low > high`. `mod` is the floored modulo, so `mod(-5, 3)` is `1` (the `%` operator stays C `fmod`, which gives `-2`). The text built-ins are listed in the text section above. The implemented key names include letters, `SPACE`, `UP`, `DOWN`, `LEFT`, `RIGHT`, `ENTER`, and `ESCAPE`. Mouse coordinates use the fixed 960×600 virtual game frame and return `-1` when the pointer is in a letterbox bar or outside the window. Mouse pressed state is an edge held until the next fixed update; held state persists until button release or window focus loss. `mouse_wheel()` returns the signed wheel detents received during the current fixed update. The string-taking ray backend built-ins are described in the drawing section below.
 
 The image/sprite built-ins are `image_load(path)`, `image_width(handle)`, `image_height(handle)`, `image_draw(handle,x,y)`, `image_draw_scaled(handle,x,y,width,height)`, and `image_destroy(handle)`. `image_load` accepts a quoted path relative to the process working directory and returns a positive numeric generational handle, or `0` if the file is missing/unsupported, limits are exceeded, or no slot is available. The first allocations use handles 1 through 64; reusing a released slot gets a new value, so a stale handle cannot alias a later image. The loader supports uncompressed 24-bit and 32-bit BMP files; PNG, JPEG, compressed BMP, and other formats are not supported. If a 32-bit BMP has all alpha bytes clear, it is treated as opaque to support files written with an unused reserved byte. Images are limited to 8,192 pixels per side, 16,777,216 total pixels per image, and 128 MiB combined decoded image data. `image_width` and `image_height` return 0 for invalid handles. Draw calls alpha-blend onto the software framebuffer using nearest-neighbor scaling and return 1 for a valid draw request or 0 for an invalid handle/arguments; draws outside the 960×600 viewport are clipped. `image_destroy(handle)` frees that resource and returns 1, or returns 0 for an invalid or already-released handle. The runtime releases all remaining images when the game closes. See `examples/image_sprite.ANVL` and its BMP asset.
 

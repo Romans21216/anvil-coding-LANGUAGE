@@ -58,6 +58,10 @@ int anvil_runtime_register_shutdown_hook(AnvilRuntimeShutdownHook hook);
 uint32_t *anvil_runtime_framebuffer(void);
 double anvil_divide(double numerator, double denominator, const char *path,
                     int line);
+double anvil_round(double value, double places);
+double anvil_clamp(double value, double low, double high);
+double anvil_sign(double value);
+double anvil_mod(double numerator, double denominator);
 double anvil_check_number(double value, const char *path, int line);
 void anvil_set_fixed_hz(int hz);
 void anvil_set_scene3d(int enabled);
@@ -95,10 +99,29 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
                   int b, int a);
 void anvil_plane(double x, double y, double z, double width, double depth,
                  int r, int g, int b, int a);
+/* One number format for every Anvil output path: console, screen text, print. */
+#define ANVIL_NUMBER_FORMAT "%.15g"
+
 void anvil_text(double x, double y, const char *text, int r, int g, int b,
                 int a);
 void anvil_text_number(double x, double y, const char *format, double value,
                        int r, int g, int b, int a);
+void anvil_print(const char *text);
+
+/* Text values: const char* built from literals, numbers and text builtins. */
+const char *anvil_str_num(double value);
+const char *anvil_str_cat(const char *left, const char *right);
+double anvil_str_equal(const char *left, const char *right);
+double anvil_text_len(const char *text);
+double anvil_text_ord(const char *text);
+double anvil_text_find(const char *text, const char *needle);
+const char *anvil_text_upper(const char *text);
+const char *anvil_text_lower(const char *text);
+const char *anvil_text_trim(const char *text);
+const char *anvil_text_mid(const char *text, double start, double count);
+const char *anvil_text_chr(double code);
+const char *anvil_text_replace(const char *text, const char *from,
+                               const char *to);
 double anvil_time(void);
 double anvil_delta(void);
 double anvil_pressed(int key);

@@ -95,7 +95,47 @@ BUILTINS = {
     "physics_step": (0, 0),
     "ray_backend": (1, 1),
     "ray_backend_available": (1, 1),
+    "round": (1, 2),
+    "clamp": (3, 3),
+    "sign": (1, 1),
+    "pow": (2, 2),
+    "log": (1, 1),
+    "log10": (1, 1),
+    "exp": (1, 1),
+    "tan": (1, 1),
+    "atan2": (2, 2),
+    "mod": (2, 2),
+    "hypot": (2, 2),
 }
+
+# Text builtins take text arguments and return text or a number.  The spec is
+# the argument list; the second element is the result type.
+TEXT_BUILTINS = {
+    "len": (("text",), "number"),
+    "ord": (("text",), "number"),
+    "find": (("text", "text"), "number"),
+    "upper": (("text",), "string"),
+    "lower": (("text",), "string"),
+    "trim": (("text",), "string"),
+    "mid": (("text", "number", "number"), "string"),
+    "replace": (("text", "text", "text"), "string"),
+    "chr": (("number",), "string"),
+}
+
+TEXT_BUILTIN_C_NAMES = {
+    "len": "anvil_text_len",
+    "ord": "anvil_text_ord",
+    "find": "anvil_text_find",
+    "upper": "anvil_text_upper",
+    "lower": "anvil_text_lower",
+    "trim": "anvil_text_trim",
+    "mid": "anvil_text_mid",
+    "replace": "anvil_text_replace",
+    "chr": "anvil_text_chr",
+}
+
+# Trailing arguments that a builtin fills in when the call is shorter.
+BUILTIN_DEFAULTS = {"round": ["0.0"]}
 
 BUILTIN_C_NAMES = {
     "time": "anvil_time",
@@ -141,6 +181,17 @@ BUILTIN_C_NAMES = {
     "physics_step": "anvil_physics_step",
     "ray_backend": "anvil_ray_backend",
     "ray_backend_available": "anvil_ray_backend_available",
+    "round": "anvil_round",
+    "clamp": "anvil_clamp",
+    "sign": "anvil_sign",
+    "pow": "pow",
+    "log": "log",
+    "log10": "log10",
+    "exp": "exp",
+    "tan": "tan",
+    "atan2": "atan2",
+    "mod": "anvil_mod",
+    "hypot": "hypot",
 }
 
 BUILTIN_STRING_ARGUMENTS = {
@@ -428,6 +479,26 @@ class ExpressionParser:
             )
         elif kind == "word" and value in KEY_CODES:
             left = ("ANVIL_KEY_" + value, "number")
+        elif kind == "word" and value in TEXT_BUILTINS:
+            spec, result = TEXT_BUILTINS[value]
+            self.expect("(")
+            args = []
+            for position, want in enumerate(spec):
+                if position:
+                    self.expect(",")
+                if want == "text":
+                    args.append(self.parse_text_argument())
+                else:
+                    code, argument_kind = self.parse()
+                    args.append(
+                        self.checked_number(self.require_number((code, argument_kind)))
+                    )
+            self.expect(")")
+            call = f"{TEXT_BUILTIN_C_NAMES[value]}({', '.join(args)})"
+            if result == "number":
+                left = (self.checked_number(call), "number")
+            else:
+                left = (call, "string")
         elif kind == "word" and value in BUILTINS:
             self.expect("(")
             args = []
@@ -449,6 +520,9 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: {value}() expects {expected} "
                     f"argument(s), got {len(args)}"
                 )
+            defaults = BUILTIN_DEFAULTS.get(value)
+            if defaults and len(args) < high:
+                args.extend(defaults[len(args) - low:])
             name = BUILTIN_C_NAMES.get(value, value)
             call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"
             if value in BUILTINS:
@@ -472,8 +546,12 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: operator {operator!r} needs "
                     "a right operand"
                 )
+            right_code, right_kind = self.parse(precedence + 1)
+            if left[1] == "string" or right_kind == "string":
+                left = self.combine_text(operator, left, right_code, right_kind)
+                continue
             left_code = self.checked_number(self.require_number(left))
-            right = self.require_number(self.parse(precedence + 1))
+            right = self.require_number((right_code, right_kind))
             if operator == "/":
                 left = (
                     f"anvil_divide({left_code}, {right}, "
@@ -508,14 +586,51 @@ class ExpressionParser:
                 )
         return left
 
-    def compile(self, expected: str = "number") -> str:
+    def combine_text(self, operator, left, right_code, right_kind):
+        """Join text with `+`, compare text, or refuse a meaningless operator."""
+        left_code, left_kind = left
+        if operator == "+":
+            joined = [
+                code if kind == "string" else f"anvil_str_num({self.checked_number(code)})"
+                for code, kind in ((left_code, left_kind), (right_code, right_kind))
+            ]
+            return (f"anvil_str_cat({joined[0]}, {joined[1]})", "string")
+        if operator in ("=", "==", "!=") and left_kind == right_kind == "string":
+            equal = f"anvil_str_equal({left_code}, {right_code})"
+            return (equal if operator != "!=" else f"(1.0 - {equal})", "number")
+        raise CompileError(
+            f"{self.path}:{self.line}: operator {operator!r} does not apply to text",
+            hint="text supports + (join), =, == and != only",
+        )
+
+    def parse_text_argument(self) -> str:
+        code, kind = self.parse()
+        if kind != "string":
+            raise CompileError(
+                f"{self.path}:{self.line}: expected text, got a number",
+                hint="pass a quoted string, or build one with upper/lower/trim/mid/replace/chr",
+            )
+        return code
+
+    def parse_full(self) -> tuple[str, str]:
         result = self.parse()
         if self.peek():
             raise CompileError(
                 f"{self.path}:{self.line}: unexpected token "
-                f"{self.tokens[self.index][1]!r} in expression"
+                f"{self.tokens[self.index][1]!r} in expression",
+                needle=self.tokens[self.index][1],
             )
-        code, actual = result
+        return result
+
+    def compile(self, expected: str = "number") -> str:
+        code, actual = self.parse_full()
+        if expected == "text":
+            if actual != "string":
+                raise CompileError(
+                    f"{self.path}:{self.line}: expected text, got a number",
+                    hint="text is a quoted string or a text expression made with +",
+                )
+            return code
         if actual != expected:
             raise CompileError(
                 f"{self.path}:{self.line}: expected {expected}, got {actual}"

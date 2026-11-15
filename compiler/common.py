@@ -27,6 +27,7 @@ class Node:
     source: pathlib.Path | None = None
     original_name: str = ""
     c_temporaries: set[str] = field(default_factory=set)
+    chained: bool = False
 
 
 class ArrayDeclarations(dict):
@@ -51,7 +52,17 @@ class ParsedProgram:
 
 
 class CompileError(Exception):
-    pass
+    """A compiler diagnostic: message plus optional hint and caret span.
+
+    The message keeps its `path:line: text` shape so tools and tests can read it
+    as data; `render()` turns the same object into a Rust-style report.
+    """
+
+    def __init__(self, message, hint=None, needle=None, length=None):
+        super().__init__(message)
+        self.hint = hint
+        self.needle = needle      # the text to underline on the source line
+        self.length = length      # caret width; defaults to len(needle)
 
 
 IDENTIFIER = r"[A-Za-z_][\w-]*"
@@ -130,6 +141,23 @@ RUNTIME_C_NAMES = {
     "anvil_plane",
     "anvil_text",
     "anvil_text_number",
+    "anvil_print",
+    "anvil_str_num",
+    "anvil_str_cat",
+    "anvil_str_equal",
+    "anvil_text_len",
+    "anvil_text_ord",
+    "anvil_text_find",
+    "anvil_text_upper",
+    "anvil_text_lower",
+    "anvil_text_trim",
+    "anvil_text_mid",
+    "anvil_text_chr",
+    "anvil_text_replace",
+    "anvil_round",
+    "anvil_clamp",
+    "anvil_sign",
+    "anvil_mod",
     "anvil_time",
     "anvil_delta",
     "anvil_pressed",
