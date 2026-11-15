@@ -58,6 +58,9 @@ int anvil_runtime_register_shutdown_hook(AnvilRuntimeShutdownHook hook);
 uint32_t *anvil_runtime_framebuffer(void);
 double anvil_divide(double numerator, double denominator, const char *path,
                     int line);
+void anvil_frame_enter(const char *name, const char *path, int line);
+void anvil_frame_leave(void);
+void anvil_report_call_stack(void);
 double anvil_round(double value, double places);
 double anvil_clamp(double value, double low, double high);
 double anvil_sign(double value);

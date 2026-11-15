@@ -21,6 +21,54 @@ from compiler.common import (
 MAX_EXPRESSION_DEPTH = 64
 _PARSE_DEPTH = ContextVar("anvil_expression_parse_depth", default=0)
 
+_NUMBER_LITERAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
+
+
+def _literal_array_index(text):
+    """Return the value of a bare number literal, or None when it is computed.
+
+    A literal index is knowable at compile time, so a fractional or
+    out-of-range one can be rejected here instead of dying at run time.
+    """
+    stripped = text.strip()
+    if not _NUMBER_LITERAL.fullmatch(stripped):
+        return None
+    try:
+        return float(stripped)
+    except ValueError:
+        return None
+
+
+def check_literal_array_index(text, size, name, path, line):
+    """Reject a literal index that is fractional or out of range.
+
+    Computed indexes are left to the run-time check. This runs for both
+    array reads and array writes so the two paths cannot disagree.
+    """
+    literal_index = _literal_array_index(text)
+    if literal_index is None:
+        return
+    spelling = text.strip()
+    if literal_index != int(literal_index):
+        raise CompileError(
+            f"{path}:{line}: array index must be a whole number, got {spelling}",
+            hint="array(a, 1.5) is not valid; use a whole number such as array(a, 1)",
+            needle=spelling,
+        )
+    if literal_index < 0:
+        raise CompileError(
+            f"{path}:{line}: array index must be zero or greater, got {spelling}",
+            hint=f"valid indexes are 0 to {size - 1}",
+            needle=spelling,
+        )
+    if literal_index >= size:
+        raise CompileError(
+            f"{path}:{line}: array index {int(literal_index)} is past the end "
+            f"of {name!r} (size {size})",
+            hint=f"valid indexes are 0 to {size - 1}",
+            needle=spelling,
+        )
+
 
 def validate_expression_depth(source, path, line):
     depth, quoted, escaped = 0, False, False
@@ -387,6 +435,7 @@ class ExpressionParser:
             size = array_size(name, self.scope, self.arrays)
             if size is None:
                 raise CompileError(f"{self.path}:{self.line}: unknown array {name!r}")
+            check_literal_array_index(parts[1], size, name, self.path, self.line)
             index_expr = ExpressionParser(
                 self.path,
                 self.line,

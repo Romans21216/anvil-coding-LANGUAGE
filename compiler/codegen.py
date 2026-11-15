@@ -17,7 +17,7 @@ from compiler.common import (
     c_bytes_literal,
     variable_code,
 )
-from compiler.expressions import expr, split_args
+from compiler.expressions import check_literal_array_index, expr, split_args
 from compiler.display_syntax import take_display_modifiers as _take_display_modifiers
 from compiler.lexer import mask_strings
 from compiler.runtime_modules import MODULES as RUNTIME_MODULES
@@ -37,6 +37,13 @@ def rgb_style(
 ) -> tuple[list[str], str]:
     color = ["255", "255", "255", "255"]
     modifiers, raw = _take_display_modifiers(raw, {"rgb", "rgba"}, path, line)
+    if len(modifiers) > 1:
+        names = ", ".join("-" + name for name, _ in modifiers)
+        raise CompileError(
+            f"{path}:{line}: display colour given more than once ({names})",
+            hint="use a single -rgb(r,g,b) or -rgba(r,g,b,a) modifier per display",
+            needle="-" + modifiers[1][0],
+        )
     if modifiers:
         vals = split_args(modifiers[0][1])
         if len(vals) not in (3, 4):
@@ -86,12 +93,18 @@ def _lower_display(
                 raise CompileError(f"{path}:{node.line}: -l expects x,y")
             loc = values
     call = re.fullmatch(
-        r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?",
+        r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+([0-9]+))?",
         raw.strip(),
     )
     if not call:
         raise CompileError(f"{path}:{node.line}: malformed display command")
-    shape, arg_text = call.groups()
+    shape, arg_text, trailing = call.groups()
+    if trailing is not None:
+        raise CompileError(
+            f"{path}:{node.line}: the number {trailing} after a display call has no effect",
+            hint="remove it; display draws in statement order, so it does nothing",
+            needle=trailing,
+        )
     args = split_args(arg_text)
     if shape == "text" and loc and len(args) == 1:
         code = text_expression(
@@ -122,7 +135,13 @@ def _lower_display(
         thick = values[4] if len(values) == 5 else "1.0"
         return shape, f"{ind}anvil_line({', '.join(values[:4])}, {tail}, {thick});"
     if shape == "text" and loc and len(values) == 1:
-        return shape, f"{ind}anvil_text({', '.join(loc)}, {values[0]}, {tail});"
+        return shape, f"{ind}anvil_text({', '.join(loc)}, {values[0]}, {', '.join(color)});"
+    if shape == "text" and loc is None:
+        raise CompileError(
+            f"{path}:{node.line}: display text requires -l(x, y)",
+            hint="add a position: display text(\"hello\") -l(20, 20)",
+            needle="display text",
+        )
     raise CompileError(f"{path}:{node.line}: invalid arguments for display {shape}")
 
 def emit_display(path, node, ind, functions, scope=None, arrays=None) -> str:
@@ -170,6 +189,7 @@ def emit_nodes(
             size = array_size(n.name, scope, arrays)
             if size is None:
                 raise CompileError(f"{path}:{n.line}: unknown array {n.name!r}")
+            check_literal_array_index(n.params[0], size, n.name, path, n.line)
             suffix = f"{c_name(scope.name if scope else 'top')}_{n.line}"
             index_var, value_var = (
                 f"_anvil_array_index_{suffix}",

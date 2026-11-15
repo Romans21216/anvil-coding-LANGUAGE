@@ -20,6 +20,41 @@ enum {
   ANVIL_MOUSE_BUTTONS = 3
 };
 enum { ANVIL_TRACE_SPHERES = 32 };
+
+/* Call stack: every Anvil function pushes a frame on entry and pops it on
+   return, so a fatal run-time error can name the chain of callers instead of
+   only the line that died. */
+enum { ANVIL_FRAME_DEPTH = 64 };
+typedef struct {
+  const char *name;
+  const char *path;
+  int line;
+} AnvilFrame;
+static AnvilFrame anvil_frames[ANVIL_FRAME_DEPTH];
+static int anvil_frame_depth = 0;
+
+void anvil_frame_enter(const char *name, const char *path, int line) {
+  if (anvil_frame_depth < ANVIL_FRAME_DEPTH) {
+    anvil_frames[anvil_frame_depth].name = name;
+    anvil_frames[anvil_frame_depth].path = path;
+    anvil_frames[anvil_frame_depth].line = line;
+  }
+  anvil_frame_depth++;
+}
+
+void anvil_frame_leave(void) {
+  if (anvil_frame_depth > 0)
+    anvil_frame_depth--;
+}
+
+void anvil_report_call_stack(void) {
+  int index = anvil_frame_depth < ANVIL_FRAME_DEPTH ? anvil_frame_depth
+                                                    : ANVIL_FRAME_DEPTH;
+  while (index-- > 0)
+    fprintf(stderr, "  in fn(%s) at %s:%d\n", anvil_frames[index].name,
+            anvil_frames[index].path ? anvil_frames[index].path : "<Anvil>",
+            anvil_frames[index].line);
+}
 static const double ANVIL_NEAR_DEPTH = 0.08;
 enum {
   ANVIL_RAY_BACKEND_BVH,
@@ -739,12 +774,45 @@ void anvil_print(const char *text) {
   fflush(stdout);
 }
 
+enum { ANVIL_FRAME_DEPTH = 64 };
+typedef struct {
+  const char *name;
+  const char *path;
+  int line;
+} AnvilFrame;
+static AnvilFrame anvil_frames[ANVIL_FRAME_DEPTH];
+static int anvil_frame_depth = 0;
+
+void anvil_frame_enter(const char *name, const char *path, int line) {
+  if (anvil_frame_depth < ANVIL_FRAME_DEPTH) {
+    anvil_frames[anvil_frame_depth].name = name;
+    anvil_frames[anvil_frame_depth].path = path;
+    anvil_frames[anvil_frame_depth].line = line;
+  }
+  anvil_frame_depth++;
+}
+
+void anvil_frame_leave(void) {
+  if (anvil_frame_depth > 0)
+    anvil_frame_depth--;
+}
+
+void anvil_report_call_stack(void) {
+  int index = anvil_frame_depth < ANVIL_FRAME_DEPTH ? anvil_frame_depth
+                                                    : ANVIL_FRAME_DEPTH;
+  while (index-- > 0)
+    fprintf(stderr, "  in fn(%s) at %s:%d\n", anvil_frames[index].name,
+            anvil_frames[index].path ? anvil_frames[index].path : "<Anvil>",
+            anvil_frames[index].line);
+}
+
 double anvil_time(void) { return anvil_elapsed_seconds; }
 double anvil_delta(void) { return anvil_delta_seconds; }
 double anvil_check_number(double value, const char *path, int line) {
   if (!isfinite(value)) {
     fprintf(stderr, "%s:%d: numeric overflow or non-finite result\n",
             path ? path : "<Anvil>", line);
+    anvil_report_call_stack();
     exit(2);
   }
   return value;
@@ -755,6 +823,7 @@ double anvil_divide(double numerator, double denominator, const char *path,
   denominator = anvil_check_number(denominator, path, line);
   if (denominator == 0.0) {
     fprintf(stderr, "%s:%d: division by zero\n", path ? path : "<Anvil>", line);
+    anvil_report_call_stack();
     exit(2);
   }
   return anvil_check_number(numerator / denominator, path, line);
@@ -797,6 +866,7 @@ double anvil_mod(double numerator, double denominator) {
   double result;
   if (denominator == 0.0) {
     fprintf(stderr, "modulo by zero\n");
+    anvil_report_call_stack();
     exit(2);
   }
   result = fmod(numerator, denominator);
@@ -1529,6 +1599,7 @@ static size_t anvil_array_checked_index(const double *values, int size,
             "%s:%d: array index %.15g is invalid; expected an integer from 0 "
             "through %d\n",
             source ? source : "<generated>", line, index, size - 1);
+    anvil_report_call_stack();
     exit(2);
   }
   return (size_t)index;

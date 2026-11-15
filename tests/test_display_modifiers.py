@@ -45,10 +45,13 @@ class DisplayModifierTests(unittest.TestCase):
         self.assertIn('anvil_text(0.0, 0.0, ' + json.dumps(LITERALS[0])
                       + ', 255, 255, 255, 255);', generated)
 
-    def test_multiple_colors_preserve_first_color_contract(self):
-        generated = self.generate(source_for('first color',
-                                 '-rgb(9,8,7) -l(0,0) -rgba(1,2,3,4)'))
-        self.assertIn('"first color", 9.0, 8.0, 7.0, 255);', generated)
+    def test_repeated_colour_modifiers_are_rejected(self):
+        for suffix in ('-rgb(9,8,7) -l(0,0) -rgba(1,2,3,4)',
+                       '-rgb(1,2,3) -rgb(9,9,9)'):
+            with self.subTest(suffix=suffix), self.assertRaises(CompileError) as error:
+                self.generate(source_for('first color', suffix))
+            self.assertIn('display colour given more than once', str(error.exception))
+            self.assertIn('display.ANVL:3:', str(error.exception))
 
     def test_duplicate_and_unclosed_real_modifiers_are_source_located(self):
         for suffix in ('-l(0,0) -l(1,2)', '-l(0,0) -rotate(1,2,3) -rotate(4,5,6)',

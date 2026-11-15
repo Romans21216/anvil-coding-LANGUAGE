@@ -856,7 +856,7 @@ class CompilerTests(unittest.TestCase):
             result = subprocess.run([str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(result.stdout.strip(), "10")
 
-    def test_array_index_is_checked_at_runtime(self):
+    def test_literal_array_index_is_rejected_at_build_time(self):
         for index in ("-1", "2", "0.5"):
             with self.subTest(index=index), tempfile.TemporaryDirectory() as temp:
                 source = pathlib.Path(temp) / "array-bounds.ANVL"
@@ -869,11 +869,30 @@ class CompilerTests(unittest.TestCase):
                     "call fn(main)\n",
                     encoding="utf-8",
                 )
-                subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
-                result = subprocess.run([str(out)], capture_output=True, text=True)
-                self.assertEqual(result.returncode, 2)
+                result = subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
                 self.assertIn("array index", result.stderr)
                 self.assertIn("array-bounds.ANVL:3:", result.stderr)
+                self.assertFalse(out.exists())
+
+    def test_computed_array_index_is_checked_at_runtime(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "array-bounds.ANVL"
+            out = pathlib.Path(temp) / "array-bounds.exe"
+            source.write_text(
+                "array values(2)\n"
+                "set var(bad) = 2\n"
+                "fn(main)\n"
+                "  output array(values, var(bad))\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
+            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
+            result = subprocess.run([str(out)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("array index", result.stderr)
+            self.assertIn("array-bounds.ANVL:4:", result.stderr)
 
     def test_array_index_side_effect_evaluates_once(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -997,7 +1016,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("active local arrays exceed the 16 MiB Anvil memory limit", result.stderr)
             self.assertIn("local-array-budget.ANVL:2:", result.stderr)
 
-    def test_function_local_array_bounds_are_checked_at_runtime(self):
+    def test_function_local_literal_array_index_is_rejected_at_build_time(self):
         with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "local-array-bounds.ANVL"
             out = pathlib.Path(temp) / "local-array-bounds.exe"
@@ -1009,11 +1028,30 @@ class CompilerTests(unittest.TestCase):
                 "call fn(main)\n",
                 encoding="utf-8",
             )
+            result = subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(pathlib.Path(temp) / "local-array-bounds.generated.c"), "--output", str(out)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("array index", result.stderr)
+            self.assertIn("local-array-bounds.ANVL:3:", result.stderr)
+            self.assertFalse(out.exists())
+
+    def test_function_local_computed_array_index_is_checked_at_runtime(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "local-array-bounds.ANVL"
+            out = pathlib.Path(temp) / "local-array-bounds.exe"
+            source.write_text(
+                "fn(main)\n"
+                "  array values(1)\n"
+                "  set local(bad) = 1\n"
+                "  output array(values, local(bad))\n"
+                "end\n"
+                "call fn(main)\n",
+                encoding="utf-8",
+            )
             subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(pathlib.Path(temp) / "local-array-bounds.generated.c"), "--output", str(out)], check=True, capture_output=True, text=True)
             result = subprocess.run([str(out)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 2)
             self.assertIn("array index", result.stderr)
-            self.assertIn("local-array-bounds.ANVL:3:", result.stderr)
+            self.assertIn("local-array-bounds.ANVL:4:", result.stderr)
 
     def test_local_array_references_are_function_scoped_and_name_checked(self):
         cases = (

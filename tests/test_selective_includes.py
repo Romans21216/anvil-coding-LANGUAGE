@@ -222,7 +222,9 @@ end
 
     @unittest.skipUnless(sys.platform=="win32","executes native/C runtime diagnostics")
     def test_qualified_runtime_errors_keep_unicode_library_path(self):
-        library=self.write("lib_λ_проба_日本_🙂.ANVL",'fn(value)\n array items(1)\n output array(items,2)\nend\n')
+        # A computed index still reaches the run-time check, so the library path
+        # in the diagnostic must survive the unicode name and the module prefix.
+        library=self.write("lib_λ_проба_日本_🙂.ANVL",'fn(value)\n array items(1)\n output array(items,1 + 1)\nend\n')
         path,program=self.program('include fn(value) - '+json.dumps(library.name)+' as labels\nfn(main)\n output call fn(value - labels)\nend\n')
         native=self.root/"error-native.exe"
         native.write_bytes(NativeCodegen(path,*program).generate())
@@ -238,6 +240,18 @@ end
                 diagnostics=result.stdout+result.stderr
                 self.assertIn(str(library).encode("utf-8"),diagnostics)
                 self.assertTrue(b":3:" in diagnostics or b"line 3 " in diagnostics,diagnostics)
+
+    def test_literal_index_in_include_is_rejected_with_unicode_library_path(self):
+        # A literal index is rejected at build time, so the unicode library path
+        # must survive into the compiler diagnostic.
+        library=self.write("lib_λ_проба_日本_🙂.ANVL",'fn(value)\n array items(1)\n output array(items,2)\nend\n')
+        path,program=self.program('include fn(value) - '+json.dumps(library.name)+' as labels\nfn(main)\n output call fn(value - labels)\nend\n')
+        with self.assertRaises(CompileError) as error:
+            emit_c(path,*program)
+        message=str(error.exception)
+        self.assertIn(str(library),message)
+        self.assertIn(":3:",message)
+        self.assertIn("array index",message)
 
     def test_all_source_private_identity_references_are_rejected_before_backend_builds(self):
         import contextlib
