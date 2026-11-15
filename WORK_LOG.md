@@ -168,8 +168,10 @@ Each of these was found by running code, and each is covered by a test.
 
 ## 6. Verification status
 
-- Branch gate: **622 passed, 1 skipped** (pytest) plus **116 differential probe
-  cases, 0 differences** between the C backend and the native x64 backend.
+- Project folder (this checkout): **275 passed** (`python -m pytest tests -q`,
+  184 s) after the library port — no regressions from the parser or loader changes.
+- Branch: **622 passed, 1 skipped** (pytest) plus **116 differential probe cases,
+  0 differences** between the C backend and the native x64 backend.
   Command: `python scripts/differential_probe.py` then `python -m pytest tests -q`.
 - Project folder: the slot game and the library demo both build with `cl.exe` and
   were verified from screenshots of real runs.
