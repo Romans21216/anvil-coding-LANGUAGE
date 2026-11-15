@@ -335,14 +335,15 @@ fn(draw)
     display text("SPIN  (SPACE)") -l(418, 499) -rgb(226, 178, 66)
   end
 
-  if var(state) = 2 and var(last_win) > 0
-    display text("PAYOUT " + var(last_win)) -l(428, 472) -rgb(150, 232, 180)
-  end
-  if var(state) = 2 and var(last_win) = 0
-    display text("NO WIN - TRY AGAIN") -l(406, 472) -rgb(150, 160, 180)
-  end
   if var(credits) < var(bet) and var(state) != 1
     display text("NOT ENOUGH CREDITS - R RESETS") -l(346, 472) -rgb(226, 96, 96)
+  else
+    if var(state) = 2 and var(last_win) > 0
+      display text("PAYOUT " + var(last_win)) -l(428, 472) -rgb(150, 232, 180)
+    end
+    if var(state) = 2 and var(last_win) = 0
+      display text("NO WIN - TRY AGAIN") -l(406, 472) -rgb(150, 160, 180)
+    end
   end
 
   if var(show_pay) = 1
