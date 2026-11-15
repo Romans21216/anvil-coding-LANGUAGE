@@ -25,8 +25,9 @@ slots.exe
 - **Animation**: each reel spins and stops in turn (0.9 s, 1.18 s, 1.46 s),
   then the result settles at 1.75 s.
 - **A paytable overlay** (P) with the symbol payouts and odds, and click-to-close.
-- **Classic cabinet**: bulbs along the top and bottom that pulse, a gold payline
-  that flashes on a win, credits / bet / win readouts.
+- **Classic cabinet**: bulbs along the top and bottom — steady while the machine
+  is idle, running a chase on a win — a gold payline that flashes on a win, and
+  credits / bet / win readouts.
 
 ## Controls
 
@@ -58,5 +59,7 @@ graphics happened to land.
 - a forced-jackpot build (every reel a seven) → WIN 500, PAYOUT 500,
   credits 695, payline flashing
 - P → paytable over a dimmed screen; click → closes
+- idle frames pixel-identical across a 15-pair capture (the bulbs used to
+  alternate twice a second, which read as flicker)
 - both backends are not a factor here: the scene engine is the C/MSVC path,
   which is the only one that renders windows
