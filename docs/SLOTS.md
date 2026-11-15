@@ -1,7 +1,9 @@
 # ANVIL SLOTS
 
 A complete 2D slot machine written in Anvil, drawn entirely from primitives —
-no image files, no external assets. Every symbol, panel, button and bulb is a
+no image files, no external assets.
+
+![ANVIL SLOTS running](assets/slots.png) Every symbol, panel, button and bulb is a
 rectangle, circle or line drawn by the engine's 2D path.
 
 Run it from Windows:
