@@ -785,5 +785,75 @@ class WasmImageTests(unittest.TestCase):
             self.assertIn("only literal image_load() paths", run.stdout)
 
 
+
+def _write_palette_bmp(path: pathlib.Path) -> None:
+    import struct
+
+    palette = [(10, 20, 30), (200, 100, 50)]
+    body = bytes((0, 1)) + b"\x00" * 2
+    entries = b"".join(bytes((b, g, r, 0)) for (r, g, b) in palette)
+    entries += b"\x00" * (4 * (256 - len(palette)))
+    offset = 54 + len(entries)
+    header = b"BM" + struct.pack("<IHHI", offset + len(body), 0, 0, offset)
+    info = struct.pack(
+        "<IiiHHIIiiII", 40, 2, 1, 1, 8, 0, len(body), 2835, 2835, len(palette), 0
+    )
+    path.write_bytes(header + info + entries + body)
+
+
+_REGION_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "clear rgba(0, 0, 0, 255)",
+        "set var(pic) = 0",
+        "set var(pal) = 0",
+        "",
+        "fn(update)",
+        "  if var(pic) = 0",
+        '    set var(pic) = image_load("quad.bmp")',
+        '    set var(pal) = image_load("pal.bmp")',
+        "  end",
+        "end",
+        "",
+        "fn(draw)",
+        "  set var(a) = image_draw_region(var(pic), 0, 0, 1, 1, 100, 100, 50, 50)",
+        "  set var(b) = image_draw_region(var(pic), 1, 0, 1, 1, 160, 100, 50, 50)",
+        "  set var(c) = image_draw_region(var(pic), 2, 2, 2, 2, 0, 0, 10, 10)",
+        "  set var(d) = image_draw_scaled(var(pal), 300, 100, 20, 10)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmRegionTests(unittest.TestCase):
+    def test_atlas_cells_and_eight_bit_bmps(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            _write_quad_bmp(root / "quad.bmp")
+            _write_palette_bmp(root / "pal.bmp")
+            result, out = build(root, _REGION_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            regions = [op for op in ops if op[0] == "image_region"]
+            self.assertEqual(len(regions), 2, "the out-of-bounds cell must draw nothing")
+            self.assertEqual(regions[0][3:11], [0, 0, 1, 1, 100, 100, 50, 50])
+            self.assertEqual(regions[1][3:11], [1, 0, 1, 1, 160, 100, 50, 50])
+            self.assertEqual(regions[0][-1], 1096806379)
+            images = [op for op in ops if op[0] == "image"]
+            self.assertEqual(len(images), 1)
+            self.assertEqual(images[0][1:7], [2, 1, 300, 100, 20, 10])
+            self.assertEqual(images[0][-1], 4067206025)
+
+
 if __name__ == "__main__":
     unittest.main()

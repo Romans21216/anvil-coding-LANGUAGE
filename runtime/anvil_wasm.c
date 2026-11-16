@@ -29,6 +29,12 @@ __attribute__((import_module("env"), import_name("save_write")))
 extern void anvil_host_save_write(const char *key, const char *value);
 __attribute__((import_module("env"), import_name("save_delete")))
 extern int anvil_host_save_delete(const char *key);
+__attribute__((import_module("env"), import_name("image_region")))
+extern void anvil_host_image_region(const unsigned int *pixels, int width,
+                                    int height, double sx, double sy, double sw,
+                                    double sh, double dx, double dy, double dw,
+                                    double dh, int tint_r, int tint_g, int tint_b,
+                                    int flip_x, int flip_y);
 __attribute__((import_module("env"), import_name("image_draw")))
 extern void anvil_host_image_draw(const unsigned int *pixels, int width,
                                   int height, double dx, double dy, double dw,
@@ -674,6 +680,25 @@ double anvil_image_draw_rotated(double handle, double cx, double cy,
   double height = (double)slot->source->height * scale;
   anvil_image_blit(slot, cx - width * 0.5, cy - height * 0.5, width, height,
                    degrees);
+  return 1.0;
+}
+
+
+double anvil_image_draw_region(double handle, double sx, double sy, double sw,
+                               double sh, double dx, double dy, double dw,
+                               double dh) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  if (!slot)
+    return 0.0;
+  double width = (double)slot->source->width;
+  double height = (double)slot->source->height;
+  if (!(sw > 0.0) || !(sh > 0.0) || !(dw == dw) || !(dh == dh) || sx < 0.0 ||
+      sy < 0.0 || sx + sw > width || sy + sh > height)
+    return 0.0;
+  anvil_host_image_region(slot->source->pixels, slot->source->width,
+                          slot->source->height, sx, sy, sw, sh, dx, dy, dw, dh,
+                          slot->tint_r, slot->tint_g, slot->tint_b,
+                          slot->flip_x, slot->flip_y);
   return 1.0;
 }
 

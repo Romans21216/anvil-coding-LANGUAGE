@@ -107,8 +107,8 @@ window.anvil.exports.anvil_frame(16);
 
 A browser cannot read files synchronously, so the wasm backend bakes images at
 build time instead of loading them at run time. Every `image_load("...")` with a
-literal string is decoded while compiling (24- and 32-bit BMP, 8,192 pixels per
-side, 4 MiB of baked pixels in total) and emitted as a C array; a computed path
+literal string is decoded while compiling (8-, 24- and 32-bit BMP, 8,192 pixels
+per side, 4 MiB of baked pixels in total) and emitted as a C array; a computed path
 cannot be baked and reports that through `image_error()` at run time, and a
 missing file is a located build error.
 
@@ -118,8 +118,12 @@ applied) and draws it scaled, flipped or rotated with smoothing disabled, so
 sprite art stays crisp. The Node host records the draw with a checksum of the
 pixels, which is what the tests assert.
 
-Not implemented yet: `image_draw_region` (atlas cells), 8/4-bit BMP, and any
-image loaded through a non-literal path.
+`image_draw_region` copies an atlas cell: the source rectangle must lie fully
+inside the image, otherwise the call returns 0 and draws nothing, exactly like
+the C runtime.
+
+Not implemented yet: 4-bit BMPs and any image loaded through a non-literal
+path.
 
 ## Saves
 
@@ -160,8 +164,7 @@ identical.
 - `sin`/`cos` lose accuracy for arguments far outside the reduced range (the
   test pins 1e6 radians, which still matches libm to six decimals); `tan` is not
   available yet.
-- Only literal `image_load()` paths are baked; `image_draw_region` and 8-bit
-  BMPs are not supported yet.
+- Only literal `image_load()` paths are baked; 4-bit BMPs are not supported.
 - `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
   same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the

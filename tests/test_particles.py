@@ -173,7 +173,15 @@ class ParticleWindowTests(unittest.TestCase):
             self.assertGreater(bright, 200, "the fresh particle should be nearly solid red")
 
             wait_for("mid")
-            mid = reader.pixel(480, 300)[0]
+            # The marker prints during draw, but the window presents a frame
+            # later, so poll briefly instead of reading a possibly stale pixel.
+            mid = 0
+            mid_deadline = time.monotonic() + 2
+            while time.monotonic() < mid_deadline:
+                mid = reader.pixel(480, 300)[0]
+                if 20 < mid < 250:
+                    break
+                time.sleep(0.02)
             self.assertGreater(mid, 20, "the particle should still be visible mid-life")
             self.assertLess(mid, 250, "the particle should have faded by mid-life")
 

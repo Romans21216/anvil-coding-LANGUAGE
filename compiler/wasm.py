@@ -74,6 +74,7 @@ ALLOWED_BUILTINS = {
     "image_draw",
     "image_draw_scaled",
     "image_draw_rotated",
+    "image_draw_region",
     "image_tint",
     "image_flip",
     "image_destroy",
@@ -116,6 +117,29 @@ async function start() {
     let memory = null;
     let app = null;
     const imageCache = new Map();
+    const tintedSurface = (pointer, width, height, tintR, tintG, tintB) => {
+      const key = pointer + ":" + tintR + ":" + tintG + ":" + tintB;
+      let offscreen = imageCache.get(key);
+      if (offscreen) return offscreen;
+      const source = new Uint32Array(memory.buffer, pointer, width * height);
+      offscreen = document.createElement("canvas");
+      offscreen.width = width;
+      offscreen.height = height;
+      const surface = offscreen.getContext("2d");
+      const image = surface.createImageData(width, height);
+      const out = new Uint32Array(image.data.buffer);
+      for (let index = 0; index < width * height; index++) {
+        const pixel = source[index];
+        const a = (pixel >>> 24) & 255;
+        const r = Math.round((((pixel >>> 16) & 255) * tintR) / 255);
+        const g = Math.round((((pixel >>> 8) & 255) * tintG) / 255);
+        const b = Math.round(((pixel & 255) * tintB) / 255);
+        out[index] = ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+      }
+      surface.putImageData(image, 0, 0);
+      imageCache.set(key, offscreen);
+      return offscreen;
+    };
     const readCString = (pointer) => {
       const bytes = new Uint8Array(memory.buffer);
       let end = pointer;
@@ -159,32 +183,20 @@ async function start() {
         context.fillText(utf8.decode(view), x, y);
       },
       image_draw(pointer, width, height, dx, dy, dw, dh, angle, tintR, tintG, tintB, flipX, flipY) {
-        const source = new Uint32Array(memory.buffer, pointer, width * height);
-        const key = pointer;
-        let offscreen = imageCache.get(key);
-        if (!offscreen) {
-          offscreen = document.createElement("canvas");
-          offscreen.width = width;
-          offscreen.height = height;
-          const surface = offscreen.getContext("2d");
-          const image = surface.createImageData(width, height);
-          const out = new Uint32Array(image.data.buffer);
-          for (let index = 0; index < width * height; index++) {
-            const pixel = source[index];
-            const a = (pixel >>> 24) & 255;
-            const r = Math.round((((pixel >>> 16) & 255) * tintR) / 255);
-            const g = Math.round((((pixel >>> 8) & 255) * tintG) / 255);
-            const b = Math.round(((pixel & 255) * tintB) / 255);
-            out[index] = ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
-          }
-          surface.putImageData(image, 0, 0);
-          imageCache.set(key, offscreen);
-        }
+        const offscreen = tintedSurface(pointer, width, height, tintR, tintG, tintB);
         context.save();
         context.translate(dx + dw / 2, dy + dh / 2);
         if (angle) context.rotate((angle * Math.PI) / 180);
         context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
         context.drawImage(offscreen, -dw / 2, -dh / 2, dw, dh);
+        context.restore();
+      },
+      image_region(pointer, width, height, sx, sy, sw, sh, dx, dy, dw, dh, tintR, tintG, tintB, flipX, flipY) {
+        const offscreen = tintedSurface(pointer, width, height, tintR, tintG, tintB);
+        context.save();
+        context.translate(dx + dw / 2, dy + dh / 2);
+        context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+        context.drawImage(offscreen, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
         context.restore();
       },
       present() {},
@@ -331,10 +343,20 @@ def _bmp_pixels(path: pathlib.Path) -> tuple[int, int, list[int]]:
     width = int.from_bytes(data[18:22], "little", signed=True)
     height = int.from_bytes(data[22:26], "little", signed=True)
     bits = int.from_bytes(data[28:30], "little")
-    if bits not in (24, 32):
-        raise ValueError(f"{bits}-bit BMPs are not supported (24 or 32 only)")
+    if bits not in (8, 24, 32):
+        raise ValueError(f"{bits}-bit BMPs are not supported (8, 24 or 32 only)")
     if width <= 0 or height == 0 or width > 8192 or abs(height) > 8192:
         raise ValueError("the image is outside the 8,192-pixel limit")
+    header_size = int.from_bytes(data[14:18], "little")
+    palette: list[tuple[int, int, int]] = []
+    if bits == 8:
+        count = int.from_bytes(data[46:50], "little") or 256
+        base = 14 + header_size
+        for index in range(count):
+            at = base + index * 4
+            if at + 3 >= len(data):
+                raise ValueError("the palette is truncated")
+            palette.append((data[at + 2], data[at + 1], data[at]))
     top_down = height < 0
     rows = abs(height)
     stride = (width * (bits // 8) + 3) & ~3
@@ -346,8 +368,15 @@ def _bmp_pixels(path: pathlib.Path) -> tuple[int, int, list[int]]:
         base = offset + source_row * stride
         for column in range(width):
             at = base + column * (bits // 8)
-            blue, green, red = data[at], data[at + 1], data[at + 2]
-            alpha = data[at + 3] if bits == 32 else 255
+            if bits == 8:
+                index = data[at]
+                if index >= len(palette):
+                    raise ValueError("a pixel index is outside the palette")
+                red, green, blue = palette[index]
+                alpha = 255
+            else:
+                blue, green, red = data[at], data[at + 1], data[at + 2]
+                alpha = data[at + 3] if bits == 32 else 255
             pixels.append((alpha << 24) | (red << 16) | (green << 8) | blue)
     return width, rows, pixels
 
