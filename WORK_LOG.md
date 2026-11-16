@@ -740,3 +740,23 @@ was missing was evidence.
   or manual sub-stepping.
 - `docs/LANGUAGE.md` no longer lists audio as future work; only mixed/streamed
   audio remains unimplemented.
+
+## Fuzz the packet envelope
+
+Part 8 says malformed packets must be fuzzed before any Internet claim; the
+send/receive path had prose but no adversarial tests.
+
+- `tests/test_network_fuzz.py` (3 cases) hosts a real program on loopback and
+  drives it with raw datagrams from a Python socket: empty, 4-byte, 23/25-byte,
+  wrong magic, version 0 and 2, payload type 0 and 2, nonzero reserved bytes,
+  sequence 0, NaN and infinite payloads, and a valid packet with trailing
+  bytes. All are ignored, and the valid packet that follows is still accepted
+  (id 7, value 2.5).
+- Replay/stale coverage: sequence 5 is accepted, 5 again (duplicate), 4
+  (stale) are dropped, 6 advances, and a sentinel id stops the loop — the
+  accepted stream is exactly `[10, 13]`.
+- Flood coverage: 500 junk datagrams followed by repeated valid packets; the
+  server still accepts the valid one and exits 0.
+- Found while writing them: `time()` does not advance inside a console
+  `fn(main)`, so a clock-based wait loop never terminates. `docs/ENGINE.md`
+  now says both `time()` and `delta()` advance only between engine frames.

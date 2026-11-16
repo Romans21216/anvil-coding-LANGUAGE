@@ -36,7 +36,7 @@ The renderer uses hand-written C software rasterization for conventional primiti
 
 ## Math, time, and input
 
-- `delta()` and `time()` return seconds.
+- `delta()` and `time()` return seconds. Both advance only between engine frames: inside a console `fn(main)` that never returns they stay at their initial values, so a loop that waits for the clock will not terminate. Console programs should bound loops with a counter and return; windowed programs get a fresh `time()` and `delta()` each fixed update.
 - `pressed(SPACE)` is a key-down edge preserved until the next fixed update; `held(SPACE)` stays true while a key is down. Letter keys and arrow keys are supported.
 - `mouse_x()` and `mouse_y()` return the pointer in the 960×600 virtual framebuffer; both return `-1` while in letterbox bars or outside the window. `mouse_pressed("left")`, `mouse_pressed("right")`, and `mouse_pressed("middle")` report one fixed-update edge; `mouse_held(...)` reports the down state until release or focus loss. `mouse_wheel()` returns signed wheel detents for the current fixed update. Pointer mapping follows the same centered aspect-preserving resize viewport as the presented game frame.
 - `rnd(low, high)` returns an inclusive integer. `seed(value)` makes the xorshift generator repeatable.
