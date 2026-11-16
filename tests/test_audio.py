@@ -116,7 +116,7 @@ class AudioLoadErrorTests(unittest.TestCase):
         )
         result = run_c(source, {"wide.wav": wav_bytes(bits=24)})
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(lines_of(result), ["0", "only 8- or 16-bit WAV is supported"])
+        self.assertEqual(lines_of(result), ["0", "only 8- or 16-bit PCM WAV is supported"])
 
     def test_three_channels_are_rejected(self) -> None:
         source = (

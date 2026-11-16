@@ -63,7 +63,7 @@ class MusicLoadTests(unittest.TestCase):
         self.assertEqual(lines[0], "0")
         self.assertEqual(lines[1], "cannot open the file")
         self.assertEqual(lines[2], "0")
-        self.assertEqual(lines[3], "not an uncompressed PCM WAV file")
+        self.assertEqual(lines[3], "not a readable WAV file")
         self.assertEqual(lines[4], "0")
         self.assertEqual(lines[5], "only mono and stereo music is supported")
         self.assertEqual(lines[6], "0")

@@ -2865,6 +2865,14 @@ typedef struct {
   int loop;
   int playing;
   int draining;
+  int adpcm;
+  int block_align;
+  int block_frames;
+  unsigned char *block_bytes;
+  short *block_pcm;
+  int block_count;
+  int block_index;
+  long bytes_left;
   double volume;
   double length;
   double seconds;
@@ -2881,6 +2889,38 @@ static const char *anvil_music_error_text = "";
 static int anvil_music_volume_seeded;
 
 static int anvil_music_read_frame(short *left, short *right) {
+  if (anvil_music.adpcm) {
+    if (anvil_music.block_index >= anvil_music.block_count) {
+      if (anvil_music.bytes_left < anvil_music.block_align) {
+        if (!anvil_music.loop)
+          return 0;
+        fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+        anvil_music.bytes_left = anvil_music.data_bytes;
+      }
+      if (fread(anvil_music.block_bytes, 1, (size_t)anvil_music.block_align,
+                anvil_music.file) != (size_t)anvil_music.block_align) {
+        if (!anvil_music.loop)
+          return 0;
+        fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+        anvil_music.bytes_left = anvil_music.data_bytes;
+        if (fread(anvil_music.block_bytes, 1, (size_t)anvil_music.block_align,
+                  anvil_music.file) != (size_t)anvil_music.block_align)
+          return 0;
+      }
+      anvil_music.bytes_left -= anvil_music.block_align;
+      anvil_music.block_count = anvil_ima_decode_block(
+          anvil_music.block_bytes, anvil_music.block_align,
+          anvil_music.channels, anvil_music.block_pcm);
+      anvil_music.block_index = 0;
+      if (anvil_music.block_count <= 0)
+        return 0;
+    }
+    int at = anvil_music.block_index * anvil_music.channels;
+    *left = anvil_music.block_pcm[at];
+    *right = anvil_music.channels == 2 ? anvil_music.block_pcm[at + 1] : *left;
+    anvil_music.block_index++;
+    return 1;
+  }
   unsigned char raw[6];
   size_t bytes = (size_t)anvil_music.frame_bytes;
   if (anvil_music.frames_left <= 0) {
@@ -3139,6 +3179,82 @@ static void anvil_audio_shutdown(void) {
 }
 
 /* Load a PCM WAV and convert it to the mixer's 48 kHz stereo 16-bit form. */
+/* ---- IMA ADPCM ---------------------------------------------------------
+   Standard 4-bit IMA ADPCM blocks as written by WAV format tag 0x0011: each
+   channel starts with a 4-byte header (int16 predictor, step index, reserved)
+   followed by 4-byte groups of nibbles per channel, low nibble first. */
+static const int anvil_ima_step[89] = {
+    7,     8,     9,     10,    11,    12,    13,    14,    16,    17,
+    19,    21,    23,    25,    28,    31,    34,    37,    41,    45,
+    50,    55,    60,    66,    73,    80,    88,    97,    107,   118,
+    130,   143,   157,   173,   190,   209,   230,   253,   279,   307,
+    337,   371,   408,   449,   494,   544,   598,   658,   724,   796,
+    876,   963,   1060,  1166,  1282,  1411,  1552,  1707,  1878,  2066,
+    2272,  2499,  2749,  3024,  3327,  3660,  4026,  4428,  4871,  5358,
+    5894,  6484,  7132,  7845,  8630,  9493,  10442, 11487, 12635, 13899,
+    15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767};
+
+static const int anvil_ima_index[16] = {-1, -1, -1, -1, 2, 4, 6, 8,
+                                        -1, -1, -1, -1, 2, 4, 6, 8};
+
+static int anvil_ima_nibble(int nibble, int *predictor, int *index) {
+  int step = anvil_ima_step[*index];
+  int diff = step >> 3;
+  if (nibble & 1)
+    diff += step >> 2;
+  if (nibble & 2)
+    diff += step >> 1;
+  if (nibble & 4)
+    diff += step;
+  if (nibble & 8)
+    diff = -diff;
+  *predictor += diff;
+  if (*predictor > 32767)
+    *predictor = 32767;
+  if (*predictor < -32768)
+    *predictor = -32768;
+  *index += anvil_ima_index[nibble];
+  if (*index < 0)
+    *index = 0;
+  if (*index > 88)
+    *index = 88;
+  return *predictor;
+}
+
+static int anvil_ima_decode_block(const unsigned char *block, int block_align,
+                                  int channels, short *out) {
+  if (!block || block_align < 4 * channels + 4 || channels < 1 || channels > 2)
+    return 0;
+  int predictor[2] = {0, 0}, index[2] = {0, 0};
+  for (int ch = 0; ch < channels; ++ch) {
+    int at = ch * 4;
+    predictor[ch] = (short)((unsigned)block[at] | ((unsigned)block[at + 1] << 8));
+    index[ch] = block[at + 2];
+    if (index[ch] > 88)
+      index[ch] = 88;
+    out[ch] = (short)predictor[ch];
+  }
+  int max_frames = (block_align - 4 * channels) * 2 / channels + 1;
+  int frame = 1;
+  int offset = 4 * channels;
+  while (frame < max_frames) {
+    for (int ch = 0; ch < channels; ++ch) {
+      for (int byte = 0; byte < 4 && offset < block_align; ++byte) {
+        unsigned char value = block[offset++];
+        for (int half = 0; half < 2; ++half) {
+          int nibble = half == 0 ? (value & 0x0F) : (value >> 4);
+          int sample = anvil_ima_nibble(nibble, &predictor[ch], &index[ch]);
+          int target = frame + byte * 2 + half;
+          if (target < max_frames)
+            out[target * channels + ch] = (short)sample;
+        }
+      }
+    }
+    frame += 8;
+  }
+  return max_frames;
+}
+
 double anvil_sound_load(const char *path) {
   anvil_sound_error_text = "";
   if (!path || path[0] == '\0') {
@@ -3205,16 +3321,20 @@ double anvil_sound_load(const char *path) {
   if (!parse_error) {
     if (format == 0 || channels == 0)
       parse_error = "the file has no format chunk";
-    else if (format != 1)
-      parse_error = "only uncompressed PCM WAV is supported";
+    else if (format != 1 && format != 17)
+      parse_error = "only PCM and IMA ADPCM WAV files are supported";
     else if (channels != 1 && channels != 2)
       parse_error = "only mono or stereo WAV is supported";
-    else if (bits != 8 && bits != 16)
-      parse_error = "only 8- or 16-bit WAV is supported";
+    else if (format == 1 && bits != 8 && bits != 16)
+      parse_error = "only 8- or 16-bit PCM WAV is supported";
+    else if (format == 17 && bits != 4)
+      parse_error = "IMA ADPCM WAV files must be 4-bit";
     else if (rate < 8000 || rate > 192000)
       parse_error = "the sample rate is outside 8000..192000 Hz";
-    else if (block != (unsigned)channels * (bits / 8))
+    else if (format == 1 && block != (unsigned)channels * (bits / 8))
       parse_error = "the WAV block alignment is inconsistent";
+    else if (format == 17 && (block < 4u * channels + 4u || block > 4096u))
+      parse_error = "the ADPCM block alignment is invalid";
     else if (data_offset < 0)
       parse_error = "the file has no data chunk";
   }
@@ -3223,7 +3343,14 @@ double anvil_sound_load(const char *path) {
     anvil_sound_error_text = parse_error;
     return 0.0;
   }
-  size_t source_frames = (size_t)(data_size / block);
+  size_t samples_per_block = 0;
+  size_t source_frames = 0;
+  if (format == 17) {
+    samples_per_block = (size_t)(block - 4 * channels) * 2 / channels + 1;
+    source_frames = (size_t)(data_size / block) * samples_per_block;
+  } else {
+    source_frames = (size_t)(data_size / block);
+  }
   size_t frame_count =
       (size_t)((double)source_frames * (double)ANVIL_AUDIO_RATE / (double)rate +
                0.5);
@@ -3247,22 +3374,68 @@ double anvil_sound_load(const char *path) {
         ANVIL_SOUND_TOTAL_BYTES / (1024 * 1024));
     return 0.0;
   }
-  unsigned char *source = (unsigned char *)malloc(data_size ? data_size : 1);
+  unsigned char *source = NULL;
   short *frames = (short *)malloc(bytes);
-  if (!source || !frames) {
-    free(source);
-    free(frames);
-    fclose(file);
-    anvil_sound_error_text = "the sound could not be allocated";
-    return 0.0;
-  }
-  if (fseek(file, data_offset, SEEK_SET) != 0 ||
-      fread(source, 1, data_size, file) != data_size) {
-    free(source);
-    free(frames);
-    fclose(file);
-    anvil_sound_error_text = "the file ended before the sound data did";
-    return 0.0;
+  if (format == 17) {
+    size_t decoded_bytes = source_frames * channels * sizeof(short);
+    if (decoded_bytes > 64u * 1024u * 1024u) {
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text =
+          "the ADPCM sound decodes to more than the 64 MiB decode budget";
+      return 0.0;
+    }
+    unsigned char *block_bytes = (unsigned char *)malloc(block);
+    short *decoded = (short *)malloc(decoded_bytes ? decoded_bytes : 1);
+    if (!block_bytes || !decoded || !frames) {
+      free(block_bytes);
+      free(decoded);
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text = "the sound could not be allocated";
+      return 0.0;
+    }
+    if (fseek(file, data_offset, SEEK_SET) != 0) {
+      free(block_bytes);
+      free(decoded);
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text = "the file ended before the sound data did";
+      return 0.0;
+    }
+    size_t blocks = (size_t)(data_size / block);
+    for (size_t b = 0; b < blocks; ++b) {
+      if (fread(block_bytes, 1, block, file) != (size_t)block) {
+        free(block_bytes);
+        free(decoded);
+        free(frames);
+        fclose(file);
+        anvil_sound_error_text = "the file ended before the sound data did";
+        return 0.0;
+      }
+      anvil_ima_decode_block(block_bytes, (int)block, (int)channels,
+                             decoded + b * samples_per_block * channels);
+    }
+    free(block_bytes);
+    source = (unsigned char *)decoded;
+    bits = 16;
+  } else {
+    source = (unsigned char *)malloc(data_size ? data_size : 1);
+    if (!source || !frames) {
+      free(source);
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text = "the sound could not be allocated";
+      return 0.0;
+    }
+    if (fseek(file, data_offset, SEEK_SET) != 0 ||
+        fread(source, 1, data_size, file) != data_size) {
+      free(source);
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text = "the file ended before the sound data did";
+      return 0.0;
+    }
   }
   fclose(file);
   for (size_t i = 0; i < frame_count; ++i) {
@@ -3498,6 +3671,27 @@ double anvil_sound_active(void) {
   return (double)active;
 }
 
+double anvil_sound_duration(double handle) {
+  if (!anvil_sound_valid(handle))
+    return 0.0;
+  return (double)anvil_sounds[(int)handle - 1].frame_count / 48000.0;
+}
+
+double anvil_sound_rms(double handle) {
+  if (!anvil_sound_valid(handle))
+    return 0.0;
+  AnvilSound *sound = &anvil_sounds[(int)handle - 1];
+  if (!sound->frames || sound->frame_count == 0)
+    return 0.0;
+  double total = 0.0;
+  size_t samples = sound->frame_count * 2;
+  for (size_t i = 0; i < samples; ++i) {
+    double value = (double)sound->frames[i];
+    total += value * value;
+  }
+  return sqrt(total / (double)samples);
+}
+
 double anvil_sound_destroy(double handle) {
   if (!anvil_sound_valid(handle))
     return 0.0;
@@ -3517,7 +3711,8 @@ double anvil_sound_destroy(double handle) {
 /* ---- Streaming music API ----------------------------------------------- */
 
 static int anvil_music_parse_wav(FILE *file, long *data_offset, long *data_bytes,
-                                 int *channels, int *bits, int *rate) {
+                                 int *channels, int *bits, int *rate,
+                                 int *format_out, int *block_out) {
   unsigned char header[12];
   if (fread(header, 1, 12, file) != 12 || memcmp(header, "RIFF", 4) != 0 ||
       memcmp(header + 8, "WAVE", 4) != 0)
@@ -3536,11 +3731,11 @@ static int anvil_music_parse_wav(FILE *file, long *data_offset, long *data_bytes
       if (size < 16 || fread(fmt, 1, 16, file) != 16)
         return 0;
       int format = fmt[0] | (fmt[1] << 8);
+      *format_out = format;
       *channels = fmt[2] | (fmt[3] << 8);
       *rate = fmt[4] | (fmt[5] << 8) | (fmt[6] << 16) | (fmt[7] << 24);
       *bits = fmt[14] | (fmt[15] << 8);
-      if (format != 1)
-        return 0;
+      *block_out = fmt[12] | (fmt[13] << 8);
       have_format = 1;
       long skip = (long)size - 16;
       if (skip > 0)
@@ -3569,11 +3764,11 @@ double anvil_music_load(const char *path) {
     return 0.0;
   }
   long data_offset = 0, data_bytes = 0;
-  int channels = 0, bits = 0, rate = 0;
+  int channels = 0, bits = 0, rate = 0, format = 0, block_align = 0;
   if (!anvil_music_parse_wav(file, &data_offset, &data_bytes, &channels, &bits,
-                             &rate)) {
+                             &rate, &format, &block_align)) {
     fclose(file);
-    anvil_music_error_text = "not an uncompressed PCM WAV file";
+    anvil_music_error_text = "not a readable WAV file";
     return 0.0;
   }
   if (channels < 1 || channels > 2) {
@@ -3581,9 +3776,24 @@ double anvil_music_load(const char *path) {
     anvil_music_error_text = "only mono and stereo music is supported";
     return 0.0;
   }
-  if (bits != 8 && bits != 16) {
+  if (format != 1 && format != 17) {
+    fclose(file);
+    anvil_music_error_text = "only PCM and IMA ADPCM music is supported";
+    return 0.0;
+  }
+  if (format == 1 && bits != 8 && bits != 16) {
     fclose(file);
     anvil_music_error_text = "music must be 8-bit or 16-bit PCM";
+    return 0.0;
+  }
+  if (format == 17 && bits != 4) {
+    fclose(file);
+    anvil_music_error_text = "IMA ADPCM music must be 4-bit";
+    return 0.0;
+  }
+  if (format == 17 && (block_align < 4 * channels + 4 || block_align > 4096)) {
+    fclose(file);
+    anvil_music_error_text = "the ADPCM block alignment is invalid";
     return 0.0;
   }
   if (rate < 8000 || rate > 192000) {
@@ -3596,12 +3806,30 @@ double anvil_music_load(const char *path) {
     anvil_music_error_text = "the music has no samples";
     return 0.0;
   }
-  int frame_bytes = channels * (bits / 8);
+  int frame_bytes = format == 17 ? block_align : channels * (bits / 8);
+  int block_frames = 0;
+  if (format == 17)
+    block_frames = (block_align - 4 * channels) * 2 / channels + 1;
+  unsigned char *block_bytes = NULL;
+  short *block_pcm = NULL;
+  if (format == 17) {
+    block_bytes = (unsigned char *)malloc((size_t)block_align);
+    block_pcm = (short *)malloc((size_t)block_frames * channels * sizeof(short));
+    if (!block_bytes || !block_pcm) {
+      free(block_bytes);
+      free(block_pcm);
+      fclose(file);
+      anvil_music_error_text = "the music could not be allocated";
+      return 0.0;
+    }
+  }
   anvil_audio_lock_init();
   EnterCriticalSection(&anvil_audio_lock);
   double previous_volume = anvil_music_volume_seeded ? anvil_music.volume : 1.0;
   if (anvil_music.file)
     fclose(anvil_music.file);
+  free(anvil_music.block_bytes);
+  free(anvil_music.block_pcm);
   memset(&anvil_music, 0, sizeof(anvil_music));
   anvil_music.file = file;
   anvil_music.data_offset = data_offset;
@@ -3610,8 +3838,16 @@ double anvil_music_load(const char *path) {
   anvil_music.channels = channels;
   anvil_music.bits = bits;
   anvil_music.rate = rate;
-  anvil_music.length =
-      (double)(data_bytes / frame_bytes) / (double)rate;
+  anvil_music.adpcm = format == 17;
+  anvil_music.block_align = block_align;
+  anvil_music.block_frames = block_frames;
+  anvil_music.block_bytes = block_bytes;
+  anvil_music.block_pcm = block_pcm;
+  anvil_music.bytes_left = data_bytes;
+  anvil_music.length = anvil_music.adpcm
+                          ? (double)((data_bytes / block_align) * block_frames) /
+                                (double)rate
+                          : (double)(data_bytes / frame_bytes) / (double)rate;
   anvil_music.volume = previous_volume;
   anvil_music_volume_seeded = 1;
   anvil_music.frames_left = data_bytes / frame_bytes;
@@ -3637,6 +3873,9 @@ static double anvil_music_start(int loop) {
   anvil_music.step = (double)anvil_music.rate / 48000.0;
   fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
   anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+  anvil_music.bytes_left = anvil_music.data_bytes;
+  anvil_music.block_count = 0;
+  anvil_music.block_index = 0;
   anvil_music_prime();
   LeaveCriticalSection(&anvil_audio_lock);
   return 1.0;
@@ -3657,6 +3896,9 @@ double anvil_music_stop(void) {
   anvil_music_buffer_index = 0;
   fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
   anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+  anvil_music.bytes_left = anvil_music.data_bytes;
+  anvil_music.block_count = 0;
+  anvil_music.block_index = 0;
   LeaveCriticalSection(&anvil_audio_lock);
   return 1.0;
 }
@@ -3683,6 +3925,10 @@ static void anvil_release_frame_resources(void) {
     fclose(anvil_music.file);
     anvil_music.file = NULL;
   }
+  free(anvil_music.block_bytes);
+  free(anvil_music.block_pcm);
+  anvil_music.block_bytes = NULL;
+  anvil_music.block_pcm = NULL;
   anvil_music.playing = 0;
   for (int i = 0; i < ANVIL_IMAGES; ++i) {
     free(anvil_images[i].pixels);

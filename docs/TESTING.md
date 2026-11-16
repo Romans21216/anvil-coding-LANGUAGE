@@ -101,6 +101,8 @@ remote desktop can prevent window creation:
   mute and per-group stop; playback cases skip without an audio device.
 - `test_music` — streaming music loading, length, volume clamps, bad-file
   messages, position/stop and loop-versus-finish behavior.
+- `test_wav_adpcm` — IMA ADPCM decoding for one-shot sounds and streaming music,
+  decoded amplitude against a PCM reference, and bit-depth rejections.
 - `test_particles` — argument validation, the 4,096-particle bound, clear
   counts, and window pixels for a fresh and fading particle.
 - `test_shadows` — a tilted camera samples the flattened shadow of a model and

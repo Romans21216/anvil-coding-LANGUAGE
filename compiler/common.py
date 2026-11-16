@@ -181,6 +181,8 @@ RUNTIME_C_NAMES = {
     "anvil_sound_pan",
     "anvil_sound_pitch",
     "anvil_sound_active",
+    "anvil_sound_duration",
+    "anvil_sound_rms",
     "anvil_sound_destroy",
     "anvil_save_error",
     "anvil_set_project",

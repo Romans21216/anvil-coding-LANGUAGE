@@ -110,6 +110,8 @@ double anvil_sound_volume(double voice_handle, double volume);
 double anvil_sound_pan(double voice_handle, double pan);
 double anvil_sound_pitch(double voice_handle, double pitch);
 double anvil_sound_active(void);
+double anvil_sound_duration(double handle);
+double anvil_sound_rms(double handle);
 double anvil_sound_destroy(double handle);
 void anvil_trace_sphere(double x, double y, double z, double radius, int r,
                         int g, int b, int a);

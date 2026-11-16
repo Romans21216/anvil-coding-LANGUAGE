@@ -588,3 +588,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Camera:** added `camera_angle(yaw,pitch)` so a program can look down programmatically (pitch clamped to ±89). Until now only the arrow keys could pitch the camera, which made ground-plane behaviour untestable.
 - **Tests:** `tests/test_shadows.py` sets a tilted camera and samples a pixel where the shadow must land: a horizontal quad at y=2 casting onto y=0 (darkens, then returns to background when `shadow_height(1)` moves it), and a cube at y=1 casting below itself. 2 passed. The demo frame was inspected as an image: two cubes on a grid plane with dark shadows beneath.
 - **Docs:** language spec rows for the 3D camera and shadows, evidence ledger, testing doc, `examples/shadows_demo.ANVL`.
+
+## Batch 48 — IMA ADPCM WAV support (8.14)
+
+- **Decoder:** a shared IMA ADPCM block decoder (89-entry step table, 16-entry index table) for WAV format tag 0x0011, mono or stereo, blocks up to 4,096 bytes.
+- **Sounds:** `sound_load` decodes every block to 16-bit, then reuses the existing 48 kHz resampler; a decode larger than 64 MiB is refused. Validation now allows PCM 8/16-bit and ADPCM 4-bit with distinct messages.
+- **Music:** `music_load` accepts ADPCM and the streaming reader decodes one block at a time into a small buffer, so memory stays flat; length and looping use block counts.
+- **Queries:** added `sound_duration(handle)` and `sound_rms(handle)` so imported audio can be checked without playing it.
+- **Bugs fixed:** the music parser still rejected every non-PCM format (`if (format != 1) return 0`), and `frame_bytes` became 0 for 4-bit audio, dividing by zero (0xC0000094) when the stream started.
+- **Tests:** `tests/test_wav_adpcm.py` covers decoding and playing a compressed sound, streaming ADPCM music with the right length and position, decoded RMS within 600 of the PCM reference, and the 4-bit rejection messages for both loaders. 4 passed.
