@@ -151,6 +151,17 @@ BUILTINS = {
     "image_destroy": (1, 1),
     "image_draw": (3, 3),
     "image_draw_scaled": (5, 5),
+    "sound_error": (0, 0),
+    "sound_load": (1, 1),
+    "sound_play": (1, 1),
+    "sound_play_loop": (1, 1),
+    "sound_stop": (1, 1),
+    "sound_stop_all": (0, 0),
+    "sound_volume": (2, 2),
+    "sound_pan": (2, 2),
+    "sound_pitch": (2, 2),
+    "sound_active": (0, 0),
+    "sound_destroy": (1, 1),
     "receive": (0, 0),
     "body_create": (4, 4),
     "body_create_box": (5, 5),
@@ -196,6 +207,17 @@ BUILTIN_C_NAMES = {
     "image_destroy": "anvil_image_destroy",
     "image_draw": "anvil_image_draw",
     "image_draw_scaled": "anvil_image_draw_scaled",
+    "sound_error": "anvil_sound_error",
+    "sound_load": "anvil_sound_load",
+    "sound_play": "anvil_sound_play",
+    "sound_play_loop": "anvil_sound_play_loop",
+    "sound_stop": "anvil_sound_stop",
+    "sound_stop_all": "anvil_sound_stop_all",
+    "sound_volume": "anvil_sound_volume",
+    "sound_pan": "anvil_sound_pan",
+    "sound_pitch": "anvil_sound_pitch",
+    "sound_active": "anvil_sound_active",
+    "sound_destroy": "anvil_sound_destroy",
     "receive": "anvil_net_receive",
     "window_on_top": "anvil_window_on_top",
     "window_fullscreen": "anvil_window_fullscreen",
@@ -247,6 +269,7 @@ BUILTIN_TEXT_RETURNING = {
     "left",
     "right",
     "image_error",
+    "sound_error",
 }
 
 # Common names from other languages, mapped to the Anvil spelling. A beginner
@@ -290,6 +313,7 @@ BUILTIN_STRING_ARGUMENTS = {
     "mouse_pressed",
     "mouse_held",
     "image_load",
+    "sound_load",
 }
 
 

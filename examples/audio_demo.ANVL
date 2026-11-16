@@ -1,0 +1,44 @@
+# Audio demo: a looping tone with volume, pan and pitch controls.
+# Run from the repository root so the bundled WAV resolves:
+#   python compiler/anvil.py examples/audio_demo.ANVL --run
+scene 2d
+clear rgba(15, 21, 35, 255)
+set var(tone) = sound_load("examples/assets/anvil_tone.wav")
+set var(voice) = 0
+set var(pitch) = 1.0
+set var(pan) = 0.0
+
+fn(update)
+  if pressed(SPACE)
+    set var(voice) = sound_play_loop(var(tone))
+    set var(ok) = sound_volume(var(voice), 0.8)
+  end
+  if var(voice) > 0
+    if pressed(UP)
+      set var(pitch) = sound_pitch(var(voice), var(pitch) + 0.1)
+    end
+    if pressed(DOWN)
+      set var(pitch) = sound_pitch(var(voice), var(pitch) - 0.1)
+    end
+    if pressed(LEFT)
+      set var(pan) = sound_pan(var(voice), var(pan) - 0.2)
+    end
+    if pressed(RIGHT)
+      set var(pan) = sound_pan(var(voice), var(pan) + 0.2)
+    end
+  end
+  if pressed(ESCAPE)
+    set var(stopped) = sound_stop_all()
+    set var(voice) = 0
+  end
+end
+
+fn(draw)
+  display rect(60, 60, 840, 480) -rgba(29, 41, 62, 255)
+  display text("Anvil audio") -l(90, 90) -rgb(235, 243, 255)
+  display text("SPACE: start looping tone") -l(90, 130) -rgb(164, 190, 224)
+  display text("UP/DOWN: pitch   LEFT/RIGHT: pan") -l(90, 164) -rgb(164, 190, 224)
+  display text("ESCAPE: stop all voices") -l(90, 198) -rgb(164, 190, 224)
+  display text("Pitch: " + var(pitch)) -l(90, 250) -rgb(120, 220, 180)
+  display text("Pan: " + var(pan)) -l(90, 284) -rgb(120, 220, 180)
+end

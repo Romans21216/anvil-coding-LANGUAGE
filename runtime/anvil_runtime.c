@@ -3,6 +3,7 @@
 #include "anvil_projection.h"
 
 #include <math.h>
+#include <mmsystem.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13,6 +14,7 @@
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "winmm.lib")
 
 enum {
   ANVIL_WIDTH = 960,
@@ -2017,7 +2019,568 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
   return DefWindowProcA(window, message, wparam, lparam);
 }
 
+/* ---- Audio -------------------------------------------------------------
+   A bounded WAV player: at most 16 loaded sounds, 8 simultaneous voices and
+   48 MiB of decoded audio, mixed at 48 kHz stereo into three 10 ms buffers
+   driven by waveOut. Everything is 16-bit PCM after load, so playback is a
+   linear resample by pitch. The device is opened lazily on the first play and
+   a missing or lost device degrades to silence with a readable error rather
+   than a crash. */
+enum {
+  ANVIL_SOUND_SLOTS = 16,
+  ANVIL_SOUND_VOICES = 8,
+  ANVIL_AUDIO_RATE = 48000,
+  ANVIL_AUDIO_FRAMES = 480,
+  ANVIL_AUDIO_BUFFERS = 3,
+  ANVIL_SOUND_SLOT_BYTES = 8 * 1024 * 1024,
+  ANVIL_SOUND_TOTAL_BYTES = 48 * 1024 * 1024
+};
+
+typedef struct {
+  short *frames;
+  size_t frame_count;
+  int used;
+} AnvilSound;
+
+typedef struct {
+  int sound;
+  double position;
+  double pitch;
+  double volume;
+  double pan;
+  int loop;
+} AnvilVoice;
+
+static AnvilSound anvil_sounds[ANVIL_SOUND_SLOTS];
+static AnvilVoice anvil_voices[ANVIL_SOUND_VOICES];
+static size_t anvil_sound_bytes;
+static CRITICAL_SECTION anvil_audio_lock;
+static int anvil_audio_lock_ready;
+static HWAVEOUT anvil_audio_device;
+static WAVEHDR anvil_audio_headers[ANVIL_AUDIO_BUFFERS];
+static short anvil_audio_buffers[ANVIL_AUDIO_BUFFERS][ANVIL_AUDIO_FRAMES * 2];
+static HANDLE anvil_audio_event;
+static HANDLE anvil_audio_thread;
+static volatile LONG anvil_audio_running;
+static char anvil_sound_error_detail[192];
+static const char *anvil_sound_error_text = "";
+
+static void anvil_sound_error_note(const char *format, ...) {
+  va_list arguments;
+  va_start(arguments, format);
+  _vsnprintf_s(anvil_sound_error_detail, sizeof(anvil_sound_error_detail),
+               _TRUNCATE, format, arguments);
+  va_end(arguments);
+  anvil_sound_error_text = anvil_sound_error_detail;
+}
+
+const char *anvil_sound_error(void) { return anvil_sound_error_text; }
+
+static unsigned anvil_sound_u16(const unsigned char *bytes) {
+  return (unsigned)bytes[0] | ((unsigned)bytes[1] << 8);
+}
+
+static unsigned long anvil_sound_u32(const unsigned char *bytes) {
+  return (unsigned long)bytes[0] | ((unsigned long)bytes[1] << 8) |
+         ((unsigned long)bytes[2] << 16) | ((unsigned long)bytes[3] << 24);
+}
+
+static int anvil_audio_lock_init(void) {
+  if (!anvil_audio_lock_ready) {
+    InitializeCriticalSection(&anvil_audio_lock);
+    anvil_audio_lock_ready = 1;
+  }
+  return 1;
+}
+
+static void anvil_audio_shutdown(void);
+static int anvil_audio_atexit_registered;
+
+static void anvil_audio_at_exit(void) { anvil_audio_shutdown(); }
+
+static void anvil_audio_register_atexit(void) {
+  if (!anvil_audio_atexit_registered) {
+    atexit(anvil_audio_at_exit);
+    anvil_audio_atexit_registered = 1;
+  }
+}
+
+static double anvil_audio_clamp(double value, double low, double high) {
+  if (!isfinite(value))
+    return low;
+  if (value < low)
+    return low;
+  if (value > high)
+    return high;
+  return value;
+}
+
+static void anvil_audio_mix(short *out, int frames) {
+  memset(out, 0, (size_t)frames * 2 * sizeof(short));
+  if (!anvil_audio_lock_ready)
+    return;
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int v = 0; v < ANVIL_SOUND_VOICES; ++v) {
+    AnvilVoice *voice = &anvil_voices[v];
+    if (!voice->sound)
+      continue;
+    AnvilSound *sound = &anvil_sounds[voice->sound - 1];
+    if (!sound->used || !sound->frames || sound->frame_count == 0) {
+      voice->sound = 0;
+      continue;
+    }
+    double left = voice->volume * (voice->pan > 0.0 ? 1.0 - voice->pan : 1.0);
+    double right = voice->volume * (voice->pan < 0.0 ? 1.0 + voice->pan : 1.0);
+    for (int i = 0; i < frames; ++i) {
+      if (voice->position >= (double)sound->frame_count) {
+        if (!voice->loop) {
+          voice->sound = 0;
+          break;
+        }
+        voice->position -= (double)sound->frame_count;
+      }
+      size_t index = (size_t)voice->position;
+      double fraction = voice->position - (double)index;
+      size_t next = index + 1 < sound->frame_count ? index + 1 : index;
+      double l = (double)sound->frames[index * 2] +
+                 ((double)sound->frames[next * 2] -
+                  (double)sound->frames[index * 2]) * fraction;
+      double r = (double)sound->frames[index * 2 + 1] +
+                 ((double)sound->frames[next * 2 + 1] -
+                  (double)sound->frames[index * 2 + 1]) * fraction;
+      int sl = (int)out[i * 2] + (int)(l * left);
+      int sr = (int)out[i * 2 + 1] + (int)(r * right);
+      out[i * 2] = (short)(sl < -32768 ? -32768 : sl > 32767 ? 32767 : sl);
+      out[i * 2 + 1] =
+          (short)(sr < -32768 ? -32768 : sr > 32767 ? 32767 : sr);
+      voice->position += voice->pitch;
+    }
+  }
+  LeaveCriticalSection(&anvil_audio_lock);
+}
+
+static DWORD WINAPI anvil_audio_thread_main(LPVOID parameter) {
+  (void)parameter;
+  while (anvil_audio_running) {
+    DWORD wait = WaitForSingleObject(anvil_audio_event, 50);
+    if (!anvil_audio_running)
+      break;
+    if (wait != WAIT_OBJECT_0 && wait != WAIT_TIMEOUT)
+      break;
+    for (int i = 0; i < ANVIL_AUDIO_BUFFERS; ++i) {
+      WAVEHDR *header = &anvil_audio_headers[i];
+      if ((header->dwFlags & WHDR_DONE) == 0)
+        continue;
+      anvil_audio_mix(anvil_audio_buffers[i], ANVIL_AUDIO_FRAMES);
+      header->dwFlags &= ~WHDR_DONE;
+      if (waveOutWrite(anvil_audio_device, header, sizeof(WAVEHDR)) !=
+          MMSYSERR_NOERROR) {
+        /* Device loss: stop mixing and let the next play retry the device. */
+        anvil_audio_running = 0;
+        anvil_sound_error_text = "the audio device was lost";
+        break;
+      }
+    }
+  }
+  return 0;
+}
+
+static int anvil_audio_start(void) {
+  if (anvil_audio_device)
+    return 1;
+  anvil_audio_lock_init();
+  anvil_audio_register_atexit();
+  if (!anvil_audio_event)
+    anvil_audio_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+  if (!anvil_audio_event) {
+    anvil_sound_error_text = "the audio event could not be created";
+    return 0;
+  }
+  WAVEFORMATEX format;
+  memset(&format, 0, sizeof(format));
+  format.wFormatTag = WAVE_FORMAT_PCM;
+  format.nChannels = 2;
+  format.nSamplesPerSec = ANVIL_AUDIO_RATE;
+  format.wBitsPerSample = 16;
+  format.nBlockAlign = (WORD)(format.nChannels * format.wBitsPerSample / 8);
+  format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
+  if (waveOutOpen(&anvil_audio_device, WAVE_MAPPER, &format,
+                  (DWORD_PTR)anvil_audio_event, 0, CALLBACK_EVENT) !=
+      MMSYSERR_NOERROR) {
+    anvil_audio_device = NULL;
+    anvil_sound_error_text = "the audio device is unavailable";
+    return 0;
+  }
+  memset(anvil_audio_headers, 0, sizeof(anvil_audio_headers));
+  for (int i = 0; i < ANVIL_AUDIO_BUFFERS; ++i) {
+    WAVEHDR *header = &anvil_audio_headers[i];
+    header->lpData = (LPSTR)anvil_audio_buffers[i];
+    header->dwBufferLength = (DWORD)sizeof(anvil_audio_buffers[i]);
+    if (waveOutPrepareHeader(anvil_audio_device, header, sizeof(WAVEHDR)) !=
+        MMSYSERR_NOERROR) {
+      waveOutClose(anvil_audio_device);
+      anvil_audio_device = NULL;
+      anvil_sound_error_text = "the audio buffers could not be prepared";
+      return 0;
+    }
+    anvil_audio_mix(anvil_audio_buffers[i], ANVIL_AUDIO_FRAMES);
+    waveOutWrite(anvil_audio_device, header, sizeof(WAVEHDR));
+  }
+  anvil_audio_running = 1;
+  anvil_audio_thread =
+      CreateThread(NULL, 0, anvil_audio_thread_main, NULL, 0, NULL);
+  if (!anvil_audio_thread) {
+    anvil_audio_running = 0;
+    waveOutReset(anvil_audio_device);
+    for (int i = 0; i < ANVIL_AUDIO_BUFFERS; ++i)
+      waveOutUnprepareHeader(anvil_audio_device, &anvil_audio_headers[i],
+                             sizeof(WAVEHDR));
+    waveOutClose(anvil_audio_device);
+    anvil_audio_device = NULL;
+    anvil_sound_error_text = "the audio thread could not be started";
+    return 0;
+  }
+  return 1;
+}
+
+static void anvil_audio_shutdown(void) {
+  if (anvil_audio_thread) {
+    anvil_audio_running = 0;
+    if (anvil_audio_event)
+      SetEvent(anvil_audio_event);
+    WaitForSingleObject(anvil_audio_thread, 2000);
+    CloseHandle(anvil_audio_thread);
+    anvil_audio_thread = NULL;
+  }
+  if (anvil_audio_device) {
+    waveOutReset(anvil_audio_device);
+    for (int i = 0; i < ANVIL_AUDIO_BUFFERS; ++i)
+      waveOutUnprepareHeader(anvil_audio_device, &anvil_audio_headers[i],
+                             sizeof(WAVEHDR));
+    waveOutClose(anvil_audio_device);
+    anvil_audio_device = NULL;
+  }
+  if (anvil_audio_event) {
+    CloseHandle(anvil_audio_event);
+    anvil_audio_event = NULL;
+  }
+  if (anvil_audio_lock_ready) {
+    EnterCriticalSection(&anvil_audio_lock);
+    memset(anvil_voices, 0, sizeof(anvil_voices));
+    LeaveCriticalSection(&anvil_audio_lock);
+  }
+  for (int i = 0; i < ANVIL_SOUND_SLOTS; ++i) {
+    free(anvil_sounds[i].frames);
+    memset(&anvil_sounds[i], 0, sizeof(anvil_sounds[i]));
+  }
+  anvil_sound_bytes = 0;
+}
+
+/* Load a PCM WAV and convert it to the mixer's 48 kHz stereo 16-bit form. */
+double anvil_sound_load(const char *path) {
+  anvil_sound_error_text = "";
+  if (!path || path[0] == '\0') {
+    anvil_sound_error_text = "the path is empty";
+    return 0.0;
+  }
+  int slot = -1;
+  for (int i = 0; i < ANVIL_SOUND_SLOTS; ++i) {
+    if (!anvil_sounds[i].used) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    anvil_sound_error_text = "no free sound slot";
+    return 0.0;
+  }
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    anvil_sound_error_text = "cannot open the file";
+    return 0.0;
+  }
+  unsigned char riff[12];
+  if (fread(riff, 1, 12, file) != 12 || memcmp(riff, "RIFF", 4) != 0 ||
+      memcmp(riff + 8, "WAVE", 4) != 0) {
+    fclose(file);
+    anvil_sound_error_text = "the file is not a readable WAV";
+    return 0.0;
+  }
+  unsigned channels = 0, bits = 0, format = 0, rate = 0, block = 0;
+  long data_offset = -1;
+  unsigned long data_size = 0;
+  const char *parse_error = NULL;
+  for (;;) {
+    unsigned char chunk[8];
+    if (fread(chunk, 1, 8, file) != 8)
+      break;
+    unsigned long size = anvil_sound_u32(chunk + 4);
+    if (memcmp(chunk, "fmt ", 4) == 0) {
+      unsigned char fmt[16];
+      if (size < 16 || fread(fmt, 1, 16, file) != 16) {
+        parse_error = "the WAV format chunk is truncated";
+        break;
+      }
+      format = anvil_sound_u16(fmt);
+      channels = anvil_sound_u16(fmt + 2);
+      rate = anvil_sound_u32(fmt + 4);
+      block = anvil_sound_u16(fmt + 12);
+      bits = anvil_sound_u16(fmt + 14);
+      if (size > 16)
+        fseek(file, (long)(size - 16), SEEK_CUR);
+    } else if (memcmp(chunk, "data", 4) == 0) {
+      data_offset = ftell(file);
+      data_size = size;
+      fseek(file, (long)size, SEEK_CUR);
+    } else {
+      fseek(file, (long)size, SEEK_CUR);
+    }
+    if (size & 1)
+      fseek(file, 1, SEEK_CUR);
+    if (data_offset >= 0 && channels)
+      break;
+  }
+  if (!parse_error) {
+    if (format == 0 || channels == 0)
+      parse_error = "the file has no format chunk";
+    else if (format != 1)
+      parse_error = "only uncompressed PCM WAV is supported";
+    else if (channels != 1 && channels != 2)
+      parse_error = "only mono or stereo WAV is supported";
+    else if (bits != 8 && bits != 16)
+      parse_error = "only 8- or 16-bit WAV is supported";
+    else if (rate < 8000 || rate > 192000)
+      parse_error = "the sample rate is outside 8000..192000 Hz";
+    else if (block != (unsigned)channels * (bits / 8))
+      parse_error = "the WAV block alignment is inconsistent";
+    else if (data_offset < 0)
+      parse_error = "the file has no data chunk";
+  }
+  if (parse_error) {
+    fclose(file);
+    anvil_sound_error_text = parse_error;
+    return 0.0;
+  }
+  size_t source_frames = (size_t)(data_size / block);
+  size_t frame_count =
+      (size_t)((double)source_frames * (double)ANVIL_AUDIO_RATE / (double)rate +
+               0.5);
+  size_t bytes = frame_count * 2 * sizeof(short);
+  if (frame_count == 0) {
+    fclose(file);
+    anvil_sound_error_text = "the WAV has no audio frames";
+    return 0.0;
+  }
+  if (bytes > (size_t)ANVIL_SOUND_SLOT_BYTES) {
+    fclose(file);
+    anvil_sound_error_note(
+        "the sound needs %llu KiB decoded; the per-sound limit is %d KiB",
+        (unsigned long long)(bytes / 1024), ANVIL_SOUND_SLOT_BYTES / 1024);
+    return 0.0;
+  }
+  if (anvil_sound_bytes + bytes > (size_t)ANVIL_SOUND_TOTAL_BYTES) {
+    fclose(file);
+    anvil_sound_error_note(
+        "loading the sound would exceed the %d MiB audio budget",
+        ANVIL_SOUND_TOTAL_BYTES / (1024 * 1024));
+    return 0.0;
+  }
+  unsigned char *source = (unsigned char *)malloc(data_size ? data_size : 1);
+  short *frames = (short *)malloc(bytes);
+  if (!source || !frames) {
+    free(source);
+    free(frames);
+    fclose(file);
+    anvil_sound_error_text = "the sound could not be allocated";
+    return 0.0;
+  }
+  if (fseek(file, data_offset, SEEK_SET) != 0 ||
+      fread(source, 1, data_size, file) != data_size) {
+    free(source);
+    free(frames);
+    fclose(file);
+    anvil_sound_error_text = "the file ended before the sound data did";
+    return 0.0;
+  }
+  fclose(file);
+  for (size_t i = 0; i < frame_count; ++i) {
+    double position = (double)i * (double)rate / (double)ANVIL_AUDIO_RATE;
+    size_t index = (size_t)position;
+    double fraction = position - (double)index;
+    if (index >= source_frames)
+      index = source_frames - 1;
+    size_t next = index + 1 < source_frames ? index + 1 : index;
+    for (int channel = 0; channel < 2; ++channel) {
+      int source_channel = channels == 1 ? 0 : channel;
+      double first, second;
+      if (bits == 16) {
+        size_t at = (index * channels + (size_t)source_channel) * 2;
+        size_t after = (next * channels + (size_t)source_channel) * 2;
+        first = (double)(short)((unsigned)source[at] |
+                                ((unsigned)source[at + 1] << 8));
+        second = (double)(short)((unsigned)source[after] |
+                                 ((unsigned)source[after + 1] << 8));
+      } else {
+        size_t at = index * channels + (size_t)source_channel;
+        size_t after = next * channels + (size_t)source_channel;
+        first = ((double)source[at] - 128.0) * 256.0;
+        second = ((double)source[after] - 128.0) * 256.0;
+      }
+      double value = first + (second - first) * fraction;
+      frames[i * 2 + channel] =
+          (short)(value < -32768.0 ? -32768 : value > 32767.0 ? 32767 : value);
+    }
+  }
+  free(source);
+  anvil_sounds[slot].frames = frames;
+  anvil_sounds[slot].frame_count = frame_count;
+  anvil_sounds[slot].used = 1;
+  anvil_sound_bytes += bytes;
+  return (double)(slot + 1);
+}
+
+static int anvil_sound_valid(double handle) {
+  if (!isfinite(handle) || handle < 1.0 || handle > (double)ANVIL_SOUND_SLOTS ||
+      floor(handle) != handle)
+    return 0;
+  return anvil_sounds[(int)handle - 1].used;
+}
+
+static int anvil_voice_valid(double handle) {
+  if (!isfinite(handle) || handle < 1.0 || handle > (double)ANVIL_SOUND_VOICES ||
+      floor(handle) != handle)
+    return 0;
+  return anvil_voices[(int)handle - 1].sound != 0;
+}
+
+static double anvil_sound_play_internal(double handle, int loop) {
+  anvil_sound_error_text = "";
+  if (!anvil_sound_valid(handle)) {
+    anvil_sound_error_text = "the sound handle is not loaded";
+    return 0.0;
+  }
+  if (!anvil_audio_start())
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  int voice = -1;
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i) {
+    if (!anvil_voices[i].sound) {
+      voice = i;
+      break;
+    }
+  }
+  if (voice < 0) {
+    LeaveCriticalSection(&anvil_audio_lock);
+    anvil_sound_error_text = "all voices are busy";
+    return 0.0;
+  }
+  anvil_voices[voice].sound = (int)handle;
+  anvil_voices[voice].position = 0.0;
+  anvil_voices[voice].pitch = 1.0;
+  anvil_voices[voice].volume = 1.0;
+  anvil_voices[voice].pan = 0.0;
+  anvil_voices[voice].loop = loop;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)(voice + 1);
+}
+
+double anvil_sound_play(double handle) {
+  return anvil_sound_play_internal(handle, 0);
+}
+
+double anvil_sound_play_loop(double handle) {
+  return anvil_sound_play_internal(handle, 1);
+}
+
+double anvil_sound_stop(double voice_handle) {
+  if (!anvil_voice_valid(voice_handle))
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  memset(&anvil_voices[(int)voice_handle - 1], 0, sizeof(AnvilVoice));
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+double anvil_sound_stop_all(void) {
+  if (!anvil_audio_lock_ready)
+    return 0.0;
+  int stopped = 0;
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i) {
+    if (anvil_voices[i].sound) {
+      memset(&anvil_voices[i], 0, sizeof(AnvilVoice));
+      stopped++;
+    }
+  }
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)stopped;
+}
+
+double anvil_sound_volume(double voice_handle, double volume) {
+  if (!anvil_voice_valid(voice_handle))
+    return 0.0;
+  double applied = anvil_audio_clamp(volume, 0.0, 1.0);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_voices[(int)voice_handle - 1].volume = applied;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return applied;
+}
+
+double anvil_sound_pan(double voice_handle, double pan) {
+  if (!anvil_voice_valid(voice_handle))
+    return 0.0;
+  double applied = anvil_audio_clamp(pan, -1.0, 1.0);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_voices[(int)voice_handle - 1].pan = applied;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return applied;
+}
+
+double anvil_sound_pitch(double voice_handle, double pitch) {
+  if (!anvil_voice_valid(voice_handle))
+    return 0.0;
+  double applied = anvil_audio_clamp(pitch, 0.25, 4.0);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_voices[(int)voice_handle - 1].pitch = applied;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return applied;
+}
+
+double anvil_sound_active(void) {
+  if (!anvil_audio_lock_ready)
+    return 0.0;
+  int active = 0;
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i)
+    if (anvil_voices[i].sound)
+      active++;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)active;
+}
+
+double anvil_sound_destroy(double handle) {
+  if (!anvil_sound_valid(handle))
+    return 0.0;
+  int slot = (int)handle - 1;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i)
+    if (anvil_voices[i].sound == slot + 1)
+      memset(&anvil_voices[i], 0, sizeof(AnvilVoice));
+  anvil_sound_bytes -= anvil_sounds[slot].frame_count * 2 * sizeof(short);
+  free(anvil_sounds[slot].frames);
+  memset(&anvil_sounds[slot], 0, sizeof(anvil_sounds[slot]));
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
 static void anvil_release_frame_resources(void) {
+  anvil_audio_shutdown();
   for (int i = 0; i < ANVIL_IMAGES; ++i) {
     free(anvil_images[i].pixels);
     memset(&anvil_images[i], 0, sizeof(anvil_images[i]));

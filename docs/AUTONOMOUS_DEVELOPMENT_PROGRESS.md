@@ -465,3 +465,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Verified end to end:** second build printed `(reused build cache)`; folded key `3b0ba6cd…` equals the cached executable's name; `.libs.json` lists 9 libraries.
 - **Tests:** same-size/same-mtime library replacement changes the key, missing library list falls back, `/VERBOSE` parsing keeps only files that exist. `tests/test_build_cache.py` 24 passed.
 - **Closes:** C8-11 entirely — headers (Batch 30) and libraries (this batch).
+
+## Batch 32 — audio: bounded WAV playback (8.14)
+
+- **Builtins:** `sound_load(path)`, `sound_error()`, `sound_play(handle)`, `sound_play_loop(handle)`, `sound_stop(voice)`, `sound_stop_all()`, `sound_volume(voice,v)`, `sound_pan(voice,p)`, `sound_pitch(voice,r)`, `sound_active()`, `sound_destroy(handle)`.
+- **Format and limits:** uncompressed PCM WAV, mono or stereo, 8- or 16-bit, 8,000–192,000 Hz; converted once at load to 48 kHz stereo 16-bit. 16 sound slots, 8 voices, 8 MiB decoded per sound, 48 MiB total. Every rejection sets a readable `sound_error()` (open failure, bad RIFF, non-PCM, channel/bit-depth/rate limits, per-sound or total budget, truncated data).
+- **Device and threading:** `waveOut` opened lazily on first play, mixed on one worker thread into three 10 ms buffers (~30 ms latency). A missing or lost device falls back to silence with an error instead of crashing; audio is released on window teardown and through `atexit` for console-only programs.
+- **Backends:** C backend only; `--backend native` raises the standard located "not available in the native x64 backend yet" diagnostic.
+- **Tests:** load errors for missing/empty path, non-WAV, 24-bit, 3 channels, low rate and the per-sound budget; play/volume/pan/pitch clamps; bounded voices (8 then "all voices are busy"); looping across its source length; destroy stops voices and frees the slot. `tests/test_audio.py` 10 passed.
+- **Also:** `examples/audio_demo.ANVL` with `examples/assets/anvil_tone.wav`, spec table and grammar, evidence ledger, testing doc.

@@ -70,6 +70,17 @@ double anvil_image_destroy(double handle);
 double anvil_image_draw(double handle, double x, double y);
 double anvil_image_draw_scaled(double handle, double x, double y, double width,
                                double height);
+const char *anvil_sound_error(void);
+double anvil_sound_load(const char *path);
+double anvil_sound_play(double handle);
+double anvil_sound_play_loop(double handle);
+double anvil_sound_stop(double voice_handle);
+double anvil_sound_stop_all(void);
+double anvil_sound_volume(double voice_handle, double volume);
+double anvil_sound_pan(double voice_handle, double pan);
+double anvil_sound_pitch(double voice_handle, double pitch);
+double anvil_sound_active(void);
+double anvil_sound_destroy(double handle);
 void anvil_trace_sphere(double x, double y, double z, double radius, int r,
                         int g, int b, int a);
 void anvil_trace_finish(void);
