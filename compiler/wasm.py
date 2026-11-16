@@ -13,6 +13,8 @@ Run:    node tools/wasm_host.mjs hello.wasm
 
 from __future__ import annotations
 
+import json
+
 import pathlib
 import re
 import shutil
@@ -20,7 +22,7 @@ import subprocess
 
 from compiler.builtin_usage import used_builtins
 from compiler.codegen import emit_c
-from compiler.common import CompileError
+from compiler.common import CompileError, c_name
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -138,6 +140,19 @@ const context = canvas.getContext("2d");
 context.imageSmoothingEnabled = false;
 const errors = document.getElementById("out");
 const utf8 = new TextDecoder();
+const sourceMap = __SOURCE_MAP__;
+const describeError = (error) => {
+  const stack = String((error && error.stack) || error);
+  for (const line of stack.split("\\n")) {
+    for (const name of Object.keys(sourceMap)) {
+      if (line.indexOf("." + name) >= 0) {
+        const entry = sourceMap[name];
+        return "Anvil runtime error in fn(" + entry.name + ") at line " + entry.line + ": " + stack.split("\\n")[0];
+      }
+    }
+  }
+  return stack;
+};
 function rgba(r, g, b, a) {
   return "rgba(" + r + "," + g + "," + b + "," + ((a === undefined ? 255 : a) / 255) + ")";
 }
@@ -500,7 +515,8 @@ async function start() {
         try {
           instance.exports.anvil_frame(delta);
         } catch (error) {
-          errors.textContent = String(error);
+          errors.textContent = describeError(error);
+          console.error(errors.textContent);
           return;
         }
         requestAnimationFrame(tick);
@@ -508,7 +524,7 @@ async function start() {
       requestAnimationFrame(tick);
     }
   } catch (error) {
-    errors.textContent = String(error);
+    errors.textContent = describeError(error);
   }
 }
 start();
@@ -848,6 +864,10 @@ def build(
     generated += bake_images(source_path, source_text)
     generated += bake_sounds(source_path, source_text)
     generated += bake_music(source_path, source_text)
+    source_map = {
+        c_name(name): {"name": name, "line": node.line}
+        for name, node in functions.items()
+    }
     if emit_c_path is not None:
         emit_c_path.parent.mkdir(parents=True, exist_ok=True)
         emit_c_path.write_text(generated, encoding="utf-8")
@@ -884,6 +904,11 @@ def build(
         )
     page = out.with_suffix(".html")
     page.write_text(
-        HOST_PAGE.replace("__TITLE__", out.stem).replace("__WASM__", out.name),
+        HOST_PAGE.replace("__TITLE__", out.stem)
+        .replace("__WASM__", out.name)
+        .replace("__SOURCE_MAP__", json.dumps(source_map)),
         encoding="utf-8",
+    )
+    out.with_suffix(".map.json").write_text(
+        json.dumps(source_map, indent=2) + "\n", encoding="utf-8"
     )

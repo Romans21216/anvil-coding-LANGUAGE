@@ -1416,5 +1416,50 @@ class WasmMusicTests(unittest.TestCase):
             self.assertIn("only the literal music_load() path", run.stdout)
 
 
+
+_TRAP_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "clear rgba(0, 0, 0, 255)",
+        "",
+        "fn(update)",
+        "  if var(armed) = 1",
+        "    say chr(300)",
+        "  end",
+        "end",
+        "",
+        "fn(draw)",
+        "  set var(armed) = 1",
+        "  display rect(0, 0, 1, 1) -rgb(0, 0, 0)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmSourceMapTests(unittest.TestCase):
+    def test_a_trap_names_the_anvil_function_and_line(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _TRAP_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            mapping = json.loads(out.with_suffix(".map.json").read_text(encoding="utf-8"))
+            self.assertEqual(mapping["anvil_update"], {"name": "update", "line": 4})
+            self.assertEqual(mapping["anvil_draw"], {"name": "draw", "line": 10})
+            page = out.with_suffix(".html").read_text(encoding="utf-8")
+            self.assertIn("anvil_update", page)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "3"},
+            )
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn("Anvil runtime error in fn(update) at line 4", run.stderr)
+            self.assertIn("Anvil chr out of range", run.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

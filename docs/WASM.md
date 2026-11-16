@@ -177,6 +177,23 @@ missing file or a compressed WAV is a located build error. The Node host records
 each play with frame count, channels, rate, volume and peak sample so the tests
 can assert the bake without an audio device.
 
+## Diagnostics
+
+A wasm trap shows up in JavaScript as `RuntimeError: unreachable` with a stack of
+minified frame numbers. The compiler writes a source map next to the module
+(`program.map.json`) and embeds the same table in the host page, mapping each
+generated function (`anvil_update`) to its Anvil name and the line where the
+function is declared. Both hosts walk the stack until they find a mapped frame
+and report, for example:
+
+```
+Anvil runtime error in fn(update) at line 4: RuntimeError: unreachable
+```
+
+This is a function-level map, not instruction-level: it tells you which Anvil
+function trapped and where it starts, not the exact statement. Unmapped frames
+(runtime helpers such as `anvil_text_chr`) fall through to the raw stack.
+
 ## Images
 
 A browser cannot read files synchronously, so the wasm backend bakes images at

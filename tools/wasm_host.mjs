@@ -28,6 +28,24 @@ const persistSaves = () => {
   if (saveFile) fs.writeFileSync(saveFile, JSON.stringify(Object.fromEntries(saves)));
 };
 
+const mapFile = file.replace(/\.wasm$/, ".map.json");
+let sourceMap = {};
+if (fs.existsSync(mapFile)) {
+  try { sourceMap = JSON.parse(fs.readFileSync(mapFile, "utf8")); } catch (error) { sourceMap = {}; }
+}
+const describeError = (error) => {
+  const stack = String((error && error.stack) || error);
+  for (const line of stack.split("\n")) {
+    for (const name of Object.keys(sourceMap)) {
+      if (line.indexOf("." + name) >= 0) {
+        const entry = sourceMap[name];
+        return "Anvil runtime error in fn(" + entry.name + ") at line " + entry.line + ": " + stack.split("\n")[0];
+      }
+    }
+  }
+  return stack;
+};
+
 const bytes = fs.readFileSync(file);
 const utf8 = new TextDecoder();
 let memory = null;
@@ -195,19 +213,24 @@ const imports = {
 const module = await WebAssembly.compile(bytes);
 const instance = await WebAssembly.instantiate(module, imports);
 memory = instance.exports.memory;
-if (instance.exports.main) instance.exports.main();
-if (script) {
-  for (const step of script) {
-    if (step[0] === "frame") instance.exports.anvil_frame(step[1] ?? 1000 / 60);
-    else if (step[0] === "key") instance.exports.anvil_key(step[1], step[2]);
-    else if (step[0] === "mouse") instance.exports.anvil_mouse(step[1], step[2]);
-    else if (step[0] === "button") instance.exports.anvil_mouse_button(step[1], step[2]);
-    else if (step[0] === "wheel") instance.exports.anvil_wheel(step[1]);
+try {
+  if (instance.exports.main) instance.exports.main();
+  if (script) {
+    for (const step of script) {
+      if (step[0] === "frame") instance.exports.anvil_frame(step[1] ?? 1000 / 60);
+      else if (step[0] === "key") instance.exports.anvil_key(step[1], step[2]);
+      else if (step[0] === "mouse") instance.exports.anvil_mouse(step[1], step[2]);
+      else if (step[0] === "button") instance.exports.anvil_mouse_button(step[1], step[2]);
+      else if (step[0] === "wheel") instance.exports.anvil_wheel(step[1]);
+    }
+  } else if (instance.exports.anvil_frame) {
+    const frames = Number(process.env.ANVIL_WASM_FRAMES ?? "3");
+    for (let index = 0; index < frames; index++) {
+      instance.exports.anvil_frame(1000 / 60);
+    }
   }
-} else if (instance.exports.anvil_frame) {
-  const frames = Number(process.env.ANVIL_WASM_FRAMES ?? "3");
-  for (let index = 0; index < frames; index++) {
-    instance.exports.anvil_frame(1000 / 60);
-  }
+} catch (error) {
+  console.error(describeError(error));
+  process.exit(1);
 }
 if (record) console.log(JSON.stringify(ops));
