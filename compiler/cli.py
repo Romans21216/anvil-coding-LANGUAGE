@@ -219,6 +219,11 @@ def main() -> int:
         type=pathlib.Path,
         help="input .ANVL source or .ANVLproj project manifest (omit with --repl)",
     )
+    ap.add_argument(
+        "--explain",
+        metavar="CODE",
+        help="print the cause and fix for a diagnostic code (for example ANV102)",
+    )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
     ap.add_argument("--generated-c", type=pathlib.Path, help="choose generated C path")
     ap.add_argument("--output", "-o", type=pathlib.Path, help="output executable")
@@ -381,6 +386,18 @@ def main() -> int:
     from compiler import commands as lifecycle
 
     toolchain_root = pathlib.Path(__file__).resolve().parents[1]
+    if args.explain:
+        from compiler.error_codes import code_list, explain
+
+        text = explain(args.explain)
+        if text is None:
+            print(
+                f"unknown diagnostic code {args.explain!r}; known codes: {code_list()}",
+                file=sys.stderr,
+            )
+            return 2
+        print(text)
+        return 0
     if args.doctor:
         return lifecycle.doctor(toolchain_root)
     if args.new is not None:

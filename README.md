@@ -171,6 +171,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Backend notes](docs/BACKENDS.md)
 - [Testing and coverage labels](docs/TESTING.md)
 - [Part 8 evidence ledger](docs/PART8_EVIDENCE.md)
+- [Diagnostic codes](docs/ERRORS.md)
 - [Versioning and stability policy](docs/VERSIONING.md)
 - [Response to the commit review and language roadmap](docs/REVIEW_RESPONSE.md)
 - [Engine runtime](docs/ENGINE.md)

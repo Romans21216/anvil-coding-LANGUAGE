@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+import subprocess
 import sys
 import unittest
 
@@ -85,6 +86,33 @@ class DocTests(unittest.TestCase):
         self.assertEqual(len(rows), len(CATEGORIES))
         for category in CATEGORIES:
             self.assertIn("`" + category.code + "`", page)
+
+
+class ExplainCliTests(unittest.TestCase):
+    def _run(self, *arguments: str):
+        compiler = pathlib.Path(__file__).resolve().parents[1] / "compiler" / "anvil.py"
+        return subprocess.run(
+            [sys.executable, str(compiler), *arguments],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def test_a_known_code_prints_cause_and_fix(self) -> None:
+        result = self._run("--explain", "ANV102")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("error[ANV102]", result.stdout)
+        self.assertIn("Cause:", result.stdout)
+        self.assertIn("Fix:", result.stdout)
+
+    def test_an_unknown_code_lists_the_known_ones(self) -> None:
+        result = self._run("--explain", "ANV999")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("ANV101", result.stderr)
+
+    def test_explain_needs_no_source_file(self) -> None:
+        result = self._run("--explain", "ANV107")
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":
