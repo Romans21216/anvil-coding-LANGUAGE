@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from compiler.suggestions import suggestion_suffix
+
 _LOCAL_READ = re.compile(r"local\(([A-Za-z_][\w-]*)\)")
 
 
@@ -259,6 +261,43 @@ def scene_statements_without_scene(functions, top):
     ]
 
 
+def _every_node(nodes):
+    """Every node, including both branches, for whole-function lint checks."""
+    for node in nodes:
+        yield node
+        children = list(getattr(node, "body", None) or [])
+        children += list(getattr(node, "otherwise", None) or [])
+        if children:
+            yield from _every_node(children)
+
+
+def unknown_calls_in_unused_functions(functions, top=(), entry=None):
+    """A typo inside a function that is never lowered would compile silently.
+
+    Uncalled functions are removed before code generation, and lowering-time
+    checks only run on emitted code, so `call fn(typo)` inside a dead helper is
+    invisible today. Parse-time validation still covers the whole file; this
+    warning surfaces the gap and `--deny-warnings` can make it fatal.
+
+    Like the unused-function warning it builds on, it only reports functions
+    from the entry file: an include is shared code and may be called elsewhere.
+    """
+    unused = {function.name for function in unused_functions(functions, top, entry)}
+    findings = []
+    for function in functions.values():
+        if function.name not in unused:
+            continue
+        for node in _every_node(function.body):
+            if getattr(node, "kind", "") == "call" and node.name not in functions:
+                findings.append(
+                    (
+                        f"unused function '{function.name}' calls unknown function "
+                        f"{node.name!r}{suggestion_suffix(node.name, functions)}",
+                        node,
+                    )
+                )
+    return findings
+
 def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     """Warnings as (message, node) pairs, ready for the CLI to render."""
     warnings = []
@@ -275,6 +314,7 @@ def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     warnings.extend(scene_statements_without_scene(functions, top))
     for node, name in unused_globals(functions, top):
         warnings.append((f"global '{name}' is never read", node))
+    warnings.extend(unknown_calls_in_unused_functions(functions, top, entry))
     for function in unused_functions(functions, top, entry):
         warnings.append((f"function '{function.name}' is never called", function))
     for function, parameter in unused_parameters(functions, entry):

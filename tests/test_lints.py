@@ -84,6 +84,27 @@ class LintTests(unittest.TestCase):
         _, functions, _ = parse_source(source, self.base)
         self.assertEqual(unreachable(functions), [])
 
+    def test_a_typo_in_an_uncalled_function_is_reported(self) -> None:
+        # Uncalled functions are pruned before code generation, so lowering
+        # never sees a bad call inside one; the lint keeps it visible.
+        program = """fn(helper)
+  call fn(helo)
+end
+fn(main)
+  say 1
+end
+call fn(main)
+"""
+        path, functions, top = parse_source(program, self.base)
+        messages = [message for message, _ in report(functions, top)]
+        self.assertTrue(
+            any("unknown function 'helo'" in message for message in messages),
+            messages,
+        )
+        self.assertTrue(
+            any("never called" in message for message in messages), messages
+        )
+
     def test_a_local_nobody_reads_is_reported(self) -> None:
         source = (
             "fn(f, a)\n"
