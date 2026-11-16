@@ -595,3 +595,31 @@ and widened the sampling window from 0.3 s to 1.0 s; the test now observes
 several draw phases and passed five consecutive runs (2.5-2.9 s each).
 
 Tests: `test_native_window` + `test_native_x64` + `test_commands` 35 passed.
+
+## `--package`: distributable folder with a hashed manifest
+
+Part 8 §8.14 asks for a stable `package` command that emits a manifest with
+compiler, target, features, asset hashes, dependencies, licenses and
+checksums, plus a dry run and missing-asset validation. Added to
+`compiler/commands.py` and dispatched from the CLI.
+
+- `--package SOURCE|MANIFEST` builds with `--release` on the selected backend
+  into `<project>/dist/<name>/`, copies the executable, the project manifest
+  and the assets, and writes `package.json`: `name`, `language_version`,
+  `compiler` (name + backend), `target` (`windows-x64`), `features`
+  (console/window/2d-render plus `image`, `physics-2d`, `network` when the
+  sources use those builtins), `entry`, `built`, a `files` list (path, role,
+  bytes, sha256), a `checksums` map, `dependencies` and `licenses`.
+- Assets are the manifest project's whole `assets/` tree plus every path named
+  by `image_load("...")`. A plain `.ANVL` source packages only the assets it
+  names, so an unrelated broken file elsewhere in the folder cannot veto it.
+- Missing-asset validation runs before any build: every `image_load` path in
+  the packaged sources must resolve, or the command lists each missing file and
+  exits 1 without writing `dist/`.
+- `--dry-run` (only valid with `--package`) prints the target, entry, output
+  folder, feature list and assets, then stops without writing.
+
+Tests: `tests/test_commands.py` grows to 11 cases; the package test builds a
+console program, re-hashes every file in `package.json`, and runs the packaged
+exe to confirm it prints `42`. Dry-run, missing-asset and stray-`--dry-run`
+paths are covered.

@@ -56,6 +56,16 @@ def main() -> int:
         action="store_true",
         help="delete the build artifacts next to SOURCE and stop",
     )
+    ap.add_argument(
+        "--package",
+        action="store_true",
+        help="build and emit a distributable folder with a hashed package.json",
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="with --package, print the plan and validate assets without writing",
+    )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
     ap.add_argument('--inspect-metadata',action='store_true',help='read embedded Anvil name/author/version from an executable')
     ap.add_argument("--generated-c", type=pathlib.Path, help="choose generated C path")
@@ -117,6 +127,14 @@ def main() -> int:
             if args.source is None:
                 raise CompileError("--clean needs a source file or project manifest")
             return commands.clean(args.source)
+        if args.dry_run and not args.package:
+            raise CompileError("--dry-run only makes sense with --package")
+        if args.package:
+            if args.source is None:
+                raise CompileError("--package needs a source file or project manifest")
+            return commands.package(
+                args.source, dry_run=args.dry_run, backend=args.backend
+            )
         if args.source is None:
             ap.error("a source file or project manifest is required")
         if args.format or args.format_check:

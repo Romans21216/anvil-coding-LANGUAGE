@@ -35,11 +35,13 @@ python compiler/anvil.py examples/image_sprite.ANVL --release --output build/ima
 
 `--run` builds and immediately launches the executable, returning the program's exit code, so edit → build → run is one command. `--format` restores canonical indentation and `--format-check` fails on unformatted files; `--deny-warnings` turns lint warnings into a failing build for CI.
 
-Three project commands round out the lifecycle. `--new DEMO` scaffolds a `DEMO/DEMO.ANVLproj`, a `main.ANVL` starter scene and an `assets/` folder that builds unmodified on either backend; `--clean` removes the executable and generated C for a source or manifest so the next build starts from zero; `--doctor` prints which toolchains, runtime files and assets this checkout can actually use, and exits non-zero only when no backend can build.
+Three project commands round out the lifecycle. `--new DEMO` scaffolds a `DEMO/DEMO.ANVLproj`, a `main.ANVL` starter scene and an `assets/` folder that builds unmodified on either backend; `--clean` removes the executable and generated C for a source or manifest so the next build starts from zero; `--doctor` prints which toolchains, runtime files and assets this checkout can actually use, and exits non-zero only when no backend can build. `--package` builds the project and writes `dist/<name>/` with the executable, the manifest, the project's assets and a `package.json` recording the compiler, target, feature groups, per-file sizes and SHA-256 checksums; add `--dry-run` to print that plan and validate every `image_load(...)` asset without writing anything.
 
 ```powershell
 python compiler/anvil.py --new demo
 python compiler/anvil.py --doctor
+python compiler/anvil.py demo/demo.ANVLproj --package --dry-run
+python compiler/anvil.py demo/demo.ANVLproj --package
 python compiler/anvil.py demo/demo.ANVLproj --clean
 ```
 
