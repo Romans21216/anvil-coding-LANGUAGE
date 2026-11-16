@@ -400,3 +400,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** `tests/test_image_limits.py` covers the width, height, pixel-count and short-file messages plus an 8,192-pixel-wide image that still loads; `tests/test_image_error.py` still passes unchanged. 8 passed.
 - **Docs:** `ENGINE.md` and `LANGUAGE_SPEC.md` describe the named reasons; `TESTING.md` lists the new module.
 - **Commit:** `e4de27d`.
+
+## Batch 25 — build-cache completeness (C8-9, C8-10)
+
+- **Reproduced both findings** with `.scratch/repro_c89_c810.py` before changing code: a 4096-byte compiler replaced by different 4096-byte code with the original `st_mtime_ns` restored produced the identical cache key, and rewriting the `link.exe` beside the compiler also left the key unchanged.
+- **C8-9 fix:** `_compiler_identity` hashes the compiler's bytes instead of path/size/mtime.
+- **C8-10 fix:** the key now includes `link.exe` bytes from the compiler's own toolset folder, the installed Windows SDK `Include`/`Lib` version directories, and `WindowsSDKVersion` when present. `CACHE_KEY_VERSION` is `anvil-cache-v3`, so pre-fix entries are never reused.
+- **Tests:** `test_same_size_same_time_compiler_replacement_changes_the_key`, `test_a_changed_linker_beside_the_compiler_changes_the_key`, `test_an_unchanged_linker_keeps_the_key` — red before the fix, green after; 12 passed with `test_build_atomic`.
+- **Measured cost:** cold C build 1.67 s, cached hit 0.22 s (was 0.13 s) with the real MSVC toolset, so hashing ~4.6 MB of tools costs about 0.09 s.
+- **Known gap recorded in `docs/COMPILER.md`:** libraries passed through `build_c(libraries=...)` are still not part of the key.
+- **Commit:** `d1e56b9`.
