@@ -527,3 +527,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Measured here:** idle 0.38 ms, overdraw 3.88 ms, text 1.12 ms, cubes 2.88 ms p50.
 - **Test:** `tests/test_runtime_budget.py` runs `--check` and asserts the scene list matches the budgets file; 2 passed in 13 s.
 - **Docs:** language spec clock row, evidence ledger, testing doc.
+
+## Batch 40 — atlas packing tool (8.14)
+
+- **Tool:** `tools/pack_atlas.py` reads uncompressed 24/32-bit BMPs, orders them by height/width/name, packs them on shelves with an optional gutter, writes a 32-bit BGRA sheet and a sorted, timestamp-free `anvil-atlas-1` JSON manifest. Sprite names come from file stems and duplicates are refused; an image wider than the sheet is refused with its width in the message.
+- **Bug caught by the test:** the width guard unpacked the sprite tuple with the fields in the wrong position, so it compared heights and allowed a 5 px image into a 4 px sheet. `pack()` now indexes the width field directly.
+- **Tests:** `tests/test_atlas_pack.py` packs three solid sprites, reads the sheet back and checks every cell pixel against the manifest rectangle, verifies rectangles do not overlap with padding, requires byte-identical sheet and JSON across runs, and covers the duplicate-name and oversized-image errors; 4 passed.
+- **Docs:** `docs/ATLAS.md` documents the workflow, options, manifest and `image_draw_region` usage.

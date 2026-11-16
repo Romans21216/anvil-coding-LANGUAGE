@@ -27,6 +27,7 @@ is absent, tests that build C programs raise `SkipTest` instead of failing.
 | Backend capability drift | `python tools/capability_matrix.py --check` |
 | Compile-time and size budgets | `python tools/bench_anvil.py --check` (re-baseline with `--write-budgets`) |
 | Runtime frame-time budgets | `python tools/bench_runtime.py --check` (re-baseline with `--write-budgets`) |
+| Sprite atlas packing | `python tools/pack_atlas.py sheet.bmp --atlas sheet.json sprites/*.bmp` |
 | A project's own cases | `python compiler/anvil.py game.ANVLproj --test [--backend native]` |
 | Formatting | `python compiler/anvil.py file.ANVL --format-check` |
 | VS Code grammar and sample validation | `npm test --prefix vscode-extension` |
@@ -94,6 +95,8 @@ remote desktop can prevent window creation:
 - `test_runtime_budget` — builds and runs the idle, 2D-overdraw, text and 3D
   benchmark scenes and enforces the frame-time budgets in
   `tools/bench_budgets.json`.
+- `test_atlas_pack` — packs solid BMPs, reads the sheet back to check the
+  manifest rectangles, and requires byte-identical output across runs.
 - `test_text_zoom` — text glyphs grow with the camera zoom and return to their
   original size on reset, measured from the presented pixels.
 - `test_includes` — the subset that runs an included graphical sample.

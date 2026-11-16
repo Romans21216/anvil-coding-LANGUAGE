@@ -169,6 +169,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Formal language specification](docs/LANGUAGE_SPEC.md)
 - [Backend capability matrix (measured)](docs/CAPABILITY_MATRIX.md)
 - [Backend notes](docs/BACKENDS.md)
+- [Sprite atlases](docs/ATLAS.md)
 - [Testing and coverage labels](docs/TESTING.md)
 - [Part 8 evidence ledger](docs/PART8_EVIDENCE.md)
 - [Diagnostic codes](docs/ERRORS.md)
