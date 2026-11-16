@@ -158,6 +158,22 @@ that consumes it. `examples/text_showcase.ANVL` puts all of this on one screen
 (capture: `docs/assets/text_showcase.png`), and prints the same values to the
 console.
 
+## Assertions
+
+`expect(actual, expected)` and `expect_text(actual, expected)` are statements,
+not value-producing calls. A passing assertion does nothing; a failing one
+writes `<file>:<line>: expect failed: expected …, got …`, prints the call stack
+and exits with code 1, which is what `--test` reports. Both are C-backend only;
+the native backend rejects them at compile time.
+
+```anvil
+fn(main)
+  expect(2 + 2, 4)
+  expect_text(upper("ok"), "OK")
+  print "checks passed"
+end
+```
+
 ## Number format
 
 Console output and `display text(...)` use one rule, so a value never changes

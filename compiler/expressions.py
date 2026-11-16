@@ -154,6 +154,7 @@ BUILTINS = {
     "atan2": (2, 2),
     "mod": (2, 2),
     "hypot": (2, 2),
+    "expect": (2, 2),
 }
 
 # Text builtins take text arguments and return text or a number.  The spec is
@@ -171,6 +172,7 @@ TEXT_BUILTINS = {
     "utf8_len": (("text",), "number"),
     "utf8_char": (("text", "number"), "string"),
     "utf8_mid": (("text", "number", "number"), "string"),
+    "expect_text": (("text", "text"), "number"),
 }
 
 TEXT_BUILTIN_C_NAMES = {
@@ -186,12 +188,18 @@ TEXT_BUILTIN_C_NAMES = {
     "utf8_len": "anvil_utf8_len",
     "utf8_char": "anvil_utf8_char",
     "utf8_mid": "anvil_utf8_mid",
+    "expect_text": "anvil_expect_text",
 }
 
 # Trailing arguments that a builtin fills in when the call is shorter.
 BUILTIN_DEFAULTS = {"round": ["0.0"]}
 
+# Builtins that receive the source location so a failure can name the line.
+BUILTIN_LOCATION_ARGUMENTS = {"expect"}
+TEXT_BUILTIN_LOCATION_ARGUMENTS = {"expect_text"}
+
 BUILTIN_C_NAMES = {
+    "expect": "anvil_expect",
     "time": "anvil_time",
     "delta": "anvil_delta",
     "rnd": "anvil_rnd",
@@ -549,6 +557,9 @@ class ExpressionParser:
                         self.checked_number(self.require_number((code, argument_kind)))
                     )
             self.expect(")")
+            if value in TEXT_BUILTIN_LOCATION_ARGUMENTS:
+                args.append(c_string_literal(str(self.path)))
+                args.append(str(self.line))
             call = f"{TEXT_BUILTIN_C_NAMES[value]}({', '.join(args)})"
             if result == "number":
                 left = (self.checked_number(call), "number")
@@ -578,6 +589,9 @@ class ExpressionParser:
             defaults = BUILTIN_DEFAULTS.get(value)
             if defaults and len(args) < high:
                 args.extend(defaults[len(args) - low:])
+            if value in BUILTIN_LOCATION_ARGUMENTS:
+                args.append(c_string_literal(str(self.path)))
+                args.append(str(self.line))
             name = BUILTIN_C_NAMES.get(value, value)
             call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"
             if value in BUILTINS:

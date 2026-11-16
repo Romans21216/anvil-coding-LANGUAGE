@@ -449,6 +449,10 @@ def parse_syntax(
                 node = Node("print", line_no, value=line[len("print") :].strip())
             elif line == "say" or line.startswith("say "):
                 node = Node("print", line_no, value=line[len("say") :].strip())
+            elif re.match(r"^expect(_text)?\s*\(", line):
+                # Assertion statement: a failing expect stops the program with
+                # the source line, so test files need no exit code plumbing.
+                node = Node("expect", line_no, value=line)
             elif m := re.fullmatch(r"(?:net\s+host|nethost|netHost)\(([0-9]+)\)(?:\s+(--local))?", line):
                 validate_port(path, line_no, m.group(1))
                 node = Node("net_host", line_no, value=m.group(1),params=['local'] if m[2] else [])

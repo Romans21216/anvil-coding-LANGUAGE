@@ -623,3 +623,29 @@ Tests: `tests/test_commands.py` grows to 11 cases; the package test builds a
 console program, re-hashes every file in `package.json`, and runs the packaged
 exe to confirm it prints `42`. Dry-run, missing-asset and stray-`--dry-run`
 paths are covered.
+
+## `--test` and `expect`: a test command that can actually fail
+
+Part 8's last missing named command was `test`. A command that only checks a
+file exits zero proves nothing, so this adds the assertion primitive too.
+
+- `expect(actual, expected)` and `expect_text(actual, expected)` are statements.
+  A passing assertion is a no-op; a failing one writes
+  `<file>:<line>: expect failed: expected …, got …`, prints the call stack and
+  exits 1. The runtime keeps the location from compile time like `anvil_divide`
+  does, so the message names the offending line, not the runtime.
+- The native backend rejects both with `statement 'expect' is not supported by
+  the native x64 backend yet` and a located diagnostic, matching the documented
+  split.
+- `--test SOURCE|MANIFEST` builds and runs every `tests/**/*.ANVL` and
+  `*_test.ANVL` file against the selected backend, printing `pass`/`fail` per
+  file and a final `N passed, M failed`. Builds go to a temp folder so test
+  runs leave no executables behind; each run has a 120 s timeout; a project
+  with no test files fails with a message rather than passing silently.
+- `--new` now also writes `tests/smoke_test.ANVL`, so a scaffolded project
+  passes `--test` immediately and the author has a worked example of the
+  assertion syntax.
+
+Tests: `tests/test_expect.py` (4 cases: passing checks, failing number, failing
+text, top-level assertion) and `tests/test_commands.py` grows to 14 with the
+test-command pass/fail/no-tests paths.

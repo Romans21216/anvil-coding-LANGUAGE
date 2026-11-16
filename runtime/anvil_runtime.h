@@ -62,6 +62,9 @@ void anvil_frame_enter(const char *name, const char *path, int line);
 void anvil_frame_leave(void);
 void anvil_report_call_stack(void);
 double anvil_round(double value, double places);
+double anvil_expect(double actual, double expected, const char *path, int line);
+double anvil_expect_text(const char *actual, const char *expected,
+                         const char *path, int line);
 double anvil_clamp(double value, double low, double high);
 double anvil_sign(double value);
 double anvil_mod(double numerator, double denominator);

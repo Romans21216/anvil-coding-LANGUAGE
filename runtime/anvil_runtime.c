@@ -958,6 +958,28 @@ double anvil_divide(double numerator, double denominator, const char *path,
   }
   return anvil_check_number(numerator / denominator, path, line);
 }
+double anvil_expect(double actual, double expected, const char *path,
+                    int line) {
+  if (actual != expected) {
+    fprintf(stderr, "%s:%d: expect failed: expected %.15g, got %.15g\n",
+            path ? path : "<Anvil>", line, expected, actual);
+    anvil_report_call_stack();
+    exit(1);
+  }
+  return actual;
+}
+double anvil_expect_text(const char *actual, const char *expected,
+                         const char *path, int line) {
+  const char *left = actual ? actual : "";
+  const char *right = expected ? expected : "";
+  if (strcmp(left, right) != 0) {
+    fprintf(stderr, "%s:%d: expect failed: expected \"%s\", got \"%s\"\n",
+            path ? path : "<Anvil>", line, right, left);
+    anvil_report_call_stack();
+    exit(1);
+  }
+  return 0.0;
+}
 double anvil_round(double value, double places) {
   double factor = 1.0, result;
   int count, i;

@@ -65,7 +65,8 @@ Every statement below occupies a single source line, except that a block stateme
 ```ebnf
 statement        = assignment | cleanup_statement | accumulation | array_write | function_call_statement | net_send_statement
                  | return_statement | if_statement | while_statement
-                 | for_statement | engine_statement | display_statement | print_statement ;
+                 | for_statement | engine_statement | display_statement | print_statement
+                 | assertion_statement ;
 assignment       = "set var(", IDENT, ") =", expression
                  | "set local(", IDENT, ") =", expression ;
 accumulation     = ("add" | "sub"), whitespace, "var(", IDENT, ")", whitespace, expression
@@ -90,6 +91,8 @@ display_style    = "-rgb(", expression, ",", expression, ",", expression, ")"
                  | "-rotate(", expression, ",", expression, ",", expression, ")" ;
 return_statement = "output", whitespace, expression ;
 print_statement  = ("print" | "say"), [ whitespace, text_expression ] ;
+assertion_statement = "expect", "(", expression, ",", expression, ")"
+                 | "expect_text", "(", text_expression, ",", text_expression, ")" ;
 text_expression  = STRING, { whitespace, "+", whitespace, (STRING | expression | text_call) }
                  | expression | text_call ;
 text_call        = text_builtin, "(", [ argument_list ], ")" ;

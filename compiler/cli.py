@@ -66,6 +66,11 @@ def main() -> int:
         action="store_true",
         help="with --package, print the plan and validate assets without writing",
     )
+    ap.add_argument(
+        "--test",
+        action="store_true",
+        help="build and run every tests/*.ANVL and *_test.ANVL file in the project",
+    )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
     ap.add_argument('--inspect-metadata',action='store_true',help='read embedded Anvil name/author/version from an executable')
     ap.add_argument("--generated-c", type=pathlib.Path, help="choose generated C path")
@@ -135,6 +140,10 @@ def main() -> int:
             return commands.package(
                 args.source, dry_run=args.dry_run, backend=args.backend
             )
+        if args.test:
+            if args.source is None:
+                raise CompileError("--test needs a project manifest or a test file")
+            return commands.test_project(args.source, backend=args.backend)
         if args.source is None:
             ap.error("a source file or project manifest is required")
         if args.format or args.format_check:

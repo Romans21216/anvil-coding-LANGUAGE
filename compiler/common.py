@@ -162,6 +162,8 @@ RUNTIME_C_NAMES = {
     "anvil_utf8_char",
     "anvil_utf8_mid",
     "anvil_round",
+    "anvil_expect",
+    "anvil_expect_text",
     "anvil_clamp",
     "anvil_sign",
     "anvil_mod",

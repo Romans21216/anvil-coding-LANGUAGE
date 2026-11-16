@@ -158,6 +158,44 @@ class PackageCommandTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("--dry-run only makes sense with --package", result.stderr)
 
+class TestCommandTests(unittest.TestCase):
+    def test_test_runs_every_test_file_and_reports_the_count(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            project = pathlib.Path(temporary) / "demo"
+            self.assertEqual(run_cli("--new", str(project)).returncode, 0)
+            result = run_cli(str(project / "demo.ANVLproj"), "--test")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Running 1 test file(s)", result.stdout)
+            self.assertIn("pass  tests", result.stdout)
+            self.assertIn("1 passed", result.stdout)
+
+    def test_test_fails_when_an_expectation_fails(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            project = pathlib.Path(temporary) / "demo"
+            self.assertEqual(run_cli("--new", str(project)).returncode, 0)
+            (project / "tests" / "broken_test.ANVL").write_text(
+                "fn(main)\n  expect(2 + 2, 5)\nend\n", encoding="utf-8"
+            )
+            result = run_cli(str(project / "demo.ANVLproj"), "--test")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("fail  tests", result.stdout)
+            self.assertIn("expect failed", result.stderr)
+            self.assertIn("1 passed, 1 failed", result.stdout)
+
+    def test_test_reports_when_a_project_has_no_tests(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            project = pathlib.Path(temporary) / "bare"
+            project.mkdir()
+            (project / "bare.ANVLproj").write_text(
+                'name = "bare"\nentry = "main.ANVL"\n', encoding="utf-8"
+            )
+            (project / "main.ANVL").write_text(
+                "fn(main)\n  output 0\nend\n", encoding="utf-8"
+            )
+            result = run_cli(str(project / "bare.ANVLproj"), "--test")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("no tests found", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

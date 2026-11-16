@@ -237,6 +237,8 @@ def emit_nodes(
                 scope or n, temporary_counter,
             )
             out.append(f"{indent}anvil_print({code});")
+        elif n.kind == "expect":
+            out.append(f"{indent}(void)({lower(n)});")
         elif n.kind == "call":
             if n.name not in functions:
                 raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
@@ -421,6 +423,7 @@ def emit_c(
             "net_leave",
             "net_join",
             "print",
+            "expect",
         )
     ]
     calls = [n for n in top if n.kind == "call"]
@@ -442,6 +445,7 @@ def emit_c(
             "net_leave",
             "net_join",
             "print",
+            "expect",
             "call",
             "noop",
         )

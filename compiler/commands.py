@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 
@@ -55,6 +56,17 @@ entry = "main.ANVL"
 
 [engine]
 fixed_hz = 60
+"""
+
+SMOKE_TEST = """\
+# {name}: headless checks.  Run them with:
+#   python compiler/anvil.py {manifest} --test
+fn(main)
+  expect(2 + 2, 4)
+  expect(round(2.5), 3)
+  expect_text(upper("ok"), "OK")
+  print "smoke test passed"
+end
 """
 
 _READY = "ok"
@@ -159,11 +171,20 @@ def new_project(target: pathlib.Path, name: str | None = None, stream=None) -> i
         encoding="utf-8",
         newline="\n",
     )
+    tests = target / "tests"
+    tests.mkdir(exist_ok=True)
+    (tests / "smoke_test.ANVL").write_text(
+        SMOKE_TEST.format(name=project_name, manifest=manifest_name),
+        encoding="utf-8",
+        newline="\n",
+    )
     print(f"Created {project_name} in {target}", file=out)
     print(f"  {manifest_name}", file=out)
     print("  main.ANVL", file=out)
     print("  assets/", file=out)
+    print("  tests/smoke_test.ANVL", file=out)
     print(f"\nBuild and run:  python compiler/anvil.py {manifest} --run", file=out)
+    print(f"Run the tests:  python compiler/anvil.py {manifest} --test", file=out)
     return 0
 
 
@@ -424,4 +445,106 @@ def package(
 
     print(f"\nWrote {dist / 'package.json'} and {len(files)} file(s).", file=out)
     print(f"Run it with:  {executable}", file=out)
+    return 0
+
+
+def _test_files(source: pathlib.Path) -> list[pathlib.Path]:
+    """Test files for ``source``: itself for a .ANVL, discovered for a project."""
+    if source.suffix.lower() != ".anvlproj":
+        return [source]
+    root = source.parent
+    found = list(sorted(root.glob("*_test.ANVL")))
+    tests_dir = root / "tests"
+    if tests_dir.is_dir():
+        found.extend(sorted(tests_dir.rglob("*.ANVL")))
+    unique: list[pathlib.Path] = []
+    seen: set[pathlib.Path] = set()
+    for path in found:
+        resolved = path.resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            unique.append(path)
+    return unique
+
+
+def test_project(source: pathlib.Path, *, backend: str = "c", stream=None) -> int:
+    """Build and run each test file; a failing run fails the command."""
+    out = stream or sys.stdout
+    source = pathlib.Path(source).resolve()
+    if not source.is_file():
+        print(f"{source}: no such file", file=sys.stderr)
+        return 1
+
+    root = source.parent
+    files = _test_files(source)
+    if not files:
+        print(
+            f"{source}: no tests found; add tests/*.ANVL or a *_test.ANVL file",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"Running {len(files)} test file(s) with the {backend} backend", file=out)
+    failures: list[tuple[pathlib.Path, subprocess.CompletedProcess]] = []
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+        build_dir = pathlib.Path(temporary)
+        for path in files:
+            label = path.relative_to(root) if path.is_relative_to(root) else path
+            executable = build_dir / f"{path.stem}.exe"
+            built = subprocess.run(
+                [
+                    sys.executable,
+                    str(COMPILER),
+                    str(path),
+                    "--backend",
+                    backend,
+                    "--output",
+                    str(executable),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(root),
+            )
+            if built.returncode != 0:
+                print(f"  fail  {label} (build)", file=out)
+                failures.append((path, built))
+                continue
+            try:
+                ran = subprocess.run(
+                    [str(executable)],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    cwd=str(root),
+                    timeout=120,
+                )
+            except subprocess.TimeoutExpired:
+                print(f"  fail  {label} (timed out after 120s)", file=out)
+                failures.append(
+                    (path, subprocess.CompletedProcess([], 1, "", "timed out after 120s"))
+                )
+                continue
+            if ran.returncode == 0:
+                print(f"  pass  {label}", file=out)
+            else:
+                print(f"  fail  {label}", file=out)
+                failures.append((path, ran))
+
+    if failures:
+        for path, result in failures:
+            print(f"\n--- {path} ---", file=out)
+            if result.stdout:
+                print(result.stdout, end="", file=out)
+            if result.stderr:
+                print(result.stderr, end="", file=sys.stderr)
+        print(
+            f"\n{len(files) - len(failures)} passed, {len(failures)} failed",
+            file=out,
+        )
+        return 1
+
+    print(f"\n{len(files)} passed", file=out)
     return 0
