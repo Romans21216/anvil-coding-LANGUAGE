@@ -11,7 +11,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from compiler.common import CompileError  # noqa: E402
 from compiler.codegen import emit_c  # noqa: E402
-from compiler.diagnostics import render  # noqa: E402
+from compiler.diagnostics import render, render_editor  # noqa: E402
 from compiler.parser import parse  # noqa: E402
 
 
@@ -78,7 +78,44 @@ class DiagnosticRenderTests(unittest.TestCase):
         self.assertIn("^", rendered)
 
 
+class EditorRenderTests(unittest.TestCase):
+    """`--diagnostics editor` needs a 1-based character column."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.tmp.name)
+        self.source = self.root / "main.ANVL"
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_the_quoted_token_supplies_the_column(self) -> None:
+        self.source.write_text("say value" + chr(10), encoding="utf-8")
+        out = render_editor(f"{self.source}:1: unknown name 'value'")
+        self.assertEqual(out, f"{self.source}:1:5: unknown name 'value'")
+
+    def test_a_tab_counts_as_one_character(self) -> None:
+        self.source.write_text(chr(9) + "say value" + chr(10), encoding="utf-8")
+        out = render_editor(f"{self.source}:1: unknown name 'value'")
+        self.assertTrue(out.startswith(f"{self.source}:1:6:"), out)
+
+    def test_an_explicit_column_wins(self) -> None:
+        self.source.write_text("say value" + chr(10), encoding="utf-8")
+        out = render_editor(f"{self.source}:1:3: boom")
+        self.assertEqual(out, f"{self.source}:1:3: boom")
+
+    def test_a_missing_file_is_unchanged(self) -> None:
+        message = f"{self.root / 'gone.ANVL'}:4: boom"
+        self.assertEqual(render_editor(message), message)
+
+    def test_a_line_out_of_range_is_unchanged(self) -> None:
+        self.source.write_text("only one line" + chr(10), encoding="utf-8")
+        message = f"{self.source}:9: boom"
+        self.assertEqual(render_editor(message), message)
+
+
 class CheckModeTests(unittest.TestCase):
+
     """--check validates a program without building anything."""
 
     def setUp(self) -> None:

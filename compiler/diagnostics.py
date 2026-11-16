@@ -29,7 +29,7 @@ _QUOTED = re.compile(r"'([^'\r\n]{1,80})'")
 _CARET_STRIP = " \t"
 
 
-def _read_line(path: pathlib.Path, line_no: int) -> str | None:
+def _read_line(path: pathlib.Path, line_no: int, expand_tabs: bool = True) -> str | None:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -37,7 +37,8 @@ def _read_line(path: pathlib.Path, line_no: int) -> str | None:
     lines = text.splitlines()
     if line_no < 1 or line_no > len(lines):
         return None
-    return lines[line_no - 1].replace("\t", " " * TAB_WIDTH)
+    line = lines[line_no - 1]
+    return line.replace("\t", " " * TAB_WIDTH) if expand_tabs else line
 
 
 def _caret_column(msg: str, source: str) -> int:
@@ -97,3 +98,31 @@ def render(message: str, max_width: int = 160) -> str:
 
     gutter = f"{line_no:>5} | "
     return f"{header}\n{gutter}{source}\n{' ' * len(gutter)}{' ' * caret_pad}^"
+
+
+def render_editor(message: str) -> str:
+    """One-line path:line:column: message for editors and CI logs.
+
+    The caret renderer is for humans; this keeps the same location logic but
+    reports a 1-based character column, counting a tab as one character so the
+    number matches what an editor shows in its gutter. Messages without a
+    readable source line come back unchanged.
+    """
+    stripped = message.rstrip()
+    match = _LOCATION.match(stripped.strip())
+    if not match:
+        return stripped
+
+    path = match.group("path")
+    line_no = int(match.group("line"))
+    body = match.group("msg").strip()
+    source = _read_line(pathlib.Path(path), line_no, expand_tabs=False)
+    if source is None:
+        return stripped
+    if match.group("col"):
+        column = max(1, int(match.group("col")))
+    else:
+        column = _caret_column(body, source) + 1
+        while column > 1 and source[column - 1] in _CARET_STRIP:
+            column -= 1
+    return f"{path}:{line_no}:{column}: {body}"
