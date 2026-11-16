@@ -15,7 +15,7 @@ import tomllib
 from compiler.build import build_c, find_compiler
 from compiler.codegen import emit_c
 from compiler.common import CompileError
-from compiler.diagnostics import render
+from compiler.diagnostics import render, render_editor
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
@@ -255,6 +255,12 @@ def main() -> int:
         "--deny-warnings",
         action="store_true",
         help="treat compiler warnings (such as an unused import) as errors",
+    )
+    ap.add_argument(
+        "--diagnostics",
+        choices=("caret", "editor"),
+        default="caret",
+        help="diagnostic format: caret blocks or one-line path:line:column",
     )
     ap.add_argument(
         "--no-cache",
@@ -512,8 +518,9 @@ def main() -> int:
         for message, node in lints.report(funcs, top, source_path):
             warnings.append((node, message))
         for node, message in warnings:
+            text = f"{node.source or source_path}:{node.line}: warning: {message}"
             print(
-                render(f"{node.source or source_path}:{node.line}: warning: {message}"),
+                render_editor(text) if args.diagnostics == "editor" else render(text),
                 file=sys.stderr,
             )
         if warnings and args.deny_warnings:
@@ -633,5 +640,6 @@ def main() -> int:
         print(f"{args.source}: {e}", file=sys.stderr)
         return 1
     except (CompileError, OSError, UnicodeError, subprocess.CalledProcessError) as e:
-        print(render(str(e)), file=sys.stderr)
+        printer = render_editor if args.diagnostics == "editor" else render
+        print(printer(str(e)), file=sys.stderr)
         return 1

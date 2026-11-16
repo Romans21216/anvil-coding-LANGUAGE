@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -13,6 +14,8 @@ from compiler.common import CompileError  # noqa: E402
 from compiler.codegen import emit_c  # noqa: E402
 from compiler.diagnostics import render, render_editor  # noqa: E402
 from compiler.parser import parse  # noqa: E402
+
+COMPILER = pathlib.Path(__file__).resolve().parents[1] / "compiler" / "anvil.py"
 
 
 class DiagnosticRenderTests(unittest.TestCase):
@@ -224,6 +227,77 @@ class CheckModeTests(unittest.TestCase):
         with self.assertRaises(CompileError) as caught:
             parse(path, source)
         self.assertIn("write local(i) instead of var(i)", str(caught.exception))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class EditorFormatCliTests(unittest.TestCase):
+    """--diagnostics editor gives editors file:line:column for every message."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.tmp.name)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def _run(self, name: str, text: str) -> subprocess.CompletedProcess:
+        source = self.root / name
+        source.write_text(text, encoding="utf-8")
+        return subprocess.run(
+            [
+                sys.executable,
+                str(COMPILER),
+                str(source),
+                "--check",
+                "--diagnostics",
+                "editor",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+    def test_an_error_reports_file_line_and_column(self) -> None:
+        program = (
+            "fn(main)"
+            + chr(10)
+            + "  say missing_name"
+            + chr(10)
+            + "end"
+            + chr(10)
+            + "call fn(main)"
+            + chr(10)
+        )
+        result = self._run("bad.ANVL", program)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("bad.ANVL:2:7: unknown name 'missing_name'", result.stderr)
+        self.assertNotIn("|", result.stderr, "editor mode must stay one line per message")
+
+    def test_a_warning_reports_file_line_and_column(self) -> None:
+        program = (
+            "fn(helper)"
+            + chr(10)
+            + "  call fn(helo)"
+            + chr(10)
+            + "end"
+            + chr(10)
+            + "fn(main)"
+            + chr(10)
+            + "  say 1"
+            + chr(10)
+            + "end"
+            + chr(10)
+            + "call fn(main)"
+            + chr(10)
+        )
+        result = self._run("warn.ANVL", program)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("warn.ANVL:2:11: warning: unused function", result.stderr)
+        self.assertNotIn("|", result.stderr)
+
 
 
 if __name__ == "__main__":

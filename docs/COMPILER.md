@@ -121,6 +121,7 @@ must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
 | `--check` | parse and validate only, with no output written |
 | `--deny-warnings` | treat warnings as build failures |
 | `--no-cache` | ignore the build cache and do not store a new entry |
+| `--diagnostics caret\|editor` | caret blocks (default) or one-line `path:line:column` messages for editors |
 | `--package <dir>` | copy the program and its assets into `dir` with `anvil-package.json` |
 | `--package-dry-run` | validate assets and print the package manifest without writing |
 | `--run` | build the program and run it, returning its exit code |
