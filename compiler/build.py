@@ -8,6 +8,7 @@ import shutil
 import subprocess
 
 from compiler.common import INCLUDE, RUNTIME
+from compiler import toolchain_env
 
 
 def find_compiler(requested: str | None):
@@ -72,19 +73,28 @@ def build_c(
         install_root = pathlib.Path(compiler).parents[7]
         devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
         if os.name == "nt" and devcmd.exists():
-            helper = output.parent / (output.stem + ".build.cmd")
-            helper.write_text(
-                '@echo off\ncall "'
-                + str(devcmd)
-                + '" -arch=x64 >nul\nif errorlevel 1 exit /b %errorlevel%\n'
-                + subprocess.list2cmdline(args)
-                + "\nexit /b %errorlevel%\n",
-                encoding="utf-8",
-            )
-            try:
-                subprocess.run(["cmd.exe", "/d", "/c", str(helper)], check=True)
-            finally:
-                helper.unlink(missing_ok=True)
+            # VsDevCmd costs 1.3-1.7 s per build; a cached environment makes
+            # the same cl.exe invocation cost ~0.4 s. Fall back to the .cmd
+            # wrapper whenever the capture is unavailable.
+            environment = toolchain_env.ensure(devcmd)
+            if environment is not None:
+                subprocess.run(args, check=True, env=environment)
+            else:
+                helper = output.parent / (output.stem + ".build.cmd")
+                helper.write_text(
+                    '@echo off\ncall "'
+                    + str(devcmd)
+                    + '" -arch=x64 >nul\nif errorlevel 1 exit /b %errorlevel%\n'
+                    + subprocess.list2cmdline(args)
+                    + "\nexit /b %errorlevel%\n",
+                    encoding="utf-8",
+                )
+                try:
+                    subprocess.run(
+                        ["cmd.exe", "/d", "/c", str(helper)], check=True
+                    )
+                finally:
+                    helper.unlink(missing_ok=True)
         else:
             subprocess.run(args, check=True)
     else:
