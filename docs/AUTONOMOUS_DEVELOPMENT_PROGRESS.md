@@ -319,3 +319,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** full suite on `0b0130d` 646 passed, 1 skipped, 1 xfailed; targeted batch after the recursion change 128 passed.
 - **Commits:** `dd40769`, `0b0130d`, `a24a071`, `6f0f3e8`.
 - **Native guard:** the same 512 KiB budget now applies to the native backend through an inline `anvil_frame_enter` helper with a writable .data base slot; 20000-deep recursion reports the diagnostic instead of dying silently. Tests cover both backends.
+
+## Batch 16 — packaging with dry run and manifest (8.14)
+
+- **Command:** `--package <dir>` copies the built program and every asset into the target folder and writes `anvil-package.json`; `--package-dry-run` prints the same manifest and validates inputs without touching the filesystem.
+- **Assets:** the project manifest gained an optional `[assets] files = [...]` list, merged with literal `image_load("...")`/`sound_load("...")` paths found in the program's sources. Paths outside the project folder are rejected; every missing asset is listed and fails the package step with exit 1.
+- **Manifest:** format, name, target, backend, compiler identity (SHA-256 of `cl`, language version for native), used builtins, program size/hash, per-asset path/size/hash and a checksums map. No timestamps, so identical inputs produce identical bytes.
+- **Files:** `compiler/package.py` (new), `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_package.py`.
+- **Tests:** `tests/test_package.py` 5 passed; with the cache and compiler suites 80 passed.
+- **Commit:** `79d8af3`.
