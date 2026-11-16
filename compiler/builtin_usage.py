@@ -17,6 +17,7 @@ _TEXT_BUILTINS = {
 }
 _MATH_BUILTINS = {
     "abs", "sqrt", "floor", "ceil", "min", "max", "round", "sin", "cos",
+    "memory_images", "memory_audio", "memory_video", "memory_total",
     "noise", "fbm",
 }
 _RANDOM_BUILTINS = {"rnd", "random"}

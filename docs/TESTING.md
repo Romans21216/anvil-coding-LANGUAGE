@@ -97,6 +97,8 @@ remote desktop can prevent window creation:
   and reset, sampled from the presented window.
 - `test_input_latency` — posts key messages to a real window and measures the
   delay until `pressed(A)` fires; interactive, kept to a few presses.
+- `test_memory_builtins` — loads images and a WAV and asserts the exact byte
+  counts from `memory_images`/`memory_audio`/`memory_video`/`memory_total`.
 - `test_memory_budget` — samples the compiler's process tree and each scene's
   working set, checks generated C and executable sizes, and enforces
   `tools/mem_budgets.json`.

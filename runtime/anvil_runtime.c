@@ -110,6 +110,7 @@ static double anvil_mouse_wheel_delta;
 static int anvil_mouse_invalid_button_warned;
 static AnvilImage anvil_images[ANVIL_IMAGES];
 static size_t anvil_image_memory_used;
+static size_t anvil_sound_bytes;
 static int anvil_clear_color[4] = {12, 17, 29, 255};
 static int anvil_scene_is_3d = 1;
 static double anvil_camera_x = 0.0, anvil_camera_y = 3.0, anvil_camera_z = 8.0;
@@ -1028,6 +1029,14 @@ double anvil_image_load(const char *path) {
   ++anvil_images[slot].generation;
   anvil_image_memory_used += (size_t)output_bytes;
   return (double)(anvil_images[slot].generation - 1) * ANVIL_IMAGES + slot + 1;
+}
+double anvil_memory_images(void) { return (double)anvil_image_memory_used; }
+double anvil_memory_audio(void) { return (double)anvil_sound_bytes; }
+double anvil_memory_video(void) {
+  return (double)ANVIL_WIDTH * (double)ANVIL_HEIGHT * 4.0;
+}
+double anvil_memory_total(void) {
+  return anvil_memory_images() + anvil_memory_audio() + anvil_memory_video();
 }
 double anvil_image_width(double handle) {
   AnvilImage *image = anvil_image_from_handle(handle);
@@ -2785,7 +2794,6 @@ static AnvilVoice anvil_voices[ANVIL_SOUND_VOICES];
    group keeps its volume while silent. */
 static double anvil_group_gain[4] = {1.0, 1.0, 1.0, 1.0};
 static int anvil_group_muted[4];
-static size_t anvil_sound_bytes;
 static CRITICAL_SECTION anvil_audio_lock;
 static int anvil_audio_lock_ready;
 static HWAVEOUT anvil_audio_device;

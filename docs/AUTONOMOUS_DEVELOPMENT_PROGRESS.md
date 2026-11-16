@@ -662,3 +662,10 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - **Measured:** p50 25.5-29.4 ms, p95 43.3-51.6 ms, worst 51.6 ms over 20 presses x 3 runs on this machine. That is between one and two 60 Hz frames, which matches the loop's structure (message pump, then fixed-step accumulator).
 - **Negative result kept honest:** replacing the frame `Sleep` with `MsgWaitForMultipleObjectsEx` so the loop wakes on input was measured A/B and was *worse* (p50 28.4 vs 25.5, p95 53.4 vs 43.3), so the runtime change was reverted rather than shipped on intuition.
 - **Tests:** `tests/test_input_latency.py` measures 8 presses, checks the report shape and ordering, and enforces `tools/input_budgets.json` through `--check`. 3 passed.
+
+## Batch 58 — resource accounting builtins (8.15)
+
+- **Builtins:** `memory_images()`, `memory_audio()`, `memory_video()` and `memory_total()` report the bytes held by each class. Images use the runtime's existing 128 MiB budget counter and fall as images are destroyed; audio uses the existing 48 MiB decoded counter; video is the fixed 960x600x4 backbuffer (2,304,000 bytes).
+- **Why:** 8.15 asked for allocation and VRAM capture, and the runtime already tracked these numbers internally for its budgets but never exposed them, so a game or a benchmark could not see them.
+- **Tests:** `tests/test_memory_builtins.py` loads an 8x8 and a 4x4 BMP and a 100-frame 8 kHz WAV, then asserts the exact sequence 0, 256, 320, 1, 64, 1, 0 for images, 2,304,000 for video, and 2,400 bytes for the decoded mono-to-48k-stereo sound, back to 0 after destroy.
+- **Wiring:** builtin arity and C names, the usage list, the TextMate grammar and the editor validator all know the four names; `npm test --prefix vscode-extension` passes.

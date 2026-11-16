@@ -154,6 +154,8 @@ async function main() {
   expect('set var(ok) = model_draw("m.gltf", 0, 0, 0, 1, 0, 0, 0)', 'model_draw', 'support.function.anvil');
   expect('set var(ok) = music_load("song.wav")', 'music_load', 'support.function.anvil');
   expect('set var(ok) = particle_emit(0, 0, 1, 1, 1, 4, 255, 0, 0)', 'particle_emit', 'support.function.anvil');
+  expect('say memory_images() + memory_audio()', 'memory_images', 'support.function.anvil');
+  expect('say memory_total()', 'memory_total', 'support.function.anvil');
   expect('set var(ok) = shadow(1)', 'shadow', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
