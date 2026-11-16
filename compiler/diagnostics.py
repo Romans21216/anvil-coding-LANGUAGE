@@ -155,6 +155,31 @@ def set_hints(builtins=None, functions=None) -> None:
         _known_functions[:] = sorted(functions)
 
 
+def as_dict(message: str, hint: str | None = None, needle: str | None = None,
+            severity: str = "error") -> dict:
+    """Return one diagnostic as structured data for editors and build servers."""
+    match = _LOCATION.match(message.strip())
+    if not match:
+        return {"severity": severity, "message": message, "help": hint}
+    path, line_text, text = match.group("path"), int(match.group("line")), match.group("message")
+    column = 1
+    code = _read_line(path, line_text)
+    if code is not None:
+        span = _find_span(code, text, needle)
+        if span:
+            column = len(code[:span[0]].replace("\t", "    ")) + 1
+    if hint is None:
+        hint = hint_for(text)
+    return {
+        "severity": severity,
+        "file": path,
+        "line": line_text,
+        "column": column,
+        "message": text,
+        "help": hint,
+    }
+
+
 def render(message: str, hint: str | None = None, needle: str | None = None,
            length: int | None = None, severity: str = "error",
            color: bool | None = None) -> str:

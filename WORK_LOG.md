@@ -523,3 +523,13 @@ to `--format` and `--deny-warnings`.
 declared backend (native examples with `--backend native`, the rest with C) and
 also asserts each example is canonically formatted. All 22 examples pass both,
 so "small examples build from a clean checkout" is enforced instead of assumed.
+
+## GATE 2: structured diagnostics for editors
+
+`--json-diagnostics` writes every error and warning to stderr as one JSON object
+per line with `severity`, `file`, `line`, `column`, `message` and `help`, reusing
+the same span logic as the rendered caret. Editors and build servers no longer
+have to parse the human-readable block.
+
+`tests/test_json_diagnostics.py` checks the error shape (line/column/message/
+help) and that warnings use the same shape under `--check`.

@@ -68,6 +68,11 @@ def main() -> int:
         help="treat lint warnings as errors and stop before building",
     )
     ap.add_argument(
+        "--json-diagnostics",
+        action="store_true",
+        help="write errors and warnings as one JSON object per line (for editors)",
+    )
+    ap.add_argument(
         "--run",
         action="store_true",
         help="build, run the executable, and return its exit code",
@@ -222,6 +227,18 @@ def main() -> int:
         diagnostics.set_hints(_builtin_names(), known_functions)
         warnings = lint(funcs, top)
         for warning in warnings:
+            if args.json_diagnostics:
+                print(
+                    json.dumps(
+                        diagnostics.as_dict(
+                            warning.message, hint=warning.hint,
+                            needle=warning.needle, severity="warning",
+                        ),
+                        ensure_ascii=False,
+                    ),
+                    file=sys.stderr,
+                )
+                continue
             print(
                 diagnostics.render(
                     warning.message, hint=warning.hint, needle=warning.needle,
@@ -316,6 +333,15 @@ def main() -> int:
         diagnostics.set_hints(_builtin_names(), known_functions)
         hint = getattr(e, "hint", None)
         needle = getattr(e, "needle", None)
+        if args.json_diagnostics:
+            print(
+                json.dumps(
+                    diagnostics.as_dict(str(e), hint=hint, needle=needle),
+                    ensure_ascii=False,
+                ),
+                file=sys.stderr,
+            )
+            return 1
         print(
             diagnostics.render(str(e), hint=hint, needle=needle),
             file=sys.stderr,
