@@ -427,3 +427,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** `tests/test_window_flags.py` drives a real window and inspects live Win32 state after each phase — `WS_EX_TOPMOST` present/absent, `WS_POPUP` plus rectangle equal to the monitor, then the original rectangle restored. 110 passed with includes, compiler, capability matrix and native x64.
 - **Also:** `examples/window_controls.ANVL` (F/T toggles), spec and engine docs, native migration note, VS Code grammar and `npm test`.
 - **Commit:** `25ac3ab`.
+
+## Batch 28 — SDK contents and environment script identity (C8-11, C8-12)
+
+- **C8-12 reproduced first:** a same-size `VsDevCmd.bat` replacement with the original `st_mtime_ns` restored produced the identical environment cache path.
+- **C8-12 fix:** the cache file name is now a SHA-256 of `VsDevCmd.bat` and `vcvarsall.bat` contents plus the arch, so stale environments cannot be revived.
+- **C8-11 fix:** `_sdk_fingerprint` hashes every file under the newest SDK version's `Include` and `Lib` trees by path, size and mtime. Measured 40 ms cold and 10 ms warm, against 531 ms for a stat-per-file walk, because `os.scandir` supplies the metadata.
+- **Residual window:** a build still trusts the newest version directory by name; if two SDKs were installed out of order the newest name wins, which matches VsDevCmd's usual selection.
+- **Tests:** header edit, library edit, unchanged control, newer version directory and missing SDK; same-size script replacement, changed nested script, unchanged script. 27 passed.
+- **Cost after the change:** cold build 451 ms (was 413 ms), cache hit 53 ms (was 41 ms).
+- **Commit:** `a4eafbc`.
