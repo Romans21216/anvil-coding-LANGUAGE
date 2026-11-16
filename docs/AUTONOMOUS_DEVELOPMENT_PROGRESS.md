@@ -358,3 +358,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** 10 passed. Manual: one passing plus one failing case reported `1 passed, 1 failed` and exit 1; removing the failing case gave exit 0.
 - **Commit:** `44dcd1b`.
 - **Command surface:** `new`, `run`, `build`, `test`, `format`, `clean`, `doctor` and `package` now all exist, completing the 8.14 command list for this checkout.
+
+## Batch 20 — measured backend capability matrix (8.16)
+
+- **Tool:** `tools/capability_matrix.py` compiles and runs fourteen feature cases on the C and native backends. A case counts as `runs` only when the build succeeds and the program's output matches the expected text exactly; other statuses are `rejected`, `runtime-error`, `wrong-output`, `build-error`, `timeout` or `skipped`.
+- **Result:** 12 of 14 cases run identically. `image-load` and `physics-body` are C-only and both report their existing located diagnostics (`... is not available in the native x64 backend yet; build with --backend c`).
+- **Reproducibility:** temporary directories are stripped from the notes, so repeated runs produce identical bytes; `--check` exits 1 when the committed document is stale, and a test enforces it.
+- **Files:** `tools/capability_matrix.py` (new), `docs/CAPABILITY_MATRIX.md` (generated), `tests/test_capability_matrix.py`, `docs/COMPILER.md`.
+- **Commit:** `1afefc5`.
