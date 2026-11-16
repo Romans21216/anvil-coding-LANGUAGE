@@ -11,14 +11,23 @@ codegen changes to see whether the workload moved.
 - Processor: AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD
 - Python: 3.13.15
 - C compiler: C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\Hostx64\x64\cl.exe
-- Runs per measurement: 10
+- Runs per measurement: 5
 
 ## Results
 
 | Backend | Build median (s) | Build min–max (s) | EXE bytes | Run median (s) | Run min–max (s) | Startup median (s) | Checksum |
 |---|---|---|---|---|---|---|---|
-| c | 1.326 | 1.312–1.332 | 291840 | 0.013 | 0.012–0.173 | 0.006 | `36886024` |
-| native | 0.093 | 0.090–0.104 | 70656 | 0.005 | 0.005–0.088 | 0.003 | `36886024` |
+| c | 1.312 | 1.304–1.392 | 292352 | 0.013 | 0.012–0.171 | 0.006 | `36886024` |
+| native | 0.092 | 0.088–0.097 | 70656 | 0.005 | 0.005–0.094 | 0.004 | `36886024` |
+
+## Compiler phases
+
+Medians over five in-process runs of the same workload, so they exclude interpreter start-up and the external toolchain.
+
+| Backend | Parse (s) | Lint (s) | Codegen (s) | Front end (s) | Toolchain (s) |
+|---|---|---|---|---|---|
+| c | 0.0009 | 0.0000 | 0.0012 | 0.0021 | 1.3097 |
+| native | 0.0009 | 0.0000 | 0.0009 | 0.0018 | 0.0904 |
 
 ## Regression budgets
 
@@ -36,11 +45,11 @@ the build.
 
 | Backend | Metric | Budget | Allowed | Measured | Status |
 |---|---|---|---|---|---|
-| c | build_seconds | 1.32 | 1.832 | 1.326 | ok |
-| c | run_seconds | 0.013 | 0.0295 | 0.01285 | ok |
-| c | startup_seconds | 0.006 | 0.014 | 0.005626 | ok |
-| c | exe_bytes | 2.888e+05 | 2.945e+05 | 2.918e+05 | ok |
-| native | build_seconds | 0.092 | 0.1742 | 0.09251 | ok |
-| native | run_seconds | 0.005 | 0.0175 | 0.005108 | ok |
-| native | startup_seconds | 0.003 | 0.0095 | 0.003341 | ok |
+| c | build_seconds | 1.32 | 1.832 | 1.312 | ok |
+| c | run_seconds | 0.013 | 0.0295 | 0.01294 | ok |
+| c | startup_seconds | 0.006 | 0.014 | 0.005637 | ok |
+| c | exe_bytes | 2.888e+05 | 2.945e+05 | 2.924e+05 | ok |
+| native | build_seconds | 0.092 | 0.1742 | 0.09225 | ok |
+| native | run_seconds | 0.005 | 0.0175 | 0.005086 | ok |
+| native | startup_seconds | 0.003 | 0.0095 | 0.003579 | ok |
 | native | exe_bytes | 7.014e+04 | 7.155e+04 | 7.066e+04 | ok |

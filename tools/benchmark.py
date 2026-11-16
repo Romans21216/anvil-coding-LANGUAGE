@@ -100,12 +100,50 @@ def _timed_run(executable: pathlib.Path, timeout: int = 120) -> tuple[float, str
     return elapsed, run.stdout.strip()
 
 
+def _frontend_phases(source: pathlib.Path) -> dict:
+    """Time the compiler phases in-process on one source file.
+
+    These are the front-end costs a programmer waits on before the toolchain
+    starts: parsing, linting, and lowering to C or to machine code.
+    """
+    from compiler.codegen import emit_c
+    from compiler.lint import lint
+    from compiler.native_codegen import NativeCodegen
+    from compiler.parser import parse
+
+    text = source.read_text(encoding="utf-8")
+
+    def timed(fn, count: int = 5):
+        samples = []
+        value = None
+        for _ in range(count):
+            start = time.perf_counter()
+            value = fn()
+            samples.append(time.perf_counter() - start)
+        return statistics.median(samples), value
+
+    parse_seconds, parsed = timed(lambda: parse(source, text))
+    functions, top, variables, arrays = parsed
+    lint_seconds, _ = timed(lambda: lint(functions, top))
+    c_seconds, _ = timed(lambda: emit_c(source, functions, top, variables, arrays))
+    native_seconds, _ = timed(
+        lambda: NativeCodegen(source, functions, top, variables, arrays).generate()
+    )
+    return {
+        "parse_seconds": parse_seconds,
+        "lint_seconds": lint_seconds,
+        "c_codegen_seconds": c_seconds,
+        "native_codegen_seconds": native_seconds,
+    }
+
+
 def _samples(fn, count: int) -> list[float]:
     return [fn() for _ in range(count)]
 
 
 def measure(runs: int) -> dict:
     results: dict[str, object] = {"machine": _machine(), "runs": runs, "backends": {}}
+    phases = _frontend_phases(WORKLOAD)
     with tempfile.TemporaryDirectory() as temporary:
         work = pathlib.Path(temporary)
         startup = work / "startup.ANVL"
@@ -147,6 +185,13 @@ def measure(runs: int) -> dict:
                     "samples": startup_times,
                 },
                 "checksum": print_checksum,
+                "phases": {
+                    "parse_seconds": phases["parse_seconds"],
+                    "lint_seconds": phases["lint_seconds"],
+                    "codegen_seconds": phases[
+                        "c_codegen_seconds" if backend == "c" else "native_codegen_seconds"
+                    ],
+                },
             }
     return results
 
@@ -182,6 +227,30 @@ def render(results: dict) -> str:
             f"| {backend} | {build['median']:.3f} | {build['min']:.3f}–{build['max']:.3f} | "
             f"{data['exe_bytes']} | {run['median']:.3f} | {run['min']:.3f}–{run['max']:.3f} | "
             f"{startup['median']:.3f} | `{data['checksum']}` |"
+        )
+    lines.append("")
+    lines.append("## Compiler phases")
+    lines.append("")
+    lines.append(
+        "Medians over five in-process runs of the same workload, so they exclude "
+        "interpreter start-up and the external toolchain."
+    )
+    lines.append("")
+    lines.append(
+        "| Backend | Parse (s) | Lint (s) | Codegen (s) | Front end (s) | Toolchain (s) |"
+    )
+    lines.append("|---|---|---|---|---|---|")
+    for backend, data in results["backends"].items():
+        phases = data.get("phases") or {}
+        if not phases:
+            continue
+        front = (
+            phases["parse_seconds"] + phases["lint_seconds"] + phases["codegen_seconds"]
+        )
+        toolchain = max(0.0, data["build_seconds"]["median"] - front)
+        lines.append(
+            f"| {backend} | {phases['parse_seconds']:.4f} | {phases['lint_seconds']:.4f} | "
+            f"{phases['codegen_seconds']:.4f} | {front:.4f} | {toolchain:.4f} |"
         )
     lines.append("")
     checksums = {data["checksum"] for data in results["backends"].values()}

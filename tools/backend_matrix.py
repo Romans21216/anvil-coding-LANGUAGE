@@ -31,6 +31,12 @@ LIBRARY = "fn(twice, n)\n output var(n) * 2\nend\n"
 # program that is compiled but not launched (a window would block the run).
 CASES = [
     (
+        "expect-assertions",
+        "tests",
+        "fn(main)\n expect(2 + 2, 4)\n expect_text(upper(\"ok\"), \"OK\")\n output 42\nend\n",
+        "42",
+    ),
+    (
         "arithmetic-precedence",
         "expressions",
         "fn(main)\n output 2 + 3 * 4\nend\n",

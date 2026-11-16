@@ -8,6 +8,7 @@ source with a diagnostic. Regenerate after changing either backend, and run
 
 | Feature | Category | C backend | Native x64 backend |
 |---|---|---|---|
+| `expect-assertions` | tests | supported | rejected |
 | `arithmetic-precedence` | expressions | supported | supported |
 | `parentheses` | expressions | supported | supported |
 | `division-fraction` | expressions | supported | supported |
@@ -42,12 +43,13 @@ source with a diagnostic. Regenerate after changing either backend, and run
 
 ## Summary
 
-- Cases where both backends build and print the same value: **22** of 31.
-- Cases the C backend supports but the native backend rejects: **3**.
-- Cases the native backend rejects: `print-statement`, `text-builtins`, `utf8-codepoints`.
+- Cases where both backends build and print the same value: **22** of 32.
+- Cases the C backend supports but the native backend rejects: **4**.
+- Cases the native backend rejects: `expect-assertions`, `print-statement`, `text-builtins`, `utf8-codepoints`.
 
 ## Rejected-case diagnostics
 
+- `expect-assertions` on `native`: error: statement 'expect' is not supported by the native x64 backend yet
 - `text-dynamic` on `native`: error: statement 'display' is not supported by the native x64 backend yet
 - `print-statement` on `native`: error: native print currently accepts one string literal; dynamic text needs the default C backend
 - `text-builtins` on `native`: error: unsupported native expression token 'len'

@@ -669,3 +669,23 @@ Tests: `tests/test_build_artifacts.py` (4 cases) asserts a failed toolchain run
 keeps the old bytes and leaves no extra file, a successful C build replaces a
 stale executable with no `.partial` left behind, a native build stages and
 renames, and a rejected program leaves the previous build untouched.
+
+## Matrix row for assertions, and compiler phase timings
+
+Two evidence gaps that Part 8 treats as release blockers: the published
+capability matrix did not mention `expect`, and the benchmark reported only
+end-to-end build time, not where the time goes.
+
+- `tools/backend_matrix.py` gains `expect-assertions`. Measured row:
+  `| expect-assertions | tests | supported | rejected |`, with the native
+  rejection quoting `statement 'expect' is not supported by the native x64
+  backend yet`. `docs/BACKEND_MATRIX.md` is regenerated and the drift test
+  still passes.
+- `tools/benchmark.py` times the front end in-process (parse, lint, codegen for
+  the selected backend, five-run medians) and renders a "Compiler phases"
+  section next to the end-to-end numbers. On this machine the workload costs
+  ~2.1 ms of front end inside a 1.31 s C build (the MSVC toolchain dominates)
+  and ~1.8 ms inside a 90 ms native build. Phase numbers are reported, not
+  budgeted, because they are far below the noise floor of the build medians.
+
+Measured on this run: `--runs 5`, all eight budget metrics `ok`.
