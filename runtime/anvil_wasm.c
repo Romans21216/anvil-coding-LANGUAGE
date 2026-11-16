@@ -733,6 +733,48 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
   }
 }
 
+
+/* ---- Baked models -------------------------------------------------------
+   model_draw arrays hold 12 doubles per triangle: three positions followed by
+   an RGB colour. The compiler bakes them from glTF at build time, so the
+   runtime only transforms and submits. */
+static int anvil_mesh_drawn_frame;
+
+double anvil_mesh_drawn(void) { return (double)anvil_mesh_drawn_frame; }
+double anvil_mesh_culled(void) { return 0.0; }
+double anvil_mesh_culling(double on) { return on != 0.0 ? 1.0 : 0.0; }
+
+double anvil_mesh_draw(const double *data, int triangle_count, double cx,
+                       double cy, double cz, double radius, double x, double y,
+                       double z, double scale, double rx, double ry, double rz) {
+  (void)cx;
+  (void)cy;
+  (void)cz;
+  (void)radius;
+  if (!data || triangle_count <= 0 || !(scale == scale) || scale == 0.0 ||
+      !(x == x) || !(y == y) || !(z == z))
+    return 0.0;
+  anvil_mesh_drawn_frame = 0;
+  for (int triangle = 0; triangle < triangle_count; ++triangle) {
+    const double *p = data + (size_t)triangle * 12;
+    AnvilWasmVec3 points[3];
+    for (int vertex = 0; vertex < 3; ++vertex) {
+      AnvilWasmVec3 local = {p[vertex * 3] * scale, p[vertex * 3 + 1] * scale,
+                             p[vertex * 3 + 2] * scale};
+      local = anvil_wasm_rotate(local, rx, ry, rz);
+      points[vertex] =
+          (AnvilWasmVec3){local.x + x, local.y + y, local.z + z};
+    }
+    int r = (int)p[9], g = (int)p[10], b = (int)p[11];
+    AnvilWasmVec3 normal = anvil_wasm_normalize(
+        anvil_wasm_cross(anvil_wasm_sub(points[1], points[0]),
+                         anvil_wasm_sub(points[2], points[0])));
+    anvil_wasm_triangle(points[0], points[1], points[2], normal, r, g, b, 255);
+    anvil_mesh_drawn_frame += 1;
+  }
+  return 1.0;
+}
+
 /* ---- Images, baked at compile time --------------------------------------
    The browser cannot read files synchronously, so the wasm backend bakes every
    BMP referenced by a literal image_load() into the module and registers it

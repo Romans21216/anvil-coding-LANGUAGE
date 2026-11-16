@@ -97,6 +97,10 @@ ALLOWED_BUILTINS = {
     "sound_destroy",
     "sound_error",
     "camera_angle",
+    "model_draw",
+    "mesh_drawn",
+    "mesh_culled",
+    "mesh_culling",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)

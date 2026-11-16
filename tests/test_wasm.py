@@ -1137,5 +1137,78 @@ class WasmScene3DTests(unittest.TestCase):
             self.assertEqual(summary[1], 320, "10 rings x 16 segments x 2 triangles")
 
 
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from test_gltf_model import write_quad  # noqa: E402
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmModelTests(unittest.TestCase):
+    def test_a_gltf_model_is_baked_and_drawn(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 6",
+                    "clear rgba(10, 12, 18, 255)",
+                    "",
+                    "fn(draw)",
+                    '  set var(d) = model_draw("quad.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            summary = [op for op in ops if op[0] == "triangles"]
+            self.assertEqual(len(summary), 1)
+            self.assertEqual(summary[0][1], 2, "a quad is two triangles")
+            min_x, max_x, min_y, max_y = summary[0][2:6]
+            self.assertTrue(390 <= min_x <= 400, min_x)
+            self.assertTrue(560 <= max_x <= 575, max_x)
+            self.assertTrue(235 <= min_y <= 245, min_y)
+            self.assertTrue(405 <= max_y <= 420, max_y)
+
+    def test_a_translated_model_moves_on_screen(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0), (0, 0, 0))
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 6",
+                    "",
+                    "fn(draw)",
+                    '  set var(d) = model_draw("quad.gltf", -2, 0, 0, 1, 0, 0, 0)',
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            summary = [op for op in ops if op[0] == "triangles"][0]
+            self.assertLess(summary[2], 390, "the model shifts left when x is negative")
+
+
 if __name__ == "__main__":
     unittest.main()

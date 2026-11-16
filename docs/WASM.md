@@ -57,8 +57,8 @@ Supported today:
 - `sin`, `cos` (range-reduced Taylor series, no libm) and `rnd` (xorshift64,
   inclusive integer range like the C runtime)
 - `scene 2d` with `fn(draw)`, `clear`, and `display rect/circle/line/text`
-- `scene 3d` with `camera perspective`, `camera fov`, `camera_angle` and
-  `display cube/plane/sphere`
+- `scene 3d` with `camera perspective`, `camera fov`, `camera_angle`,
+  `display cube/plane/sphere` and `model_draw` (glTF baked at build time)
 - input and time: `time()`, `delta()`, `pressed(key)`, `held(key)`,
   `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`,
   `mouse_wheel()`
@@ -120,11 +120,18 @@ view, and `display cube/plane/sphere` submit world-space triangles. Each
 triangle is rotated, translated, put in camera space with the C runtime's basis,
 projected, flat-shaded by a fixed directional light and handed to the host.
 
+`model_draw` works because the compiler bakes glTF triangles into the module
+exactly as it does for the C backend: the runtime receives 12 doubles per
+triangle (three positions plus RGB), scales, rotates and translates them, then
+submits them through the same path as the primitives. `mesh_drawn()` counts the
+triangles submitted in the frame; `mesh_culled()` is always 0 because there is
+no bounding-sphere test yet, and `mesh_culling(on)` only echoes its argument.
+
 The host draws them with the painter's algorithm on the 2D canvas: triangles are
 collected during the frame and sorted far-to-near at `present()`. That means no
 depth buffer, so overlapping triangles at the same depth can sort wrongly, and
-3D is always painted after any 2D drawing in the frame. Models, shadows, culling
-and `ray_sphere` remain C-backend only.
+3D is always painted after any 2D drawing in the frame. Shadows, culling,
+skins, morph targets, textures and `ray_sphere` remain C-backend only.
 
 ## Audio
 

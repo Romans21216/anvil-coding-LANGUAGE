@@ -119,7 +119,7 @@ remote desktop can prevent window creation:
   backend, typed saves across separate Node runs, text helpers, `ord`/`chr`, `noise`/`fbm`, the `chr` failure path
   compared against the C backend, baked sprites and atlas regions through
   recorded draw streams, baked sounds through recorded play ops including loop, pan, pitch and group routing,
-  and 3D cubes/planes/spheres through recorded triangle summaries), checks the generated host
+  3D cubes/planes/spheres and baked glTF models through recorded triangle summaries), checks the generated host
   page, and asserts located refusals.
 - `test_particles` — argument validation, the 4,096-particle bound, clear
   counts, and window pixels for a fresh and fading particle.
