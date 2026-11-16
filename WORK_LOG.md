@@ -347,3 +347,24 @@ executable or invoking a C compiler, so check and build agree on every error.
 
 Measured: `python compiler/anvil.py B9.ANVL --check` exits 1 with the repeated
 `-rgb` diagnostic, and a valid program still prints "no errors" and exits 0.
+
+## Part 8.7 item 3: published backend feature matrix and conformance suite
+
+`tools/backend_matrix.py` compiles and runs one catalog of language features on
+both declared backends and writes `docs/BACKEND_MATRIX.md`: a row counts as
+supported only when the build succeeds and the program prints the expected
+value, so capabilities are measured instead of inferred from docs.
+
+Measured today (28 cases):
+
+- 20 of 28 cases build and print the same value on the C and native backends.
+- The native backend rejects `mod(...)`, `round(...)`, `print`, `len(...)`, and
+  `clear` inside `fn(draw)` with source-located diagnostics.
+- Console number formatting still differs: C prints `1 / 3` as
+  `0.333333333333333` (`%.15g`), the native backend prints `0.333333`.
+- `for local(i) = 3 to 1` runs zero iterations on both backends (the default
+  step is `1`); descending loops need `step -1`, which both backends honour.
+
+`tests/test_backend_matrix.py` regenerates the matrix and fails when the
+committed document drifts, so backend changes cannot silently invalidate the
+published capability table.
