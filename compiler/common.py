@@ -169,6 +169,8 @@ RUNTIME_C_NAMES = {
     "anvil_physics_capacity",
     "anvil_physics_gravity",
     "anvil_physics_step",
+    "anvil_frame_enter",
+    "anvil_frame_leave",
 }
 
 MAX_ARRAY_SIZE = 1_048_576

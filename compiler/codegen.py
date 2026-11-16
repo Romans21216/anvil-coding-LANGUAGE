@@ -708,7 +708,7 @@ def emit_c(
         result_type = (
             "const char *" if getattr(fn, "returns_text", False) else "double"
         )
-        lines.append(f"static {result_type} {c_name(name)}({params}) {{")
+        lines.append(f"static {result_type} {c_name(name)}_body({params}) {{")
         lines.extend(
             f"    double {c_name(name + '__' + local)} = 0.0;"
             for local in sorted(fn.locals)
@@ -731,6 +731,13 @@ def emit_c(
             lines.append(
                 '    return "";' if getattr(fn, "returns_text", False) else "    return 0.0;"
             )
+        lines.append("}")
+        arguments = ", ".join(c_name(name + "__" + param) for param in fn.params)
+        lines.append(f"static {result_type} {c_name(name)}({params}) {{")
+        lines.append("    anvil_frame_enter();")
+        lines.append(f"    {result_type} result = {c_name(name)}_body({arguments});")
+        lines.append("    anvil_frame_leave();")
+        lines.append("    return result;")
         lines.extend(["}", ""])
     # Setup commands and initial values run before callbacks.
     setup = [

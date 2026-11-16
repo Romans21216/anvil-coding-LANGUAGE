@@ -143,6 +143,8 @@ double anvil_array_get(const double *values, int size, double index,
                        const char *source, int line);
 void anvil_array_set(double *values, int size, double index, double value,
                      const char *source, int line);
+void anvil_frame_enter(void);
+void anvil_frame_leave(void);
 double anvil_list_get(const double *values, int index, double count,
                       const char *path, int line);
 char *anvil_text_upper(const char *source);

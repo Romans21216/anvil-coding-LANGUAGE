@@ -21,6 +21,28 @@ enum {
   ANVIL_IMAGES = 64,
   ANVIL_IMAGE_MAX_DIMENSION = 8192
 };
+/* Bounded recursion: generated functions enter and leave a frame, and a call
+   that grows the C stack past this budget stops with a diagnostic instead of
+   an OS stack overflow. The base is captured on the first entry. */
+enum { ANVIL_STACK_BUDGET_BYTES = 512 * 1024 };
+static uintptr_t anvil_stack_base;
+void anvil_frame_enter(void) {
+  char marker;
+  uintptr_t here = (uintptr_t)&marker;
+  if (anvil_stack_base == 0) {
+    anvil_stack_base = here;
+    return;
+  }
+  if (here < anvil_stack_base &&
+      anvil_stack_base - here > (uintptr_t)ANVIL_STACK_BUDGET_BYTES) {
+    fprintf(stderr,
+            "Anvil call depth exceeded the %d KiB stack budget; check for "
+            "unbounded recursion\n",
+            (int)(ANVIL_STACK_BUDGET_BYTES / 1024));
+    exit(2);
+  }
+}
+void anvil_frame_leave(void) {}
 #define ANVIL_IMAGE_MEMORY_LIMIT ((size_t)128 * 1024 * 1024)
 enum { ANVIL_TRACE_SPHERES = 32 };
 static const double ANVIL_NEAR_DEPTH = 0.08;
