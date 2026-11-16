@@ -77,10 +77,18 @@
     "function-reference": {
       "match": "\\b(fnref)(\\s*)(\\()([A-Za-z_][A-Za-z0-9_-]*)(?:\\s+(--?)\\s+([A-Za-z_][A-Za-z0-9_-]*))?(?=\\s*\\))",
       "captures": {
-        "1": {"name": "support.function.anvil"},
-        "4": {"name": "variable.function.anvil"},
-        "5": {"name": "keyword.operator.anvil"},
-        "6": {"name": "entity.name.namespace.anvil"}
+        "1": {
+          "name": "support.function.anvil"
+        },
+        "4": {
+          "name": "variable.function.anvil"
+        },
+        "5": {
+          "name": "keyword.operator.anvil"
+        },
+        "6": {
+          "name": "entity.name.namespace.anvil"
+        }
       }
     },
     "comments": {
@@ -229,7 +237,7 @@
       "name": "support.function.engine.anvil"
     },
     "keywords": {
-      "match": "\\b(fn|set|add|sub|local|output|call|include|as|if|else|end|repeat|while|for|and|or|not|where|get|to|from|step|all|pressed|held|released)\\b",
+      "match": "\\b(fn|set|add|sub|local|output|print|say|call|include|as|if|else|end|repeat|while|for|and|or|not|where|get|to|from|step|all|pressed|held|released)\\b",
       "name": "keyword.control.anvil"
     },
     "constants": {
@@ -237,7 +245,7 @@
       "name": "constant.language.anvil"
     },
     "builtins": {
-      "match": "\\b(array|fnref|compute|floor|ceil|sqrt|sin|cos|abs|min|max|clamp|rnd|noise|fbm|time|delta|pressed|held|mouse_x|mouse_y|mouse_pressed|mouse_held|mouse_wheel|image_load|image_width|image_height|image_destroy|image_draw|image_draw_scaled|axis|rgba|rgb|cube|sphere|ray_sphere|ray_backend|ray_backend_available|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave|body_create|body_create_box|body_destroy|body_active|body_x|body_y|body_vx|body_vy|body_set_velocity|body_force|body_restitution|body_friction|body_collision|physics_capacity|physics_gravity|physics_step|receive)\\b(?=\\s*\\()",
+      "match": "\\b(array|fnref|compute|floor|ceil|round|sqrt|sin|cos|tan|atan2|abs|sign|min|max|clamp|pow|hypot|log|log10|exp|mod|len|upper|lower|trim|mid|replace|find|ord|chr|rnd|noise|fbm|time|delta|pressed|held|mouse_x|mouse_y|mouse_pressed|mouse_held|mouse_wheel|image_load|image_width|image_height|image_destroy|image_draw|image_draw_scaled|axis|rgba|rgb|cube|sphere|ray_sphere|ray_backend|ray_backend_available|plane|rect|circle|line|text|sprite|mesh|host|join|sync|rpc|leave|body_create|body_create_box|body_destroy|body_active|body_x|body_y|body_vx|body_vy|body_set_velocity|body_force|body_restitution|body_friction|body_collision|physics_capacity|physics_gravity|physics_step|receive)\\b(?=\\s*\\()",
       "name": "support.function.anvil"
     },
     "numbers": {
