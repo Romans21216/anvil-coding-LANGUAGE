@@ -57,6 +57,8 @@ Supported today:
 - `sin`, `cos` (range-reduced Taylor series, no libm) and `rnd` (xorshift64,
   inclusive integer range like the C runtime)
 - `scene 2d` with `fn(draw)`, `clear`, and `display rect/circle/line/text`
+- `scene 3d` with `camera perspective`, `camera fov`, `camera_angle` and
+  `display cube/plane/sphere`
 - input and time: `time()`, `delta()`, `pressed(key)`, `held(key)`,
   `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`,
   `mouse_wheel()`
@@ -108,6 +110,21 @@ frames and inject input deterministically:
 window.anvil.exports.anvil_key(65, 1);
 window.anvil.exports.anvil_frame(16);
 ```
+
+## 3D
+
+`scene 3d` works with the same camera conventions as the C runtime: `camera
+perspective x y z` sets the eye, `camera fov(degrees)` clamps to 20-120 and sets
+the focal length from the 960-pixel width, `camera_angle(yaw,pitch)` turns the
+view, and `display cube/plane/sphere` submit world-space triangles. Each
+triangle is rotated, translated, put in camera space with the C runtime's basis,
+projected, flat-shaded by a fixed directional light and handed to the host.
+
+The host draws them with the painter's algorithm on the 2D canvas: triangles are
+collected during the frame and sorted far-to-near at `present()`. That means no
+depth buffer, so overlapping triangles at the same depth can sort wrongly, and
+3D is always painted after any 2D drawing in the frame. Models, shadows, culling
+and `ray_sphere` remain C-backend only.
 
 ## Audio
 
@@ -201,6 +218,8 @@ identical.
   test pins 1e6 radians, which still matches libm to six decimals); `tan` is not
   available yet.
 - Only literal `image_load()` paths are baked; 4-bit BMPs are not supported.
+- 3D uses a painter's algorithm rather than a depth buffer; expect sorting
+  artifacts where geometry intersects, and no model/shadow/ray support.
 - `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
   same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the

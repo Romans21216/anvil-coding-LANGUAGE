@@ -195,6 +195,15 @@ const char *anvil_sound_error(void);
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);
 void anvil_set_scene3d(int enabled);
+void anvil_camera_perspective(double x, double y, double z);
+void anvil_camera_fov(double degrees);
+double anvil_camera_angle(double yaw, double pitch);
+void anvil_cube(double x, double y, double z, double size, double rx, double ry,
+                double rz, int r, int g, int b, int a);
+void anvil_plane(double x, double y, double z, double width, double depth,
+                 int r, int g, int b, int a);
+void anvil_sphere(double x, double y, double z, double radius, int r, int g,
+                  int b, int a);
 void anvil_clear(int r, int g, int b, int a);
 void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
                 int a);

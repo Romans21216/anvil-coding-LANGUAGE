@@ -33,6 +33,7 @@ const utf8 = new TextDecoder();
 let memory = null;
 const ops = [];
 const voices = new Map();
+const triangles = [];
 let nextVoice = 0;
 const readCString = (pointer) => {
   const view = new Uint8Array(memory.buffer);
@@ -133,7 +134,23 @@ const imports = {
     sound_active() {
       return voices.size;
     },
+    triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a) {
+      triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a]);
+    },
     present() {
+      if (triangles.length) {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const t of triangles) {
+          for (const [x, y] of [[t[0], t[1]], [t[3], t[4]], [t[6], t[7]]]) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+        ops.push(["triangles", triangles.length, Math.round(minX), Math.round(maxX), Math.round(minY), Math.round(maxY)]);
+        triangles.length = 0;
+      }
       ops.push(["present"]);
     },
     save_read(pointer, out, capacity) {

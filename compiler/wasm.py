@@ -96,13 +96,14 @@ ALLOWED_BUILTINS = {
     "sound_active",
     "sound_destroy",
     "sound_error",
+    "camera_angle",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
 SCENE_STATEMENT = re.compile(r"^\s*scene\s+(\w+)", re.MULTILINE)
 DISPLAY_STATEMENT = re.compile(r"^\s*display\s+([a-z_]+)\s*\(", re.MULTILINE)
 CAMERA_STATEMENT = re.compile(r"^\s*camera\b", re.MULTILINE)
-ALLOWED_SHAPES = {"rect", "circle", "line", "text"}
+ALLOWED_SHAPES = {"rect", "circle", "line", "text", "cube", "plane", "sphere"}
 
 HOST_PAGE = """<!doctype html>
 <html lang="en">
@@ -135,6 +136,7 @@ async function start() {
     let app = null;
     const imageCache = new Map();
     const audioState = { ctx: null, voices: new Map(), nextVoice: 0, active: 0 };
+    const triangles = [];
     const audioContext = () => {
       if (!audioState.ctx) {
         const Ctor = window.AudioContext || window.webkitAudioContext;
@@ -339,7 +341,26 @@ async function start() {
       sound_active() {
         return audioState.active;
       },
-      present() {},
+      triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a) {
+        triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a]);
+      },
+      present() {
+        if (!triangles.length) return;
+        triangles.sort(
+          (first, second) =>
+            second[2] + second[5] + second[8] - (first[2] + first[5] + first[8])
+        );
+        for (const t of triangles) {
+          context.fillStyle = "rgba(" + t[9] + "," + t[10] + "," + t[11] + "," + (t[12] / 255) + ")";
+          context.beginPath();
+          context.moveTo(t[0], t[1]);
+          context.lineTo(t[3], t[4]);
+          context.lineTo(t[6], t[7]);
+          context.closePath();
+          context.fill();
+        }
+        triangles.length = 0;
+      },
       save_read(pointer, out, capacity) {
         const value = localStorage.getItem("anvil:" + readCString(pointer));
         if (value === null) return -1;
@@ -430,13 +451,6 @@ def validate(
     text = source_text
     if text is None:
         text = pathlib.Path(source_path).read_text(encoding="utf-8")
-    match = SCENE_STATEMENT.search(text)
-    if match and match.group(1).lower() != "2d":
-        line = text.count("\n", 0, match.start()) + 1
-        raise CompileError(
-            f"{source_path}:{line}: the wasm backend draws 'scene 2d' only; "
-            f"'scene {match.group(1)}' needs the C backend"
-        )
     for match in DISPLAY_STATEMENT.finditer(text):
         if match.group(1) in ALLOWED_SHAPES:
             continue
@@ -445,14 +459,13 @@ def validate(
             f"{source_path}:{line}: display {match.group(1)}(...) is not available "
             "in the wasm backend yet"
         )
-    for pattern, label in ((CAMERA_STATEMENT, "camera"), (ENGINE_STATEMENT, "engine")):
-        match = pattern.search(text)
-        if match:
-            line = text.count("\n", 0, match.start()) + 1
-            raise CompileError(
-                f"{source_path}:{line}: '{label}' statements are not available in "
-                "the wasm backend yet"
-            )
+    match = ENGINE_STATEMENT.search(text)
+    if match:
+        line = text.count("\n", 0, match.start()) + 1
+        raise CompileError(
+            f"{source_path}:{line}: 'engine' statements are not available in "
+            "the wasm backend yet"
+        )
     used = used_builtins(functions, top)
     for name in used:
         if name in ALLOWED_BUILTINS:

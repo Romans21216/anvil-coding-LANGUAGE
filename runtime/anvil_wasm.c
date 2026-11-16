@@ -29,6 +29,11 @@ __attribute__((import_module("env"), import_name("save_write")))
 extern void anvil_host_save_write(const char *key, const char *value);
 __attribute__((import_module("env"), import_name("save_delete")))
 extern int anvil_host_save_delete(const char *key);
+__attribute__((import_module("env"), import_name("triangle")))
+extern void anvil_host_triangle(double x1, double y1, double z1, double x2,
+                                double y2, double z2, double x3, double y3,
+                                double z3, int r, int g, int b, int a);
+
 __attribute__((import_module("env"), import_name("image_region")))
 extern void anvil_host_image_region(const unsigned int *pixels, int width,
                                     int height, double sx, double sy, double sw,
@@ -537,6 +542,195 @@ double anvil_rnd(double min_value, double max_value) {
     return (double)low;
   unsigned long long span = (unsigned long long)(high - low) + 1ULL;
   return (double)(low + (long long)(anvil_random_u64() % span));
+}
+
+/* ---- 3D scene ------------------------------------------------------------
+   A small perspective pipeline: model points are rotated, translated, put in
+   camera space with the same basis and projection as the C runtime, then handed
+   to the host as screen-space triangles with a depth for painter's-algorithm
+   sorting. Shading is a fixed directional light so faces read as solid. */
+typedef struct {
+  double x, y, z;
+} AnvilWasmVec3;
+
+static int anvil_scene_is_3d;
+static double anvil_camera_x, anvil_camera_y, anvil_camera_z;
+static double anvil_camera_yaw, anvil_camera_pitch;
+static double anvil_camera_focal = 520.0;
+
+void anvil_set_scene3d(int enabled) { anvil_scene_is_3d = enabled != 0; }
+
+void anvil_camera_perspective(double x, double y, double z) {
+  anvil_camera_x = x;
+  anvil_camera_y = y;
+  anvil_camera_z = z;
+}
+
+void anvil_camera_fov(double degrees) {
+  if (degrees < 20.0)
+    degrees = 20.0;
+  if (degrees > 120.0)
+    degrees = 120.0;
+  anvil_camera_focal =
+      (960.0 * 0.5) / (sin(degrees * 0.008726646259971647884) / cos(degrees * 0.008726646259971647884));
+}
+
+double anvil_camera_angle(double yaw, double pitch) {
+  if (!(yaw == yaw) || !(pitch == pitch))
+    return 0.0;
+  if (pitch > 89.0)
+    pitch = 89.0;
+  if (pitch < -89.0)
+    pitch = -89.0;
+  anvil_camera_yaw = yaw;
+  anvil_camera_pitch = pitch;
+  return 1.0;
+}
+
+static AnvilWasmVec3 anvil_wasm_sub(AnvilWasmVec3 a, AnvilWasmVec3 b) {
+  return (AnvilWasmVec3){a.x - b.x, a.y - b.y, a.z - b.z};
+}
+static double anvil_wasm_dot(AnvilWasmVec3 a, AnvilWasmVec3 b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+static AnvilWasmVec3 anvil_wasm_cross(AnvilWasmVec3 a, AnvilWasmVec3 b) {
+  return (AnvilWasmVec3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
+                         a.x * b.y - a.y * b.x};
+}
+static AnvilWasmVec3 anvil_wasm_normalize(AnvilWasmVec3 v) {
+  double length = __builtin_sqrt(anvil_wasm_dot(v, v));
+  if (length < 1e-12)
+    return (AnvilWasmVec3){0, 1, 0};
+  return (AnvilWasmVec3){v.x / length, v.y / length, v.z / length};
+}
+static AnvilWasmVec3 anvil_wasm_rotate(AnvilWasmVec3 p, double rx, double ry,
+                                       double rz) {
+  const double d = 0.017453292519943295769;
+  rx *= d;
+  ry *= d;
+  rz *= d;
+  double c = cos(rx), s = sin(rx);
+  p = (AnvilWasmVec3){p.x, p.y * c - p.z * s, p.y * s + p.z * c};
+  c = cos(ry);
+  s = sin(ry);
+  p = (AnvilWasmVec3){p.x * c + p.z * s, p.y, -p.x * s + p.z * c};
+  c = cos(rz);
+  s = sin(rz);
+  p = (AnvilWasmVec3){p.x * c - p.y * s, p.x * s + p.y * c, p.z};
+  return p;
+}
+
+static AnvilWasmVec3 anvil_wasm_to_camera(AnvilWasmVec3 p) {
+  const double radians = 0.017453292519943295769;
+  double yaw = anvil_camera_yaw * radians;
+  double pitch = anvil_camera_pitch * radians;
+  AnvilWasmVec3 right = {cos(yaw), 0.0, sin(yaw)};
+  AnvilWasmVec3 forward = {sin(yaw) * cos(pitch), sin(pitch),
+                           -cos(yaw) * cos(pitch)};
+  AnvilWasmVec3 up = anvil_wasm_normalize(anvil_wasm_cross(right, forward));
+  AnvilWasmVec3 relative = {p.x - anvil_camera_x, p.y - anvil_camera_y,
+                            p.z - anvil_camera_z};
+  return (AnvilWasmVec3){anvil_wasm_dot(relative, right),
+                         anvil_wasm_dot(relative, up),
+                         anvil_wasm_dot(relative, forward)};
+}
+
+static int anvil_wasm_project(AnvilWasmVec3 p, double *sx, double *sy,
+                              double *depth) {
+  AnvilWasmVec3 camera = anvil_wasm_to_camera(p);
+  if (camera.z <= 0.05)
+    return 0;
+  *sx = 480.0 + camera.x * anvil_camera_focal / camera.z;
+  *sy = 324.0 - camera.y * anvil_camera_focal / camera.z;
+  *depth = camera.z;
+  return 1;
+}
+
+static void anvil_wasm_triangle(AnvilWasmVec3 a, AnvilWasmVec3 b,
+                                AnvilWasmVec3 c, AnvilWasmVec3 normal,
+                                int r, int g, int bl, int alpha) {
+  if (!anvil_scene_is_3d)
+    return;
+  double x1, y1, d1, x2, y2, d2, x3, y3, d3;
+  if (!anvil_wasm_project(a, &x1, &y1, &d1) ||
+      !anvil_wasm_project(b, &x2, &y2, &d2) ||
+      !anvil_wasm_project(c, &x3, &y3, &d3))
+    return;
+  AnvilWasmVec3 light = {-0.35, 0.8, -0.45};
+  double shade = anvil_wasm_dot(anvil_wasm_normalize(normal), light);
+  if (shade < 0)
+    shade = -shade;
+  shade = 0.45 + 0.55 * shade;
+  int shaded_r = (int)(r * shade);
+  int shaded_g = (int)(g * shade);
+  int shaded_b = (int)(bl * shade);
+  anvil_host_triangle(x1, y1, d1, x2, y2, d2, x3, y3, d3, shaded_r, shaded_g,
+                      shaded_b, alpha);
+}
+
+static void anvil_wasm_quad(AnvilWasmVec3 a, AnvilWasmVec3 b, AnvilWasmVec3 c,
+                            AnvilWasmVec3 d, int r, int g, int bl, int alpha) {
+  AnvilWasmVec3 normal =
+      anvil_wasm_normalize(anvil_wasm_cross(anvil_wasm_sub(b, a),
+                                            anvil_wasm_sub(c, a)));
+  anvil_wasm_triangle(a, b, c, normal, r, g, bl, alpha);
+  anvil_wasm_triangle(a, c, d, normal, r, g, bl, alpha);
+}
+
+void anvil_cube(double x, double y, double z, double size, double rx, double ry,
+                double rz, int r, int g, int b, int a) {
+  double half = size * 0.5;
+  AnvilWasmVec3 corners[8];
+  for (int index = 0; index < 8; ++index) {
+    AnvilWasmVec3 local = {(index & 1) ? half : -half,
+                           (index & 2) ? half : -half,
+                           (index & 4) ? half : -half};
+    local = anvil_wasm_rotate(local, rx, ry, rz);
+    corners[index] = (AnvilWasmVec3){local.x + x, local.y + y, local.z + z};
+  }
+  /* Each face is two triangles; indices follow the corner bit layout. */
+  anvil_wasm_quad(corners[0], corners[1], corners[3], corners[2], r, g, b, a);
+  anvil_wasm_quad(corners[4], corners[6], corners[7], corners[5], r, g, b, a);
+  anvil_wasm_quad(corners[0], corners[4], corners[5], corners[1], r, g, b, a);
+  anvil_wasm_quad(corners[2], corners[3], corners[7], corners[6], r, g, b, a);
+  anvil_wasm_quad(corners[0], corners[2], corners[6], corners[4], r, g, b, a);
+  anvil_wasm_quad(corners[1], corners[5], corners[7], corners[3], r, g, b, a);
+}
+
+void anvil_plane(double x, double y, double z, double width, double depth,
+                 int r, int g, int b, int alpha) {
+  double hw = width * 0.5, hd = depth * 0.5;
+  AnvilWasmVec3 p0 = {x - hw, y, z - hd};
+  AnvilWasmVec3 p1 = {x + hw, y, z - hd};
+  AnvilWasmVec3 p2 = {x + hw, y, z + hd};
+  AnvilWasmVec3 p3 = {x - hw, y, z + hd};
+  anvil_wasm_quad(p0, p1, p2, p3, r, g, b, alpha);
+}
+
+void anvil_sphere(double x, double y, double z, double radius, int r, int g,
+                  int b, int a) {
+  const int rings = 10;
+  const int segments = 16;
+  for (int ring = 0; ring < rings; ++ring) {
+    double phi0 = 3.14159265358979323846 * (double)ring / (double)rings;
+    double phi1 = 3.14159265358979323846 * (double)(ring + 1) / (double)rings;
+    for (int segment = 0; segment < segments; ++segment) {
+      double theta0 = 6.283185307179586476925 * (double)segment / (double)segments;
+      double theta1 =
+          6.283185307179586476925 * (double)(segment + 1) / (double)segments;
+      AnvilWasmVec3 quad[4];
+      double phis[2] = {phi0, phi1};
+      double thetas[2] = {theta0, theta1};
+      for (int corner = 0; corner < 4; ++corner) {
+        double phi = phis[corner >> 1];
+        double theta = thetas[corner & 1];
+        quad[corner] = (AnvilWasmVec3){
+            x + radius * sin(phi) * cos(theta), y + radius * cos(phi),
+            z + radius * sin(phi) * sin(theta)};
+      }
+      anvil_wasm_quad(quad[0], quad[1], quad[3], quad[2], r, g, b, a);
+    }
+  }
 }
 
 /* ---- Images, baked at compile time --------------------------------------
@@ -1397,7 +1591,6 @@ double anvil_save_delete(const char *slot) {
 static int anvil_clear_r, anvil_clear_g, anvil_clear_b, anvil_clear_a;
 static AnvilCallback anvil_frame_update, anvil_frame_draw;
 
-void anvil_set_scene3d(int enabled) { (void)enabled; }
 
 void anvil_clear(int r, int g, int b, int a) {
   anvil_clear_r = r;

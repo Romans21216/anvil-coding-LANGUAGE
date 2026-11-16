@@ -124,10 +124,10 @@ class WasmRejectionTests(unittest.TestCase):
             root = pathlib.Path(temp)
             result, _ = build(
                 root,
-                "scene 2d\n\nfn(draw)\n  display cube(0, 0, 0, 1) -rgb(255, 0, 0)\nend\n",
+                "scene 2d\n\nfn(draw)\n  display ray_sphere(0, 0, 3, 1) -rgb(255, 0, 0)\nend\n",
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("display cube(...) is not available", result.stderr)
+            self.assertIn("display ray_sphere(...) is not available", result.stderr)
             self.assertIn(":4:", result.stderr)
 
     def test_unsupported_builtins_name_the_call_site(self) -> None:
@@ -192,16 +192,15 @@ class WasmCanvasTests(unittest.TestCase):
             self.assertIn("getContext(\"2d\")", page)
             self.assertIn("requestAnimationFrame", page)
 
-    def test_three_d_and_other_shapes_are_refused(self) -> None:
+    def test_unavailable_shapes_are_refused(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(root, "scene 3d\n\nfn(draw)\n  display cube(0, 0, 0, 1) -rgb(255, 0, 0)\nend\n")
+            result, _ = build(
+                root,
+                "scene 3d\n\nfn(draw)\n  display ray_sphere(0, 0, 3, 1) -rgb(255, 0, 0)\nend\n",
+            )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("draws 'scene 2d' only", result.stderr)
-
-            result, _ = build(root, "scene 2d\n\nfn(draw)\n  display cube(0, 0, 0, 1) -rgb(255, 0, 0)\nend\n")
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("display cube(...) is not available in the wasm backend", result.stderr)
+            self.assertIn("display ray_sphere(...) is not available", result.stderr)
 
 
 
@@ -1065,6 +1064,77 @@ class WasmAudioGroupTests(unittest.TestCase):
             self.assertIn(["sound_group_mute", 2, 1], ops)
             self.assertIn(["sound_group_mute", 2, 0], ops)
             self.assertIn(["sound_group_stop", 2, 2], ops)
+
+
+
+_THREE_D_PROGRAM = "\n".join(
+    (
+        "scene 3d",
+        "camera perspective 0 3 12",
+        "camera fov(70)",
+        "clear rgba(11, 16, 27, 255)",
+        "",
+        "fn(draw)",
+        "  display plane(0, -1, 0, 14, 14) -rgb(33, 47, 64)",
+        "  display cube(0, 0, 0, 2) -rgb(88, 164, 255)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmScene3DTests(unittest.TestCase):
+    def test_cube_and_plane_emit_sorted_triangles(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _THREE_D_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            summary = [op for op in ops if op[0] == "triangles"]
+            self.assertEqual(len(summary), 1)
+            self.assertEqual(summary[0][1], 14, "two plane triangles plus twelve cube triangles")
+            min_x, max_x, min_y, max_y = summary[0][2:6]
+            self.assertLess(min_x, 0)
+            self.assertGreater(max_x, 960)
+            self.assertGreater(min_y, 300, "geometry sits below the horizon")
+            self.assertGreater(max_y, 600, "the floor extends past the bottom edge")
+
+    def test_sphere_emits_a_bounded_triangle_fan(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 6",
+                    "",
+                    "fn(draw)",
+                    "  display sphere(0, 0, 0, 1) -rgb(200, 120, 60)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            summary = [op for op in ops if op[0] == "triangles"][0]
+            self.assertEqual(summary[1], 320, "10 rings x 16 segments x 2 triangles")
 
 
 if __name__ == "__main__":
