@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import hashlib
 import shutil
@@ -23,18 +24,70 @@ CACHE_DIR_NAME = ".anvil-cache"
 SOURCE_LIMIT_BYTES = 4 * 1024 * 1024
 
 
-CACHE_KEY_VERSION = b"anvil-cache-v2"
+CACHE_KEY_VERSION = b"anvil-cache-v3"
+
+
+def _file_digest(path: pathlib.Path) -> bytes:
+    """SHA-256 of a file's bytes, read in blocks so large tools stay cheap."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.digest()
 
 
 def _compiler_identity(compiler: str) -> bytes:
-    """Compiler path plus a cheap identity, so replacing the compiler binary at
-    the same path cannot reuse an executable the old one produced."""
+    """Compiler path plus the hash of its bytes.
+
+    A compiler replaced in place with different code of the same length and a
+    restored modification time must not reuse an executable the old one
+    produced, so identity comes from contents rather than stat metadata.
+    """
     path = pathlib.Path(compiler)
+    parts = [str(path).encode("utf-8", "replace")]
     try:
-        info = path.stat()
+        parts.append(_file_digest(path))
     except OSError:
-        return str(path).encode("utf-8", "replace")
-    return f"{path}\0{info.st_size}\0{info.st_mtime_ns}".encode("utf-8", "replace")
+        parts.append(b"unreadable")
+    return b"\0".join(parts)
+
+
+def _sdk_version_names(folder: pathlib.Path) -> bytes:
+    try:
+        return ",".join(
+            sorted(entry.name for entry in folder.iterdir() if entry.is_dir())
+        ).encode("utf-8", "replace")
+    except OSError:
+        return b"missing"
+
+
+def _toolchain_identity(compiler: str) -> bytes:
+    """The linker and Windows SDK the C build actually selects.
+
+    build_c runs cl.exe, which invokes link.exe from its own toolset and links
+    against the SDK that VsDevCmd puts on the search path. Both decide the
+    executable's bytes, so a linker or SDK change must invalidate the cache
+    even when the generated C and cl.exe are unchanged.
+    """
+    folder = pathlib.Path(compiler).parent
+    linker = folder / "link.exe"
+    if linker.is_file():
+        linker_part = b"link:" + _file_digest(linker)
+    else:
+        linker_part = b"link:missing"
+    program_files = pathlib.Path(
+        os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    )
+    sdk = program_files / "Windows Kits" / "10"
+    return b"\0".join(
+        (
+            linker_part,
+            b"sdk-include:" + _sdk_version_names(sdk / "Include"),
+            b"sdk-lib:" + _sdk_version_names(sdk / "Lib"),
+            b"sdk-env:"
+            + os.environ.get("WindowsSDKVersion", "").encode("utf-8", "replace"),
+        )
+    )
 
 
 def _cache_key(
@@ -54,6 +107,7 @@ def _cache_key(
     )
     digest.update(chr(0).encode("utf-8") + tag)
     digest.update(_compiler_identity(compiler))
+    digest.update(_toolchain_identity(compiler))
     if runtime is None:
         runtime = pathlib.Path(__file__).resolve().parents[1] / "runtime"
     # Every top-level runtime source and header belongs to the C build's

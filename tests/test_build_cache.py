@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
 import sys
@@ -154,6 +155,44 @@ class CacheKeyInputTests(unittest.TestCase):
             compiler.write_bytes(b"fake compiler two, a different binary")
             after = _cache_key("int main(void){}", str(compiler), True, runtime)
         self.assertNotEqual(before, after)
+
+    def test_same_size_same_time_compiler_replacement_changes_the_key(self) -> None:
+        """C8-9: stat metadata alone can collide after an in-place replacement."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            runtime = self._runtime_dir(root)
+            compiler = self._compiler(root)
+            before = _cache_key("int main(void){}", str(compiler), True, runtime)
+            original = compiler.stat()
+            compiler.write_bytes(b"Y" * original.st_size)
+            os.utime(compiler, ns=(original.st_atime_ns, original.st_mtime_ns))
+            after = _cache_key("int main(void){}", str(compiler), True, runtime)
+        self.assertNotEqual(before, after)
+
+    def test_a_changed_linker_beside_the_compiler_changes_the_key(self) -> None:
+        """C8-10: cl.exe invokes link.exe, which decides the executable bytes."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            runtime = self._runtime_dir(root)
+            compiler = self._compiler(root)
+            linker = root / "link.exe"
+            linker.write_bytes(b"linker one")
+            before = _cache_key("int main(void){}", str(compiler), True, runtime)
+            original = linker.stat()
+            linker.write_bytes(b"LINKER TWO")
+            os.utime(linker, ns=(original.st_atime_ns, original.st_mtime_ns))
+            after = _cache_key("int main(void){}", str(compiler), True, runtime)
+        self.assertNotEqual(before, after)
+
+    def test_an_unchanged_linker_keeps_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            runtime = self._runtime_dir(root)
+            compiler = self._compiler(root)
+            (root / "link.exe").write_bytes(b"linker one")
+            first = _cache_key("int main(void){}", str(compiler), True, runtime)
+            second = _cache_key("int main(void){}", str(compiler), True, runtime)
+        self.assertEqual(first, second)
 
     def test_unchanged_inputs_keep_the_key(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

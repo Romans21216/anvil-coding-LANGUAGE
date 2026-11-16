@@ -63,6 +63,13 @@ The native build has no external toolchain to start and no cache, so it is stead
 the C build's first run pays for loading the MSVC environment and later runs reuse
 the build cache.
 
+The cache key covers the generated C, every runtime source and header, the compiler
+Python sources, the **contents** of `cl.exe`, the contents of the `link.exe` beside it,
+and the installed Windows SDK version directories. A compiler replaced in place with the
+same size and a restored timestamp, or a different linker in the same toolset, therefore
+misses the cache instead of reusing a stale executable. Libraries passed to `build_c`
+through `libraries=` are not part of the key yet.
+
 ## Native backend limits
 
 The direct backend handles console programs (numeric functions with up to sixteen
