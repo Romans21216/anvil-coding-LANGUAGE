@@ -8,6 +8,7 @@ import re
 import struct
 from dataclasses import dataclass
 
+from compiler.suggestions import suggestion_suffix
 from compiler.common import CompileError, KEY_CODES, Node, decode_string
 from compiler.common import constant_truth
 from compiler.expressions import (
@@ -203,6 +204,7 @@ class _Expression:
                 hint = f"; it is a variable, so write var({value})"
             raise CompileError(
                 f"{self.owner.path}:{self.line}: unknown name {value!r}{hint}"
+                f"{suggestion_suffix(value, self.owner.variables)}"
             )
 
         while self._peek():
@@ -358,7 +360,10 @@ class _Expression:
         name, raw_args = parts[0], parts[1:]
         target = self.owner.functions.get(name)
         if target is None:
-            raise CompileError(f"{self.owner.path}:{self.line}: unknown function {name!r}")
+            raise CompileError(
+                f"{self.owner.path}:{self.line}: unknown function {name!r}"
+                f"{suggestion_suffix(name, self.owner.functions)}"
+            )
         if len(raw_args) != len(target.params):
             raise CompileError(
                 f"{self.owner.path}:{self.line}: function {name!r} expects "
@@ -1389,7 +1394,10 @@ class NativeCodegen:
     def emit_call(self, name: str, raw_args: list[str], scope: Node | None, line: int) -> None:
         target = self.functions.get(name)
         if target is None:
-            raise CompileError(f"{self.path}:{line}: unknown function {name!r}")
+            raise CompileError(
+                f"{self.path}:{line}: unknown function {name!r}"
+                f"{suggestion_suffix(name, self.functions)}"
+            )
         if len(raw_args) != len(target.params):
             raise CompileError(
                 f"{self.path}:{line}: function {name!r} expects "

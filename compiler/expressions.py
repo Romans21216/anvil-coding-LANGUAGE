@@ -8,6 +8,7 @@ import math
 import pathlib
 import re
 
+from compiler.suggestions import suggestion_suffix
 from compiler.common import (
     CompileError,
     KEY_CODES,
@@ -536,6 +537,7 @@ class ExpressionParser:
             if self.functions is not None and name not in self.functions:
                 raise CompileError(
                     f"{self.path}:{self.line}: unknown function {name!r}"
+                    f"{suggestion_suffix(name, self.functions)}"
                 )
             if self.functions is not None and len(raw_args) != len(
                 self.functions[name].params
@@ -631,9 +633,13 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: unknown name {value!r}; "
                     f"did you mean {hint}?"
                 )
+            names = set(self.arrays)
+            if self.scope is not None:
+                names |= self.scope.locals
             raise CompileError(
                 f"{self.path}:{self.line}: unknown name {value!r} "
                 f"(variables are written var({value}))"
+                f"{suggestion_suffix(value, names)}"
             )
         else:
             raise CompileError(

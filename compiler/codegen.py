@@ -6,6 +6,7 @@ import json
 import pathlib
 import re
 
+from compiler.suggestions import suggestion_suffix
 from compiler.common import (
     MAX_ACTIVE_LOCAL_ARRAY_BYTES,
     CompileError,
@@ -412,7 +413,10 @@ def emit_nodes(
             out.append(f"{indent}exit(0);")
         elif n.kind == "call":
             if n.name not in functions:
-                raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
+                raise CompileError(
+                    f"{n.source or path}:{n.line}: unknown function {n.name!r}"
+                    f"{suggestion_suffix(n.name, functions)}"
+                )
             args = split_args(n.value)
             if len(args) != len(functions[n.name].params):
                 raise CompileError(
@@ -578,6 +582,14 @@ def local_array_cleanup(scope: Node, indent: str) -> list[str]:
     ]
 
 
+def _walk_nodes(nodes):
+    for node in nodes:
+        yield node
+        for branch in (node.body, node.otherwise):
+            if branch:
+                yield from _walk_nodes(branch)
+
+
 def _walk_kinds(nodes):
     for node in nodes:
         yield node.kind
@@ -606,9 +618,18 @@ def emit_c(
         or "update" in functions
         or any(node.kind == "scene" for node in top)
     )
-    functions = dict(reachable_functions(
+    reachable = dict(reachable_functions(
         functions, top, graphical=graphical, extra=("random-pipeline",)
     ))
+    # Check call targets against every declared function before pruning, so a
+    # typo can suggest an existing function even when that function is dead.
+    for node in _walk_nodes(list(reachable.values()) + list(top)):
+        if node.kind == "call" and node.name not in functions:
+            raise CompileError(
+                f"{node.source or path}:{node.line}: unknown function {node.name!r}"
+                f"{suggestion_suffix(node.name, functions)}"
+            )
+    functions = reachable
     string_variables = set(STRING_VARIABLES)
     from compiler.builtin_usage import used_builtins
 
@@ -796,7 +817,10 @@ def emit_c(
         )
     for n in calls:
         if n.name not in functions:
-            raise CompileError(f"{n.source or path}:{n.line}: unknown function {n.name!r}")
+            raise CompileError(
+                f"{n.source or path}:{n.line}: unknown function {n.name!r}"
+                f"{suggestion_suffix(n.name, functions)}"
+            )
         if len(split_args(n.value)) != len(functions[n.name].params):
             raise CompileError(
                 f"{n.source or path}:{n.line}: function {n.name!r} expects "

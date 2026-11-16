@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from compiler.common import CompileError, MAX_BLOCK_DEPTH, ParsedProgram, RUNTIME_C_NAMES, c_name
+from compiler.suggestions import suggestion_suffix
 from compiler.expressions import STRING_VARIABLES, split_amp, split_args
 
 
@@ -467,16 +468,22 @@ def validate_program(program: ParsedProgram) -> None:
                     f"{source}:{line_no}: {name!r} is a local variable here; "
                     f"write local({name}) instead of var({name})"
                 )
+            names = set(variables)
+            if fn is not None:
+                names |= fn.locals | set(fn.params)
             raise CompileError(
                 f"{source}:{line_no}: unknown variable {name!r}; assign it "
                 f"with set var({name}) first"
+                f"{suggestion_suffix(name, names)}"
             )
     for name, line_no, function_name, source in program.local_references:
         fn = functions.get(function_name) if function_name else None
         if fn is None or name not in fn.locals:
+            candidates = set(variables) | (fn.locals if fn is not None else set())
             raise CompileError(
                 f"{source}:{line_no}: unknown local variable {name!r}; "
                 f"declare it with set local({name}) first"
+                f"{suggestion_suffix(name, candidates)}"
             )
     for fn in functions.values():
         for node in _walk_all(fn.body):
