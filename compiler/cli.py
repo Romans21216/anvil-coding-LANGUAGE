@@ -37,7 +37,24 @@ def main() -> int:
     ap.add_argument(
         "source",
         type=pathlib.Path,
+        nargs="?",
         help="input .ANVL source or .ANVLproj project manifest",
+    )
+    ap.add_argument(
+        "--doctor",
+        action="store_true",
+        help="report which toolchains and backends are usable here and stop",
+    )
+    ap.add_argument(
+        "--new",
+        type=pathlib.Path,
+        metavar="FOLDER",
+        help="create a starter project in FOLDER and stop",
+    )
+    ap.add_argument(
+        "--clean",
+        action="store_true",
+        help="delete the build artifacts next to SOURCE and stop",
     )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
     ap.add_argument('--inspect-metadata',action='store_true',help='read embedded Anvil name/author/version from an executable')
@@ -90,6 +107,18 @@ def main() -> int:
     args = ap.parse_args()
     known_functions: list[str] = []
     try:
+        from compiler import commands
+
+        if args.doctor:
+            return commands.doctor()
+        if args.new is not None:
+            return commands.new_project(args.new)
+        if args.clean:
+            if args.source is None:
+                raise CompileError("--clean needs a source file or project manifest")
+            return commands.clean(args.source)
+        if args.source is None:
+            ap.error("a source file or project manifest is required")
         if args.format or args.format_check:
             if args.source.suffix.lower() != ".anvl":
                 raise CompileError(

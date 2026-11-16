@@ -554,3 +554,32 @@ help) and that warnings use the same shape under `--check`.
 - Docs: `LANGUAGE.md` gains a "Number format" section; `LANGUAGE_SPEC.md`,
   `README.md`, `COMPILER.md`, and `NATIVE_X64_COMPILER_MIGRATION.md` describe
   15 significant digits instead of six fractional digits.
+
+## Part 8 project commands: `--new`, `--clean`, `--doctor`
+
+Part 8 asks for stable `new`/`run`/`build`/`test`/`format`/`clean`/`doctor`/
+`package` commands. `run`, `build`, `format` and `check` already existed as
+flags; the three that need project-level knowledge now live in
+`compiler/commands.py` and are dispatched before any source is read.
+
+- `--new FOLDER` writes `FOLDER/<name>.ANVLproj`, `main.ANVL` and `assets/`.
+  The starter scene is literal-only (a `rect`, a `circle`, a `text`), so it
+  passes `--check` on both the C and native backends untouched. An existing
+  non-empty folder is refused rather than overwritten.
+- `--clean SOURCE|MANIFEST` removes `<stem>.exe`, `<stem>.c` and
+  `<stem>.generated.c` next to the source, plus `<project>/build/` for a
+  manifest. It reports `nothing to clean` when the build is already gone and
+  accepts a `.ANVLproj` so a manifest-driven project cleans as one command.
+- `--doctor` reports Python (needs 3.11 for `tomllib`), the detected C
+  compiler and its path, the C runtime sources, the executable icon and the
+  VS Code grammar, plus the built-in native backend. It exits 1 only when no
+  backend can build, so a checkout without MSVC still reports usable.
+
+Also fixed: the flag block had been written twice, so `--doctor`, `--new` and
+`--clean` raised `argparse.ArgumentError: conflicting option string: --doctor`
+and every CLI invocation failed. One block remains.
+
+Tests: `tests/test_commands.py` (7 cases) covers doctor output, scaffold +
+both-backend `--check`, refusal to overwrite, exe removal keeping the source,
+the `nothing to clean` path, and `--clean` without a source. Full suite: 342
+passed.
