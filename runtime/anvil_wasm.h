@@ -33,6 +33,17 @@ static inline double floor(double value) { return __builtin_floor(value); }
 static inline double ceil(double value) { return __builtin_ceil(value); }
 static inline double sqrt(double value) { return __builtin_sqrt(value); }
 static inline double trunc(double value) { return __builtin_trunc(value); }
+static inline double fmin(double a, double b) {
+  if (a != a) return b;
+  if (b != b) return a;
+  return a < b ? a : b;
+}
+static inline double fmax(double a, double b) {
+  if (a != a) return b;
+  if (b != b) return a;
+  return a > b ? a : b;
+}
+
 static inline double round(double value) {
   double truncated = __builtin_trunc(value);
   double fraction = value - truncated;
@@ -133,6 +144,8 @@ char *anvil_text_right(const char *source, double count);
 char *anvil_text_char(const char *source, double index);
 int anvil_str_contains(const char *source, const char *needle);
 int anvil_str_starts(const char *source, const char *prefix);
+double anvil_list_get(const double *values, int index, double count,
+                      const char *path, int line);
 int anvil_str_ends(const char *source, const char *suffix);
 
 /* Perlin-style noise and character conversion, matching the C runtime. */

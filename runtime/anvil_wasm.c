@@ -1548,6 +1548,67 @@ int anvil_str_contains(const char *source, const char *needle) {
   return 0;
 }
 
+static void anvil_wasm_write_number_error(const char *path, int line, int index,
+                                          int last) {
+  char message[256];
+  int at = 0;
+  if (path) {
+    for (const char *c = path; *c && at < 200; ++c)
+      message[at++] = *c;
+  } else {
+    message[at++] = '?';
+  }
+  message[at++] = ':';
+  char digits[16];
+  int length = 0;
+  int value = line < 0 ? -line : line;
+  do {
+    digits[length++] = (char)('0' + value % 10);
+    value /= 10;
+  } while (value > 0);
+  if (line < 0)
+    message[at++] = '-';
+  while (length > 0)
+    message[at++] = digits[--length];
+  const char *middle = ": list index ";
+  for (const char *c = middle; *c; ++c)
+    message[at++] = *c;
+  value = index < 0 ? -index : index;
+  length = 0;
+  do {
+    digits[length++] = (char)('0' + value % 10);
+    value /= 10;
+  } while (value > 0);
+  if (index < 0)
+    message[at++] = '-';
+  while (length > 0)
+    message[at++] = digits[--length];
+  const char *outside = " is outside 0..";
+  for (const char *c = outside; *c; ++c)
+    message[at++] = *c;
+  value = last < 0 ? -last : last;
+  length = 0;
+  do {
+    digits[length++] = (char)('0' + value % 10);
+    value /= 10;
+  } while (value > 0);
+  if (last < 0)
+    message[at++] = '-';
+  while (length > 0)
+    message[at++] = digits[--length];
+  message[at++] = '\n';
+  anvil_host_write(2, message, at);
+}
+
+double anvil_list_get(const double *values, int index, double count,
+                      const char *path, int line) {
+  if (!values || index < 0 || index >= (int)count) {
+    anvil_wasm_write_number_error(path, line, index, (int)count - 1);
+    exit(2);
+  }
+  return values[index];
+}
+
 int anvil_str_starts(const char *source, const char *prefix) {
   size_t index = 0;
   while (prefix[index]) {

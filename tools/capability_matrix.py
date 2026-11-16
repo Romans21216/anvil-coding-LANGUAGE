@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,6 +28,9 @@ from compiler.codegen import emit_c  # noqa: E402
 from compiler.common import CompileError  # noqa: E402
 from compiler.native_codegen import NativeCodegen  # noqa: E402
 from compiler.parser import parse  # noqa: E402
+from compiler import wasm as wasm_backend  # noqa: E402
+
+WASM_HOST = ROOT / "tools" / "wasm_host.mjs"
 
 # A real bundled BMP used by the asset case.
 SPRITE_BYTES = (ROOT / "examples" / "assets" / "anvil_sprite.bmp").read_bytes()
@@ -154,7 +158,20 @@ def _run_case(case: dict, backend: str, workdir: pathlib.Path) -> tuple[str, str
     try:
         functions, top, variables, arrays = parse(source_path, case["source"])
         executable = workdir / f"case-{backend}.exe"
-        if backend == "native":
+        if backend == "wasm":
+            if shutil.which("clang") is None or shutil.which("node") is None:
+                return "skipped", "clang or node is not available"
+            wasm_backend.build(
+                source_path,
+                functions,
+                top,
+                variables,
+                arrays,
+                out=workdir / "case-wasm.wasm",
+                fixed_hz=60,
+                project_name="capability",
+            )
+        elif backend == "native":
             executable.write_bytes(
                 NativeCodegen(source_path, functions, top, variables, arrays).generate()
             )
@@ -168,16 +185,29 @@ def _run_case(case: dict, backend: str, workdir: pathlib.Path) -> tuple[str, str
                 return "skipped", "MSVC is not available"
             build_c(compiler[1], c_path, executable, release=True)
     except CompileError as error:
-        first = _clean(str(error).splitlines()[0], workdir)
-        return "rejected", first
+        lines = [line for line in str(error).splitlines() if line.strip()]
+        chosen = next(
+            (line for line in lines if "error:" in line),
+            lines[0] if lines else "build failed",
+        )
+        return "rejected", _clean(chosen.splitlines()[0], workdir)
     except Exception as error:  # toolchain failure
         return "build-error", _clean(
             f"{type(error).__name__}: {error}".splitlines()[0], workdir
         )
     try:
-        result = subprocess.run(
-            [str(executable)], cwd=workdir, capture_output=True, text=True, timeout=60
-        )
+        if backend == "wasm":
+            result = subprocess.run(
+                ["node", str(WASM_HOST), str(workdir / "case-wasm.wasm")],
+                cwd=workdir,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        else:
+            result = subprocess.run(
+                [str(executable)], cwd=workdir, capture_output=True, text=True, timeout=60
+            )
     except subprocess.TimeoutExpired:
         return "timeout", "did not finish in 60 s"
     output = result.stdout.replace("\r\n", "\n")
@@ -194,7 +224,7 @@ def measure() -> list[dict]:
     rows = []
     for case in CASES:
         row = {"id": case["id"], "backends": {}}
-        for backend in ("c", "native"):
+        for backend in ("c", "native", "wasm"):
             with tempfile.TemporaryDirectory() as temp:
                 status, note = _run_case(case, backend, pathlib.Path(temp))
             row["backends"][backend] = {"status": status, "note": note}
@@ -210,28 +240,34 @@ def render(rows: list[dict]) -> str:
         "A case counts as running only when the build succeeds and the program's",
         "output matches the expected text exactly.",
         "",
-        "| Case | C backend | Native backend |",
-        "| --- | --- | --- |",
+        "| Case | C backend | Native backend | WASM backend |",
+        "| --- | --- | --- | --- |",
     ]
     for row in rows:
         cells = []
-        for backend in ("c", "native"):
+        for backend in ("c", "native", "wasm"):
             entry = row["backends"][backend]
             cell = f"`{entry['status']}`"
             if entry["note"]:
                 cell += f": {entry['note']}"
             cells.append(cell.replace("|", "\\|"))
-        lines.append(f"| `{row['id']}` | {cells[0]} | {cells[1]} |")
-    both = sum(
-        1
-        for row in rows
-        if row["backends"]["c"]["status"] == "runs"
-        and row["backends"]["native"]["status"] == "runs"
+        lines.append(f"| `{row['id']}` | {cells[0]} | {cells[1]} | {cells[2]} |")
+    def runs(row, backend):
+        return row["backends"][backend]["status"] == "runs"
+
+    all_three = sum(
+        1 for row in rows
+        if runs(row, "c") and runs(row, "native") and runs(row, "wasm")
     )
+    both = sum(
+        1 for row in rows if runs(row, "c") and runs(row, "native")
+    )
+    c_wasm = sum(1 for row in rows if runs(row, "c") and runs(row, "wasm"))
     lines.extend(
         [
             "",
-            f"Summary: {both} of {len(rows)} cases run identically on both backends.",
+            f"Summary: {all_three} of {len(rows)} cases run on all three backends; "
+            f"{both} run on C and native, {c_wasm} on C and WASM.",
             "",
         ]
     )
