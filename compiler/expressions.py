@@ -217,6 +217,9 @@ BUILTINS = {
     "particle_count": (0, 0),
     "particle_clear": (0, 0),
     "particle_gravity": (1, 1),
+    "mesh_culled": (0, 0),
+    "mesh_drawn": (0, 0),
+    "mesh_culling": (1, 1),
 }
 
 BUILTIN_C_NAMES = {
@@ -288,6 +291,9 @@ BUILTIN_C_NAMES = {
     "particle_count": "anvil_particle_count",
     "particle_clear": "anvil_particle_clear",
     "particle_gravity": "anvil_particle_gravity",
+    "mesh_culled": "anvil_mesh_culled",
+    "mesh_drawn": "anvil_mesh_drawn",
+    "mesh_culling": "anvil_mesh_culling",
     "abs": "fabs",
     "round": "round",
     "len": "(double)strlen",
@@ -713,7 +719,9 @@ class ExpressionParser:
                 ) from None
             from compiler import gltf
             try:
-                symbol, count = gltf.ensure_emitted(asset, pathlib.Path(self.path))
+                symbol, count, bounds = gltf.ensure_emitted(
+                    asset, pathlib.Path(self.path)
+                )
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             mesh_args = []
@@ -723,6 +731,8 @@ class ExpressionParser:
             self.expect(")")
             call = (
                 f"anvil_mesh_draw((const double *){symbol}, {count}, "
+                + ", ".join(f"{value:.6g}" for value in bounds)
+                + ", "
                 + ", ".join(mesh_args)
                 + ")"
             )

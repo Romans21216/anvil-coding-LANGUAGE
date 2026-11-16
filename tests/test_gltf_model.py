@@ -273,5 +273,68 @@ class GltfPixelTests(unittest.TestCase):
             )
 
 
+
+class GltfCullingTests(unittest.TestCase):
+    def test_offscreen_models_are_culled_and_can_be_forced(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+            source_text = chr(10).join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 5",
+                    "camera fov(60)",
+                    "clear rgba(0, 0, 0, 255)",
+                    "set var(frame) = 0",
+                    "",
+                    "fn(draw)",
+                    "  add var(frame) 1",
+                    "  if var(frame) = 2",
+                    '    set var(a) = model_draw("quad.gltf", 0, 0, 20, 1, 0, 0, 0)',
+                    '    say "behind"',
+                    "    say mesh_culled()",
+                    "    say mesh_drawn()",
+                    "  end",
+                    "  if var(frame) = 10",
+                    '    set var(b) = model_draw("quad.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    '    say "front"',
+                    "    say mesh_culled()",
+                    "    say mesh_drawn()",
+                    "  end",
+                    "  if var(frame) = 20",
+                    "    set var(off) = mesh_culling(0)",
+                    '    set var(c) = model_draw("quad.gltf", 0, 0, 20, 1, 0, 0, 0)',
+                    '    say "off"',
+                    "    say mesh_culled()",
+                    "    say mesh_drawn()",
+                    "  end",
+                    "  if var(frame) = 30",
+                    '    say "done"',
+                    "    stop",
+                    "  end",
+                    "end",
+                    "",
+                )
+            )
+            result, _ = build(root, source_text)
+            if result.returncode != 0:
+                if "No C compiler found" in result.stderr:
+                    raise unittest.SkipTest("MSVC is not available")
+                self.fail(result.stderr)
+            completed = subprocess.run(
+                [str(root / "model.exe")],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            out = completed.stdout
+            lines = [line for line in out.replace(chr(13) + chr(10), chr(10)).splitlines() if line]
+            self.assertEqual(
+                lines,
+                ["behind", "1", "0", "front", "0", "1", "off", "0", "1", "done"],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

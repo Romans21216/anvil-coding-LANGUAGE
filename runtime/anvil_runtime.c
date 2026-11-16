@@ -144,6 +144,8 @@ static unsigned int anvil_ray_backend_warnings;
 static double anvil_delta_seconds = 1.0 / 60.0;
 static double anvil_frame_tick_seconds, anvil_frame_render_seconds,
     anvil_frame_present_seconds;
+static int anvil_mesh_culling_enabled = 1;
+static int anvil_mesh_culled_frame, anvil_mesh_drawn_frame;
 static int anvil_fixed_hz = 60;
 static double anvil_elapsed_seconds;
 static LARGE_INTEGER anvil_clock_frequency;
@@ -194,6 +196,8 @@ static void anvil_pixel(int x, int y, uint32_t color, int alpha) {
 
 static void anvil_clear_frame(void) {
   anvil_trace_sphere_count = 0;
+  anvil_mesh_culled_frame = 0;
+  anvil_mesh_drawn_frame = 0;
   uint32_t c = anvil_color(anvil_clear_color[0], anvil_clear_color[1],
                            anvil_clear_color[2]);
   size_t count = (size_t)ANVIL_WIDTH * ANVIL_HEIGHT;
@@ -474,6 +478,13 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
    three vertices, then r, g, b in 0..255. Vertices are scaled and rotated about
    the model origin, translated to (x,y,z), flat-shaded with the scene light and
    rasterised through the same near-plane clip and depth buffer as the cube. */
+double anvil_mesh_culled(void) { return (double)anvil_mesh_culled_frame; }
+double anvil_mesh_drawn(void) { return (double)anvil_mesh_drawn_frame; }
+double anvil_mesh_culling(double on) {
+  anvil_mesh_culling_enabled = on != 0.0;
+  return anvil_mesh_culling_enabled ? 1.0 : 0.0;
+}
+
 static void anvil_world_triangle(AnvilVec3 v[3], uint32_t base,
                                  double brightness, int alpha) {
   AnvilProjected projected[4];
@@ -503,13 +514,47 @@ static void anvil_world_triangle(AnvilVec3 v[3], uint32_t base,
   }
 }
 
-double anvil_mesh_draw(const double *data, int triangle_count, double x,
-                       double y, double z, double scale, double rx, double ry,
-                       double rz) {
+/* Bounding-sphere frustum test. The sphere is transformed to world space,
+   then projected; if it lies entirely behind the near plane or completely
+   outside the viewport it cannot contribute a pixel. */
+static int anvil_mesh_visible(double cx, double cy, double cz, double radius,
+                              double x, double y, double z, double scale,
+                              double rx, double ry, double rz) {
+  if (!anvil_scene_is_3d)
+    return 1;
+  AnvilVec3 center = {cx * scale, cy * scale, cz * scale};
+  center = anvil_rotate(center, rx, ry, rz);
+  center.x += x;
+  center.y += y;
+  center.z += z;
+  double r = fabs(radius * scale);
+  AnvilCameraVertex camera = anvil_to_camera(center);
+  if (camera.depth + r < ANVIL_NEAR_DEPTH)
+    return 0;
+  if (camera.depth > ANVIL_NEAR_DEPTH) {
+    double screen_radius = r * anvil_camera_focal / camera.depth;
+    double sx = ANVIL_WIDTH * 0.5 + camera.x * anvil_camera_focal / camera.depth;
+    double sy = ANVIL_HEIGHT * 0.54 - camera.y * anvil_camera_focal / camera.depth;
+    if (sx + screen_radius < 0.0 || sx - screen_radius > ANVIL_WIDTH ||
+        sy + screen_radius < 0.0 || sy - screen_radius > ANVIL_HEIGHT)
+      return 0;
+  }
+  return 1;
+}
+
+double anvil_mesh_draw(const double *data, int triangle_count, double cx,
+                       double cy, double cz, double radius, double x, double y,
+                       double z, double scale, double rx, double ry, double rz) {
   if (!data || triangle_count <= 0 || !isfinite(x) || !isfinite(y) ||
       !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
       !isfinite(rz) || scale == 0.0)
     return 0.0;
+  if (anvil_mesh_culling_enabled &&
+      !anvil_mesh_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry, rz)) {
+    anvil_mesh_culled_frame++;
+    return 0.0;
+  }
+  anvil_mesh_drawn_frame++;
   AnvilVec3 light = anvil_normalize((AnvilVec3){-0.35, 0.8, 0.55});
   for (int t = 0; t < triangle_count; ++t) {
     const double *p = data + (size_t)t * 12;

@@ -299,7 +299,7 @@ def load_triangles(path: pathlib.Path) -> list[float]:
 
 # ---- Compiler integration -------------------------------------------------
 
-_registry: dict[str, tuple[str, int, list[float]]] = {}
+_registry: dict[str, tuple[str, int, list[float], tuple[float, float, float, float]]] = {}
 _prescan: set[str] = set()
 PATTERN = re.compile(r'\bmodel_draw\s*\(\s*"((?:[^"\\]|\\.)*)"')
 
@@ -327,12 +327,36 @@ def _resolve(asset: str, source_path: pathlib.Path) -> pathlib.Path:
     return path.resolve()
 
 
-def ensure_emitted(asset: str, source_path: pathlib.Path) -> tuple[str, int]:
+def bounds_of(data: list[float]) -> tuple[float, float, float, float]:
+    """Centre and radius of a sphere around the baked triangles."""
+    if not data:
+        return (0.0, 0.0, 0.0, 0.0)
+    xs: list[float] = []
+    ys: list[float] = []
+    zs: list[float] = []
+    for start in range(0, len(data), 12):
+        for vertex in range(3):
+            xs.append(data[start + vertex * 3])
+            ys.append(data[start + vertex * 3 + 1])
+            zs.append(data[start + vertex * 3 + 2])
+    cx = (min(xs) + max(xs)) / 2.0
+    cy = (min(ys) + max(ys)) / 2.0
+    cz = (min(zs) + max(zs)) / 2.0
+    radius = 0.0
+    for x, y, z in zip(xs, ys, zs):
+        distance = ((x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2) ** 0.5
+        radius = max(radius, distance)
+    return (cx, cy, cz, radius)
+
+
+def ensure_emitted(
+    asset: str, source_path: pathlib.Path
+) -> tuple[str, int, tuple[float, float, float, float]]:
     path = _resolve(asset, source_path)
     key = str(path)
     if key in _registry:
-        symbol, count, _ = _registry[key]
-        return symbol, count
+        symbol, count, _, bounds = _registry[key]
+        return symbol, count, bounds
     if not path.is_file():
         raise ModelError(f"cannot find model {asset!r} (resolved to {path})")
     if not key.endswith((".gltf", ".glb")):
@@ -340,13 +364,14 @@ def ensure_emitted(asset: str, source_path: pathlib.Path) -> tuple[str, int]:
     data = load_triangles(path)
     symbol = f"anvil_model_{len(_registry)}"
     count = len(data) // 12
-    _registry[key] = (symbol, count, data)
-    return symbol, count
+    bounds = bounds_of(data)
+    _registry[key] = (symbol, count, data, bounds)
+    return symbol, count, bounds
 
 
 def definitions() -> list[str]:
     lines: list[str] = []
-    for key, (symbol, count, data) in _registry.items():
+    for key, (symbol, count, data, _) in _registry.items():
         lines.append(f"/* model: {pathlib.Path(key).name}, {count} triangles */")
         rows = []
         for start in range(0, len(data), 12):

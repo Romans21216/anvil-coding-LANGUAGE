@@ -573,3 +573,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Benchmark:** `particles_2d` joins `tools/bench_runtime.py` (about 2,400 live particles at p50 0.88 ms), and its budget is enforced with the others.
 - **Bug caught:** the runtime header lacked the new prototypes, so generated C used implicit declarations and `particle_clear` returned garbage; the prototypes were added after the `anvil_rect` block.
 - **Docs:** language spec row, evidence ledger, testing doc, `examples/particles_demo.ANVL` (screenshot inspected: orange fountain over the floor band).
+
+## Batch 46 — bounding-sphere culling for models (8.13)
+
+- **Compiler:** `bounds_of` computes a centre and radius from the baked triangles and emits them as part of the `anvil_mesh_draw` call, so culling costs no runtime bounds pass.
+- **Runtime:** each model's sphere is scaled, rotated and translated, then tested against the near plane and the projected viewport. Entirely-behind or entirely-outside models are skipped before any triangle work, returning 0. `mesh_culled()`/`mesh_drawn()` expose per-frame counts and `mesh_culling(on)` toggles the test.
+- **Measured:** 20 off-screen models of 2,048 triangles each (40,960 triangles) cost 3.83 ms/frame with culling off and 0.20 ms with it on — 18.9x less render time for that scene. A single 2-triangle quad only gained 1.11x, so the win scales with triangle count, as expected.
+- **Tests:** `tests/test_gltf_model.py` now asserts a behind-camera model reports 1 culled / 0 drawn, a visible one 0 / 1, and that `mesh_culling(0)` forces the behind-camera model to draw. 10 passed.
+- **Docs:** language spec model row, `docs/MODELS.md` culling section, evidence ledger, testing doc.
