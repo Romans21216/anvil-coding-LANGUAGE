@@ -64,6 +64,7 @@ inspect generated C or PE bytes, or test compiler behaviour directly:
   PE inspection), `test_extensions`, `test_libraries`, `test_more_libraries`,
   `test_all_libraries_import`, `test_library_edges`, `test_essentials`,
   `test_geometry`, `test_vector`, `test_units_validate`, `test_image_error`,
+  `test_image_limits`, `test_output_flush`, `test_net_fuzz`,
   `test_native_trig`, `test_bench`.
 
 ## Interactive coverage

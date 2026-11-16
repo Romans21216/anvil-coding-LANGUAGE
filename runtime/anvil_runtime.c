@@ -3,6 +3,7 @@
 #include "anvil_projection.h"
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -647,6 +648,16 @@ static AnvilImage *anvil_image_from_handle(double handle) {
   return image->pixels && image->generation == generation ? image : NULL;
 }
 static const char *anvil_image_error_text = "";
+static char anvil_image_error_detail[192];
+
+static void anvil_image_error_note(const char *format, ...) {
+  va_list arguments;
+  va_start(arguments, format);
+  _vsnprintf_s(anvil_image_error_detail, sizeof(anvil_image_error_detail),
+               _TRUNCATE, format, arguments);
+  va_end(arguments);
+  anvil_image_error_text = anvil_image_error_detail;
+}
 
 const char *anvil_image_error(void) { return anvil_image_error_text; }
 
@@ -675,13 +686,15 @@ double anvil_image_load(const char *path) {
     return 0.0;
   }
   unsigned char header[54] = {0};
-  int ok = fread(header, 1, sizeof(header), file) == sizeof(header) &&
-           header[0] == 'B' && header[1] == 'M';
+  if (fread(header, 1, sizeof(header), file) != sizeof(header) ||
+      header[0] != 'B' || header[1] != 'M') {
+    fclose(file);
+    anvil_image_error_text = "the file is not a readable 24- or 32-bit BMP";
+    return 0.0;
+  }
   int64_t file_size = -1;
-  if (ok && _fseeki64(file, 0, SEEK_END) == 0)
+  if (_fseeki64(file, 0, SEEK_END) == 0)
     file_size = _ftelli64(file);
-  if (file_size < (int64_t)sizeof(header))
-    ok = 0;
   int64_t pixel_offset = (int64_t)anvil_read_u32_le(header + 10);
   uint32_t dib_size = anvil_read_u32_le(header + 14);
   int32_t width = (int32_t)anvil_read_u32_le(header + 18);
@@ -691,35 +704,63 @@ double anvil_image_load(const char *path) {
   uint32_t compression = anvil_read_u32_le(header + 30);
   if (dib_size < 40 || pixel_offset < 14 + (int64_t)dib_size || width <= 0 ||
       signed_height == 0 || signed_height == INT32_MIN || planes != 1 ||
-      (bits_per_pixel != 24 && bits_per_pixel != 32) || compression != BI_RGB)
-    ok = 0;
-  int height = signed_height < 0 ? -signed_height : signed_height;
-  if (width > ANVIL_IMAGE_MAX_DIMENSION ||
-      height > ANVIL_IMAGE_MAX_DIMENSION)
-    ok = 0;
-  uint64_t pixel_count = ok ? (uint64_t)(unsigned int)width *
-                                  (uint64_t)(unsigned int)height
-                            : 0;
-  uint64_t output_bytes = pixel_count * sizeof(uint32_t);
-  uint64_t row_bytes = ok ? (uint64_t)(unsigned int)width *
-                                (bits_per_pixel / 8)
-                          : 0;
-  uint64_t row_stride = (row_bytes + 3u) & ~UINT64_C(3);
-  if (pixel_count == 0 || pixel_count > 16u * 1024u * 1024u ||
-      output_bytes > ANVIL_IMAGE_MEMORY_LIMIT - anvil_image_memory_used ||
-      row_stride > SIZE_MAX ||
-      pixel_offset + (int64_t)(row_stride * (uint64_t)(unsigned int)height) >
-          file_size)
-    ok = 0;
-
-  uint32_t *pixels = NULL;
-  unsigned char *row = NULL;
-  if (ok) {
-    pixels = (uint32_t *)malloc((size_t)output_bytes);
-    row = (unsigned char *)malloc((size_t)row_stride);
-    if (!pixels || !row)
-      ok = 0;
+      (bits_per_pixel != 24 && bits_per_pixel != 32) || compression != BI_RGB) {
+    fclose(file);
+    anvil_image_error_text = "the file is not a readable 24- or 32-bit BMP";
+    return 0.0;
   }
+  int height = signed_height < 0 ? -signed_height : signed_height;
+  if (width > ANVIL_IMAGE_MAX_DIMENSION) {
+    fclose(file);
+    anvil_image_error_note("the image is %d pixels wide; the limit is %d",
+                           (int)width, (int)ANVIL_IMAGE_MAX_DIMENSION);
+    return 0.0;
+  }
+  if (height > ANVIL_IMAGE_MAX_DIMENSION) {
+    fclose(file);
+    anvil_image_error_note("the image is %d pixels tall; the limit is %d",
+                           height, (int)ANVIL_IMAGE_MAX_DIMENSION);
+    return 0.0;
+  }
+  uint64_t pixel_count =
+      (uint64_t)(unsigned int)width * (uint64_t)(unsigned int)height;
+  uint64_t output_bytes = pixel_count * sizeof(uint32_t);
+  if (pixel_count == 0 || pixel_count > 16u * 1024u * 1024u) {
+    fclose(file);
+    anvil_image_error_note("the image has %llu pixels; the limit is %d",
+                           (unsigned long long)pixel_count, 16 * 1024 * 1024);
+    return 0.0;
+  }
+  if (output_bytes > ANVIL_IMAGE_MEMORY_LIMIT - anvil_image_memory_used) {
+    fclose(file);
+    anvil_image_error_note(
+        "the image needs %llu MiB; only %llu MiB of the 128 MiB image budget "
+        "remain",
+        (unsigned long long)((output_bytes + 1048575u) / 1048576u),
+        (unsigned long long)((ANVIL_IMAGE_MEMORY_LIMIT -
+                              anvil_image_memory_used) /
+                             1048576u));
+    return 0.0;
+  }
+  uint64_t row_bytes = (uint64_t)(unsigned int)width * (bits_per_pixel / 8);
+  uint64_t row_stride = (row_bytes + 3u) & ~UINT64_C(3);
+  if (pixel_offset + (int64_t)(row_stride * (uint64_t)(unsigned int)height) >
+      file_size) {
+    fclose(file);
+    anvil_image_error_text = "the file is too short for the declared image size";
+    return 0.0;
+  }
+
+  uint32_t *pixels = (uint32_t *)malloc((size_t)output_bytes);
+  unsigned char *row = (unsigned char *)malloc((size_t)row_stride);
+  if (!pixels || !row) {
+    free(pixels);
+    free(row);
+    fclose(file);
+    anvil_image_error_text = "the image could not be allocated";
+    return 0.0;
+  }
+  int ok = 1;
   int any_alpha = 0;
   for (int source_y = 0; ok && source_y < height; ++source_y) {
     int64_t row_offset = pixel_offset + (int64_t)row_stride * source_y;
@@ -741,9 +782,8 @@ double anvil_image_load(const char *path) {
   free(row);
   fclose(file);
   if (!ok) {
-    anvil_image_error_text =
-        "the file is not a readable 24- or 32-bit BMP within the limits";
     free(pixels);
+    anvil_image_error_text = "the file ended before the image data did";
     return 0.0;
   }
   if (bits_per_pixel == 32 && !any_alpha) {
