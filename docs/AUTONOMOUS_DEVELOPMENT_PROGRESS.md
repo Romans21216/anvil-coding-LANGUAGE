@@ -308,3 +308,14 @@ This log records verified implementation batches and is reconciled with Git befo
 - Files: `compiler/native_codegen.py`, `compiler/cli.py`, `runtime/anvil_runtime.c`, `docs/LANGUAGE_SPEC.md`, `README.md`, and the number/mid/chr/noise/cache test files.
 - Tests: `tests/test_number.py` 19 passed; the targeted cross-backend batch `test_number`, `test_number_format`, `test_text_functions`, `test_chrorrd`, `test_mid`, `test_noise_bounds`, `test_build_cache`, `test_native_x64` 97 passed.
 - Commits: `fdb6344` (C8-1/C8-3/C8-5), `214e200` (C8-7), `40bf89d` (C8-6), `e6513b4` (C8-2/C8-4/C8-8), `7545c4c` (README).
+
+## Batch 15 — build safety and bounded inputs (8.10, 8.15)
+
+- **Atomic output:** `build_c` links to `<name>.partial.exe` and only replaces the requested output after the toolchain succeeds, so a failing `cl`/`cc` cannot leave a truncated program behind. A failing-toolchain test keeps the previous bytes.
+- **Cache bypass:** `--no-cache` skips the cached lookup, forces a real build and stores nothing, leaving existing entries usable. Documented in the CLI table.
+- **Bounded entry source:** the entry file is stat'ed and refused above the 4 MiB include budget before it is read, so a mistaken huge path cannot be loaded into memory.
+- **Bounded call depth (C backend):** generated functions call `anvil_frame_enter`/`anvil_frame_leave`; a chain that grows the C stack past 512 KiB stops with `Anvil call depth exceeded the 512 KiB stack budget` and exit 2. 200000-deep non-tail recursion previously died with no output and now reports the diagnostic; 100-deep recursion still returns 5050.
+- **Files:** `compiler/build.py`, `compiler/cli.py`, `compiler/codegen.py`, `compiler/common.py`, `runtime/anvil_runtime.c`, `runtime/anvil_runtime.h`, `docs/COMPILER.md`, `docs/INCLUDES.md`, `docs/LANGUAGE_SPEC.md`, and four new test files.
+- **Tests:** full suite on `0b0130d` 646 passed, 1 skipped, 1 xfailed; targeted batch after the recursion change 128 passed.
+- **Commits:** `dd40769`, `0b0130d`, `a24a071`, `6f0f3e8`.
+- **Remaining:** the native backend still lacks the call-depth guard; it dies silently between 5000 and 20000 frames.
