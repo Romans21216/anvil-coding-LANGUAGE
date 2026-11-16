@@ -43,7 +43,7 @@ def reference_noise(x, y, z):
 @unittest.skipUnless(sys.platform == "win32", "runs emitted AMD64 PE executables")
 class NativeProceduralTests(unittest.TestCase):
     def run_source(self, source, code=0):
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as directory:
             path = pathlib.Path(directory) / "procedural.ANVL"
             path.write_text(source, encoding="utf-8")
             functions, top, variables, arrays = parse(path, source)

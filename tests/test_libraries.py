@@ -10,7 +10,7 @@ from compiler.parser import parse
 
 class LibraryFixture(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        self.temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(self.temp.cleanup)
         self.root = pathlib.Path(self.temp.name)
 

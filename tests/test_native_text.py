@@ -156,7 +156,7 @@ end
         source = 'scene 2d\nfn(draw)\n display text("Anvil") -l(10,10)\nend\n'
         original = X64Code.rip_call_import
         for failed in ("CreateFontW","TextOutW"):
-            with self.subTest(failed=failed), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(failed=failed), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 path = pathlib.Path(temp)/"text.ANVL"
                 path.write_text(source,encoding="utf-8")
                 def call(code,name):
@@ -185,7 +185,7 @@ end
                  ('text("'+('a'*8193)+'") -l(1,2)','exceeds 8192'),
                  ('text('+json.dumps("\U0001f642"*4097)+') -l(1,2)','exceeds 8192')]
         for command,message in cases:
-            with self.subTest(message=message), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(message=message), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 path = pathlib.Path(temp)/"invalid.ANVL"
                 source = f"scene 2d\nfn(draw)\n display {command}\nend\n"
                 path.write_text(source,encoding="utf-8")
@@ -195,7 +195,7 @@ end
                 self.assertIn(message,str(caught.exception))
 
     def test_range_errors_keep_unicode_include_location_and_literal_boundary_works(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             library = root / "labels_\u03bb.ANVL"
             path = root / "main.ANVL"
@@ -214,7 +214,7 @@ end
         self.assertEqual(app.result[0],0)
 
     def test_unused_imports_and_duplicate_utf16_pool(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp)/"pool.ANVL"
             source = 'scene 2d\nfn(draw)\n display text("same") -l(1,1)\n display text("same") -l(2,2)\nend\n'
             path.write_text(source,encoding="utf-8")

@@ -91,7 +91,7 @@ int main(void) {
   return 0;
 }
 '''
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             folder = pathlib.Path(temp)
             harness, empty, executable = folder / "circle_probe.c", folder / "empty.c", folder / "circle_probe.exe"
             harness.write_text(source, encoding="utf-8")

@@ -84,7 +84,7 @@ class DisplayModifierTests(unittest.TestCase):
                    ' -rgb(min(9,8),max(2,3),abs(-7))\n'
                    ' set array(values,0) = 17\n'
                    ' display rect(array(values,0),0,10,10)\nend\n')
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
             root = pathlib.Path(temporary)
             (root / 'program.c').write_text(self.generate(source), encoding='utf-8')
             harness = root / 'display_probe.c'
@@ -124,7 +124,7 @@ int main(void) { anvil_draw(); return 0; }
                       ' display ray_sphere(0,0,3,1)\n display ray_sphere(1,0,3,1)\n'
                       ' display text(' + json.dumps(literal) + ') -l(0,0)\n'
                       ' display rect(call fn(anvil_trace_sphere),0,1,1)\nend\n')
-            with self.subTest(literal=literal), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(literal=literal), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 root = pathlib.Path(temp)
                 (root/'program.c').write_text(self.generate(source), encoding='utf-8')
                 harness = root/'order.c'

@@ -31,7 +31,7 @@ class NativeConformanceTests(unittest.TestCase):
             ("runtime-label-direct", "fn(anvil_print_number)\n output 7\nend\nfn(main)\n output call fn(anvil_print_number)\nend\n", "7"),
             ("runtime-label-included", 'include "formatter.ANVL"\nfn(main)\n output call fn(anvil_print_number)\nend\n', "7"),
         ]
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
             root = pathlib.Path(temporary)
             (root / "library.ANVL").write_text("fn(modify)\n set local(value) = 3\n add var(value) 2\n output local(value)\nend\n", encoding="utf-8")
             (root / "formatter.ANVL").write_text("fn(anvil_print_number)\n output 7\nend\n", encoding="utf-8")

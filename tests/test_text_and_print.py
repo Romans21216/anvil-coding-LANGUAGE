@@ -24,7 +24,7 @@ def compile_source(source, temp, name="probe.ANVL", emit_c=False, check=False,
 
 class TextAndPrintTests(unittest.TestCase):
     def run_program(self, source):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path, result = compile_source(source, temp)
             self.assertEqual(result.returncode, 0, result.stderr)
             executable = path.with_suffix(".exe")
@@ -63,7 +63,7 @@ class TextAndPrintTests(unittest.TestCase):
             '  display text("a=" + local(x) + " b=" + (local(x) * 2) + " c") -l(10, 10)\n'
             "end\n"
         )
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path, result = compile_source(source, temp, "hud.ANVL", emit_c=True)
             generated_path = path.with_suffix(".c")
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -191,7 +191,7 @@ class DiagnosticTests(unittest.TestCase):
             "  output 0\n"
             "end\n"
         )
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path, result = compile_source(source, temp)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("error: ", result.stderr)
@@ -202,7 +202,7 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_unknown_name_gets_a_did_you_mean_hint(self):
         source = "fn(main)\n  output fllor(2.5)\nend\n"
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path, result = compile_source(source, temp)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unknown name", result.stderr)
@@ -210,7 +210,7 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_else_if_misuse_explains_the_alternative(self):
         source = "fn(main)\n  else if 1\n  end\nend\n"
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path, result = compile_source(source, temp)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("'else if' must follow an if", result.stderr)
@@ -218,7 +218,7 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_display_without_a_scene_warns_but_still_builds(self):
         source = "fn(main)\n  display rect(0, 0, 10, 10)\n  output 0\nend\n"
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path, result = compile_source(source, temp, check=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("warning: ", result.stderr)
@@ -227,7 +227,7 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_deny_warnings_turns_the_warning_into_a_failure(self):
         source = "fn(main)\n  display rect(0, 0, 10, 10)\n  output 0\nend\n"
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp) / "warn.ANVL"
             path.write_text(source, encoding="utf-8")
             result = subprocess.run(
@@ -247,7 +247,7 @@ class DiagnosticTests(unittest.TestCase):
             "  output 0\n"
             "end\n"
         )
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path, result = compile_source(source, temp, check=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("`output` returns from the function", result.stderr)

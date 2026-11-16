@@ -23,7 +23,7 @@ class BenchmarkWorkloadTests(unittest.TestCase):
         if not find_compiler(None):
             self.skipTest("differential run requires MSVC")
         outputs = {}
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
             work = pathlib.Path(temporary)
             for backend in ("c", "native"):
                 executable = work / f"workload-{backend}.exe"

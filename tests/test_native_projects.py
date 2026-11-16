@@ -13,7 +13,7 @@ from tests.native_app import NativeApp
 
 class NativeProjectTests(unittest.TestCase):
     def test_nested_project_without_c_toolchain(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / 'src').mkdir()
             (root / 'lib.ANVL').write_text('fn(value)\n output 20\nend\n', encoding='utf-8')
@@ -30,7 +30,7 @@ class NativeProjectTests(unittest.TestCase):
                 self.assertEqual((result.returncode, result.stdout.strip()), (0, '20'))
 
     def test_project_memory_settings_reach_native_array_backend(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             entry = root / "main.ANVL"
             source = "fn(main)\n array scratch(4)\n output 9\nend\ncall fn(main)\n"
@@ -62,7 +62,7 @@ class NativeProjectTests(unittest.TestCase):
     def test_active_call_memory_budget_is_shared_across_native_recursion(self):
         if sys.platform != "win32":
             self.skipTest("native backend emits Windows PE executables")
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             entry = root / "main.ANVL"
             entry.write_text(
@@ -110,7 +110,7 @@ class NativeProjectTests(unittest.TestCase):
         import contextlib
         import io
         from compiler.common import CompileError
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             source = 'scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n'
             entry = root/'main.ANVL'; entry.write_text(source,encoding='utf-8')
@@ -135,7 +135,7 @@ class NativeProjectTests(unittest.TestCase):
 
     def test_control_character_entries_have_clean_cli_errors(self):
         import json
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             project = root/'bad.ANVLproj'
             for entry in ('\0', 'bad\npath', 'bad\tpath', 'bad\x01path'):

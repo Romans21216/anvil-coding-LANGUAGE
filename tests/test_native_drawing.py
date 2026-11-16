@@ -203,7 +203,7 @@ end
         for primitive, initial, count in cases:
             for index in range(count):
                 for value in (-1073741825,1073741825):
-                    with self.subTest(primitive=primitive,index=index,value=value), RetryingTemporaryDirectory() as temp:
+                    with self.subTest(primitive=primitive,index=index,value=value), RetryingTemporaryDirectory(ignore_cleanup_errors=True) as temp:
                         root = pathlib.Path(temp)
                         library = root / "shapes_\u03bb.ANVL"
                         arguments = list(initial)
@@ -225,13 +225,13 @@ end
                                  ("circle(0,0,1) -rot(0,0,0)", "unsupported native circle modifier"),
                                  ("line(1,2,3)", "expects x1,y1,x2,y2"),
                                  ("line(1,2,3,4,5,6)", "expects x1,y1,x2,y2")]:
-            with self.subTest(drawing=drawing), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(drawing=drawing), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 path = pathlib.Path(temp) / "input.ANVL"
                 source = f"scene 2d\nfn(draw)\n display {drawing}\nend\n"
                 path.write_text(source, encoding="utf-8")
                 with self.assertRaisesRegex(CompileError, message):
                     NativeCodegen(path, *parse(path, source)).generate()
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp) / "rect.ANVL"
             source = "scene 2d\nfn(draw)\n display rect(1,1,1,1)\nend\n"
             path.write_text(source, encoding="utf-8")

@@ -13,7 +13,7 @@ COMPILER = ROOT / "compiler" / "anvil.py"
 
 class CompilerTests(unittest.TestCase):
     def test_language_version_header_and_legacy_default(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             for name, source_text in {
                 "explicit-v1": "# Header comments are ignored\n\nlanguage version 1\nfn(main)\n  output 7\nend\ncall fn(main)\n",
                 "implicit-v1": "fn(main)\n  output 7\nend\ncall fn(main)\n",
@@ -31,7 +31,7 @@ class CompilerTests(unittest.TestCase):
             "duplicate": ("language version 1\nlanguage version 1\nfn(main)\nend\n", "language version may only be declared once", 2),
             "late": ("fn(main)\nend\nlanguage version 1\n", "language version declaration must appear before all other source code", 3),
         }
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             for name, (source_text, expected, line) in cases.items():
                 with self.subTest(name=name):
                     source = pathlib.Path(temp) / f"{name}.ANVL"
@@ -42,7 +42,7 @@ class CompilerTests(unittest.TestCase):
                     self.assertIn(expected, result.stderr)
 
     def test_oversized_language_version_is_source_located(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "oversized-version.ANVL"
             source.write_text("language version " + ("9" * 5000) + "\nfn(main)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "oversized.c")], capture_output=True, text=True)
@@ -52,7 +52,7 @@ class CompilerTests(unittest.TestCase):
             self.assertNotIn("Traceback", result.stderr)
 
     def test_unicode_decimal_digit_is_rejected_as_invalid_anvil_syntax(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "unicode-digit.ANVL"
             generated = pathlib.Path(temp) / "unicode-digit.c"
             source.write_text("fn(main)\n  output ١\nend\ncall fn(main)\n", encoding="utf-8")
@@ -64,7 +64,7 @@ class CompilerTests(unittest.TestCase):
             self.assertFalse(generated.exists(), "invalid Unicode numeric syntax must fail before C generation")
 
     def test_oversized_array_length_is_rejected_without_integer_conversion_error(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "oversized-array.ANVL"
             generated = pathlib.Path(temp) / "oversized-array.c"
             source.write_text("array huge(" + ("9" * 5000) + ")\nfn(main)\nend\n", encoding="utf-8")
@@ -76,7 +76,7 @@ class CompilerTests(unittest.TestCase):
             self.assertFalse(generated.exists(), "invalid array size must fail before C generation")
 
     def test_duplicate_display_location_modifier_is_rejected(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "duplicate-location.ANVL"
             generated = pathlib.Path(temp) / "duplicate-location.c"
             source.write_text('fn(draw)\n  display text("Hi") -l(1,2) -l(3,4)\nend\n', encoding="utf-8")
@@ -87,7 +87,7 @@ class CompilerTests(unittest.TestCase):
             self.assertFalse(generated.exists(), "invalid duplicate location modifier must fail before C generation")
 
     def test_game_source_emits_native_renderer_calls(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             c_file = pathlib.Path(temp) / "world.c"
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "first_world.ANVL"), "--emit-c", str(c_file)], check=True, capture_output=True, text=True)
             generated = c_file.read_text(encoding="utf-8")
@@ -100,7 +100,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_camera_control(4.0, 80.0)", generated)
 
     def test_ray_tracing_batch_flushes_before_hud_drawing(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "trace.ANVL"
             c_file = pathlib.Path(temp) / "trace.c"
             source.write_text(
@@ -117,7 +117,7 @@ class CompilerTests(unittest.TestCase):
             self.assertLess(generated.index("anvil_trace_sphere("), generated.index("anvil_trace_finish();", generated.index("anvil_trace_sphere(")))
 
     def test_ray_backend_builtins_select_and_report_available_backends(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "ray-backend.ANVL"
             out = pathlib.Path(temp) / "ray-backend.exe"
             generated = out.with_suffix(".generated.c")
@@ -161,7 +161,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn('anvil_ray_backend_available ( "bvh" )', generated.read_text(encoding="utf-8"))
 
     def test_ray_backend_builtin_requires_a_string(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "ray-backend-type.ANVL"
             source.write_text("fn(main)\n  output ray_backend(3)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -169,7 +169,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("expected a string, got a number", result.stderr)
 
     def test_mouse_builtins_emit_runtime_calls_and_validate_button_names_as_strings(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "mouse.ANVL"
             generated = pathlib.Path(temp) / "mouse.c"
             source.write_text(
@@ -211,7 +211,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("expected a string, got a number", invalid.stderr)
 
     def test_mouse_input_example_generates_native_mouse_calls(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             generated = pathlib.Path(temp) / "mouse_input.c"
             result = subprocess.run(
                 [
@@ -232,7 +232,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_mouse_wheel ( )", emitted)
 
     def test_image_builtins_emit_calls_and_require_a_path_string(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "images.ANVL"
             generated = pathlib.Path(temp) / "images.c"
             source.write_text(
@@ -276,25 +276,25 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("expected a string, got a number", invalid.stderr)
 
     def test_starter_game_links_native_runtime(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             out = pathlib.Path(temp) / "world.exe"
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "first_world.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertGreater(out.stat().st_size, 100_000)
 
     def test_multiplayer_sample_links_winsock_runtime(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             out = pathlib.Path(temp) / "network.exe"
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "network_counter.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertGreater(out.stat().st_size, 100_000)
 
     def test_multiplayer_client_links_winsock_runtime(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             out = pathlib.Path(temp) / "client.exe"
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "network_client.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertGreater(out.stat().st_size, 100_000)
 
     def test_2d_circle_physics_step_collision_and_stale_handles(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics.ANVL"
             out = pathlib.Path(temp) / "physics.exe"
             source.write_text(
@@ -363,7 +363,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "1")
 
     def test_2d_box_and_mixed_shape_physics_contacts(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics-boxes.ANVL"
             out = pathlib.Path(temp) / "physics-boxes.exe"
             source.write_text(
@@ -409,7 +409,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "1")
 
     def test_box_physics_builtin_arity_is_validated(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics-box-arity.ANVL"
             source.write_text("fn(main)\n  output body_create_box(0, 0, 2, 2)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -417,7 +417,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("body_create_box() expects 5 argument(s), got 4", result.stderr)
 
     def test_physics_friction_slows_sliding_body_and_validates_values(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics-friction.ANVL"
             out = pathlib.Path(temp) / "physics-friction.exe"
             source.write_text(
@@ -450,7 +450,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "1")
 
     def test_physics_friction_zero_and_geometric_mean(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics-friction-edges.ANVL"
             out = pathlib.Path(temp) / "physics-friction-edges.exe"
             source.write_text(
@@ -483,7 +483,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "1")
 
     def test_physics_body_capacity_can_grow_and_safely_shrink(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics-capacity.ANVL"
             out = pathlib.Path(temp) / "physics-capacity.exe"
             source.write_text(
@@ -536,7 +536,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "1")
 
     def test_physics_capacity_builtin_arity_is_validated(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics-capacity-arity.ANVL"
             source.write_text("fn(main)\n  output physics_capacity()\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -544,7 +544,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("physics_capacity() expects 1 argument(s), got 0", result.stderr)
 
     def test_physics_builtin_arity_is_validated_before_c_generation(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics-arity.ANVL"
             source.write_text("fn(main)\n  output body_create(0, 0, 1)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -553,7 +553,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("body_create() expects 4 argument(s), got 3", result.stderr)
 
     def test_physics_contact_timing_bounds_and_repeatability(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "physics-bounds.ANVL"
             out = pathlib.Path(temp) / "physics-bounds.exe"
             source.write_text(
@@ -597,13 +597,13 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(first, second)
 
     def test_numeric_program_builds_and_runs(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             out = pathlib.Path(temp) / "numeric.exe"
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "numeric_demo.ANVL"), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "17")
 
     def test_division_by_zero_reports_source_location(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "divide-zero.ANVL"
             out = pathlib.Path(temp) / "divide-zero.exe"
             source.write_text(
@@ -619,7 +619,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn(f"{source}:2: division by zero", result.stderr)
 
     def test_regular_division_remains_supported(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "division.ANVL"
             out = pathlib.Path(temp) / "division.exe"
             source.write_text(
@@ -639,7 +639,7 @@ class CompilerTests(unittest.TestCase):
             "comparison-overflow": "1e308 * 1e308 > 0",
             "invalid-math": "sqrt(-1)",
         }
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             for name, expression in cases.items():
                 with self.subTest(name=name):
                     source = pathlib.Path(temp) / f"{name}.ANVIL"
@@ -659,7 +659,7 @@ class CompilerTests(unittest.TestCase):
             "local-sub": "  set local(value) = -1e308\n  sub local(value) 1e308\n  output local(value)\n",
             "for-step": "  set local(counter) = 0\n  for local(index) = 1e308 to 1e308 step 1e308\n    add local(counter) 1\n  end\n  output local(counter)\n",
         }
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             for name, body in cases.items():
                 with self.subTest(name=name):
                     source = pathlib.Path(temp) / f"{name}.ANVIL"
@@ -671,7 +671,7 @@ class CompilerTests(unittest.TestCase):
                     self.assertIn("numeric overflow or non-finite result", result.stderr)
 
     def test_function_parameters_returns_and_local_scope(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "functions.ANVL"
             out = pathlib.Path(temp) / "functions.exe"
             source.write_text(
@@ -693,7 +693,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "13")
 
     def test_function_call_arity_is_validated(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "bad-arity.ANVL"
             source.write_text("fn(double, value)\n  output var(value) * 2\nend\nfn(main)\n  output call fn(double)\nend\ncall fn(main)\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -702,7 +702,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("expects 1 argument(s), got 0", result.stderr)
 
     def test_local_variables_are_not_visible_outside_their_function(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "local-scope.ANVL"
             source.write_text("fn(first)\n  set local(value) = 2\n  output local(value)\nend\nfn(second)\n  output var(value)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -711,7 +711,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("unknown variable 'value'", result.stderr)
 
     def test_recursive_function_calls_compile_and_run(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "recursive.ANVL"
             out = pathlib.Path(temp) / "recursive.exe"
             source.write_text(
@@ -732,7 +732,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "120")
 
     def test_while_loop_runs_and_updates_locals(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "while.ANVL"
             out = pathlib.Path(temp) / "while.exe"
             source.write_text(
@@ -756,7 +756,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "15")
 
     def test_while_loop_requires_condition(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "bad.ANVL"
             source.write_text("fn(main)\n  while\n  end\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -764,7 +764,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("while needs a condition", result.stderr)
 
     def test_for_loop_ascending_descending_steps_and_nesting(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "for.ANVL"
             out = pathlib.Path(temp) / "for.exe"
             source.write_text(
@@ -795,7 +795,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "24")
 
     def test_for_loop_evaluates_bounds_and_step_once(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "for_calls.ANVL"
             out = pathlib.Path(temp) / "for_calls.exe"
             source.write_text(
@@ -819,7 +819,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "3")
 
     def test_nested_for_loop_rejects_reused_control_variable(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "bad_nested_for.ANVL"
             source.write_text(
                 "fn(main)\n"
@@ -835,7 +835,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("nested for loops must use different local variables", result.stderr)
 
     def test_fixed_numeric_arrays_support_dynamic_reads_and_writes(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "arrays.ANVL"
             out = pathlib.Path(temp) / "arrays.exe"
             source.write_text(
@@ -858,7 +858,7 @@ class CompilerTests(unittest.TestCase):
 
     def test_literal_array_index_is_rejected_at_build_time(self):
         for index in ("-1", "2", "0.5"):
-            with self.subTest(index=index), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(index=index), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 source = pathlib.Path(temp) / "array-bounds.ANVL"
                 out = pathlib.Path(temp) / "array-bounds.exe"
                 source.write_text(
@@ -876,7 +876,7 @@ class CompilerTests(unittest.TestCase):
                 self.assertFalse(out.exists())
 
     def test_computed_array_index_is_checked_at_runtime(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "array-bounds.ANVL"
             out = pathlib.Path(temp) / "array-bounds.exe"
             source.write_text(
@@ -895,7 +895,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("array-bounds.ANVL:4:", result.stderr)
 
     def test_array_index_side_effect_evaluates_once(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "array-once.ANVL"
             out = pathlib.Path(temp) / "array-once.exe"
             source.write_text(
@@ -932,7 +932,7 @@ class CompilerTests(unittest.TestCase):
             ("fn(array_get)\n output 0\nend\n", "conflicts with a reserved runtime name"),
         )
         for program, diagnostic in cases:
-            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 source = pathlib.Path(temp) / "bad-array.ANVL"
                 source.write_text(program, encoding="utf-8")
                 result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -940,7 +940,7 @@ class CompilerTests(unittest.TestCase):
                 self.assertIn(diagnostic, result.stderr)
 
     def test_function_local_arrays_are_zeroed_and_isolated_per_call(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "local-arrays.ANVL"
             out = pathlib.Path(temp) / "local-arrays.exe"
             source.write_text(
@@ -992,7 +992,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_local_array_free(anvil_sum_offset__values, 3);", generated_c)
 
     def test_recursive_local_array_budget_fails_with_source_diagnostic(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "local-array-budget.ANVL"
             out = pathlib.Path(temp) / "local-array-budget.exe"
             source.write_text(
@@ -1017,7 +1017,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("local-array-budget.ANVL:2:", result.stderr)
 
     def test_function_local_literal_array_index_is_rejected_at_build_time(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "local-array-bounds.ANVL"
             out = pathlib.Path(temp) / "local-array-bounds.exe"
             source.write_text(
@@ -1035,7 +1035,7 @@ class CompilerTests(unittest.TestCase):
             self.assertFalse(out.exists())
 
     def test_function_local_computed_array_index_is_checked_at_runtime(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "local-array-bounds.ANVL"
             out = pathlib.Path(temp) / "local-array-bounds.exe"
             source.write_text(
@@ -1060,7 +1060,7 @@ class CompilerTests(unittest.TestCase):
             ("fn(main, items)\n array items(2)\n output array(items, 0)\nend\n", "conflicts with a local variable or parameter"),
         )
         for program, diagnostic in cases:
-            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 source = pathlib.Path(temp) / "bad-local-array.ANVL"
                 source.write_text(program, encoding="utf-8")
                 result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -1068,7 +1068,7 @@ class CompilerTests(unittest.TestCase):
                 self.assertIn(diagnostic, result.stderr)
 
     def test_network_api_emits_native_udp_calls(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             c_file = pathlib.Path(temp) / "network.c"
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "examples" / "network_counter.ANVL"), "--emit-c", str(c_file)], check=True, capture_output=True, text=True)
             generated = c_file.read_text(encoding="utf-8")
@@ -1077,7 +1077,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_net_receive ( )", generated)
 
     def test_udp_nan_receive_reports_source_location(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             port_probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             port_probe.bind(("127.0.0.1", 0))
             port = port_probe.getsockname()[1]
@@ -1116,7 +1116,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn(f"{source}:4: numeric overflow or non-finite result", stderr)
 
     def test_udp_finite_receive_and_missing_socket_remain_supported(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             no_socket_source = pathlib.Path(temp) / "no-network.ANVL"
             no_socket_out = pathlib.Path(temp) / "no-network.exe"
             no_socket_source.write_text("fn(main)\n  output receive()\nend\ncall fn(main)\n", encoding="utf-8")
@@ -1166,7 +1166,7 @@ class CompilerTests(unittest.TestCase):
         port = port_probe.getsockname()[1]
         port_probe.close()
 
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "packet.ANVL"
             out = pathlib.Path(temp) / "packet.exe"
             source.write_text(
@@ -1218,7 +1218,7 @@ class CompilerTests(unittest.TestCase):
         port = host_probe.getsockname()[1]
         host_probe.close()
 
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "packet-peer.ANVL"
             out = pathlib.Path(temp) / "packet-peer.exe"
             source.write_text(
@@ -1289,7 +1289,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(stdout.splitlines(), ["132"])
 
     def test_packet_builtins_emit_network_runtime_calls(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "packet-builtins.ANVL"
             generated = pathlib.Path(temp) / "packet-builtins.c"
             source.write_text(
@@ -1317,7 +1317,7 @@ class CompilerTests(unittest.TestCase):
         listener.settimeout(5)
         port = listener.getsockname()[1]
         try:
-            with tempfile.TemporaryDirectory() as temp:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 source = pathlib.Path(temp) / "packet-send.ANVL"
                 out = pathlib.Path(temp) / "packet-send.exe"
                 source.write_text(
@@ -1349,7 +1349,7 @@ class CompilerTests(unittest.TestCase):
         self.assertEqual(address[0], "127.0.0.1")
 
     def test_packet_send_rejects_invalid_message_ids_and_nonfinite_values(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "invalid-packet-send.ANVL"
             out = pathlib.Path(temp) / "invalid-packet-send.exe"
             source.write_text(
@@ -1366,7 +1366,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "0")
 
     def test_unknown_statement_has_source_location(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "broken.ANVL"
             source.write_text("fn(main)\n  frobnicate\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "broken.c")], capture_output=True, text=True)
@@ -1374,7 +1374,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("broken.ANVL:2:", result.stderr)
 
     def test_unknown_function_expression_has_source_location(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "unknown-call.ANVL"
             source.write_text("fn(main)\n  output call fn(missing)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -1382,7 +1382,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("unknown-call.ANVL:2:", result.stderr)
 
     def test_nested_branches_build_and_run(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "nested.ANVL"
             out = pathlib.Path(temp) / "nested.exe"
             source.write_text("fn(main)\n  set var(value) = 5\n  if var(value) > 0\n    if var(value) < 10\n      output var(value)\n    else\n      output 0\n    end\n  else\n    output 0\n  end\nend\ncall fn(main)\n", encoding="utf-8")
@@ -1390,7 +1390,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "5")
 
     def test_expression_precedence_builds_expected_result(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "precedence.ANVL"
             out = pathlib.Path(temp) / "precedence.exe"
             source.write_text("fn(main)\n  output 2 + 3 * 4\nend\ncall fn(main)\n", encoding="utf-8")
@@ -1398,7 +1398,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "14")
 
     def test_and_or_short_circuit_side_effecting_calls(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "short-circuit.ANVL"
             out = pathlib.Path(temp) / "short-circuit.exe"
             source.write_text(
@@ -1421,7 +1421,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "2")
 
     def test_remainder_operator_compiles_and_runs_for_numbers(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "remainder.ANVL"
             out = pathlib.Path(temp) / "remainder.exe"
             source.write_text("fn(main)\n  output 7 % 4\nend\ncall fn(main)\n", encoding="utf-8")
@@ -1429,7 +1429,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(subprocess.run([str(out)], check=True, capture_output=True, text=True).stdout.strip(), "3")
 
     def test_string_value_is_rejected_in_numeric_context(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "type-error.ANVL"
             source.write_text('fn(main)\n  output "not a number"\nend\n', encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -1438,7 +1438,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("expected number, got string", result.stderr)
 
     def test_malformed_expression_is_rejected_by_anvil_parser(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "malformed.ANVL"
             source.write_text("fn(main)\n  output 1 2\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -1447,7 +1447,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("unexpected token '2'", result.stderr)
 
     def test_builtin_arity_is_validated_before_c_generation(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "arity.ANVL"
             source.write_text("fn(main)\n  output sqrt()\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -1456,7 +1456,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("sqrt() expects 1 argument(s), got 0", result.stderr)
 
     def test_undefined_variable_has_source_diagnostic(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "undefined.ANVL"
             source.write_text("fn(main)\n  output var(missing)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -1465,7 +1465,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("unknown variable 'missing'", result.stderr)
 
     def test_identifiers_that_normalize_to_same_c_name_are_rejected(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "collision.ANVL"
             source.write_text("fn(main)\n  set var(foo-bar) = 1\n  set var(foo_bar) = 2\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -1473,7 +1473,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("both map to C name 'anvil_foo_bar'", result.stderr)
 
     def test_seeded_random_and_noise_are_repeatable(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "random.ANVL"
             out = pathlib.Path(temp) / "random.exe"
             source.write_text("fn(main)\n  seed(42)\n  set var(roll) = rnd(1, 100)\n  output var(roll) + noise(0.1, 0.2, 0.3)\nend\ncall fn(main)\n", encoding="utf-8")
@@ -1483,7 +1483,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(first, second)
 
     def test_project_manifest_resolves_entry_inside_project(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             c_file = pathlib.Path(temp) / "project.c"
             subprocess.run([sys.executable, str(COMPILER), str(ROOT / "game.ANVLproj"), "--emit-c", str(c_file)], check=True, capture_output=True, text=True)
             generated = c_file.read_text(encoding="utf-8")
@@ -1492,7 +1492,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn('"First World"', generated)
 
     def test_project_memory_settings_control_c_local_array_limits(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             source = root / "main.ANVL"
             source.write_text(
@@ -1533,7 +1533,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("main.ANVL:2", rejected.stderr)
 
     def test_project_memory_manifest_values_are_bounded(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "main.ANVL").write_text("fn(main)\nend\n", encoding="utf-8")
             project = root / "bad-memory.ANVLproj"
@@ -1560,7 +1560,7 @@ class CompilerTests(unittest.TestCase):
                 self.assertNotIn("Traceback", result.stderr)
 
     def test_active_call_memory_limit_rejects_impossible_single_local_array(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "main.ANVL").write_text(
                 "fn(main)\n array scratch(131073)\nend\n", encoding="utf-8"
@@ -1581,7 +1581,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("above the active-call memory limit of 1048576 bytes", result.stderr)
 
     def test_active_call_memory_budget_is_shared_across_c_recursion(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "main.ANVL").write_text(
                 "fn(recurse, depth)\n"
@@ -1615,7 +1615,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("active local arrays exceed the 1 MiB Anvil memory limit", result.stderr)
 
     def test_project_manifest_rejects_invalid_fixed_rate(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "main.ANVL").write_text("fn(main)\nend\n", encoding="utf-8")
             project = root / "invalid-rate.ANVLproj"
@@ -1625,7 +1625,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("engine.fixed_hz must be an integer from 1 to 240", result.stderr)
 
     def test_project_manifest_rejects_unimplemented_settings(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "main.ANVL").write_text("fn(main)\nend\n", encoding="utf-8")
             project = root / "unknown-setting.ANVLproj"
@@ -1635,7 +1635,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("unsupported project setting(s): target", result.stderr)
 
     def test_project_manifest_rejects_entry_outside_project(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             project = pathlib.Path(temp) / "escape.ANVLproj"
             project.write_text('name = "escape"\nentry = "../outside.ANVL"\n', encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(project), "--emit-c", str(pathlib.Path(temp) / "escape.c")], capture_output=True, text=True)
@@ -1643,7 +1643,7 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("entry must resolve inside the project folder", result.stderr)
 
     def test_malformed_project_manifest_returns_clean_diagnostic(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             project = pathlib.Path(temp) / "malformed.ANVLproj"
             project.write_text('name = "unterminated\nentry = "missing.ANVL"\n', encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(project), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
@@ -1652,7 +1652,7 @@ class CompilerTests(unittest.TestCase):
             self.assertNotIn("Traceback", result.stderr)
 
     def test_network_port_range_is_checked(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "bad-port.ANVL"
             source.write_text("net host(70000)\nfn(main)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad-port.c")], capture_output=True, text=True)

@@ -20,7 +20,7 @@ COMPILER = ROOT / "compiler" / "anvil.py"
 
 class AuthoringSyntaxTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        self.temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.root = pathlib.Path(self.temp.name)
 
     def tearDown(self):

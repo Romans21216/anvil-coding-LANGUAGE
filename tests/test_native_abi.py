@@ -16,7 +16,7 @@ from compiler.parser import parse
 @unittest.skipUnless(sys.platform == "win32", "emitted Windows x64 executables")
 class NativeABITests(unittest.TestCase):
     def run_image(self, image):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp) / "abi.exe"
             path.write_bytes(image)
             result = subprocess.run([str(path)], capture_output=True, timeout=5)
@@ -125,7 +125,7 @@ class NativeABITests(unittest.TestCase):
             source += ")\n add local(total) local(result) * " + str(count+1) + "\n"
             expected += (sum(i*i for i in range(1, count+1)) if count else 7.25) * (count+1)
         source += " output local(total)\nend\n"
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp) / "calls.ANVL"
             path.write_text(source, encoding="utf-8")
             functions, top, variables, arrays = parse(path, source)

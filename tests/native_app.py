@@ -43,7 +43,7 @@ class NativeApp:
                                                  ctypes.c_void_p, ctypes.c_size_t,
                                                  ctypes.POINTER(ctypes.c_size_t)]
         try:
-            self.temp = tempfile.TemporaryDirectory()
+            self.temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
             path = self.source_path or pathlib.Path(self.temp.name) / "input.ANVL"
             path.write_text(self.source, encoding="utf-8")
             functions, top, variables, arrays = parse(path, self.source)

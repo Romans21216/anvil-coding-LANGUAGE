@@ -13,7 +13,7 @@ from compiler.parser import parse
 @unittest.skipUnless(sys.platform == 'win32', 'native PE execution')
 class NativeArrayTests(unittest.TestCase):
     def run_source(self, source, fail_import=None):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp) / 'arrays.ANVL'
             path.write_text(source, encoding='utf-8')
             generator = NativeCodegen(path, *parse(path, source))
@@ -104,7 +104,7 @@ end
         result = self.run_source('fn(main)\n array buffer(2)\n output 5\nend\n','HeapFree')
         self.assertEqual(result.returncode,2)
         self.assertIn('release error',result.stdout)
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path=pathlib.Path(temp)/'unused.ANVL'
             source='fn(unused)\n array buffer(2)\n output array(buffer,0)\nend\nfn(main)\n output 7\nend\n'
             image=NativeCodegen(path,*parse(path,source)).generate()

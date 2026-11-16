@@ -92,7 +92,7 @@ end
             finally:
                 user.ReleaseDC(hwnd, dc)
 
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp) / "scene.ANVL"
             path.write_text(source, encoding="utf-8")
             functions, top, variables, arrays = parse(path, source)
@@ -196,7 +196,7 @@ end
 
     def test_backbuffer_allocation_failure_is_controlled(self):
         source = "scene 2d\nfn(draw)\n display rect(10,10,20,20)\nend\n"
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp) / "failure.ANVL"
             path.write_text(source, encoding="utf-8")
             functions, top, variables, arrays = parse(path, source)
@@ -227,7 +227,7 @@ end
             ("scene 2d\nclear rgba(0,0,0,20)\nfn(draw)\nend\n", "alpha 255"),
         ]
         for source, diagnostic in cases:
-            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(diagnostic=diagnostic), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 path = pathlib.Path(temp) / "unsupported.ANVL"
                 path.write_text(source, encoding="utf-8")
                 functions, top, variables, arrays = parse(path, source)

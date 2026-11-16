@@ -66,7 +66,7 @@ class FormatterTests(unittest.TestCase):
         self.assertEqual(format_source(source), expected)
 
     def test_formatted_source_still_compiles(self):
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
             path = pathlib.Path(temporary) / "messy.ANVL"
             path.write_text(MESSY, encoding="utf-8")
             result = subprocess.run(
@@ -82,7 +82,7 @@ class FormatterTests(unittest.TestCase):
             self.assertIn("no errors", check.stdout)
 
     def test_format_check_reports_unformatted_then_formatted(self):
-        with tempfile.TemporaryDirectory() as temporary:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
             path = pathlib.Path(temporary) / "messy.ANVL"
             path.write_text(MESSY, encoding="utf-8")
             unformatted = subprocess.run(

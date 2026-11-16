@@ -496,3 +496,12 @@ matching the scene-setup rule.
 
 `tests/test_native_x64.py` covers acceptance and the alpha-255 rejection; the
 `clear-inside-draw` matrix row now reads `builds` on both backends.
+
+### Windows temp-dir teardown races (all test files)
+
+A second suite hit the same `WinError 5` during `TemporaryDirectory` cleanup
+(`test_native_projects.test_clock_title_and_shutdown`, removing a just-built
+`input.exe`), after the assertions had passed. Every test file now uses
+`TemporaryDirectory(ignore_cleanup_errors=True)`, matching the earlier runtime
+fix, so a briefly locked executable cannot fail a green test. Behaviour checks
+are unchanged.

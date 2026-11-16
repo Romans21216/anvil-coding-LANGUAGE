@@ -129,7 +129,7 @@ class LinkerGarbageCollectionTests(unittest.TestCase):
 @unittest.skipUnless(os.name == "nt", "MSVC helper wrapping is Windows-specific")
 class MsvcBuildTests(unittest.TestCase):
     def test_environment_helper_uses_owned_temporary_directory(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             install = root / "Microsoft Visual Studio" / "2022" / "BuildTools"
             compiler = (

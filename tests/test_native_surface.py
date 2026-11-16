@@ -120,7 +120,7 @@ end
                  (1e308,1e308,1e308,1e308,20,30,40,255),
                  (1,2,8,7,40,50,60,-1),(1,2,8,7,10,20,30,1000)]
         expected = [(0,0,0)]*(width*height)
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp)/"guard.ANVL"
             source = "scene 2d\nfn(draw)\nend\n"
             path.write_text(source,encoding="utf-8")
@@ -183,7 +183,7 @@ end
         source = "scene 2d\nfn(draw)\n display rect(1,1,20,20) -rgba(100,200,40,128)\nend\n"
         original = X64Code.rip_call_import
         for failed in ("CreateDIBSection","null_bits","budget","GdiFlush"):
-            with self.subTest(failed=failed), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(failed=failed), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 path = pathlib.Path(temp)/"failure.ANVL"
                 path.write_text(source,encoding="utf-8")
                 generator = NativeCodegen(path,*parse(path,source))
