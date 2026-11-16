@@ -56,6 +56,31 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(len(codes), len(set(codes)))
 
 
+class LocationEdgeTests(unittest.TestCase):
+    """Real diagnostics use Windows paths, columns and quoted names with colons."""
+
+    def test_a_windows_path_with_spaces_is_stripped(self) -> None:
+        message = "C:" + chr(92) + "Users" + chr(92) + "a b" + chr(92) + "main.ANVL:12: unknown function 'helo'"
+        self.assertEqual(message_body(message), "unknown function 'helo'")
+        self.assertEqual(classify(message).code, "ANV104")
+
+    def test_a_forward_slash_path_is_stripped(self) -> None:
+        message = "C:/proj/main.ANVL:3: unexpected token '='"
+        self.assertEqual(message_body(message), "unexpected token '='")
+
+    def test_a_quoted_name_may_contain_a_colon(self) -> None:
+        message = "main.ANVL:12: unknown function 'a: b'"
+        self.assertEqual(message_body(message), "unknown function 'a: b'")
+        self.assertEqual(classify(message).code, "ANV104")
+
+    def test_a_message_without_a_location_is_unchanged(self) -> None:
+        self.assertEqual(message_body("unknown function 'helo'"), "unknown function 'helo'")
+
+    def test_a_warning_prefix_still_classifies(self) -> None:
+        message = "main.ANVL:4: warning: unknown name 'x' (variables are written var(x))"
+        self.assertEqual(classify(message).code, "ANV101")
+
+
 class ExplainTests(unittest.TestCase):
     def test_an_explanation_names_the_code_and_gives_a_fix(self) -> None:
         text = explain("ANV104")
