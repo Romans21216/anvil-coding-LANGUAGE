@@ -916,6 +916,7 @@ class NativeCodegen:
         self._needs_chr_error = False
         self._needs_frame_helper = False
         self._frame_base_offset = None
+        self._frame_helper_emitted = False
         self._needs_equal_helper = False
         self._join_counter = 0
         self._string_offsets: dict[str, int] = {}
@@ -2198,6 +2199,9 @@ class NativeCodegen:
 
     def _emit_frame_helper(self) -> None:
         """Bound the call chain: a stack past 512 KiB is a controlled error."""
+        if self._frame_helper_emitted:
+            return
+        self._frame_helper_emitted = True
         if self._frame_base_offset is None:
             self._frame_base_offset = self.reserve_data(bytes(8))
         self.code.label("function:anvil_frame_enter")
