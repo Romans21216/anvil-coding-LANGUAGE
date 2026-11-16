@@ -294,3 +294,17 @@ This log records verified implementation batches and is reconciled with Git befo
 - Native runtime regression covers 24-bit and top-down 32-bit files, malformed/oversized inputs, dimension queries, clipped/scaled/native drawing, destruction, reload and stale-handle rejection. `python -m unittest discover -s tests -q` passed 79 tests; MSVC release build of the example, npm extension validation, compileall, QA arithmetic and diff check pass.
 - Canonical issue #23 status: #201 PARTIALLY IMPLEMENTED (BMP only), #202 IN PROGRESS pending independent review, #209 IN PROGRESS pending independent review, #212 PARTIALLY IMPLEMENTED (scaling present, rotation missing).
 - Latest independent score remains **92/100 — FAIL against 98** on `c102604`; review of the sprite source candidate is pending.
+
+## Batch 14 — cross-backend number and text-slice parity (C8 findings)
+
+- Closed the eight open C8 findings from the strict Part 8 review with executed C/native comparisons rather than source inspection alone.
+- C8-1: the native `mid` helper clamps `start` and `count` in the double domain before converting to int64, and `right` clamps then truncates the count, so huge and fractional arguments match the C runtime (`mid("abcdef",1e300,2)` is empty, `right("abcdef",1.9)` is `f` on both).
+- C8-2: both parsers keep nine significant fraction digits and skip the rest; a six-value cross-backend probe is identical.
+- C8-3: the two test oracles that still encoded prefix parsing were corrected, a cross-backend parity test was added, and `LANGUAGE_SPEC.md` now states the whole-text rule explicitly.
+- C8-4/C8-8: the native parser accumulates the integer mantissa in double like C, stops consuming exponent digits at C's 1000 boundary, and both backends read a magnitude outside the finite binary64 range as 0.
+- C8-5: `chr(0)` is documented as empty text because Anvil text is zero-terminated, with matching tests on both backends.
+- C8-6: the build-cache key now hashes every top-level runtime `.c`/`.h` file and the compiler's size/mtime, with a key-version tag retiring old entries.
+- C8-7: `anvil_noise` rejects non-finite and out-of-range coordinates before any float-to-int conversion, using the native `[-2147483648, 2147483647)` interval; `fbm` inherits the per-octave check.
+- Files: `compiler/native_codegen.py`, `compiler/cli.py`, `runtime/anvil_runtime.c`, `docs/LANGUAGE_SPEC.md`, `README.md`, and the number/mid/chr/noise/cache test files.
+- Tests: `tests/test_number.py` 19 passed; the targeted cross-backend batch `test_number`, `test_number_format`, `test_text_functions`, `test_chrorrd`, `test_mid`, `test_noise_bounds`, `test_build_cache`, `test_native_x64` 97 passed.
+- Commits: `fdb6344` (C8-1/C8-3/C8-5), `214e200` (C8-7), `40bf89d` (C8-6), `e6513b4` (C8-2/C8-4/C8-8), `7545c4c` (README).
