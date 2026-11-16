@@ -142,6 +142,27 @@ double anvil_fbm(double x, double y, double z, int octaves, double lacunarity,
 double anvil_text_ord(const char *source);
 char *anvil_text_chr(double code);
 
+/* Images are baked into the module by the compiler. */
+typedef struct {
+  const char *path;
+  int width, height;
+  const unsigned int *pixels; /* 0xAARRGGBB */
+} AnvilWasmImage;
+
+void anvil_wasm_set_images(const AnvilWasmImage *images, int count);
+double anvil_image_load(const char *path);
+double anvil_image_width(double handle);
+double anvil_image_height(double handle);
+double anvil_image_draw(double handle, double x, double y);
+double anvil_image_draw_scaled(double handle, double x, double y, double width,
+                               double height);
+double anvil_image_draw_rotated(double handle, double cx, double cy,
+                                double degrees, double scale);
+double anvil_image_tint(double handle, double r, double g, double b);
+double anvil_image_flip(double handle, double x, double y);
+double anvil_image_destroy(double handle);
+const char *anvil_image_error(void);
+
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);
 void anvil_set_scene3d(int enabled);

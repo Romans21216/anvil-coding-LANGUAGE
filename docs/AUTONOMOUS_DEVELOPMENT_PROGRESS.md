@@ -669,3 +669,10 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - **Why:** 8.15 asked for allocation and VRAM capture, and the runtime already tracked these numbers internally for its budgets but never exposed them, so a game or a benchmark could not see them.
 - **Tests:** `tests/test_memory_builtins.py` loads an 8x8 and a 4x4 BMP and a 100-frame 8 kHz WAV, then asserts the exact sequence 0, 256, 320, 1, 64, 1, 0 for images, 2,304,000 for video, and 2,400 bytes for the decoded mono-to-48k-stereo sound, back to 0 after destroy.
 - **Wiring:** builtin arity and C names, the usage list, the TextMate grammar and the editor validator all know the four names; `npm test --prefix vscode-extension` passes.
+
+## Batch 59 — baked sprites in wasm (8.12)
+
+- **Why bake:** the browser cannot read a file synchronously, and `image_load` in the C runtime is synchronous. The wasm backend now decodes every literal `image_load("...")` BMP while compiling (24/32-bit, 8,192 px per side, 4 MiB total) and emits it as a C array plus a registration table; the runtime looks the path up in that table.
+- **Runtime:** 32 image slots with generational handles, `image_width/height/destroy/error`, and drawing forwarded to a host `image_draw` import with destination rectangle, angle, tint and flip. A computed path cannot be baked and returns 0 with an `image_error()` that says so; a missing literal file is a located build error.
+- **Hosts:** the page converts ARGB pixels once per image into an offscreen canvas with tint applied and draws scaled/flipped/rotated with smoothing disabled; the Node host records the draw plus an FNV checksum of the pixels.
+- **Verified:** a 2x2 BMP (red/green/blue/white) scaled to 200x200 and drawn 1:1 was sampled in Chromium — quadrants read (253,1,1), (1,255,1), (1,1,255), (255,255,255) and the 1:1 pixels read exactly red and green. `tests/test_wasm.py` asserts the recorded draw geometry, tint/flip fields, the exact pixel checksum, the missing-file build error and the computed-path runtime message. 22 passed.

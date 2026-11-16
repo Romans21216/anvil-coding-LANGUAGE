@@ -29,6 +29,12 @@ __attribute__((import_module("env"), import_name("save_write")))
 extern void anvil_host_save_write(const char *key, const char *value);
 __attribute__((import_module("env"), import_name("save_delete")))
 extern int anvil_host_save_delete(const char *key);
+__attribute__((import_module("env"), import_name("image_draw")))
+extern void anvil_host_image_draw(const unsigned int *pixels, int width,
+                                  int height, double dx, double dy, double dw,
+                                  double dh, double angle, int tint_r,
+                                  int tint_g, int tint_b, int flip_x,
+                                  int flip_y);
 
 #define ANVIL_TEXT_BUFFERS 64
 static char anvil_text_buffers[ANVIL_TEXT_BUFFERS][ANVIL_STR_CAP];
@@ -525,6 +531,169 @@ double anvil_rnd(double min_value, double max_value) {
     return (double)low;
   unsigned long long span = (unsigned long long)(high - low) + 1ULL;
   return (double)(low + (long long)(anvil_random_u64() % span));
+}
+
+/* ---- Images, baked at compile time --------------------------------------
+   The browser cannot read files synchronously, so the wasm backend bakes every
+   BMP referenced by a literal image_load() into the module and registers it
+   here. Drawing forwards the decoded pixels to the host, which owns the canvas
+   and the scaling/rotation. */
+enum {
+  ANVIL_WASM_IMAGE_SLOTS = 32,
+  ANVIL_WASM_IMAGE_STRIDE = 32
+};
+
+static const AnvilWasmImage *anvil_baked_images;
+static int anvil_baked_image_count;
+static int anvil_images_ready;
+static const char *anvil_image_error_text = "";
+
+typedef struct {
+  const AnvilWasmImage *source;
+  unsigned int generation;
+  int tint_r, tint_g, tint_b;
+  int flip_x, flip_y;
+  int used;
+} AnvilWasmImageSlot;
+
+static AnvilWasmImageSlot anvil_image_slots[ANVIL_WASM_IMAGE_SLOTS];
+
+void anvil_wasm_set_images(const AnvilWasmImage *images, int count) {
+  anvil_baked_images = images;
+  anvil_baked_image_count = count;
+}
+
+void anvil_wasm_register_images(void) __attribute__((weak));
+
+static void anvil_images_ensure(void) {
+  if (anvil_images_ready)
+    return;
+  anvil_images_ready = 1;
+  if (anvil_wasm_register_images)
+    anvil_wasm_register_images();
+}
+
+const char *anvil_image_error(void) { return anvil_image_error_text; }
+
+static AnvilWasmImageSlot *anvil_image_slot(double handle) {
+  if (!(handle >= 1.0) || handle > 1.0e9)
+    return NULL;
+  int index = (int)(handle - 1.0) % ANVIL_WASM_IMAGE_STRIDE;
+  unsigned int generation =
+      (unsigned int)((handle - 1.0) / ANVIL_WASM_IMAGE_STRIDE) + 1;
+  AnvilWasmImageSlot *slot = &anvil_image_slots[index];
+  if (!slot->used || slot->generation != generation)
+    return NULL;
+  return slot;
+}
+
+double anvil_image_load(const char *path) {
+  anvil_images_ensure();
+  for (int index = 0; index < anvil_baked_image_count; ++index) {
+    if (strcmp(anvil_baked_images[index].path, path) != 0)
+      continue;
+    for (int slot_index = 0; slot_index < ANVIL_WASM_IMAGE_SLOTS; ++slot_index) {
+      AnvilWasmImageSlot *slot = &anvil_image_slots[slot_index];
+      if (slot->used)
+        continue;
+      slot->used = 1;
+      slot->source = &anvil_baked_images[index];
+      slot->generation += 1;
+      slot->tint_r = 255;
+      slot->tint_g = 255;
+      slot->tint_b = 255;
+      slot->flip_x = 0;
+      slot->flip_y = 0;
+      anvil_image_error_text = "";
+      return (double)(slot->generation - 1) * ANVIL_WASM_IMAGE_STRIDE +
+             slot_index + 1;
+    }
+    anvil_image_error_text = "the image slots are full";
+    return 0.0;
+  }
+  anvil_image_error_text =
+      "the image was not baked into this build; only literal image_load() "
+      "paths are available in the wasm backend";
+  return 0.0;
+}
+
+double anvil_image_width(double handle) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  return slot ? (double)slot->source->width : 0.0;
+}
+
+double anvil_image_height(double handle) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  return slot ? (double)slot->source->height : 0.0;
+}
+
+double anvil_image_destroy(double handle) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  if (!slot)
+    return 0.0;
+  slot->used = 0;
+  slot->source = NULL;
+  return 1.0;
+}
+
+static void anvil_image_blit(AnvilWasmImageSlot *slot, double dx, double dy,
+                             double dw, double dh, double angle) {
+  if (!slot)
+    return;
+  anvil_host_image_draw(slot->source->pixels, slot->source->width,
+                        slot->source->height, dx, dy, dw, dh, angle,
+                        slot->tint_r, slot->tint_g, slot->tint_b, slot->flip_x,
+                        slot->flip_y);
+}
+
+double anvil_image_draw(double handle, double x, double y) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  if (!slot)
+    return 0.0;
+  anvil_image_blit(slot, x, y, (double)slot->source->width,
+                   (double)slot->source->height, 0.0);
+  return 1.0;
+}
+
+double anvil_image_draw_scaled(double handle, double x, double y, double width,
+                               double height) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  if (!slot || !(width == width) || !(height == height) || width == 0.0 ||
+      height == 0.0)
+    return 0.0;
+  anvil_image_blit(slot, x, y, width, height, 0.0);
+  return 1.0;
+}
+
+double anvil_image_draw_rotated(double handle, double cx, double cy,
+                                double degrees, double scale) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  if (!slot || !(degrees == degrees) || !(scale == scale) || scale == 0.0)
+    return 0.0;
+  double width = (double)slot->source->width * scale;
+  double height = (double)slot->source->height * scale;
+  anvil_image_blit(slot, cx - width * 0.5, cy - height * 0.5, width, height,
+                   degrees);
+  return 1.0;
+}
+
+double anvil_image_tint(double handle, double r, double g, double b) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  if (!slot)
+    return 0.0;
+  slot->tint_r = r < 0 ? 0 : r > 255 ? 255 : (int)r;
+  slot->tint_g = g < 0 ? 0 : g > 255 ? 255 : (int)g;
+  slot->tint_b = b < 0 ? 0 : b > 255 ? 255 : (int)b;
+  return 1.0;
+}
+
+double anvil_image_flip(double handle, double x, double y) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  if (!slot)
+    return 0.0;
+  slot->flip_x = x != 0.0;
+  slot->flip_y = y != 0.0;
+  return 1.0;
 }
 
 /* ---- Noise and characters ----------------------------------------------- */

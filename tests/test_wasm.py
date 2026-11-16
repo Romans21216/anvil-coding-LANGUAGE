@@ -133,9 +133,9 @@ class WasmRejectionTests(unittest.TestCase):
     def test_unsupported_builtins_name_the_call_site(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(root, "fn(main)\n  say image_load(\"pic.bmp\")\nend\ncall fn(main)\n")
+            result, _ = build(root, "fn(main)\n  say sound_load(\"beep.wav\")\nend\ncall fn(main)\n")
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("'image_load' is not available in the wasm backend yet", result.stderr)
+            self.assertIn("'sound_load' is not available in the wasm backend yet", result.stderr)
             self.assertIn(":2:", result.stderr)
 
 
@@ -673,6 +673,116 @@ class WasmNoiseTests(unittest.TestCase):
             self.assertNotEqual(run.returncode, 0)
             self.assertIn("Anvil chr out of range", run.stderr)
             self.assertEqual(run.stdout, "")
+
+
+
+def _write_quad_bmp(path: pathlib.Path) -> None:
+    import struct
+
+    rows = [
+        [(0, 0, 255), (255, 255, 255)],  # bottom row: blue, white
+        [(255, 0, 0), (0, 255, 0)],  # top row: red, green
+    ]
+    data = b""
+    for row in rows:
+        data += b"".join(bytes((b, g, r)) for (r, g, b) in row)
+        data += b"\x00" * ((4 - (2 * 3) % 4) % 4)
+    header = b"BM" + struct.pack("<IHHI", 54 + len(data), 0, 0, 54)
+    info = struct.pack("<IiiHHIIiiII", 40, 2, 2, 1, 24, 0, len(data), 2835, 2835, 0, 0)
+    path.write_bytes(header + info + data)
+
+
+_IMAGE_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "clear rgba(0, 0, 0, 255)",
+        "set var(pic) = 0",
+        "",
+        "fn(update)",
+        "  if var(pic) = 0",
+        '    set var(pic) = image_load("quad.bmp")',
+        "    set var(tint) = image_tint(var(pic), 128, 255, 64)",
+        "    set var(flip) = image_flip(var(pic), 1, 0)",
+        "  end",
+        "end",
+        "",
+        "fn(draw)",
+        "  set var(d) = image_draw_scaled(var(pic), 100, 100, 200, 200)",
+        "  set var(s) = image_draw(var(pic), 400, 100)",
+        "  set var(r) = image_draw_rotated(var(pic), 700, 300, 90, 2)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmImageTests(unittest.TestCase):
+    def test_literal_bmps_are_baked_and_drawn(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            _write_quad_bmp(root / "quad.bmp")
+            result, out = build(root, _IMAGE_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            images = [op for op in ops if op[0] == "image"]
+            self.assertEqual(len(images), 3)
+            self.assertEqual(images[0], ["image", 2, 2, 100.0, 100.0, 200.0, 200.0, 0.0, 128, 255, 64, 1, 0, 1096806379])
+            self.assertEqual(images[1][3:7], [400.0, 100.0, 2.0, 2.0])
+            self.assertEqual(images[2][3:8], [698, 298, 4, 4, 90])
+
+    def test_a_missing_bmp_is_a_located_build_error(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, _ = build(
+                root,
+                'scene 2d\n\nfn(draw)\n  set var(p) = image_load("nope.bmp")\nend\n',
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("image_load cannot read \"nope.bmp\"", result.stderr)
+            self.assertIn(":4:", result.stderr)
+
+    def test_a_computed_path_reports_the_bake_limit(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "scene 2d",
+                    'set var(name) = "quad.bmp"',
+                    "set var(pic) = 0",
+                    "",
+                    "fn(update)",
+                    "  if var(pic) = 0",
+                    "    set var(pic) = image_load(var(name))",
+                    "    say image_error()",
+                    "  end",
+                    "end",
+                    "",
+                    "fn(draw)",
+                    "  display rect(0, 0, 1, 1) -rgb(0, 0, 0)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertIn("only literal image_load() paths", run.stdout)
 
 
 if __name__ == "__main__":

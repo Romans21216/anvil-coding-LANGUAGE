@@ -60,6 +60,9 @@ Supported today:
 - input and time: `time()`, `delta()`, `pressed(key)`, `held(key)`,
   `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`,
   `mouse_wheel()`
+- images: `image_load`, `image_width`, `image_height`, `image_draw`,
+  `image_draw_scaled`, `image_draw_rotated`, `image_tint`, `image_flip`,
+  `image_destroy`, `image_error` (literal paths baked at build time)
 - saves: `save_number`, `load_number`, `save_text`, `load_text`,
   `save_exists`, `save_delete`, `save_error`
 
@@ -100,6 +103,24 @@ window.anvil.exports.anvil_key(65, 1);
 window.anvil.exports.anvil_frame(16);
 ```
 
+## Images
+
+A browser cannot read files synchronously, so the wasm backend bakes images at
+build time instead of loading them at run time. Every `image_load("...")` with a
+literal string is decoded while compiling (24- and 32-bit BMP, 8,192 pixels per
+side, 4 MiB of baked pixels in total) and emitted as a C array; a computed path
+cannot be baked and reports that through `image_error()` at run time, and a
+missing file is a located build error.
+
+Drawing forwards the baked pixels to the host, which owns the canvas: the page
+converts ARGB pixels once per image into an offscreen canvas (with the tint
+applied) and draws it scaled, flipped or rotated with smoothing disabled, so
+sprite art stays crisp. The Node host records the draw with a checksum of the
+pixels, which is what the tests assert.
+
+Not implemented yet: `image_draw_region` (atlas cells), 8/4-bit BMP, and any
+image loaded through a non-literal path.
+
 ## Saves
 
 Saves work in the browser without files. The host page backs them with
@@ -139,6 +160,8 @@ identical.
 - `sin`/`cos` lose accuracy for arguments far outside the reduced range (the
   test pins 1e6 radians, which still matches libm to six decimals); `tan` is not
   available yet.
+- Only literal `image_load()` paths are baked; `image_draw_region` and 8-bit
+  BMPs are not supported yet.
 - `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
   same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the

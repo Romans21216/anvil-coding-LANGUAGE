@@ -63,6 +63,15 @@ const imports = {
       const view = new Uint8Array(memory.buffer, pointer, length);
       ops.push(["text", x, y, utf8.decode(view), r, g, b, a]);
     },
+    image_draw(pointer, width, height, dx, dy, dw, dh, angle, tintR, tintG, tintB, flipX, flipY) {
+      const source = new Uint32Array(memory.buffer, pointer, width * height);
+      let hash = 2166136261 >>> 0;
+      for (let index = 0; index < source.length; index++) {
+        hash ^= source[index];
+        hash = Math.imul(hash, 16777619) >>> 0;
+      }
+      ops.push(["image", width, height, dx, dy, dw, dh, angle, tintR, tintG, tintB, flipX, flipY, hash]);
+    },
     present() {
       ops.push(["present"]);
     },

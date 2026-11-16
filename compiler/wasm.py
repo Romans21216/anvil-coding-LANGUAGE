@@ -68,6 +68,16 @@ ALLOWED_BUILTINS = {
     "chr",
     "noise",
     "fbm",
+    "image_load",
+    "image_width",
+    "image_height",
+    "image_draw",
+    "image_draw_scaled",
+    "image_draw_rotated",
+    "image_tint",
+    "image_flip",
+    "image_destroy",
+    "image_error",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
@@ -90,6 +100,7 @@ HOST_PAGE = """<!doctype html>
 <script>
 const canvas = document.getElementById("screen");
 const context = canvas.getContext("2d");
+context.imageSmoothingEnabled = false;
 const errors = document.getElementById("out");
 const utf8 = new TextDecoder();
 function rgba(r, g, b, a) {
@@ -104,6 +115,7 @@ async function start() {
     const module = await WebAssembly.compile(bytes);
     let memory = null;
     let app = null;
+    const imageCache = new Map();
     const readCString = (pointer) => {
       const bytes = new Uint8Array(memory.buffer);
       let end = pointer;
@@ -145,6 +157,35 @@ async function start() {
         context.font = "20px 'Segoe UI', system-ui, sans-serif";
         context.textBaseline = "top";
         context.fillText(utf8.decode(view), x, y);
+      },
+      image_draw(pointer, width, height, dx, dy, dw, dh, angle, tintR, tintG, tintB, flipX, flipY) {
+        const source = new Uint32Array(memory.buffer, pointer, width * height);
+        const key = pointer;
+        let offscreen = imageCache.get(key);
+        if (!offscreen) {
+          offscreen = document.createElement("canvas");
+          offscreen.width = width;
+          offscreen.height = height;
+          const surface = offscreen.getContext("2d");
+          const image = surface.createImageData(width, height);
+          const out = new Uint32Array(image.data.buffer);
+          for (let index = 0; index < width * height; index++) {
+            const pixel = source[index];
+            const a = (pixel >>> 24) & 255;
+            const r = Math.round((((pixel >>> 16) & 255) * tintR) / 255);
+            const g = Math.round((((pixel >>> 8) & 255) * tintG) / 255);
+            const b = Math.round(((pixel & 255) * tintB) / 255);
+            out[index] = ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+          }
+          surface.putImageData(image, 0, 0);
+          imageCache.set(key, offscreen);
+        }
+        context.save();
+        context.translate(dx + dw / 2, dy + dh / 2);
+        if (angle) context.rotate((angle * Math.PI) / 180);
+        context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+        context.drawImage(offscreen, -dw / 2, -dh / 2, dw, dh);
+        context.restore();
       },
       present() {},
       save_read(pointer, out, capacity) {
@@ -276,6 +317,93 @@ def validate(
     return used
 
 
+
+IMAGE_LOAD = re.compile(r'image_load\(\s*"((?:\\.|[^"\\])*)"')
+MAX_BAKED_IMAGE_BYTES = 4 * 1024 * 1024
+
+
+def _bmp_pixels(path: pathlib.Path) -> tuple[int, int, list[int]]:
+    """Decode an uncompressed 24/32-bit BMP into 0xAARRGGBB pixels."""
+    data = path.read_bytes()
+    if len(data) < 54 or data[:2] != b"BM":
+        raise ValueError("not a BMP file")
+    offset = int.from_bytes(data[10:14], "little")
+    width = int.from_bytes(data[18:22], "little", signed=True)
+    height = int.from_bytes(data[22:26], "little", signed=True)
+    bits = int.from_bytes(data[28:30], "little")
+    if bits not in (24, 32):
+        raise ValueError(f"{bits}-bit BMPs are not supported (24 or 32 only)")
+    if width <= 0 or height == 0 or width > 8192 or abs(height) > 8192:
+        raise ValueError("the image is outside the 8,192-pixel limit")
+    top_down = height < 0
+    rows = abs(height)
+    stride = (width * (bits // 8) + 3) & ~3
+    if offset + stride * rows > len(data):
+        raise ValueError("the file is too short for its declared size")
+    pixels: list[int] = []
+    for row in range(rows):
+        source_row = row if top_down else rows - row - 1
+        base = offset + source_row * stride
+        for column in range(width):
+            at = base + column * (bits // 8)
+            blue, green, red = data[at], data[at + 1], data[at + 2]
+            alpha = data[at + 3] if bits == 32 else 255
+            pixels.append((alpha << 24) | (red << 16) | (green << 8) | blue)
+    return width, rows, pixels
+
+
+def bake_images(source_path: pathlib.Path, text: str) -> str:
+    """Bake literal image_load() BMPs into C arrays the runtime can serve."""
+    images: dict[str, tuple[int, int, list[int]]] = {}
+    total_bytes = 0
+    for match in IMAGE_LOAD.finditer(text):
+        literal = match.group(1).replace("\\\\", "\\")
+        if literal in images:
+            continue
+        target = (source_path.parent / literal).resolve()
+        line = text.count("\n", 0, match.start()) + 1
+        try:
+            width, height, pixels = _bmp_pixels(target)
+        except FileNotFoundError:
+            raise CompileError(
+                f"{source_path}:{line}: image_load cannot read \"{literal}\""
+            ) from None
+        except ValueError as error:
+            raise CompileError(
+                f"{source_path}:{line}: image_load \"{literal}\": {error}"
+            ) from None
+        total_bytes += len(pixels) * 4
+        if total_bytes > MAX_BAKED_IMAGE_BYTES:
+            raise CompileError(
+                f"{source_path}:{line}: baked images exceed the 4 MiB budget"
+            )
+        images[literal] = (width, height, pixels)
+    if not images:
+        return "\nvoid anvil_wasm_register_images(void) {}\n"
+    chunks = ["\n/* Baked images: the browser cannot read files synchronously. */"]
+    for index, (_literal, (width, height, pixels)) in enumerate(images.items()):
+        chunks.append(f"static const unsigned int anvil_baked_pixels_{index}[] = {{")
+        row: list[str] = []
+        for pixel in pixels:
+            row.append(f"0x{pixel:08x}u")
+            if len(row) == 12:
+                chunks.append("  " + ", ".join(row) + ",")
+                row = []
+        if row:
+            chunks.append("  " + ", ".join(row) + ",")
+        chunks.append("};")
+    chunks.append("static const AnvilWasmImage anvil_baked_images[] = {")
+    for index, (literal, (width, height, _pixels)) in enumerate(images.items()):
+        escaped = literal.replace("\\", "\\\\")
+        chunks.append(f'  {{"{escaped}", {width}, {height}, anvil_baked_pixels_{index}}},')
+    chunks.append("};")
+    chunks.append(
+        "void anvil_wasm_register_images(void) {\n"
+        f"  anvil_wasm_set_images(anvil_baked_images, {len(images)});\n"
+        "}\n"
+    )
+    return "\n".join(chunks)
+
 def build(
     source_path: pathlib.Path,
     functions,
@@ -299,6 +427,7 @@ def build(
         runtime_header="anvil_wasm.h",
         minimal_includes=True,
     )
+    generated += bake_images(source_path, source_path.read_text(encoding="utf-8"))
     if emit_c_path is not None:
         emit_c_path.parent.mkdir(parents=True, exist_ok=True)
         emit_c_path.write_text(generated, encoding="utf-8")
