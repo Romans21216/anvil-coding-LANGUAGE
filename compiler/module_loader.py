@@ -96,7 +96,7 @@ class ProgramLoader:
                 with canonical.open("rb") as stream:
                     payload = stream.read(limits.MAX_SOURCE_BYTES-self.source_bytes+1)
                 if len(payload)+self.source_bytes > limits.MAX_SOURCE_BYTES:
-                    raise CompileError(f"{where}: include source exceeds the 4 MiB budget")
+                    raise CompileError(f"{where}: source exceeds the 4 MiB budget (this file plus its includes)")
                 text = payload.decode("utf-8-sig")
                 size = len(payload)
             except (OSError,UnicodeError) as error:
@@ -105,7 +105,7 @@ class ProgramLoader:
             size = len(text.encode("utf-8"))
         self.source_bytes += size
         if self.source_bytes > limits.MAX_SOURCE_BYTES:
-            raise CompileError(f"{where}: include source exceeds the 4 MiB budget")
+            raise CompileError(f"{where}: source exceeds the 4 MiB budget (this file plus its includes)")
         unit = parse_syntax(
             path, text,
             local_array_elements=self.local_array_elements,
@@ -157,7 +157,7 @@ class ProgramLoader:
         unit,size = self.read(path,text,where)
         self.expanded_bytes += size
         if self.expanded_bytes > limits.MAX_SOURCE_BYTES:
-            raise CompileError(f"{where}: expanded include source exceeds the 4 MiB budget")
+            raise CompileError(f"{where}: expanded source exceeds the 4 MiB budget (this file plus its includes)")
         self.seen.add(key)
         self.active.append(canonical)
         for name,fn in unit.functions.items():

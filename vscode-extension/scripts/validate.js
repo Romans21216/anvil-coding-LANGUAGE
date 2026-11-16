@@ -150,6 +150,12 @@ async function main() {
   expect('set var(ok) = image_destroy(var(handle))', 'image_destroy', 'support.function.anvil');
   expect('set var(ok) = image_draw(var(handle), 1, 2)', 'image_draw', 'support.function.anvil');
   expect('set var(ok) = image_draw_scaled(var(handle), 1, 2, 4, 5)', 'image_draw_scaled', 'support.function.anvil');
+  expect('set var(clip) = sound_load("assets/jump.wav")', 'sound_load', 'support.function.anvil');
+  expect('set var(playing) = sound_play(var(clip))', 'sound_play', 'support.function.anvil');
+  expect('set var(stopped) = sound_stop()', 'sound_stop', 'support.function.anvil');
+  expect('set var(rate) = sound_rate(var(clip))', 'sound_rate', 'support.function.anvil');
+  expect('set var(bytes) = sound_length(var(clip))', 'sound_length', 'support.function.anvil');
+  expect('expect(2 + 2, 4)', 'expect', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
   expect('set var(size) = 3 + 4', '+', 'keyword.operator.anvil');

@@ -848,3 +848,26 @@ on this machine.
 - Documented in `docs/ENGINE.md`; `docs/NATIVE_X64_COMPILER_MIGRATION.md` now
   says plainly that the native backend has no such guard and dies with the OS
   code, instead of the vaguer "unbounded recursion remains unsupported".
+
+## Editor grammar catches up with the language
+
+Part 8 requires the editor grammar to agree with actual behaviour. Adding the
+audio builtins and `expect` had left the TextMate grammar behind, so
+`sound_load(...)` and friends were painted as plain identifiers.
+
+- `vscode-extension/syntaxes/anvil.tmLanguage.json` now scopes `sound_load`,
+  `sound_play`, `sound_stop`, `sound_rate` and `sound_length` as
+  `support.function.anvil`, beside `image_*` and the physics calls.
+- `vscode-extension/scripts/validate.js` gained assertions for all five audio
+  calls plus `expect`, so the grammar cannot silently drift again; the existing
+  PASS run still validates the manifest, indentation and folding rules.
+- While checking parser bounds I found the 4 MiB source limit reported
+  "include source exceeds the 4 MiB budget" even for the top-level file. It now
+  reads "source exceeds the 4 MiB budget (this file plus its includes)", which
+  matches what is actually measured. `test_selective_includes` asserted the old
+  wording, so it now checks the new text *and* the `main.ANVL:2:` location
+  instead of the message alone.
+
+Bounds confirmed by probing (no change needed): statement nesting stops at 128
+blocks with a located error, expression nesting at 64 levels, and the size
+budget is enforced before parsing.

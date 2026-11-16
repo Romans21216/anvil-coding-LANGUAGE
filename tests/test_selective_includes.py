@@ -194,8 +194,10 @@ end
         library = self.write("a.ANVL",'fn(value)\n output 1\nend\n'+'# padding\n'*40)
         source='include fn(value) - "a.ANVL"\ninclude "a.ANVL"\nfn(main)\n output 0\nend\n'
         physical=len(source.encode())+library.stat().st_size
-        with mock.patch("compiler.modules.MAX_SOURCE_BYTES",physical+1),self.assertRaisesRegex(CompileError,"expanded include source"):
+        with mock.patch("compiler.modules.MAX_SOURCE_BYTES",physical+1),self.assertRaises(CompileError) as caught:
             self.program(source)
+        self.assertIn("main.ANVL:2:",str(caught.exception))
+        self.assertIn("expanded source exceeds the 4 MiB budget",str(caught.exception))
         library.write_text('fn(value)\n output '+'('*65+'1'+')'*65+'\nend\n',encoding="utf-8")
         path,program=self.program('include fn(value) - "a.ANVL"\nfn(main)\n output call fn(value - a)\nend\n')
         for generate in (lambda:NativeCodegen(path,*program).generate(),lambda:emit_c(path,*program)):
