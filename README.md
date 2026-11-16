@@ -60,6 +60,16 @@ npm test --prefix vscode-extension
 
 The numeric sample builds and prints `17`. The starter world builds into a native Windows executable. Run it to open the game window.
 
+Regression budgets live in `tools/benchmarks/budgets.json` and are checked against medians from the same workload:
+
+```powershell
+python tools/benchmark.py                # refresh docs/BENCHMARKS.md
+python tools/benchmark.py --check-budget # exit 1 when a metric regresses past tolerance
+python tools/benchmark.py --write-budget # re-record the agreed baseline
+```
+
+A metric is allowed `median * tolerance + slack`, so scheduling noise does not fail the build; a changed checksum also fails the check, because it means the workload printed a different answer.
+
 ## Files
 
 - [Language guide](docs/LANGUAGE.md)

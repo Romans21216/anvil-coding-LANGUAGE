@@ -7,6 +7,13 @@ checksum so changes can be compared on the same workload.
 
     python tools/benchmark.py                # write docs/BENCHMARKS.md
     python tools/benchmark.py --runs 20      # more samples
+    python tools/benchmark.py --check-budget # fail if a metric regressed
+    python tools/benchmark.py --write-budget # re-record the agreed budget
+
+Part 8 GATE 6 also asks for regression budgets that fail CI when a measured
+metric moves past the agreed threshold. The budget lives in
+`tools/benchmarks/budgets.json` and is compared against medians, never single
+runs, so ordinary scheduling noise does not break the build.
 """
 
 from __future__ import annotations
@@ -25,8 +32,20 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 WORKLOAD = ROOT / "tools" / "benchmarks" / "console_workload.ANVL"
+BUDGETS = ROOT / "tools" / "benchmarks" / "budgets.json"
 STARTUP_SOURCE = "fn(main)\n output 1\nend\n"
 BACKENDS = ("c", "native")
+
+# Part 8 GATE 6: "Set regression budgets; fail CI when agreed thresholds
+# regress beyond noise." Timings are noisy, so each metric gets a ratio plus an
+# absolute slack. Byte size is deterministic, so it gets a tight ratio and no
+# slack. A budget is the *allowed* value, not the observed median.
+METRICS = {
+    "build_seconds": {"tolerance": 1.35, "slack": 0.05, "unit": "s"},
+    "run_seconds": {"tolerance": 1.50, "slack": 0.010, "unit": "s"},
+    "startup_seconds": {"tolerance": 1.50, "slack": 0.005, "unit": "s"},
+    "exe_bytes": {"tolerance": 1.02, "slack": 0.0, "unit": "B"},
+}
 
 
 def _machine() -> dict:
@@ -172,6 +191,157 @@ def render(results: dict) -> str:
             "that is a semantic defect, not a timing difference.**"
         )
         lines.append("")
+    if BUDGETS.exists():
+        budget = load_budgets()
+        rows, missing = compare_budget(results, budget)
+        lines.append(
+            render_budget(rows, missing, budget, check_checksums(results, budget))
+        )
+    return "\n".join(lines)
+
+
+def _metric_value(backend: dict, metric: str) -> float:
+    value = backend[metric]
+    if isinstance(value, dict):
+        return float(value["median"])
+    return float(value)
+
+
+def flatten(results: dict) -> dict[str, dict[str, float]]:
+    """Return ``{backend: {metric: median}}`` from a :func:`measure` result."""
+    return {
+        backend: {metric: _metric_value(data, metric) for metric in METRICS}
+        for backend, data in results["backends"].items()
+    }
+
+
+def load_budgets(path: pathlib.Path = BUDGETS) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_budget(
+    results: dict,
+    path: pathlib.Path = BUDGETS,
+    metrics: dict = METRICS,
+) -> dict:
+    """Record the current medians as the regression budget."""
+    budget = {
+        "note": (
+            "Regression budget for Part 8 GATE 6. Backend values are medians "
+            "measured by `python tools/benchmark.py --write-budget`; a metric is "
+            "allowed `median * tolerance + slack`. Re-record deliberately when a "
+            "change is meant to move the baseline, and keep the same workload, "
+            "build settings and machine when comparing."
+        ),
+        "machine": results["machine"],
+        "metrics": {name: dict(spec) for name, spec in metrics.items()},
+        "backends": flatten(results),
+        "checksums": {
+            backend: data.get("checksum")
+            for backend, data in results["backends"].items()
+        },
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(budget, indent=2) + "\n", encoding="utf-8")
+    return budget
+
+
+def allowed_value(base: float, spec: dict) -> float:
+    """Return the allowed value for a budget base under one metric's spec."""
+    return float(base) * float(spec.get("tolerance", 1.35)) + float(spec.get("slack", 0.0))
+
+
+def compare_budget(results: dict, budget: dict) -> tuple[list[dict], list[str]]:
+    """Compare measured medians against the budget.
+
+    Returns ``(rows, missing)`` where each row records one metric comparison and
+    ``missing`` names backends the budget does not cover. A row is ``ok`` when
+    ``actual <= budget * tolerance + slack``.
+    """
+    declared = budget.get("backends") or {}
+    metrics = budget.get("metrics") or METRICS
+    rows: list[dict] = []
+    missing: list[str] = []
+    for backend, measured in flatten(results).items():
+        base = declared.get(backend)
+        if not base:
+            missing.append(backend)
+            continue
+        for metric in METRICS:
+            if metric not in base:
+                continue
+            spec = metrics.get(metric) or METRICS[metric]
+            allowed = allowed_value(base[metric], spec)
+            actual = measured[metric]
+            rows.append(
+                {
+                    "backend": backend,
+                    "metric": metric,
+                    "unit": spec.get("unit", ""),
+                    "budget": float(base[metric]),
+                    "allowed": allowed,
+                    "actual": actual,
+                    "ok": actual <= allowed,
+                }
+            )
+    return rows, missing
+
+
+def check_checksums(results: dict, budget: dict) -> list[str]:
+    """Return one line per backend whose printed checksum drifted from the budget."""
+    expected = budget.get("checksums") or {}
+    mismatches: list[str] = []
+    for backend, data in results["backends"].items():
+        want = expected.get(backend)
+        if want is None:
+            continue
+        got = data.get("checksum")
+        if got != want:
+            mismatches.append(f"{backend}: printed {got!r}, budget expects {want!r}")
+    return mismatches
+
+
+def render_budget(
+    rows: list[dict],
+    missing: list[str],
+    budget: dict,
+    checksum_mismatches: list[str] | None = None,
+) -> str:
+    metrics = budget.get("metrics") or METRICS
+    lines = [
+        "## Regression budgets",
+        "",
+        "Checked by `python tools/benchmark.py --check-budget`, which exits non-zero",
+        "when a measured median exceeds its allowed value. A metric is allowed",
+        "`median * tolerance + slack`, so ordinary scheduling noise does not fail",
+        "the build.",
+        "",
+        "| Metric | Tolerance | Slack |",
+        "|---|---|---|",
+    ]
+    for metric, spec in metrics.items():
+        lines.append(
+            f"| {metric} | ×{float(spec.get('tolerance', 1.35)):.2f} | "
+            f"{float(spec.get('slack', 0.0)):g} {spec.get('unit', '')} |"
+        )
+    lines.append("")
+    lines.append("| Backend | Metric | Budget | Allowed | Measured | Status |")
+    lines.append("|---|---|---|---|---|---|")
+    for row in rows:
+        lines.append(
+            f"| {row['backend']} | {row['metric']} | {row['budget']:.4g} | "
+            f"{row['allowed']:.4g} | {row['actual']:.4g} | "
+            f"{'ok' if row['ok'] else '**over budget**'} |"
+        )
+    for backend in missing:
+        lines.append(f"| {backend} | *all* | — | — | — | **no budget recorded** |")
+    if not rows and not missing:
+        lines.append("| *none* | *none* | — | — | — | no budget file |")
+    lines.append("")
+    for mismatch in checksum_mismatches or []:
+        lines.append(f"**Checksum regression:** {mismatch}")
+    if checksum_mismatches:
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -183,18 +353,72 @@ def main() -> int:
         "--write",
         type=pathlib.Path,
         default=ROOT / "docs" / "BENCHMARKS.md",
-        help="markdown path to write (default docs/BENCHMARKS.md)",
+        help="markdown report to write",
+    )
+    parser.add_argument(
+        "--budget",
+        type=pathlib.Path,
+        default=BUDGETS,
+        help="regression budget file",
+    )
+    parser.add_argument(
+        "--write-budget",
+        action="store_true",
+        help="record the current medians as the regression budget",
+    )
+    parser.add_argument(
+        "--check-budget",
+        action="store_true",
+        help="fail when a measured median exceeds the recorded budget",
     )
     args = parser.parse_args()
+
     results = measure(args.runs)
     if args.json:
-        json.dump(results, sys.stdout, indent=2)
-        sys.stdout.write("\n")
+        print(json.dumps(results, indent=2))
+    else:
+        report = render(results)
+        args.write.parent.mkdir(parents=True, exist_ok=True)
+        args.write.write_text(report, encoding="utf-8")
+        print(report)
+        print(f"wrote {args.write}")
+
+    if args.write_budget:
+        budget = write_budget(results, args.budget)
+        print(f"wrote budget {args.budget} from {len(budget['backends'])} backend(s)")
         return 0
-    text = render(results)
-    args.write.write_text(text, encoding="utf-8")
-    print(text)
-    print(f"wrote {args.write}")
+
+    if args.check_budget:
+        if not args.budget.exists():
+            print(
+                f"no budget file at {args.budget}; record one with --write-budget",
+                file=sys.stderr,
+            )
+            return 2
+        budget = load_budgets(args.budget)
+        rows, missing = compare_budget(results, budget)
+        checksum_failures = check_checksums(results, budget)
+        failures = [row for row in rows if not row["ok"]]
+        for row in rows:
+            state = "ok" if row["ok"] else "OVER BUDGET"
+            print(
+                f"{row['backend']:8} {row['metric']:16} "
+                f"budget {row['budget']:.4g} allowed {row['allowed']:.4g} "
+                f"measured {row['actual']:.4g}  {state}"
+            )
+        for backend in missing:
+            print(f"{backend:8} *                no budget recorded", file=sys.stderr)
+        for mismatch in checksum_failures:
+            print(f"checksum regression: {mismatch}", file=sys.stderr)
+        if failures or missing or checksum_failures:
+            print(
+                f"benchmark budget failed: {len(failures)} metric(s) over budget, "
+                f"{len(missing)} backend(s) unrecorded, "
+                f"{len(checksum_failures)} checksum regression(s)",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"benchmark budget ok: {len(rows)} metric(s) within budget")
     return 0
 
 

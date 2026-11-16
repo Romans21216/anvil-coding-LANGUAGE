@@ -17,5 +17,30 @@ codegen changes to see whether the workload moved.
 
 | Backend | Build median (s) | Build min–max (s) | EXE bytes | Run median (s) | Run min–max (s) | Startup median (s) | Checksum |
 |---|---|---|---|---|---|---|---|
-| c | 1.320 | 1.316–1.343 | 288768 | 0.013 | 0.013–0.180 | 0.006 | `36886024` |
-| native | 0.092 | 0.091–0.099 | 70144 | 0.005 | 0.005–0.089 | 0.003 | `36886024` |
+| c | 1.326 | 1.312–1.332 | 291840 | 0.013 | 0.012–0.173 | 0.006 | `36886024` |
+| native | 0.093 | 0.090–0.104 | 70656 | 0.005 | 0.005–0.088 | 0.003 | `36886024` |
+
+## Regression budgets
+
+Checked by `python tools/benchmark.py --check-budget`, which exits non-zero
+when a measured median exceeds its allowed value. A metric is allowed
+`median * tolerance + slack`, so ordinary scheduling noise does not fail
+the build.
+
+| Metric | Tolerance | Slack |
+|---|---|---|
+| build_seconds | ×1.35 | 0.05 s |
+| run_seconds | ×1.50 | 0.01 s |
+| startup_seconds | ×1.50 | 0.005 s |
+| exe_bytes | ×1.02 | 0 B |
+
+| Backend | Metric | Budget | Allowed | Measured | Status |
+|---|---|---|---|---|---|
+| c | build_seconds | 1.32 | 1.832 | 1.326 | ok |
+| c | run_seconds | 0.013 | 0.0295 | 0.01285 | ok |
+| c | startup_seconds | 0.006 | 0.014 | 0.005626 | ok |
+| c | exe_bytes | 2.888e+05 | 2.945e+05 | 2.918e+05 | ok |
+| native | build_seconds | 0.092 | 0.1742 | 0.09251 | ok |
+| native | run_seconds | 0.005 | 0.0175 | 0.005108 | ok |
+| native | startup_seconds | 0.003 | 0.0095 | 0.003341 | ok |
+| native | exe_bytes | 7.014e+04 | 7.155e+04 | 7.066e+04 | ok |
