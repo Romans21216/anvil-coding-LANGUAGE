@@ -41,6 +41,31 @@ class MemoryBudgetTests(unittest.TestCase):
             self.assertGreater(result["exe_bytes"], 50000)
             self.assertGreaterEqual(result["run_peak_mb"], 5.0)
 
+    def test_asset_scene_reports_resource_bytes(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            report = pathlib.Path(temp) / "assets.json"
+            run = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--scene",
+                    "assets",
+                    "--json",
+                    str(report),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            result = json.loads(report.read_text(encoding="utf-8"))["results"][0]
+            self.assertEqual(result["scene"], "assets")
+            self.assertEqual(result["image_bytes"], 8 * 64 * 64 * 4)
+            self.assertEqual(result["video_bytes"], 960 * 600 * 4)
+            self.assertGreater(result["audio_bytes"], 0)
+            self.assertEqual(result["image_bytes_after_destroy"], 7 * 64 * 64 * 4)
+            self.assertGreater(result["audio_bytes"], result["audio_bytes_after_destroy"])
+
     def test_budgets_hold_for_one_scene(self) -> None:
         run = subprocess.run(
             [

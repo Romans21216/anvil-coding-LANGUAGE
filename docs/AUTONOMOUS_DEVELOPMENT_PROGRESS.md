@@ -741,3 +741,10 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - **Tool:** `tools/capability_matrix.py` now builds and runs every case on the wasm backend as well, adding a third column and a summary that counts all-three, C+native and C+wasm coverage. Build rejections report the first real compiler error line rather than the "wasm build failed:" header.
 - **Two real gaps found by measuring:** `lists` failed to link because `anvil_list_get` existed in the C runtime but not in the wasm shim, and `math-builtins` failed because `min`/`max` lower to `fmin`/`fmax` libcalls and the shim had no declarations. Both are fixed; the list error message reproduces the C runtime's `path:line: list index N is outside 0..M` text.
 - **Result:** 12 of 14 cases now run on all three backends; 13 of 14 run on C and wasm, with only `physics-body` refused in wasm (physics is not part of the browser subset). `image-load` runs in wasm thanks to the baked-image support, while native still refuses it.
+
+## Batch 70 — asset memory scene (8.15)
+
+- **Tool:** `tools/bench_memory.py` gained an `assets` scene: eight generated 64x64 BMPs and two 0.25 s 8 kHz WAVs are loaded, the program prints `memory_images()`, `memory_audio()` and `memory_video()`, waits 0.3 s so the sampler sees the peak, destroys one image and one sound and prints both counters again.
+- **Measured:** images 131,072 B (8 x 64 x 64 x 4), audio 576,000 B (two mono 8 kHz clips resampled to 48 kHz stereo), video 2,304,000 B; runtime peak 5.2 MB with the assets live, against 1.9 MB without the wait — the wait is what makes the peak visible, which is worth knowing when reading the number.
+- **Budgets:** `tools/mem_budgets.json` now records exact byte budgets for the asset counters alongside the per-scene RSS budgets, and `--check` fails if a load leaks or a size changes.
+- **Tests:** `tests/test_memory_budget.py` asserts the exact image and video bytes, a positive audio count, and that destroying one image and one sound reduces each counter. 4 passed.

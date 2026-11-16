@@ -27,6 +27,9 @@ import sys
 import tempfile
 import time
 
+import math
+import struct
+
 import psutil
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -66,11 +69,89 @@ def process_tree_bytes(root_pid: int) -> int:
     return total
 
 
-def measure_compile(name: str, root: pathlib.Path) -> dict[str, float]:
+ASSET_SCENE = "assets"
+ASSET_IMAGES = 8
+ASSET_IMAGE_SIDE = 64
+ASSET_SOUNDS = 2
+ASSET_SOUND_FRAMES = 12000
+ASSET_SOUND_RATE = 8000
+
+ASSET_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        '  set var(a0) = image_load("a0.bmp")',
+        '  set var(a1) = image_load("a1.bmp")',
+        '  set var(a2) = image_load("a2.bmp")',
+        '  set var(a3) = image_load("a3.bmp")',
+        '  set var(a4) = image_load("a4.bmp")',
+        '  set var(a5) = image_load("a5.bmp")',
+        '  set var(a6) = image_load("a6.bmp")',
+        '  set var(a7) = image_load("a7.bmp")',
+        "  say memory_images()",
+        '  set var(s0) = sound_load("tone0.wav")',
+        '  set var(s1) = sound_load("tone1.wav")',
+        "  say memory_audio()",
+        "  say memory_video()",
+        "  wait 0.3",
+        "  set var(d0) = image_destroy(var(a0))",
+        "  set var(d1) = sound_destroy(var(s0))",
+        "  say memory_images()",
+        "  say memory_audio()",
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+
+def write_asset_files(root: pathlib.Path) -> None:
+    row = bytes((30, 60, 200)) * ASSET_IMAGE_SIDE
+    padding = b"\x00" * ((4 - (ASSET_IMAGE_SIDE * 3) % 4) % 4)
+    data = (row + padding) * ASSET_IMAGE_SIDE
+    header = b"BM" + struct.pack("<IHHI", 54 + len(data), 0, 0, 54)
+    info = struct.pack(
+        "<IiiHHIIiiII",
+        40,
+        ASSET_IMAGE_SIDE,
+        ASSET_IMAGE_SIDE,
+        1,
+        24,
+        0,
+        len(data),
+        2835,
+        2835,
+        0,
+        0,
+    )
+    for index in range(ASSET_IMAGES):
+        (root / f"a{index}.bmp").write_bytes(header + info + data)
+    samples = b"".join(
+        struct.pack(
+            "<h",
+            int(9000 * math.sin(2 * math.pi * 240 * i / ASSET_SOUND_RATE)),
+        )
+        for i in range(ASSET_SOUND_FRAMES)
+    )
+    riff = b"RIFF" + struct.pack("<I", 36 + len(samples)) + b"WAVE"
+    fmt = b"fmt " + struct.pack(
+        "<IHHIIHH", 16, 1, 1, ASSET_SOUND_RATE, ASSET_SOUND_RATE * 2, 2, 16
+    )
+    for index in range(ASSET_SOUNDS):
+        (root / f"tone{index}.wav").write_bytes(
+            riff + fmt + b"data" + struct.pack("<I", len(samples)) + samples
+        )
+
+
+def measure_compile(
+    name: str, root: pathlib.Path, source_text: str | None = None
+) -> dict[str, float]:
     source = root / f"{name}.ANVL"
     executable = root / f"{name}.exe"
     generated = root / f"{name}.c"
-    source.write_text(program(SCENES[name]), encoding="utf-8")
+    source.write_text(
+        source_text if source_text is not None else program(SCENES[name]),
+        encoding="utf-8",
+    )
     command = [
         sys.executable,
         str(COMPILER),
@@ -101,33 +182,62 @@ def measure_compile(name: str, root: pathlib.Path) -> dict[str, float]:
     }
 
 
-def measure_run(name: str, root: pathlib.Path, executable: pathlib.Path) -> dict[str, float]:
+def measure_run(
+    name: str,
+    root: pathlib.Path,
+    executable: pathlib.Path,
+    capture: bool = False,
+) -> dict[str, float]:
     process = subprocess.Popen(
         [str(executable)],
         cwd=root,
-        stdout=subprocess.DEVNULL,
+        stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        text=True,
     )
     peak = 0
     started = time.perf_counter()
     while process.poll() is None and time.perf_counter() - started < RUN_SECONDS:
         peak = max(peak, process_tree_bytes(process.pid))
         time.sleep(RUN_SAMPLE_SECONDS)
+    output = ""
     if process.poll() is None:
         process.kill()
+    if capture and process.stdout is not None:
+        output = process.stdout.read()
     process.wait()
-    return {
+    result = {
         "run_ms": round((time.perf_counter() - started) * 1000.0, 1),
         "run_peak_mb": round(max(peak, 1) / MB, 1),
     }
+    if capture:
+        result["stdout"] = output
+    return result
 
 
 def measure(name: str) -> dict[str, float]:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
         root = pathlib.Path(temp)
-        build = measure_compile(name, root)
+        if name == ASSET_SCENE:
+            write_asset_files(root)
+            build = measure_compile(name, root, ASSET_PROGRAM)
+        else:
+            build = measure_compile(name, root)
         executable = pathlib.Path(build.pop("executable"))
-        run = measure_run(name, root, executable)
+        run = measure_run(name, root, executable, capture=name == ASSET_SCENE)
+    if name == ASSET_SCENE:
+        numbers = [
+            float(line)
+            for line in run.pop("stdout", "").splitlines()
+            if line.strip() and line.replace(".", "", 1).replace("-", "", 1).isdigit()
+        ]
+        if len(numbers) < 5:
+            raise SystemExit(f"the asset scene did not report five numbers: {numbers}")
+        run["image_bytes"] = int(numbers[0])
+        run["audio_bytes"] = int(numbers[1])
+        run["video_bytes"] = int(numbers[2])
+        run["image_bytes_after_destroy"] = int(numbers[3])
+        run["audio_bytes_after_destroy"] = int(numbers[4])
     return {"scene": name, **build, **run}
 
 
@@ -148,11 +258,19 @@ def write_budgets(results: list[dict[str, float]]) -> None:
         )
         for result in results
     }
+    asset_budgets = {
+        key: int(result[key] * 1.0)
+        for result in results
+        if result["scene"] == ASSET_SCENE
+        for key in ("image_bytes", "audio_bytes", "video_bytes")
+    }
     document = {
         "compile_peak_mb": round(compile_peak, 1),
         "run_peak_mb": run_budgets,
         "note": "2.5x the measured peak with floors; re-baseline on new hardware",
     }
+    if asset_budgets:
+        document["assets"] = asset_budgets
     BUDGETS.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {BUDGETS.relative_to(ROOT)}")
 
@@ -169,6 +287,11 @@ def check(results: list[dict[str, float]], budgets: dict) -> int:
                 f"{compile_budget} MB"
             )
             failures += 1
+        if scene == ASSET_SCENE:
+            for key, limit in (budgets.get("assets") or {}).items():
+                if result.get(key, 0) > limit:
+                    print(f"{scene}: {key} {result[key]} over budget {limit}")
+                    failures += 1
         budget = float(run_budgets.get(scene, RUN_FLOOR_MB))
         if result["run_peak_mb"] > budget:
             print(
@@ -188,21 +311,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--scene",
         action="append",
-        choices=sorted(SCENES),
+        choices=sorted(list(SCENES) + [ASSET_SCENE]),
         help="limit the run to one scene (repeatable)",
     )
     arguments = parser.parse_args(argv)
 
-    names = arguments.scene or list(SCENES)
+    names = arguments.scene or list(SCENES) + [ASSET_SCENE]
     results = [measure(name) for name in names]
 
     print(f"{'scene':<14}{'compile':>10}{'C bytes':>10}{'exe bytes':>12}{'run peak':>10}")
     for result in results:
+        suffix = ""
+        if "image_bytes" in result:
+            suffix = (
+                f"  images {result['image_bytes']} B, "
+                f"audio {result['audio_bytes']} B, "
+                f"video {result['video_bytes']} B"
+            )
         print(
             f"{result['scene']:<14}{result['compile_peak_mb']:>8.1f} MB"
             f"{result['generated_bytes']:>10}"
             f"{result['exe_bytes']:>12}"
-            f"{result['run_peak_mb']:>8.1f} MB"
+            f"{result['run_peak_mb']:>8.1f} MB{suffix}"
         )
 
     if arguments.write_budgets:

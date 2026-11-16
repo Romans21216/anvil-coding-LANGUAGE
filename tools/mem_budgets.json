@@ -1,11 +1,17 @@
 {
-  "compile_peak_mb": 283.2,
+  "compile_peak_mb": 286.8,
   "run_peak_mb": {
     "idle_2d": 60.0,
     "overdraw_2d": 60.0,
     "text_ui": 60.0,
     "particles_2d": 60.0,
-    "cubes_3d": 60.0
+    "cubes_3d": 60.0,
+    "assets": 60.0
   },
-  "note": "2.5x the measured peak with floors; re-baseline on new hardware"
+  "note": "2.5x the measured peak with floors; re-baseline on new hardware",
+  "assets": {
+    "image_bytes": 131072,
+    "audio_bytes": 576000,
+    "video_bytes": 2304000
+  }
 }
