@@ -56,6 +56,7 @@ const char *anvil_format_number(double value);
 void anvil_set_fixed_hz(int hz);
 void anvil_set_scene3d(int enabled);
 void anvil_camera_perspective(double x, double y, double z);
+double anvil_camera_angle(double yaw, double pitch);
 void anvil_camera_fov(double degrees);
 void anvil_camera_control(double speed, double turn_degrees_per_second);
 double anvil_mouse_x(void);
@@ -136,6 +137,9 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
 double anvil_mesh_culled(void);
 double anvil_mesh_drawn(void);
 double anvil_mesh_culling(double on);
+double anvil_shadow(double on);
+double anvil_shadow_height(double y);
+double anvil_shadow_alpha(double alpha);
 void anvil_sphere(double x, double y, double z, double radius, int r, int g,
                   int b, int a);
 void anvil_plane(double x, double y, double z, double width, double depth,

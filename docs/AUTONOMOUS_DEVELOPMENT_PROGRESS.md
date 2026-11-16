@@ -581,3 +581,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Measured:** 20 off-screen models of 2,048 triangles each (40,960 triangles) cost 3.83 ms/frame with culling off and 0.20 ms with it on — 18.9x less render time for that scene. A single 2-triangle quad only gained 1.11x, so the win scales with triangle count, as expected.
 - **Tests:** `tests/test_gltf_model.py` now asserts a behind-camera model reports 1 culled / 0 drawn, a visible one 0 / 1, and that `mesh_culling(0)` forces the behind-camera model to draw. 10 passed.
 - **Docs:** language spec model row, `docs/MODELS.md` culling section, evidence ledger, testing doc.
+
+## Batch 47 — overhead shadows (8.13)
+
+- **Runtime:** `shadow(on)` makes `cube` and `model_draw` draw a copy of their geometry flattened onto a horizontal plane at `shadow_height(y)`, in black at `shadow_alpha(a)` (default 150), before the object. Drawn through the same depth buffer, so objects occlude their own shadows correctly.
+- **Camera:** added `camera_angle(yaw,pitch)` so a program can look down programmatically (pitch clamped to ±89). Until now only the arrow keys could pitch the camera, which made ground-plane behaviour untestable.
+- **Tests:** `tests/test_shadows.py` sets a tilted camera and samples a pixel where the shadow must land: a horizontal quad at y=2 casting onto y=0 (darkens, then returns to background when `shadow_height(1)` moves it), and a cube at y=1 casting below itself. 2 passed. The demo frame was inspected as an image: two cubes on a grid plane with dark shadows beneath.
+- **Docs:** language spec rows for the 3D camera and shadows, evidence ledger, testing doc, `examples/shadows_demo.ANVL`.

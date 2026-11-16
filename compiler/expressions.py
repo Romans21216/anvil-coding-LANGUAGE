@@ -212,6 +212,7 @@ BUILTINS = {
     "window_on_top": (1, 1),
     "window_fullscreen": (1, 1),
     "camera2d": (3, 3),
+    "camera_angle": (2, 2),
     "model_draw": (8, 8),
     "particle_emit": (9, 9),
     "particle_count": (0, 0),
@@ -220,6 +221,9 @@ BUILTINS = {
     "mesh_culled": (0, 0),
     "mesh_drawn": (0, 0),
     "mesh_culling": (1, 1),
+    "shadow": (1, 1),
+    "shadow_height": (1, 1),
+    "shadow_alpha": (1, 1),
 }
 
 BUILTIN_C_NAMES = {
@@ -287,6 +291,7 @@ BUILTIN_C_NAMES = {
     "window_on_top": "anvil_window_on_top",
     "window_fullscreen": "anvil_window_fullscreen",
     "camera2d": "anvil_camera2d",
+    "camera_angle": "anvil_camera_angle",
     "particle_emit": "anvil_particle_emit",
     "particle_count": "anvil_particle_count",
     "particle_clear": "anvil_particle_clear",
@@ -294,6 +299,9 @@ BUILTIN_C_NAMES = {
     "mesh_culled": "anvil_mesh_culled",
     "mesh_drawn": "anvil_mesh_drawn",
     "mesh_culling": "anvil_mesh_culling",
+    "shadow": "anvil_shadow",
+    "shadow_height": "anvil_shadow_height",
+    "shadow_alpha": "anvil_shadow_alpha",
     "abs": "fabs",
     "round": "round",
     "len": "(double)strlen",

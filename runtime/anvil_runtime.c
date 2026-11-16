@@ -146,6 +146,12 @@ static double anvil_frame_tick_seconds, anvil_frame_render_seconds,
     anvil_frame_present_seconds;
 static int anvil_mesh_culling_enabled = 1;
 static int anvil_mesh_culled_frame, anvil_mesh_drawn_frame;
+/* Overhead shadow: the same geometry flattened onto a ground plane. */
+static int anvil_shadows_enabled;
+static double anvil_shadow_ground_y;
+static int anvil_shadow_alpha_value = 150;
+static void anvil_world_triangle(AnvilVec3 v[3], uint32_t base,
+                                 double brightness, int alpha);
 static int anvil_fixed_hz = 60;
 static double anvil_elapsed_seconds;
 static LARGE_INTEGER anvil_clock_frequency;
@@ -331,6 +337,18 @@ void anvil_camera_perspective(double x, double y, double z) {
   anvil_camera_y = y;
   anvil_camera_z = z;
 }
+double anvil_camera_angle(double yaw, double pitch) {
+  if (!isfinite(yaw) || !isfinite(pitch))
+    return 0.0;
+  if (pitch > 89.0)
+    pitch = 89.0;
+  if (pitch < -89.0)
+    pitch = -89.0;
+  anvil_camera_yaw = yaw;
+  anvil_camera_pitch = pitch;
+  return 1.0;
+}
+
 void anvil_camera_fov(double degrees) {
   if (degrees < 20.0)
     degrees = 20.0;
@@ -435,6 +453,23 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
                                   {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}};
   AnvilVec3 light = anvil_normalize((AnvilVec3){-0.35, 0.8, 0.55});
   uint32_t base = anvil_color(r, g, b);
+  if (anvil_shadows_enabled && a > 0) {
+    AnvilVec3 shadow[8];
+    for (int i = 0; i < 8; ++i) {
+      shadow[i] = v[i];
+      shadow[i].y = anvil_shadow_ground_y + 0.002;
+    }
+    for (int f = 0; f < 6; ++f) {
+      const int triangles[2][3] = {{faces[f][0], faces[f][1], faces[f][2]},
+                                   {faces[f][0], faces[f][2], faces[f][3]}};
+      for (int t = 0; t < 2; ++t) {
+        AnvilVec3 corners[3] = {shadow[triangles[t][0]],
+                                shadow[triangles[t][1]],
+                                shadow[triangles[t][2]]};
+        anvil_world_triangle(corners, 0, 1.0, anvil_shadow_alpha_value);
+      }
+    }
+  }
   for (int f = 0; f < 6; ++f) {
     AnvilVec3 n =
         anvil_normalize(anvil_cross(anvil_sub(v[faces[f][1]], v[faces[f][0]]),
@@ -483,6 +518,26 @@ double anvil_mesh_drawn(void) { return (double)anvil_mesh_drawn_frame; }
 double anvil_mesh_culling(double on) {
   anvil_mesh_culling_enabled = on != 0.0;
   return anvil_mesh_culling_enabled ? 1.0 : 0.0;
+}
+
+double anvil_shadow(double on) {
+  anvil_shadows_enabled = on != 0.0;
+  return anvil_shadows_enabled ? 1.0 : 0.0;
+}
+
+double anvil_shadow_height(double y) {
+  if (!isfinite(y))
+    return 0.0;
+  anvil_shadow_ground_y = y;
+  return y;
+}
+
+double anvil_shadow_alpha(double alpha) {
+  if (!isfinite(alpha))
+    return 0.0;
+  int applied = (int)(alpha < 0.0 ? 0.0 : alpha > 255.0 ? 255.0 : alpha);
+  anvil_shadow_alpha_value = applied;
+  return (double)applied;
 }
 
 static void anvil_world_triangle(AnvilVec3 v[3], uint32_t base,
@@ -556,6 +611,19 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
   }
   anvil_mesh_drawn_frame++;
   AnvilVec3 light = anvil_normalize((AnvilVec3){-0.35, 0.8, 0.55});
+  if (anvil_shadows_enabled) {
+    for (int t = 0; t < triangle_count; ++t) {
+      const double *p = data + (size_t)t * 12;
+      AnvilVec3 v[3];
+      for (int i = 0; i < 3; ++i) {
+        AnvilVec3 q = {p[i * 3] * scale, p[i * 3 + 1] * scale,
+                       p[i * 3 + 2] * scale};
+        q = anvil_rotate(q, rx, ry, rz);
+        v[i] = (AnvilVec3){x + q.x, anvil_shadow_ground_y + 0.002, z + q.z};
+      }
+      anvil_world_triangle(v, 0, 1.0, anvil_shadow_alpha_value);
+    }
+  }
   for (int t = 0; t < triangle_count; ++t) {
     const double *p = data + (size_t)t * 12;
     AnvilVec3 v[3];

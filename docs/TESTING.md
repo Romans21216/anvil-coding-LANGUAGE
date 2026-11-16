@@ -103,6 +103,8 @@ remote desktop can prevent window creation:
   messages, position/stop and loop-versus-finish behavior.
 - `test_particles` — argument validation, the 4,096-particle bound, clear
   counts, and window pixels for a fresh and fading particle.
+- `test_shadows` — a tilted camera samples the flattened shadow of a model and
+  of a cube, and checks the shadow moves with `shadow_height`.
 - `test_gltf_model` — glTF/GLB loaders, node transforms, a located missing-model
   error, window pixels for flat shading and depth ordering, and culling counters
   for behind-camera versus visible models.
