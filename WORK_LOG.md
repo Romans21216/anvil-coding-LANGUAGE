@@ -462,3 +462,11 @@ with the native backend rejecting text built-ins (a documented gap).
   `--check`.
 - Existing `examples/*.ANVL` already pass `--format-check`, so adopting the
   formatter causes no churn.
+
+### `--deny-warnings`
+
+Warnings already shared the error layout but always let the build continue.
+`--deny-warnings` now prints them and exits 1 before any output is produced, so
+CI can enforce a warning-free tree. `tests/test_text_and_print.py` checks the
+failing exit code and the "treated as errors" note; `docs/LANGUAGE.md` documents
+the flag next to the warning list.

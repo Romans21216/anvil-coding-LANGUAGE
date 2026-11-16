@@ -176,7 +176,9 @@ Unknown names and functions get a did-you-mean list, `else if` misuse explains
 the alternative, and runtime faults keep reporting `path:line:` before exiting
 with code 2. Warnings use the same layout with `warning:` and do not stop the
 build: drawing without a scene, `output` inside a loop (it returns at the first
-iteration), and statements after an `output` (unreachable) are reported.
+iteration), and statements after an `output` (unreachable) are reported. Pass
+`--deny-warnings` to treat any warning as an error and stop before building, for
+CI or a strict local check.
 
 ## Expressions
 

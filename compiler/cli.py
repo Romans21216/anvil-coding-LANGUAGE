@@ -63,6 +63,11 @@ def main() -> int:
         help="select the C toolchain or experimental Anvil-owned x64 PE backend",
     )
     ap.add_argument(
+        "--deny-warnings",
+        action="store_true",
+        help="treat lint warnings as errors and stop before building",
+    )
+    ap.add_argument(
         "--format",
         action="store_true",
         help="rewrite the .ANVL source with canonical block indentation and stop",
@@ -208,7 +213,8 @@ def main() -> int:
         from compiler import diagnostics
         from compiler.lint import lint
         diagnostics.set_hints(_builtin_names(), known_functions)
-        for warning in lint(funcs, top):
+        warnings = lint(funcs, top)
+        for warning in warnings:
             print(
                 diagnostics.render(
                     warning.message, hint=warning.hint, needle=warning.needle,
@@ -216,6 +222,13 @@ def main() -> int:
                 ),
                 file=sys.stderr,
             )
+        if warnings and args.deny_warnings:
+            print(
+                f"{source_path}: {len(warnings)} warning(s) treated as errors "
+                "(--deny-warnings)",
+                file=sys.stderr,
+            )
+            return 1
         if args.check:
             # Check the same lowering the selected backend would run, so
             # --check cannot pass a program that the build would reject.

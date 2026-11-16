@@ -225,6 +225,19 @@ class DiagnosticTests(unittest.TestCase):
             self.assertIn("has no effect without a scene", result.stderr)
             self.assertIn(f"--> {path}:2:", result.stderr)
 
+    def test_deny_warnings_turns_the_warning_into_a_failure(self):
+        source = "fn(main)\n  display rect(0, 0, 10, 10)\n  output 0\nend\n"
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "warn.ANVL"
+            path.write_text(source, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(path), "--check", "--deny-warnings"],
+                capture_output=True, text=True,
+            )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("warning: ", result.stderr)
+        self.assertIn("treated as errors", result.stderr)
+
     def test_output_inside_a_loop_warns_that_the_loop_runs_once(self):
         source = (
             "fn(main)\n"
