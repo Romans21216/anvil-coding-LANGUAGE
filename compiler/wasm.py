@@ -46,6 +46,9 @@ ALLOWED_BUILTINS = {
     "mouse_pressed",
     "mouse_held",
     "mouse_wheel",
+    "sin",
+    "cos",
+    "rnd",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)

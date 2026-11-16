@@ -410,7 +410,7 @@ static int anvil_button_index(const char *button) {
       a++;
       b++;
     }
-    if (same && *a == ' ' && *b == ' ')
+    if (same && *a == '\0' && *b == '\0')
       return index;
   }
   return -1;
@@ -462,6 +462,64 @@ __attribute__((export_name("anvil_mouse_button"))) void anvil_host_mouse_button(
 __attribute__((export_name("anvil_wheel"))) void anvil_host_wheel(
     double delta) {
   anvil_mouse_wheel_value += delta;
+}
+
+/* ---- Math and random ---------------------------------------------------- */
+static unsigned long long anvil_rng_state = 0x9E3779B97F4A7C15ULL;
+
+static unsigned long long anvil_random_u64(void) {
+  unsigned long long x = anvil_rng_state;
+  x ^= x >> 12;
+  x ^= x << 25;
+  x ^= x >> 27;
+  anvil_rng_state = x;
+  return x * 2685821657736338717ULL;
+}
+
+/* Reduce an angle to [-pi, pi] so the Taylor series stays accurate. */
+static double anvil_wrap_angle(double value) {
+  const double two_pi = 6.283185307179586476925286766559;
+  const double inv_two_pi = 0.159154943091895335768883763373;
+  double turns = value * inv_two_pi;
+  turns = __builtin_trunc(turns + (turns >= 0.0 ? 0.5 : -0.5));
+  return value - turns * two_pi;
+}
+
+double sin(double radians) {
+  double x = anvil_wrap_angle(radians);
+  double x2 = x * x;
+  double term = x, sum = x;
+  for (int n = 1; n <= 9; ++n) {
+    term *= -x2 / ((2.0 * n) * (2.0 * n + 1.0));
+    sum += term;
+  }
+  return sum;
+}
+
+double cos(double radians) {
+  double x = anvil_wrap_angle(radians);
+  double x2 = x * x;
+  double term = 1.0, sum = 1.0;
+  for (int n = 1; n <= 9; ++n) {
+    term *= -x2 / ((2.0 * n - 1.0) * (2.0 * n));
+    sum += term;
+  }
+  return sum;
+}
+
+/* Inclusive integer range, matching the C runtime's anvil_rnd. */
+double anvil_rnd(double min_value, double max_value) {
+  if (min_value > max_value) {
+    double swap = min_value;
+    min_value = max_value;
+    max_value = swap;
+  }
+  long long low = (long long)ceil(min_value);
+  long long high = (long long)floor(max_value);
+  if (high <= low)
+    return (double)low;
+  unsigned long long span = (unsigned long long)(high - low) + 1ULL;
+  return (double)(low + (long long)(anvil_random_u64() % span));
 }
 
 /* ---- Canvas 2D ---------------------------------------------------------- */

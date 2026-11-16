@@ -623,3 +623,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Node host:** `--input JSON` drives a script of `key`/`mouse`/`button`/`wheel`/`frame` steps for tests.
 - **Tests:** `tests/test_wasm.py` adds exact output for pressed/held edges, mouse coordinates and per-frame delta, time accumulation across frames, and the host page's input listeners. 11 passed.
 - **Visual check:** a colour-flag program was served and opened in Chromium; stepping frames showed blue when idle, red while `A` was held, and blue again on release, both through the exported API and through real DOM `KeyboardEvent`s.
+
+## Batch 52 — wasm math and random (8.12)
+
+- **Runtime:** `sin`/`cos` implemented without libm by reducing the angle to [-pi, pi] (nearest-turn) and summing the Taylor series to n=9; `rnd(low, high)` uses the same xorshift64 multiplier/algorithm as the C runtime and keeps its inclusive integer range and swap-if-reversed behavior, seeded with a fixed constant so runs are reproducible.
+- **Why:** clang lowers `sin`/`cos` to libcalls in wasm (there is no trig instruction), so the freestanding shim has to provide them under the libm names the C generator already emits.
+- **Tests:** `tests/test_wasm.py` runs a ten-value trig program and pins results that match `cl.exe`'s libm byte-for-byte, including `sin(1e6)`; a 500-draw loop asserts `rnd(0,9)` never leaves its range and `rnd(4,4)` is the fixed point. 13 passed.
+- **Cross-check:** the same source compiled with the C backend and with the wasm backend produced identical ten-line output (`diff` empty).

@@ -133,9 +133,9 @@ class WasmRejectionTests(unittest.TestCase):
     def test_unsupported_builtins_name_the_call_site(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(root, "fn(main)\n  say rnd(0, 1)\nend\ncall fn(main)\n")
+            result, _ = build(root, "fn(main)\n  say noise(0, 0, 0)\nend\ncall fn(main)\n")
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("'rnd' is not available in the wasm backend yet", result.stderr)
+            self.assertIn("'noise' is not available in the wasm backend yet", result.stderr)
             self.assertIn(":2:", result.stderr)
 
 
@@ -311,6 +311,94 @@ class WasmInputTests(unittest.TestCase):
             page = out.with_suffix(".html").read_text(encoding="utf-8")
             for needle in ("keydown", "keyup", "mousemove", "mousedown", "wheel", "anvil_key"):
                 self.assertIn(needle, page)
+
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmMathTests(unittest.TestCase):
+    def test_trig_matches_libm(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _MATH_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(
+                run.stdout.splitlines(),
+                [
+                    "0",
+                    "1000",
+                    "1000",
+                    "-1000",
+                    "479426",
+                    "-416147",
+                    "841470985",
+                    "-839071529",
+                    "-598472144",
+                    "-349994",
+                ],
+            )
+
+    def test_rnd_stays_inside_its_inclusive_range(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "fn(main)",
+                    "  set var(i) = 0",
+                    "  set var(bad) = 0",
+                    "  while var(i) < 500",
+                    "    set var(v) = rnd(0, 9)",
+                    "    if var(v) < 0",
+                    "      set var(bad) = compute(var(bad) + 1)",
+                    "    end",
+                    "    if var(v) > 9",
+                    "      set var(bad) = compute(var(bad) + 1)",
+                    "    end",
+                    "    set var(i) = compute(var(i) + 1)",
+                    "  end",
+                    "  say var(bad)",
+                    '  say rnd(4, 4)',
+                    "end",
+                    "call fn(main)",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines(), ["0", "4"])
+
+
+_MATH_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        "  say round(sin(0) * 1000)",
+        "  say round(cos(0) * 1000)",
+        "  say round(sin(1.5707963267948966) * 1000)",
+        "  say round(cos(3.141592653589793) * 1000)",
+        "  say round(sin(0.5) * 1000000)",
+        "  say round(cos(2.0) * 1000000)",
+        "  say round(sin(1.0) * 1000000000)",
+        "  say round(cos(10.0) * 1000000000)",
+        "  say round(sin(-2.5) * 1000000000)",
+        "  say round(sin(1e6) * 1000000)",
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
 
 
 if __name__ == "__main__":

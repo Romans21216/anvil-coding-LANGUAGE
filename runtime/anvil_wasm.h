@@ -111,6 +111,9 @@ double anvil_mouse_y(void);
 double anvil_mouse_pressed(const char *button);
 double anvil_mouse_held(const char *button);
 double anvil_mouse_wheel(void);
+double sin(double radians);
+double cos(double radians);
+double anvil_rnd(double min_value, double max_value);
 
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);

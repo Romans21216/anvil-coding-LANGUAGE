@@ -51,6 +51,8 @@ Supported today:
 - `say`, `write`, `output`
 - text values, `&` joining, and the builtins `len`, `mid`, `upper`, `number`
 - `floor`, `ceil`, `sqrt`, `abs`, `min`, `max`, `clamp`, `round`
+- `sin`, `cos` (range-reduced Taylor series, no libm) and `rnd` (xorshift64,
+  inclusive integer range like the C runtime)
 - `scene 2d` with `fn(draw)`, `clear`, and `display rect/circle/line/text`
 - input and time: `time()`, `delta()`, `pressed(key)`, `held(key)`,
   `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`,
@@ -111,4 +113,7 @@ identical.
   libm functions are not linked yet.
 - No Web Audio, IndexedDB or source maps yet; those are the remaining 8.12
   items. 3D and images also need the C backend.
+- `sin`/`cos` lose accuracy for arguments far outside the reduced range (the
+  test pins 1e6 radians, which still matches libm to six decimals); `tan`,
+  `noise` and `fbm` are not available yet.
 - `anvil_frame` ignores its delta argument; animations advance per host frame.
