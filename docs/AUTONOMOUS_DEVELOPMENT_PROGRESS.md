@@ -385,3 +385,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Contract update:** the old UDP NaN test expected exit 2 with a located non-finite error; it now floods NaN and asserts survival plus acceptance of a later finite value. `docs/LANGUAGE_SPEC.md` and `docs/MULTIPLAYER.md` record the payload rules.
 - **Tests:** 70 passed across `test_compiler`, `test_net_fuzz` and `test_output_flush`.
 - **Commits:** `031bfb0`, plus the test-contract commit.
+
+## Batch 23 — Part 8 evidence ledger (8.16)
+
+- **`docs/PART8_EVIDENCE.md`:** maps sections 8.8–8.17 to verified behaviour, the exact commits and test files, and the remaining gap for each. Status is honest: 8.8/8.10 verified, 8.9 verified for existing resources, 8.11/8.13/8.14/8.15 partial, 8.12 browser not implemented, 8.17 new-user trial not performed.
+- **Checked before claiming:** local-array and recursion budgets are covered by `tests/test_compiler.py` and `tests/test_recursion_budget.py`; image caps are documented and enforced but only missing-file diagnostics are tested (recorded as a gap); the 3D sample is marked interactive rather than automated.
+- **Index:** 17 commits from the C8 parity work through the network fuzz and per-line flush.
+- **Files:** `docs/PART8_EVIDENCE.md` (new), `README.md`.
+- **Commit:** `27be76d`.
