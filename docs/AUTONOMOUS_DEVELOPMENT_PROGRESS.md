@@ -410,3 +410,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Measured cost:** cold C build 1.67 s, cached hit 0.22 s (was 0.13 s) with the real MSVC toolset, so hashing ~4.6 MB of tools costs about 0.09 s.
 - **Known gap recorded in `docs/COMPILER.md`:** libraries passed through `build_c(libraries=...)` are still not part of the key.
 - **Commit:** `d1e56b9`.
+
+## Batch 26 — typo inside an unused function (8.10/8.8)
+
+- **Gap found by probing include diagnostics:** an unknown call inside a function that is never called compiled clean (`main.ANVL: ok`), because uncalled functions are pruned before lowering and the project's documented boundary only checks emitted code. Include spans themselves are correct: the same error in a *called* helper reports `lib/util.ANVL:5` with a caret.
+- **Fix:** `compiler/lints.py::unknown_calls_in_unused_functions` warns `unused function 'helper' calls unknown function 'helo'; did you mean 'hello'?`, reusing the suggestion helper. It joins the existing warning list, so `--deny-warnings` exits 1. Entry file only, matching the unused-function warning's shared-include policy.
+- **Pre-flight:** all 36 examples parsed; zero would warn.
+- **Tests:** `test_a_typo_in_an_uncalled_function_is_reported` was red first, then green; 50 passed across `test_lints`, `test_suggestions`, `test_dead_branches`, `test_refusals`, `test_unused_imports`. CLI verified: warning with caret, `--deny-warnings` rc 1.
+- **Commit:** `a896281`.
