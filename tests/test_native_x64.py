@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 
+from compiler.common import CompileError
 from compiler.native_x64 import Pe32Plus, minimal_exit_exe
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
@@ -118,6 +119,28 @@ end
 call fn(main)
 """
         self.assertEqual(self._run_source(source), "-42\n")
+
+    def test_native_backend_prints_literal_text_lines(self):
+        source = """\
+fn(main)
+  print "score = 7"
+  print "say \\"hi\\""
+  output 0
+end
+"""
+        self.assertEqual(self._run_source(source), 'score = 7\nsay "hi"\n0\n')
+
+    def test_native_backend_rejects_dynamic_print_with_a_source_location(self):
+        source = 'fn(main)\n  set var(score) = 7\n  print "score = " + var(score)\nend\n'
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "dynamic-print.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as raised:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        message = str(raised.exception)
+        self.assertIn("dynamic-print.ANVL:3", message)
+        self.assertIn("one string literal", message)
 
     def test_native_backend_prints_fractional_numbers(self):
         cases = {

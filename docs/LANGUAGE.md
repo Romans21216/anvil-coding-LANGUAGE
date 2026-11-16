@@ -119,11 +119,12 @@ function, `fn(update)` or `fn(draw)`. `print` alone writes a blank line, and
 console program prints only `fn(main)`'s return value when it ends.
 
 **Native backend split.** Everything above needs the C backend. `--backend native`
-draws literal text only: `display text("literal")` works, but a text expression
-(`"score " + var(score)`) and `print` are rejected at compile time with a
-diagnostic that says so. This is a known, deliberate gap — see [native backend
-availability](NATIVE_X64_COMPILER_MIGRATION.md) — so build HUDs that show numbers
-with the default C backend.
+draws literal text only: `display text("literal")` works, and so does
+`print "literal"`; a text expression (`"score " + var(score)`) is rejected at
+compile time with a diagnostic that says so. This is a known, deliberate gap —
+see [native backend availability](NATIVE_X64_COMPILER_MIGRATION.md) — so build
+HUDs that show numbers with the default C backend. The measured per-feature
+support table is [BACKEND_MATRIX.md](BACKEND_MATRIX.md).
 
 | Call | Result |
 | --- | --- |

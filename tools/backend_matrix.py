@@ -163,6 +163,12 @@ CASES = [
         "score = 7\n0",
     ),
     (
+        "print-literal",
+        "text",
+        'fn(main)\n print "hello"\nend\n',
+        "hello\n0",
+    ),
+    (
         "text-builtins",
         "text",
         'fn(main)\n output len("anvil")\nend\n',

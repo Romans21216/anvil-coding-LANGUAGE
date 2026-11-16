@@ -30,6 +30,7 @@ source with a diagnostic. Regenerate after changing either backend, and run
 | `text-format-number` | text | supported | wrong value |
 | `text-dynamic` | text | builds | rejected |
 | `print-statement` | text | supported | rejected |
+| `print-literal` | text | supported | supported |
 | `text-builtins` | text | supported | rejected |
 | `clear-inside-draw` | graphics | builds | rejected |
 | `display-rect` | graphics | builds | builds |
@@ -39,7 +40,7 @@ source with a diagnostic. Regenerate after changing either backend, and run
 
 ## Summary
 
-- Cases where both backends build and print the same value: **17** of 28.
+- Cases where both backends build and print the same value: **18** of 29.
 - Cases the C backend supports but the native backend rejects: **4**.
 - Cases the native backend rejects: `mod-builtin`, `round-builtin`, `print-statement`, `text-builtins`.
 
@@ -48,6 +49,6 @@ source with a diagnostic. Regenerate after changing either backend, and run
 - `mod-builtin` on `native`: error: unsupported native expression token 'mod'
 - `round-builtin` on `native`: error: unsupported native expression token 'round'
 - `text-dynamic` on `native`: error: statement 'display' is not supported by the native x64 backend yet
-- `print-statement` on `native`: error: statement 'print' is not supported by the native x64 backend yet
+- `print-statement` on `native`: error: native print currently accepts one string literal; dynamic text needs the default C backend
 - `text-builtins` on `native`: error: unsupported native expression token 'len'
 - `clear-inside-draw` on `native`: error: statement 'clear' is not supported by the native x64 backend yet

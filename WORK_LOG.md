@@ -384,3 +384,16 @@ this Windows 11 / MSVC 14.51 machine, 10 runs:
 `tests/test_benchmark_workload.py` builds the same workload on both backends and
 fails if the printed values diverge, extending the differential conformance
 suite beyond the small numeric cases.
+
+## Native backend: literal `print`
+
+The matrix showed `print` rejected by the native backend even for a plain string
+literal, while `display text("literal")` already worked. The native backend now
+emits the same `GetStdHandle`/`WriteFile` sequence for `print "literal"` and
+appends a newline, so a literal line prints identically on both backends:
+
+- `print "hello"` prints `hello` then the program's numeric result on both.
+- A text expression (`print "score = " + var(score)`) still fails at compile
+  time with the source line and a message that says the C backend is required.
+- `tests/test_native_x64.py` covers both the literal success and the located
+  rejection; `docs/BACKEND_MATRIX.md` now includes a `print-literal` row.

@@ -469,6 +469,33 @@ class NativeCodegen:
         self.code.bytes(b"\xf2\x0f\x11\x04\xc2")  # movsd [rdx+rax*8],xmm0
         self.pop_temp()
 
+    def emit_print_statement(self, node) -> None:
+        """Write one literal text line to stdout; dynamic text stays C-only."""
+        import json as _json
+        import re as _re
+
+        location = f"{node.source or self.path}:{node.line}"
+        raw = (node.value or "").strip()
+        if not _re.fullmatch(r'"(?:\\.|[^"\\])*"', raw):
+            raise CompileError(
+                f"{location}: native print currently accepts one string literal; "
+                "dynamic text needs the default C backend"
+            )
+        try:
+            payload = _json.loads(raw).encode("utf-8") + b"\n"
+        except (ValueError, UnicodeEncodeError) as exc:
+            raise CompileError(f"{location}: invalid native print literal: {exc}") from exc
+        offset = self.reserve_data(payload + b"\0")
+        self.code.mov_imm(1, -11)  # STD_OUTPUT_HANDLE
+        self.code.rip_call_import("GetStdHandle")
+        self.code.mov_reg(1, 0)
+        self.code.rip_lea_data(2, offset)
+        self.code.mov_imm(8, len(payload))
+        self.code.stack_int(9, 0x28, address=True)
+        self.code.mov_imm(0, 0)
+        self.code.stack_int(0, 0x20, store=True)
+        self.code.rip_call_import("WriteFile")
+
     def emit_runtime_error(self, message_text: str) -> None:
         """Write pooled UTF-8 diagnostic data and terminate with status 2."""
         message = message_text.encode("utf-8")
@@ -624,6 +651,8 @@ class NativeCodegen:
                 )
             elif node.kind == "display" and self._window is not None:
                 self._window.emit_display(node, scope)
+            elif node.kind == "print":
+                self.emit_print_statement(node)
             elif node.kind in ("add", "sub", "local_add", "local_sub",'global_add','global_sub'):
                 name = node.name
                 target_scope=None if node.kind.startswith('global_') else scope
