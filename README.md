@@ -50,6 +50,12 @@ python compiler/anvil.py demo/demo.ANVLproj --clean
 
 Tests use `expect(actual, expected)` and `expect_text(actual, expected)`, which print the failing file and line, dump the call stack and exit 1 when the value differs. The scaffolded project ships `tests/smoke_test.ANVL`, so `--new` followed by `--test` passes out of the box.
 
+Add `--web` to a package to target the browser instead of Windows. `--package --web` writes `dist/<name>/web/` containing `index.html`, `engine.js` and `style.css` with the project's source embedded, so the folder opens from `file://` with no server, build step or plugin. Remote font imports are stripped so the page makes no network requests. The bundled lab page is a preview: it parses `scene`, `clear` and `display` declarations and draws them on a canvas, but it is not the compiled runtime, so gameplay code that depends on the full language does not execute there yet. See [the browser target](docs/WEB.md).
+
+```powershell
+python compiler/anvil.py demo/demo.ANVLproj --package --web
+```
+
 This compiles through temporary C with MSVC in the same build command, then removes the C and object intermediates automatically. Generated C keeps functions and global scalar/array storage reachable from selected entry points and callbacks, including function-reference targets. Release builds enable MSVC function/data sections and linker elimination. A runtime-module registry compiles image loading, networking, and 2D physics in separate C translation units only when reachable Anvil code uses those features. The renderer and remaining runtime systems still share the core translation unit. Image resources are released through the core runtime shutdown-hook interface. These are internal feature boundaries, not yet a user-facing package/import system. To preserve translated C for inspection, add `--generated-c build/first_world.c`; to only translate without building, use `--emit-c build/first_world.c`. The generated C is ordinary C, while the supplied runtime currently targets Windows. Anvil owns the language front end, validation, reachability analysis, and runtime; the C toolchain performs machine-code generation and linking.
 
 To try the experimental direct backend, only Python 3.11 or newer is required on Windows x64:

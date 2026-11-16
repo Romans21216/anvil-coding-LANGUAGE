@@ -760,3 +760,29 @@ send/receive path had prose but no adversarial tests.
 - Found while writing them: `time()` does not advance inside a console
   `fn(main)`, so a clock-based wait loop never terminates. `docs/ENGINE.md`
   now says both `time()` and `delta()` advance only between engine frames.
+
+## Browser target: `--package --web`
+
+Part 8's browser requirement is standard web technology, no plugin. The
+repository already had a canvas lab page; what was missing was a way to ship a
+project as one.
+
+- `anvil.py project.ANVLproj --package --web` writes `dist/<name>/web/` with
+  `index.html`, `engine.js`, `style.css` and the project's assets. The project
+  source replaces the lab's built-in demo, so the folder opens from `file://`
+  with no server, build step or plugin, and `package.json` records
+  `target: "browser"`, `backend: "html+canvas"` and per-file checksums.
+- The bundled stylesheet has the Google Fonts `@import` stripped, so a packaged
+  page issues no network requests at all. (The repository copy still uses the
+  remote font; only the shipped bundle is sanitised.)
+- The page is a preview: it parses `scene`, `clear` and `display` declarations
+  and draws them, but it does not execute `fn(update)`/`fn(draw)`, variables,
+  physics, audio or networking. The CLI says so after packaging and
+  `docs/WEB.md` records both the capability and the route to a real WebAssembly
+  target.
+- Source embedding escapes backslashes, backticks and `${` so a project that
+  contains them cannot break the template literal; `node --check` parses the
+  generated engine in the test when Node is installed.
+
+Tests: `WebPackageTests` (3 cases) in `tests/test_commands.py` cover the
+self-contained bundle, the escaping case, and `--web` without `--package`.

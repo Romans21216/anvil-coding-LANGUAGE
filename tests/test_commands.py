@@ -3,6 +3,7 @@
 import hashlib
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -195,6 +196,86 @@ class TestCommandTests(unittest.TestCase):
             result = run_cli(str(project / "bare.ANVLproj"), "--test")
             self.assertEqual(result.returncode, 1)
             self.assertIn("no tests found", result.stderr)
+
+class WebPackageTests(unittest.TestCase):
+    MARKER = 'display text("web package marker") -l(10, 10) -rgb(255, 255, 255)'
+
+    def _project(self, folder: pathlib.Path) -> pathlib.Path:
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "game.ANVLproj").write_text(
+            'name = "Web Game"\nentry = "main.ANVL"\n', encoding="utf-8"
+        )
+        (folder / "main.ANVL").write_text(
+            "scene 2d\nclear rgba(11, 16, 27, 255)\n"
+            "fn(update)\nend\n"
+            "fn(draw)\n  " + self.MARKER + "\nend\n",
+            encoding="utf-8",
+        )
+        return folder / "game.ANVLproj"
+
+    def test_web_package_is_self_contained_and_embeds_the_project_source(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            project = self._project(pathlib.Path(temporary) / "game")
+            result = run_cli(str(project), "--package", "--web")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            web = pathlib.Path(temporary) / "game" / "dist" / "web-game" / "web"
+            for name in ("index.html", "engine.js", "style.css"):
+                self.assertTrue((web / name).is_file(), name)
+
+            engine = (web / "engine.js").read_text(encoding="utf-8")
+            self.assertIn("web package marker", engine)
+            # No remote requests: the bundle must open from file:// offline and
+            # must not contact a third party.
+            for path in web.rglob("*"):
+                if path.is_file():
+                    text = path.read_text(encoding="utf-8", errors="replace")
+                    self.assertNotIn("http://", text, path.name)
+                    self.assertNotIn("https://", text, path.name)
+
+            manifest = json.loads(
+                (web.parent / "package.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["target"], "browser")
+            self.assertEqual(manifest["compiler"]["backend"], "html+canvas")
+            self.assertIn("web/index.html", manifest["checksums"])
+
+    def test_web_package_escapes_template_characters_in_the_source(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            folder = pathlib.Path(temporary) / "tricky"
+            folder.mkdir()
+            (folder / "tricky.ANVLproj").write_text(
+                'name = "tricky"\nentry = "main.ANVL"\n', encoding="utf-8"
+            )
+            (folder / "main.ANVL").write_text(
+                "scene 2d\nclear rgba(0, 0, 0, 255)\n"
+                "fn(update)\nend\n"
+                "fn(draw)\n"
+                r'  display text("price ${x} `tick`") -l(10, 10)' + "\n"
+                "end\n",
+                encoding="utf-8",
+            )
+            result = run_cli(str(folder / "tricky.ANVLproj"), "--package", "--web")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            engine = (
+                folder / "dist" / "tricky" / "web" / "engine.js"
+            ).read_text(encoding="utf-8")
+            self.assertIn(r"\`tick\`", engine)
+            self.assertIn(r"\${x}", engine)
+
+            if shutil.which("node"):
+                checked = subprocess.run(
+                    ["node", "--check", str(folder / "dist" / "tricky" / "web" / "engine.js")],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_web_requires_package(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            source = pathlib.Path(temporary) / "plain.ANVL"
+            source.write_text("fn(main)\n  output 0\nend\n", encoding="utf-8")
+            result = run_cli(str(source), "--web")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("--web only makes sense with --package", result.stderr)
 
 
 if __name__ == "__main__":

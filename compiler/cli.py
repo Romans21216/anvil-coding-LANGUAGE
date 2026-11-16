@@ -72,6 +72,11 @@ def main() -> int:
         action="store_true",
         help="build and run every tests/*.ANVL and *_test.ANVL file in the project",
     )
+    ap.add_argument(
+        "--web",
+        action="store_true",
+        help="with --package, emit a static browser preview instead of an exe",
+    )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
     ap.add_argument('--inspect-metadata',action='store_true',help='read embedded Anvil name/author/version from an executable')
     ap.add_argument("--generated-c", type=pathlib.Path, help="choose generated C path")
@@ -135,11 +140,16 @@ def main() -> int:
             return commands.clean(args.source)
         if args.dry_run and not args.package:
             raise CompileError("--dry-run only makes sense with --package")
+        if args.web and not args.package:
+            raise CompileError("--web only makes sense with --package")
         if args.package:
             if args.source is None:
                 raise CompileError("--package needs a source file or project manifest")
             return commands.package(
-                args.source, dry_run=args.dry_run, backend=args.backend
+                args.source,
+                dry_run=args.dry_run,
+                backend=args.backend,
+                target="web" if args.web else "desktop",
             )
         if args.test:
             if args.source is None:

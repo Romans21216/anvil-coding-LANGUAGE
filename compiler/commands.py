@@ -328,11 +328,65 @@ def _package_plan(
     return project_name, entry, root / "dist" / _slug(project_name), assets
 
 
+def _embed_source(engine_js: str, source: str) -> str:
+    """Replace the demo source embedded in ``engine.js`` with a project's source."""
+    escaped = (
+        source.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+    )
+    start = engine_js.find("const demo = `")
+    if start < 0:
+        raise CompileError("engine.js no longer contains the embedded demo source")
+    end = engine_js.find("`;", start)
+    if end < 0:
+        raise CompileError("engine.js demo source block is unterminated")
+    return engine_js[:start] + "const demo = `" + escaped + engine_js[end:]
+
+
+def _write_web_bundle(
+    project_name: str,
+    root: pathlib.Path,
+    entry: pathlib.Path,
+    dist: pathlib.Path,
+    assets: list[pathlib.Path],
+) -> None:
+    """Write a self-contained static page that previews the project in a browser.
+
+    The lab page parses `scene`, `clear` and `display` declarations; it is a
+    preview, not the compiled runtime, and the generated folder says so. No
+    plugin, server, or network access is required — the files run from `file://`.
+    """
+    web = dist / "web"
+    web.mkdir(parents=True, exist_ok=True)
+    engine = (ROOT / "engine.js").read_text(encoding="utf-8")
+    (web / "engine.js").write_text(
+        _embed_source(engine, entry.read_text(encoding="utf-8")),
+        encoding="utf-8",
+        newline="\n",
+    )
+    # Drop remote font imports: a packaged game must load with no network
+    # access and must not contact a third party when it opens.
+    style = re.sub(
+        r"@import\s+url\(\s*['\"]https?://[^)]*\)\s*;\s*\n?",
+        "",
+        (ROOT / "style.css").read_text(encoding="utf-8"),
+    )
+    (web / "style.css").write_text(style, encoding="utf-8", newline="\n")
+    page = (ROOT / "index.html").read_text(encoding="utf-8").replace(
+        "<title>Anvil Engine Lab</title>", f"<title>{project_name}</title>"
+    )
+    (web / "index.html").write_text(page, encoding="utf-8", newline="\n")
+    for asset in assets:
+        destination = web / asset.relative_to(root)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(asset, destination)
+
+
 def package(
     source: pathlib.Path,
     *,
     dry_run: bool = False,
     backend: str = "c",
+    target: str = "desktop",
     stream=None,
 ) -> int:
     """Build a project and emit a distributable folder with a hashed manifest."""
@@ -368,7 +422,10 @@ def package(
     manifest_copy = dist / source.name if source.suffix.lower() == ".anvlproj" else None
 
     print(f"Package {project_name}", file=out)
-    print(f"  target    windows-x64 ({backend} backend)", file=out)
+    if target == "web":
+        print("  target    browser (static html+canvas preview)", file=out)
+    else:
+        print(f"  target    windows-x64 ({backend} backend)", file=out)
     print(f"  entry     {entry.relative_to(root)}", file=out)
     print(f"  output    {dist}", file=out)
     print(f"  features  {', '.join(_features(sources))}", file=out)
@@ -379,38 +436,52 @@ def package(
         return 0
 
     dist.mkdir(parents=True, exist_ok=True)
-    built = subprocess.run(
-        [
-            sys.executable,
-            str(COMPILER),
-            str(source),
-            "--release",
-            "--backend",
-            backend,
-            "--output",
-            str(executable),
-        ],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        cwd=str(root),
-    )
-    if built.returncode != 0:
-        print(built.stdout, end="", file=out)
-        print(built.stderr, end="", file=sys.stderr)
-        print(f"error: build failed; {dist} was not packaged", file=sys.stderr)
-        return 1
+    copied: list[tuple[pathlib.Path, str]] = []
+    if target == "web":
+        try:
+            _write_web_bundle(project_name, root, entry, dist, assets)
+        except CompileError as error:
+            print(f"error: {error.message}", file=sys.stderr)
+            return 1
+        web = dist / "web"
+        copied.append((web / "index.html", "web-page"))
+        copied.append((web / "engine.js", "web-engine"))
+        copied.append((web / "style.css", "web-style"))
+        for asset in assets:
+            copied.append((web / asset.relative_to(root), "asset"))
+    else:
+        built = subprocess.run(
+            [
+                sys.executable,
+                str(COMPILER),
+                str(source),
+                "--release",
+                "--backend",
+                backend,
+                "--output",
+                str(executable),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=str(root),
+        )
+        if built.returncode != 0:
+            print(built.stdout, end="", file=out)
+            print(built.stderr, end="", file=sys.stderr)
+            print(f"error: build failed; {dist} was not packaged", file=sys.stderr)
+            return 1
 
-    copied: list[tuple[pathlib.Path, str]] = [(executable, "executable")]
-    if manifest_copy is not None:
-        shutil.copy2(source, manifest_copy)
-        copied.append((manifest_copy, "project-manifest"))
-    for asset in assets:
-        destination = dist / asset.relative_to(root)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(asset, destination)
-        copied.append((destination, "asset"))
+        copied = [(executable, "executable")]
+        if manifest_copy is not None:
+            shutil.copy2(source, manifest_copy)
+            copied.append((manifest_copy, "project-manifest"))
+        for asset in assets:
+            destination = dist / asset.relative_to(root)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(asset, destination)
+            copied.append((destination, "asset"))
 
     files = []
     checksums = {}
@@ -430,14 +501,17 @@ def package(
     manifest = {
         "name": project_name,
         "language_version": 1,
-        "compiler": {"name": "anvil", "backend": backend},
-        "target": "windows-x64",
+        "compiler": {
+            "name": "anvil",
+            "backend": "html+canvas" if target == "web" else backend,
+        },
+        "target": "browser" if target == "web" else "windows-x64",
         "features": _features(sources),
         "entry": entry.relative_to(root).as_posix(),
         "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "files": files,
         "checksums": checksums,
-        "dependencies": [],
+        "dependencies": [] if target != "web" else ["engine.js (bundled)"],
         "licenses": ["Anvil compiler and runtime: see LICENSE"],
     }
     (dist / "package.json").write_text(
@@ -445,7 +519,15 @@ def package(
     )
 
     print(f"\nWrote {dist / 'package.json'} and {len(files)} file(s).", file=out)
-    print(f"Run it with:  {executable}", file=out)
+    if target == "web":
+        print(f"Open it with:  {dist / 'web' / 'index.html'}", file=out)
+        print(
+            "This page previews scene/clear/display declarations; it is not the "
+            "compiled runtime.",
+            file=out,
+        )
+    else:
+        print(f"Run it with:  {executable}", file=out)
     return 0
 
 
