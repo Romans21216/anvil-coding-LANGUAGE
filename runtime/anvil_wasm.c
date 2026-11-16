@@ -723,7 +723,11 @@ double anvil_image_flip(double handle, double x, double y) {
 
 __attribute__((import_module("env"), import_name("sound_play")))
 extern int anvil_host_sound_play(const short *pcm, int frames, int channels,
-                                 int rate, double volume);
+                                 int rate, double volume, int loop);
+__attribute__((import_module("env"), import_name("sound_pan")))
+extern void anvil_host_sound_pan(int voice, double pan);
+__attribute__((import_module("env"), import_name("sound_pitch")))
+extern void anvil_host_sound_pitch(int voice, double rate);
 __attribute__((import_module("env"), import_name("sound_stop")))
 extern void anvil_host_sound_stop(int voice);
 __attribute__((import_module("env"), import_name("sound_stop_all")))
@@ -812,13 +816,40 @@ double anvil_sound_load(const char *path) {
   return 0.0;
 }
 
-double anvil_sound_play(double handle) {
+double anvil_sound_start(double handle, int loop);
+
+double anvil_sound_play(double handle) { return anvil_sound_start(handle, 0); }
+double anvil_sound_play_loop(double handle) {
+  return anvil_sound_start(handle, 1);
+}
+double anvil_sound_pan(double voice, double pan) {
+  if (!(voice >= 1.0) || !(pan == pan))
+    return 0.0;
+  double clamped = pan < -1.0 ? -1.0 : pan > 1.0 ? 1.0 : pan;
+  anvil_host_sound_pan((int)voice, clamped);
+  return clamped;
+}
+double anvil_sound_pitch(double voice, double rate) {
+  if (!(voice >= 1.0) || !(rate == rate))
+    return 0.0;
+  double clamped = rate < 0.25 ? 0.25 : rate > 4.0 ? 4.0 : rate;
+  anvil_host_sound_pitch((int)voice, clamped);
+  return clamped;
+}
+double anvil_sound_duration(double handle) {
+  AnvilWasmSoundSlot *slot = anvil_sound_slot(handle);
+  if (!slot || slot->source->rate <= 0)
+    return 0.0;
+  return (double)slot->source->frames / (double)slot->source->rate;
+}
+
+double anvil_sound_start(double handle, int loop) {
   AnvilWasmSoundSlot *slot = anvil_sound_slot(handle);
   if (!slot)
     return 0.0;
   int voice = anvil_host_sound_play(slot->source->pcm, slot->source->frames,
                                     slot->source->channels,
-                                    slot->source->rate, slot->volume);
+                                    slot->source->rate, slot->volume, loop);
   if (voice <= 0) {
     anvil_sound_error_text = "the host could not play the sound";
     return 0.0;

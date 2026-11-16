@@ -920,7 +920,7 @@ class WasmSoundTests(unittest.TestCase):
             )
             ops = json.loads(lines[-1])
             played = [op for op in ops if op[0] == "sound_play"]
-            self.assertEqual(played, [["sound_play", 800, 1, 8000, 1, 12000, 1]])
+            self.assertEqual(played, [["sound_play", 800, 1, 8000, 1, 12000, 1, 0]])
             self.assertIn(["sound_volume", 1, 0.5], ops)
             self.assertIn(["sound_stop_all", 1], ops)
 
@@ -945,6 +945,64 @@ class WasmSoundTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("PCM only", result.stderr)
+
+
+
+
+_LOOP_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "set var(s) = 0",
+        "set var(report) = 0",
+        "",
+        "fn(update)",
+        "  if var(report) = 0",
+        '    set var(s) = sound_load("tone.wav")',
+        "    say sound_duration(var(s))",
+        "    say sound_play_loop(var(s))",
+        "    say sound_pan(1, 2)",
+        "    say sound_pitch(1, 9)",
+        "    say sound_pan(1, -0.5)",
+        "    say sound_pitch(1, 0.5)",
+        "    say sound_stop(1)",
+        "    set var(report) = 1",
+        "  end",
+        "end",
+        "",
+        "fn(draw)",
+        "  display rect(0, 0, 1, 1) -rgb(0, 0, 0)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmLoopSoundTests(unittest.TestCase):
+    def test_loop_pan_pitch_and_duration(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            _write_tone(root / "tone.wav")
+            result, out = build(root, _LOOP_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertEqual(lines[:7], ["0.1", "1", "1", "4", "-0.5", "0.5", "1"])
+            ops = json.loads(lines[-1])
+            played = [op for op in ops if op[0] == "sound_play"]
+            self.assertEqual(played, [["sound_play", 800, 1, 8000, 1, 12000, 1, 1]])
+            self.assertIn(["sound_pan", 1, 1], ops)
+            self.assertIn(["sound_pitch", 1, 4], ops)
+            self.assertIn(["sound_pan", 1, -0.5], ops)
+            self.assertIn(["sound_pitch", 1, 0.5], ops)
+            self.assertIn(["sound_stop", 1, 1], ops)
 
 
 if __name__ == "__main__":

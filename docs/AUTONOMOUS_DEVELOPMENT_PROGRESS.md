@@ -689,3 +689,9 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - **Runtime:** 16 generational sound slots, `sound_load`/`sound_error`/`sound_play`/`sound_stop`/`sound_stop_all`/`sound_volume`/`sound_active`/`sound_destroy`, with host imports for the playback verbs. Pan, pitch, loop, groups and streaming music are not implemented in wasm yet.
 - **Gestures:** browsers suspend audio until a user gesture; the page resumes the context on `keydown`/`pointerdown`, and `window.anvilAudio()` exposes `{active, voices, state, sampleRate}`.
 - **Verified:** the Node host records each play with frames, channels, rate, volume and peak sample (800 frames, mono, 8 kHz, peak 12000). In Chromium the context stayed `suspended` before a trusted click and moved to `running` after one, with the voice ending cleanly. `tests/test_wasm.py` asserts the recorded play, volume and stop ops, the exact stdout sequence, a located missing-file error and a compressed-WAV refusal. 26 passed.
+
+## Batch 62 — wasm audio: loop, pan, pitch, duration (8.12)
+
+- **API:** `sound_play_loop`, `sound_pan`, `sound_pitch` and `sound_duration` join the wasm audio set. Pan clamps to -1..1 and pitch to 0.25-4 with the same return-the-applied-value contract as the C runtime; duration is `frames / rate` from the baked source.
+- **Hosts:** the page routes each voice through a gain node and a stereo panner, sets `source.loop` for looping plays, and applies pan/pitch to the live nodes; the Node host records the loop flag and the pan/pitch calls.
+- **Verified:** a program reports duration 0.1 s, loop voice 1, pan(`2`)->1, pitch(`9`)->4, pan(-0.5), pitch(0.5) and stop; the Node recorder matches those ops. In Chromium a looping 0.1 s tone stayed active at 0.5 s and 2.0 s with the context `running`, so it really loops rather than holding a finished source. `tests/test_wasm.py` asserts both; 27 passed.

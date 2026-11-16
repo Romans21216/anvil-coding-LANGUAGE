@@ -176,6 +176,10 @@ typedef struct {
 void anvil_wasm_set_sounds(const AnvilWasmSound *sounds, int count);
 double anvil_sound_load(const char *path);
 double anvil_sound_play(double handle);
+double anvil_sound_play_loop(double handle);
+double anvil_sound_pan(double voice, double pan);
+double anvil_sound_pitch(double voice, double rate);
+double anvil_sound_duration(double handle);
 double anvil_sound_stop(double voice);
 double anvil_sound_stop_all(void);
 double anvil_sound_volume(double voice, double volume);

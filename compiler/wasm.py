@@ -81,6 +81,10 @@ ALLOWED_BUILTINS = {
     "image_error",
     "sound_load",
     "sound_play",
+    "sound_play_loop",
+    "sound_pan",
+    "sound_pitch",
+    "sound_duration",
     "sound_stop",
     "sound_stop_all",
     "sound_volume",
@@ -230,7 +234,7 @@ async function start() {
         context.drawImage(offscreen, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
         context.restore();
       },
-      sound_play(pointer, frames, channels, rate, volume) {
+      sound_play(pointer, frames, channels, rate, volume, loop) {
         const ctx = audioContext();
         if (!ctx || frames <= 0) return 0;
         const samples = new Int16Array(memory.buffer, pointer, frames * channels);
@@ -245,10 +249,14 @@ async function start() {
         source.buffer = buffer;
         const gain = ctx.createGain();
         gain.gain.value = volume;
-        source.connect(gain).connect(ctx.destination);
+        const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+        source.connect(gain);
+        if (panner) gain.connect(panner).connect(ctx.destination);
+        else gain.connect(ctx.destination);
+        source.loop = loop !== 0 && loop !== undefined;
         audioState.nextVoice += 1;
         const voice = audioState.nextVoice;
-        audioState.voices.set(voice, { source, gain });
+        audioState.voices.set(voice, { source, gain, panner });
         audioState.active += 1;
         source.onended = () => {
           if (audioState.voices.delete(voice)) {
@@ -273,6 +281,14 @@ async function start() {
       sound_volume(voice, volume) {
         const entry = audioState.voices.get(voice);
         if (entry) entry.gain.gain.value = volume;
+      },
+      sound_pan(voice, pan) {
+        const entry = audioState.voices.get(voice);
+        if (entry && entry.panner) entry.panner.pan.value = pan;
+      },
+      sound_pitch(voice, rate) {
+        const entry = audioState.voices.get(voice);
+        if (entry) entry.source.playbackRate.value = rate;
       },
       sound_active() {
         return audioState.active;

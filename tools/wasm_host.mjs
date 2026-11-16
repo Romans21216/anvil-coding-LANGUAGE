@@ -83,7 +83,7 @@ const imports = {
       }
       ops.push(["image_region", width, height, sx, sy, sw, sh, dx, dy, dw, dh, tintR, tintG, tintB, flipX, flipY, hash]);
     },
-    sound_play(pointer, frames, channels, rate, volume) {
+    sound_play(pointer, frames, channels, rate, volume, loop) {
       const samples = new Int16Array(memory.buffer, pointer, frames * channels);
       let peak = 0;
       for (let index = 0; index < samples.length; index++) {
@@ -92,7 +92,7 @@ const imports = {
       }
       nextVoice += 1;
       voices.add(nextVoice);
-      ops.push(["sound_play", frames, channels, rate, volume, peak, nextVoice]);
+      ops.push(["sound_play", frames, channels, rate, volume, peak, nextVoice, loop ? 1 : 0]);
       return nextVoice;
     },
     sound_stop(voice) {
@@ -106,6 +106,12 @@ const imports = {
     },
     sound_volume(voice, volume) {
       ops.push(["sound_volume", voice, volume]);
+    },
+    sound_pan(voice, pan) {
+      ops.push(["sound_pan", voice, pan]);
+    },
+    sound_pitch(voice, rate) {
+      ops.push(["sound_pitch", voice, rate]);
     },
     sound_active() {
       return voices.size;
