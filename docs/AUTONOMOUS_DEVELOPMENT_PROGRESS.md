@@ -376,3 +376,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Accuracy check:** all 91 test modules named in the page exist.
 - **Files:** `docs/TESTING.md` (new), `README.md`.
 - **Commit:** `8997af2`.
+
+## Batch 22 — network fuzzing and prompt output (8.14/8.15)
+
+- **Runtime hardening:** `anvil_net_receive` ignores datagrams whose length is not one double and 8-byte payloads that are NaN or infinite, keeping the previous value. A malformed packet can no longer poison comparisons or stop the program.
+- **Fuzz test:** `tests/test_net_fuzz.py` hosts a real program, sends empty/1/4/7/9/16-byte datagrams and NaN/+inf/-inf bit patterns, then one valid 2.5, and asserts the program exits 0 with only 2.5 accepted and no `nan`/`inf` output.
+- **Found while testing:** `say` output was block-buffered when stdout was a pipe, so a running program looked silent until exit. Generated C now calls `fflush(stdout)` after each `say` line; `tests/test_output_flush.py` reads the first line while the program is still sleeping.
+- **Contract update:** the old UDP NaN test expected exit 2 with a located non-finite error; it now floods NaN and asserts survival plus acceptance of a later finite value. `docs/LANGUAGE_SPEC.md` and `docs/MULTIPLAYER.md` record the payload rules.
+- **Tests:** 70 passed across `test_compiler`, `test_net_fuzz` and `test_output_flush`.
+- **Commits:** `031bfb0`, plus the test-contract commit.
