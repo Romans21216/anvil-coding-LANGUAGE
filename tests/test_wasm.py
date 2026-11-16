@@ -1210,5 +1210,114 @@ class WasmModelTests(unittest.TestCase):
             self.assertLess(summary[2], 390, "the model shifts left when x is negative")
 
 
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmShadowCullingTests(unittest.TestCase):
+    def test_a_cube_submits_one_shadow_quad(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 4 9",
+                    "set var(ang) = camera_angle(0, -22)",
+                    "set var(sh) = shadow(1)",
+                    "set var(gh) = shadow_height(0)",
+                    "set var(al) = shadow_alpha(300)",
+                    "",
+                    "fn(update)",
+                    "  say shadow_alpha(300)",
+                    "end",
+                    "",
+                    "fn(draw)",
+                    "  display cube(0, 2, 0, 2) -rgb(255, 140, 60)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertEqual(lines[0], "255", "shadow alpha clamps to 255")
+            ops = json.loads(lines[-1])
+            summary = [op for op in ops if op[0] == "triangles"][0]
+            self.assertEqual(summary[1], 14, "twelve cube triangles plus two shadow triangles")
+
+    def test_culling_skips_off_screen_models(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 6",
+                    "set var(report) = 0",
+                    "",
+                    "fn(update)",
+                    "  if var(report) = 2",
+                    "    say mesh_culled()",
+                    "    set var(report) = 3",
+                    "  end",
+                    "  set var(report) = compute(var(report) + 1)",
+                    "end",
+                    "",
+                    "fn(draw)",
+                    '  set var(d) = model_draw("quad.gltf", 40, 0, 0, 1, 0, 0, 0)',
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "3"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines()[0], "1", "the model reports culled")
+            self.assertNotIn("triangles", run.stdout)
+
+    def test_a_model_shadow_adds_flattened_triangles(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 6",
+                    "set var(sh) = shadow(1)",
+                    "",
+                    "fn(draw)",
+                    '  set var(d) = model_draw("quad.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            summary = [op for op in ops if op[0] == "triangles"][0]
+            self.assertEqual(summary[1], 4, "two model triangles plus two shadow triangles")
+
+
 if __name__ == "__main__":
     unittest.main()

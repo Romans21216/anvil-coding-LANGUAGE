@@ -120,6 +120,17 @@ view, and `display cube/plane/sphere` submit world-space triangles. Each
 triangle is rotated, translated, put in camera space with the C runtime's basis,
 projected, flat-shaded by a fixed directional light and handed to the host.
 
+Shadows are the same overhead projection as the desktop runtime: `shadow(on)`,
+`shadow_height(y)` and `shadow_alpha(a)` flatten a cube's bottom face and every
+model triangle onto the ground plane in black with that alpha. Shadow triangles
+carry a separate draw layer so they paint after ordinary geometry; without it
+the floor's own triangles sorted over them. The shadow quad uses the cube's
+bottom face — the first attempt used a side face, which projected to a line.
+
+Bounding-sphere culling is implemented for `model_draw`: a model is skipped when
+its whole sphere is behind the near plane or outside the screen, and
+`mesh_culled()` reports it.
+
 `model_draw` works because the compiler bakes glTF triangles into the module
 exactly as it does for the C backend: the runtime receives 12 doubles per
 triangle (three positions plus RGB), scales, rotates and translates them, then
@@ -130,8 +141,8 @@ no bounding-sphere test yet, and `mesh_culling(on)` only echoes its argument.
 The host draws them with the painter's algorithm on the 2D canvas: triangles are
 collected during the frame and sorted far-to-near at `present()`. That means no
 depth buffer, so overlapping triangles at the same depth can sort wrongly, and
-3D is always painted after any 2D drawing in the frame. Shadows, culling,
-skins, morph targets, textures and `ray_sphere` remain C-backend only.
+3D is always painted after any 2D drawing in the frame. Skins, morph targets,
+textures and `ray_sphere` remain C-backend only.
 
 ## Audio
 

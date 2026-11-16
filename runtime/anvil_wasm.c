@@ -32,7 +32,8 @@ extern int anvil_host_save_delete(const char *key);
 __attribute__((import_module("env"), import_name("triangle")))
 extern void anvil_host_triangle(double x1, double y1, double z1, double x2,
                                 double y2, double z2, double x3, double y3,
-                                double z3, int r, int g, int b, int a);
+                                double z3, int r, int g, int b, int a,
+                                int layer);
 
 __attribute__((import_module("env"), import_name("image_region")))
 extern void anvil_host_image_region(const unsigned int *pixels, int width,
@@ -648,7 +649,8 @@ static int anvil_wasm_project(AnvilWasmVec3 p, double *sx, double *sy,
 
 static void anvil_wasm_triangle(AnvilWasmVec3 a, AnvilWasmVec3 b,
                                 AnvilWasmVec3 c, AnvilWasmVec3 normal,
-                                int r, int g, int bl, int alpha) {
+                                int r, int g, int bl, int alpha,
+                                double depth_bias, int layer) {
   if (!anvil_scene_is_3d)
     return;
   double x1, y1, d1, x2, y2, d2, x3, y3, d3;
@@ -664,18 +666,23 @@ static void anvil_wasm_triangle(AnvilWasmVec3 a, AnvilWasmVec3 b,
   int shaded_r = (int)(r * shade);
   int shaded_g = (int)(g * shade);
   int shaded_b = (int)(bl * shade);
-  anvil_host_triangle(x1, y1, d1, x2, y2, d2, x3, y3, d3, shaded_r, shaded_g,
-                      shaded_b, alpha);
+  anvil_host_triangle(x1, y1, d1 + depth_bias, x2, y2, d2 + depth_bias, x3,
+                      y3, d3 + depth_bias, shaded_r, shaded_g, shaded_b, alpha,
+                      layer);
 }
 
 static void anvil_wasm_quad(AnvilWasmVec3 a, AnvilWasmVec3 b, AnvilWasmVec3 c,
                             AnvilWasmVec3 d, int r, int g, int bl, int alpha) {
+  const double bias = 0.0;
   AnvilWasmVec3 normal =
       anvil_wasm_normalize(anvil_wasm_cross(anvil_wasm_sub(b, a),
                                             anvil_wasm_sub(c, a)));
-  anvil_wasm_triangle(a, b, c, normal, r, g, bl, alpha);
-  anvil_wasm_triangle(a, c, d, normal, r, g, bl, alpha);
+  anvil_wasm_triangle(a, b, c, normal, r, g, bl, alpha, bias, 0);
+  anvil_wasm_triangle(a, c, d, normal, r, g, bl, alpha, bias, 0);
 }
+
+static void anvil_wasm_shadow_triangle(AnvilWasmVec3 a, AnvilWasmVec3 b,
+                                       AnvilWasmVec3 c);
 
 void anvil_cube(double x, double y, double z, double size, double rx, double ry,
                 double rz, int r, int g, int b, int a) {
@@ -695,6 +702,10 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
   anvil_wasm_quad(corners[2], corners[3], corners[7], corners[6], r, g, b, a);
   anvil_wasm_quad(corners[0], corners[2], corners[6], corners[4], r, g, b, a);
   anvil_wasm_quad(corners[1], corners[5], corners[7], corners[3], r, g, b, a);
+  /* One shadow for the whole cube (its bottom face), not one per face: six
+     stacked translucent copies would read as solid black. */
+  anvil_wasm_shadow_triangle(corners[0], corners[1], corners[5]);
+  anvil_wasm_shadow_triangle(corners[0], corners[5], corners[4]);
 }
 
 void anvil_plane(double x, double y, double z, double width, double depth,
@@ -734,6 +745,67 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
 }
 
 
+/* ---- Shadows and culling ------------------------------------------------ */
+static int anvil_shadows_enabled;
+static double anvil_shadow_ground_y;
+static int anvil_shadow_alpha_value = 150;
+static int anvil_mesh_culling_enabled = 1;
+static int anvil_mesh_culled_frame;
+
+double anvil_shadow(double on) {
+  anvil_shadows_enabled = on != 0.0;
+  return anvil_shadows_enabled ? 1.0 : 0.0;
+}
+double anvil_shadow_height(double y) {
+  if (!(y == y))
+    return 0.0;
+  anvil_shadow_ground_y = y;
+  return y;
+}
+double anvil_shadow_alpha(double alpha) {
+  if (!(alpha == alpha))
+    return 0.0;
+  int applied = (int)(alpha < 0.0 ? 0.0 : alpha > 255.0 ? 255.0 : alpha);
+  anvil_shadow_alpha_value = applied;
+  return (double)applied;
+}
+
+static void anvil_wasm_shadow_triangle(AnvilWasmVec3 a, AnvilWasmVec3 b,
+                                       AnvilWasmVec3 c) {
+  if (!anvil_shadows_enabled || anvil_shadow_alpha_value <= 0)
+    return;
+  AnvilWasmVec3 flat_a = {a.x, anvil_shadow_ground_y + 0.002, a.z};
+  AnvilWasmVec3 flat_b = {b.x, anvil_shadow_ground_y + 0.002, b.z};
+  AnvilWasmVec3 flat_c = {c.x, anvil_shadow_ground_y + 0.002, c.z};
+  anvil_wasm_triangle(flat_a, flat_b, flat_c, (AnvilWasmVec3){0, 1, 0}, 0, 0, 0,
+                      anvil_shadow_alpha_value, 0.0, 1);
+}
+
+static int anvil_wasm_sphere_visible(double cx, double cy, double cz,
+                                     double radius, double x, double y,
+                                     double z, double scale, double rx,
+                                     double ry, double rz) {
+  if (!anvil_mesh_culling_enabled || radius <= 0.0)
+    return 1;
+  AnvilWasmVec3 centre = {cx * scale, cy * scale, cz * scale};
+  centre = anvil_wasm_rotate(centre, rx, ry, rz);
+  centre = (AnvilWasmVec3){centre.x + x, centre.y + y, centre.z + z};
+  AnvilWasmVec3 camera = anvil_wasm_to_camera(centre);
+  double scaled = radius * scale;
+  if (camera.z + scaled <= 0.05)
+    return 0;
+  if (camera.z - scaled < 0.05)
+    return 1;
+  double projected = scaled * anvil_camera_focal / camera.z;
+  double screen_x = 480.0 + camera.x * anvil_camera_focal / camera.z;
+  double screen_y = 324.0 - camera.y * anvil_camera_focal / camera.z;
+  if (screen_x + projected < 0.0 || screen_x - projected > 960.0)
+    return 0;
+  if (screen_y + projected < 0.0 || screen_y - projected > 600.0)
+    return 0;
+  return 1;
+}
+
 /* ---- Baked models -------------------------------------------------------
    model_draw arrays hold 12 doubles per triangle: three positions followed by
    an RGB colour. The compiler bakes them from glTF at build time, so the
@@ -741,19 +813,24 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
 static int anvil_mesh_drawn_frame;
 
 double anvil_mesh_drawn(void) { return (double)anvil_mesh_drawn_frame; }
-double anvil_mesh_culled(void) { return 0.0; }
-double anvil_mesh_culling(double on) { return on != 0.0 ? 1.0 : 0.0; }
+double anvil_mesh_culled(void) { return (double)anvil_mesh_culled_frame; }
+double anvil_mesh_culling(double on) {
+  anvil_mesh_culling_enabled = on != 0.0;
+  return anvil_mesh_culling_enabled ? 1.0 : 0.0;
+}
 
 double anvil_mesh_draw(const double *data, int triangle_count, double cx,
                        double cy, double cz, double radius, double x, double y,
                        double z, double scale, double rx, double ry, double rz) {
-  (void)cx;
-  (void)cy;
-  (void)cz;
-  (void)radius;
   if (!data || triangle_count <= 0 || !(scale == scale) || scale == 0.0 ||
       !(x == x) || !(y == y) || !(z == z))
     return 0.0;
+  if (!anvil_wasm_sphere_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry,
+                                 rz)) {
+    anvil_mesh_culled_frame = 1;
+    return 0.0;
+  }
+  anvil_mesh_culled_frame = 0;
   anvil_mesh_drawn_frame = 0;
   for (int triangle = 0; triangle < triangle_count; ++triangle) {
     const double *p = data + (size_t)triangle * 12;
@@ -769,7 +846,9 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
     AnvilWasmVec3 normal = anvil_wasm_normalize(
         anvil_wasm_cross(anvil_wasm_sub(points[1], points[0]),
                          anvil_wasm_sub(points[2], points[0])));
-    anvil_wasm_triangle(points[0], points[1], points[2], normal, r, g, b, 255);
+    anvil_wasm_triangle(points[0], points[1], points[2], normal, r, g, b, 255,
+                        0.0, 0);
+    anvil_wasm_shadow_triangle(points[0], points[1], points[2]);
     anvil_mesh_drawn_frame += 1;
   }
   return 1.0;

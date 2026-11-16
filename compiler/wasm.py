@@ -101,6 +101,9 @@ ALLOWED_BUILTINS = {
     "mesh_drawn",
     "mesh_culled",
     "mesh_culling",
+    "shadow",
+    "shadow_height",
+    "shadow_alpha",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
@@ -345,13 +348,14 @@ async function start() {
       sound_active() {
         return audioState.active;
       },
-      triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a) {
-        triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a]);
+      triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
+        triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
       },
       present() {
         if (!triangles.length) return;
         triangles.sort(
           (first, second) =>
+            first[13] - second[13] ||
             second[2] + second[5] + second[8] - (first[2] + first[5] + first[8])
         );
         for (const t of triangles) {

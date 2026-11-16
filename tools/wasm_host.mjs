@@ -134,8 +134,8 @@ const imports = {
     sound_active() {
       return voices.size;
     },
-    triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a) {
-      triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a]);
+    triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
+      triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
     },
     present() {
       if (triangles.length) {

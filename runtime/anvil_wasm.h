@@ -210,6 +210,9 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
 double anvil_mesh_drawn(void);
 double anvil_mesh_culled(void);
 double anvil_mesh_culling(double on);
+double anvil_shadow(double on);
+double anvil_shadow_height(double y);
+double anvil_shadow_alpha(double alpha);
 void anvil_clear(int r, int g, int b, int a);
 void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
                 int a);
