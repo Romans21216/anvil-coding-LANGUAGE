@@ -103,6 +103,55 @@ def _place_extension_dlls(output: pathlib.Path) -> None:
             shutil.copyfile(dll, target)
 
 
+def _package_after_build(
+    args,
+    source_path: pathlib.Path,
+    out: pathlib.Path,
+    funcs,
+    top,
+    project_name: str,
+    backend: str,
+    declared_assets: list[str],
+    manifest_path: pathlib.Path | None,
+    compiler,
+) -> int:
+    """Collect assets, validate them and write (or print) the package manifest."""
+    from compiler import package as package_mod
+    from compiler.builtin_usage import used_builtins
+    from compiler.common import LANGUAGE_VERSION
+
+    root = (manifest_path.parent if manifest_path else source_path.parent).resolve()
+    sources = {source_path.resolve()}
+    for node in top:
+        origin = getattr(node, "source", None)
+        if origin:
+            sources.add(pathlib.Path(origin).resolve())
+    for function in funcs.values():
+        origin = getattr(function, "source", None)
+        if origin:
+            sources.add(pathlib.Path(origin).resolve())
+    if backend == "native":
+        identity = {"name": "anvil-native", "language_version": LANGUAGE_VERSION}
+    else:
+        identity = {
+            "name": compiler[0],
+            "sha256": package_mod.sha256_file(pathlib.Path(compiler[1])),
+        }
+    return package_mod.package(
+        project_root=root,
+        name=project_name,
+        backend=backend,
+        entry=source_path,
+        program=out,
+        declared_assets=declared_assets,
+        sources=sorted(sources),
+        features=used_builtins(funcs, top),
+        compiler=identity,
+        target_dir=args.package or pathlib.Path("dist"),
+        dry_run=args.package_dry_run,
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=(
@@ -157,6 +206,17 @@ def main() -> int:
         "--no-cache",
         action="store_true",
         help="ignore the build cache and do not store a new entry",
+    )
+    ap.add_argument(
+        "--package",
+        type=pathlib.Path,
+        metavar="DIR",
+        help="copy the program and its assets into DIR with anvil-package.json",
+    )
+    ap.add_argument(
+        "--package-dry-run",
+        action="store_true",
+        help="validate assets and print the package manifest without writing",
     )
     ap.add_argument(
         "--print-imports",
@@ -222,6 +282,7 @@ def main() -> int:
         source_path = args.source
         include_root = None
         fixed_hz = 60
+        declared_assets: list[str] = []
         project_name = "Anvil Game"
         manifest_path = None
         manifest_entry = None
@@ -232,7 +293,7 @@ def main() -> int:
                 )
             manifest_text = args.source.read_text(encoding="utf-8")
             manifest = tomllib.loads(manifest_text)
-            unknown_keys = set(manifest) - {"name", "entry", "engine"}
+            unknown_keys = set(manifest) - {"name", "entry", "engine", "assets"}
             if unknown_keys:
                 raise CompileError(
                     f"{args.source}: unsupported project setting(s): "
@@ -273,6 +334,23 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: manifest needs a non-empty string 'entry'"
                 )
+            assets_table = manifest.get("assets", {})
+            if not isinstance(assets_table, dict):
+                raise CompileError(f"{args.source}: 'assets' must be a TOML table")
+            unknown_asset_keys = set(assets_table) - {"files"}
+            if unknown_asset_keys:
+                raise CompileError(
+                    f"{args.source}: unsupported asset setting(s): "
+                    f"{', '.join(sorted(unknown_asset_keys))}"
+                )
+            asset_files = assets_table.get("files", [])
+            if not isinstance(asset_files, list) or not all(
+                isinstance(item, str) and item for item in asset_files
+            ):
+                raise CompileError(
+                    f"{args.source}: assets.files must be a list of non-empty strings"
+                )
+            declared_assets = list(asset_files)
             manifest_path = args.source
             manifest_entry = entry
             project_root = args.source.resolve().parent
@@ -369,6 +447,11 @@ def main() -> int:
             out.write_bytes(executable)
             _place_extension_dlls(out)
             print(f"Built {out} as native AMD64 PE (no C/Rust compiler)")
+            if args.package or args.package_dry_run:
+                return _package_after_build(
+                    args, source_path, out, funcs, top, project_name, "native",
+                    declared_assets, manifest_path, None,
+                )
             return 0
         generated = emit_c(
             source_path, funcs, top, variables, arrays, fixed_hz, project_name
@@ -429,6 +512,11 @@ def main() -> int:
                     )
                 print(f"Built {out} using {compiler[0]}")
         _place_extension_dlls(out)
+        if args.package or args.package_dry_run:
+            return _package_after_build(
+                args, source_path, out, funcs, top, project_name, "c",
+                declared_assets, manifest_path, compiler,
+            )
         return 0
     except tomllib.TOMLDecodeError as e:
         print(f"{args.source}: {e}", file=sys.stderr)
