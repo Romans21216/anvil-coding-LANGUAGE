@@ -177,5 +177,47 @@ class WindowFlagTests(unittest.TestCase):
                     process.communicate()
 
 
+    def test_repeating_a_toggle_keeps_the_saved_state(self) -> None:
+        """Calling a flag twice must not overwrite the saved style or rectangle."""
+        program = NL.join(
+            (
+                "scene 2d",
+                "fn(draw)",
+                "  if var(step) = 0",
+                "    set var(step) = 1",
+                "    say window_fullscreen(1)",
+                "    say window_fullscreen(1)",
+                "    say window_on_top(1)",
+                "    say window_fullscreen(0)",
+                "    say window_fullscreen(0)",
+                "    say window_on_top(0)",
+                "    stop",
+                "  end",
+                "end",
+                "",
+            )
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            source = root / "twice.ANVL"
+            source.write_text(program, encoding="utf-8")
+            out = root / "twice.exe"
+            build = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "-o", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            if build.returncode != 0:
+                if "No C compiler found" in build.stderr:
+                    self.skipTest("MSVC is not available")
+                self.fail(build.stdout + build.stderr)
+            result = subprocess.run(
+                [str(out)], capture_output=True, text=True, timeout=60
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.split(), ["1"] * 6)
+
+
 if __name__ == "__main__":
     unittest.main()
