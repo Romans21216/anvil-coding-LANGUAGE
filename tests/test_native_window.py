@@ -37,7 +37,7 @@ fn(update)
 end
 fn(draw)
   set var(drawing) = 1
-  for local(delay) = 1 to 200000
+  for local(delay) = 1 to 20000000
   end
   set array(positions, 0) = var(x)
   display rect(array(positions, 0) + 0.5, 20.5, call fn(width), 30.25) -rgb(200, 80, 40)
@@ -147,7 +147,7 @@ end
                 # Inspect a live draw phase rather than relying on a lucky screenshot.
                 # The old visible-HDC path showed background here before the rect call.
                 samples = 0
-                deadline = time.monotonic() + 0.3
+                deadline = time.monotonic() + 1.0
                 while time.monotonic() < deadline:
                     drawing = ctypes.c_double()
                     size = ctypes.c_size_t()

@@ -583,3 +583,15 @@ Tests: `tests/test_commands.py` (7 cases) covers doctor output, scaffold +
 both-backend `--check`, refusal to overwrite, exe removal keeping the source,
 the `nothing to clean` path, and `--clean` without a source. Full suite: 342
 passed.
+
+## Native window test: make the deliberate slow draw actually slow
+
+`test_direct_2d_scene_pixels_resize_and_close` failed about two runs in three
+with `0 not greater than 0 : did not observe the deliberate slow draw`. The
+fixture drew with `for local(delay) = 1 to 200000`, which the native backend
+finishes in well under the 1 ms sampler period, so the `drawing` flag was
+usually gone before it could be read. Raised the loop to 20,000,000 iterations
+and widened the sampling window from 0.3 s to 1.0 s; the test now observes
+several draw phases and passed five consecutive runs (2.5-2.9 s each).
+
+Tests: `test_native_window` + `test_native_x64` + `test_commands` 35 passed.
