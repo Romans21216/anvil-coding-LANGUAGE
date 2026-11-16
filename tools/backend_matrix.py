@@ -169,6 +169,12 @@ CASES = [
         "hello\n0",
     ),
     (
+        "print-toplevel",
+        "text",
+        'print "booting"\nfn(main)\n output 0\nend\n',
+        "booting\n0",
+    ),
+    (
         "text-builtins",
         "text",
         'fn(main)\n output len("anvil")\nend\n',

@@ -130,6 +130,10 @@ end
 """
         self.assertEqual(self._run_source(source), 'score = 7\nsay "hi"\n0\n')
 
+    def test_native_backend_runs_top_level_literal_print_before_main(self):
+        source = 'print "booting"\nfn(main)\n  output 0\nend\n'
+        self.assertEqual(self._run_source(source), "booting\n0\n")
+
     def test_native_backend_rejects_dynamic_print_with_a_source_location(self):
         source = 'fn(main)\n  set var(score) = 7\n  print "score = " + var(score)\nend\n'
         with tempfile.TemporaryDirectory() as temp:

@@ -915,7 +915,7 @@ class NativeCodegen:
         if any(node.kind == "scene" for node in self.top):
             return self._generate_window()
         calls = [node for node in self.top if node.kind == "call"]
-        allowed=("call", "seed",'global_set','net_ip','net_host','net_join','net_leave')
+        allowed=("call", "seed",'global_set','net_ip','net_host','net_join','net_leave','print')
         if any(node.kind not in allowed for node in self.top):
             unsupported = next(node for node in self.top if node.kind not in allowed)
             raise CompileError(
@@ -924,7 +924,7 @@ class NativeCodegen:
         from compiler.modules import reachable_functions
         for name, fn in reachable_functions(self.functions, self.top, graphical=False):
             self._emit_function(name, fn)
-        setup = [node for node in self.top if node.kind in ("seed",'global_set','net_ip','net_host','net_join','net_leave')]
+        setup = [node for node in self.top if node.kind in ("seed",'global_set','net_ip','net_host','net_join','net_leave','print')]
         if setup:
             self._emit_function("native:console_setup", Node("function", 1, body=setup))
         if calls:

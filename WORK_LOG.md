@@ -413,3 +413,14 @@ Both now lower to SSE2 in `compiler/native_math.py`:
 Tests in `tests/test_native_x64.py` cover the matching values, the sign cases
 and both rejections; `docs/BACKEND_MATRIX.md` regenerates with these rows
 supported on both backends (20 of 29 shared cases).
+
+## Native backend: top-level `print` and editor grammar alignment
+
+- Top-level `print "literal"` now runs before `main` on the native backend,
+  matching the C backend's setup order (`booting` then the program result).
+  Covered by `tests/test_native_x64.py` and the `print-toplevel` matrix row.
+- The VS Code TextMate grammar now scopes `print`/`say` as keywords and adds
+  the numeric/text built-ins the C backend documents (`round`, `sign`, `pow`,
+  `hypot`, `log`, `log10`, `exp`, `tan`, `atan2`, `mod`, `len`, `upper`,
+  `lower`, `trim`, `mid`, `replace`, `find`, `ord`, `chr`). `npm test
+  --prefix vscode-extension` checks the new scopes against real source lines.

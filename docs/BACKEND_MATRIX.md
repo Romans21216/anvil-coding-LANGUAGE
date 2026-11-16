@@ -31,6 +31,7 @@ source with a diagnostic. Regenerate after changing either backend, and run
 | `text-dynamic` | text | builds | rejected |
 | `print-statement` | text | supported | rejected |
 | `print-literal` | text | supported | supported |
+| `print-toplevel` | text | supported | supported |
 | `text-builtins` | text | supported | rejected |
 | `clear-inside-draw` | graphics | builds | rejected |
 | `display-rect` | graphics | builds | builds |
@@ -40,7 +41,7 @@ source with a diagnostic. Regenerate after changing either backend, and run
 
 ## Summary
 
-- Cases where both backends build and print the same value: **20** of 29.
+- Cases where both backends build and print the same value: **21** of 30.
 - Cases the C backend supports but the native backend rejects: **2**.
 - Cases the native backend rejects: `print-statement`, `text-builtins`.
 
