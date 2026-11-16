@@ -655,3 +655,10 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - **Runtime:** `noise`/`fbm` ported with the C runtime's hash table, gradient table, fade curve and 0.7 scale, including the coordinate-range check that writes `Anvil noise coordinate range error` and traps. `ord`/`chr` match the C semantics: `ord("")` is 0, `chr(0)` is empty text, and an out-of-range `chr` writes `Anvil chr out of range` and stops with a non-zero exit.
 - **Hosts:** both hosts now route `write(2, ...)` to stderr (the generated C already used fd 2), so the C and wasm failure paths report through the same channel.
 - **Tests:** `tests/test_wasm.py` compares a 13-line noise/fBm/ord/chr program across C and wasm byte for byte (including negative and fractional coordinates) and asserts the `chr(300)` failure message, empty stdout and non-zero exit. 19 passed.
+
+## Batch 57 — input-latency capture (8.15)
+
+- **Tool:** `tools/bench_input.py` builds a program that prints `time()` once for clock calibration and again whenever `pressed(A)` fires, finds the window by process id, posts `WM_KEYDOWN`/`WM_KEYUP` through `PostMessageW`, and reports p50/p95/worst over N presses and R runs. The program clock is calibrated against the harness before any sleep, which matters: reading the calibration line after a delay charged the wait to every sample and produced 328 ms "latency".
+- **Measured:** p50 25.5-29.4 ms, p95 43.3-51.6 ms, worst 51.6 ms over 20 presses x 3 runs on this machine. That is between one and two 60 Hz frames, which matches the loop's structure (message pump, then fixed-step accumulator).
+- **Negative result kept honest:** replacing the frame `Sleep` with `MsgWaitForMultipleObjectsEx` so the loop wakes on input was measured A/B and was *worse* (p50 28.4 vs 25.5, p95 53.4 vs 43.3), so the runtime change was reverted rather than shipped on intuition.
+- **Tests:** `tests/test_input_latency.py` measures 8 presses, checks the report shape and ordering, and enforces `tools/input_budgets.json` through `--check`. 3 passed.

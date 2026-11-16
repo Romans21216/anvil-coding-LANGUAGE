@@ -1,0 +1,6 @@
+{
+  "p50_ms": 58.8,
+  "p95_ms": 82.5,
+  "max_ms": 82.5,
+  "note": "measured with headroom; re-baseline on new hardware"
+}
