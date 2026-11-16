@@ -1,0 +1,23 @@
+scene 2d
+set var(fullscreen) = 0
+set var(on-top) = 0
+
+fn(update)
+  if pressed(F)
+    set var(fullscreen) = 1 - var(fullscreen)
+    window_fullscreen(var(fullscreen))
+  end
+  if pressed(T)
+    set var(on-top) = 1 - var(on-top)
+    window_on_top(var(on-top))
+  end
+end
+
+fn(draw)
+  clear rgba(12, 16, 24, 255)
+  display rect(40, 40, 220, 120) -rgb(40, 120, 200)
+  display rect(70, 70, 60, 60) -rgb(250, 200, 90)
+  display text("F  fullscreen: " + var(fullscreen)) 1 -l(40, 190) -rgb(232, 238, 248)
+  display text("T  always on top: " + var(on-top)) 2 -l(40, 220) -rgb(232, 238, 248)
+  display text("Toggle either flag while another window is focused.") 3 -l(40, 260) -rgb(160, 178, 200)
+end

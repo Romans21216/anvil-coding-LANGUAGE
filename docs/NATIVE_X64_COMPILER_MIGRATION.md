@@ -68,6 +68,7 @@ Build `examples/native_procedural.ANVL` with `--backend native` for generated te
 | Symptom | Action |
 |---|---|
 | C compiler is requested | Select `--backend native`; the current default is still C. |
+| `window_on_top` / `window_fullscreen` | Not implemented in the native backend; the compiler raises a source-located diagnostic and the C backend supports them. |
 | Unsupported native shape, opacity, or built-in | Use the documented native subset and check the source-line compiler diagnostic. Unsupported features do not silently use another backend. |
 | `native scene 2d requires fn(draw)` | Define `fn(draw)` with no parameters. An optional `fn(update)` also takes no parameters. |
 | Native data exceeds 16 MiB | Reduce global array/storage requirements; runtime metadata also uses native program data. |

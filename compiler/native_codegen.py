@@ -1669,6 +1669,11 @@ class NativeCodegen:
                     self.code.rip_lea_data(1, self._text_cache[b"\n"])
                     self.code.mov_imm(2, 1)
                     self.code.call("function:anvil_print_text")
+            elif node.kind == "window_set":
+                raise CompileError(
+                    f"{self.owner.path}:{node.line}: window_{node.name}() is not "
+                    "available in the native x64 backend yet; build with --backend c"
+                )
             elif node.kind == "wait":
                 self.emit_expression(node.value, node.line, scope)
                 self.emit_finite_check(node.line)

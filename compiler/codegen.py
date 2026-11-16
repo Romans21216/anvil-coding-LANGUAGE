@@ -558,6 +558,12 @@ def emit_nodes(
             out.append(statement)
         elif n.kind == "seed":
             out.append(f"{indent}anvil_seed((unsigned long long)({lower(n)}));")
+        elif n.kind == "window_set":
+            function = (
+                "anvil_window_fullscreen" if n.name == "fullscreen"
+                else "anvil_window_on_top"
+            )
+            out.append(f"{indent}{function}({lower(n)});")
         elif n.kind == "net_send":
             out.append(
                 f"{indent}anvil_net_ok = (double)anvil_net_send({lower(n)});"

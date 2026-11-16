@@ -85,6 +85,9 @@ typedef struct {
 } AnvilImage;
 
 static HWND anvil_window;
+static LONG anvil_window_saved_style;
+static RECT anvil_window_saved_rect;
+static int anvil_window_is_fullscreen;
 static HDC anvil_memory_dc;
 static HBITMAP anvil_bitmap;
 static HGDIOBJ anvil_old_bitmap;
@@ -2033,6 +2036,57 @@ static void anvil_release_frame_resources(void) {
   anvil_bitmap = NULL;
   anvil_old_bitmap = NULL;
   anvil_memory_dc = NULL;
+}
+
+double anvil_window_on_top(double on) {
+  if (!anvil_window)
+    return 0.0;
+  HWND after = on != 0.0 ? HWND_TOPMOST : HWND_NOTOPMOST;
+  return SetWindowPos(anvil_window, after, 0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+             ? 1.0
+             : 0.0;
+}
+
+double anvil_window_fullscreen(double on) {
+  if (!anvil_window)
+    return 0.0;
+  if ((on != 0.0) == anvil_window_is_fullscreen)
+    return 1.0;
+  if (on != 0.0) {
+    MONITORINFO info;
+    memset(&info, 0, sizeof(info));
+    info.cbSize = sizeof(info);
+    HMONITOR monitor = MonitorFromWindow(anvil_window, MONITOR_DEFAULTTONEAREST);
+    if (!GetMonitorInfoA(monitor, &info))
+      return 0.0;
+    anvil_window_saved_style = (LONG)GetWindowLongPtrA(anvil_window, GWL_STYLE);
+    if (!GetWindowRect(anvil_window, &anvil_window_saved_rect))
+      return 0.0;
+    SetWindowLongPtrA(anvil_window, GWL_STYLE, (LONG_PTR)(WS_POPUP | WS_VISIBLE));
+    int width = info.rcMonitor.right - info.rcMonitor.left;
+    int height = info.rcMonitor.bottom - info.rcMonitor.top;
+    if (!SetWindowPos(anvil_window, HWND_TOP, info.rcMonitor.left,
+                      info.rcMonitor.top, width, height,
+                      SWP_FRAMECHANGED | SWP_NOOWNERZORDER)) {
+      SetWindowLongPtrA(anvil_window, GWL_STYLE,
+                        (LONG_PTR)anvil_window_saved_style);
+      return 0.0;
+    }
+    anvil_window_is_fullscreen = 1;
+  } else {
+    SetWindowLongPtrA(anvil_window, GWL_STYLE,
+                      (LONG_PTR)anvil_window_saved_style);
+    int width = anvil_window_saved_rect.right - anvil_window_saved_rect.left;
+    int height = anvil_window_saved_rect.bottom - anvil_window_saved_rect.top;
+    if (!SetWindowPos(anvil_window, NULL, anvil_window_saved_rect.left,
+                      anvil_window_saved_rect.top, width, height,
+                      SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOOWNERZORDER))
+      return 0.0;
+    anvil_window_is_fullscreen = 0;
+  }
+  InvalidateRect(anvil_window, NULL, FALSE);
+  return 1.0;
 }
 
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {

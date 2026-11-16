@@ -671,6 +671,8 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             elif line.startswith("net send(") and line.endswith(")"):
                 variables.add("net_ok")
                 node = Node("net_send", line_no, value=line[len("net send(") : -1])
+            elif m := re.fullmatch(r"window_(on_top|fullscreen)\((.*)\)", line):
+                node = Node("window_set", line_no, name=m.group(1), value=m.group(2))
             elif line.startswith("seed(") and line.endswith(")"):
                 node = Node("seed", line_no, value=line[5:-1])
         if node is None:

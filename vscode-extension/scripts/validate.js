@@ -91,6 +91,8 @@ async function main() {
   expect('set var(held) = mouse_held("right")', 'mouse_held', 'support.function.anvil');
   expect('set var(wheel) = mouse_wheel()', 'mouse_wheel', 'support.function.anvil');
   expect('set var(handle) = image_load("assets/player.bmp")', 'image_load', 'support.function.anvil');
+  expect('window_fullscreen(1)', 'window_fullscreen', 'support.function.anvil');
+  expect('window_on_top(0)', 'window_on_top', 'support.function.anvil');
   expect('set var(width) = image_width(var(handle))', 'image_width', 'support.function.anvil');
   expect('set var(height) = image_height(var(handle))', 'image_height', 'support.function.anvil');
   expect('set var(ok) = image_destroy(var(handle))', 'image_destroy', 'support.function.anvil');

@@ -98,6 +98,8 @@ double anvil_delta(void);
 double anvil_pressed(int key);
 double anvil_held(int key);
 double anvil_rnd(double min_value, double max_value);
+double anvil_window_on_top(double on);
+double anvil_window_fullscreen(double on);
 void anvil_seed(unsigned long long seed);
 void anvil_wait(double seconds);
 void anvil_press_enter(void);

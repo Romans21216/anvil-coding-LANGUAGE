@@ -170,6 +170,8 @@ BUILTINS = {
     "physics_step": (0, 0),
     "ray_backend": (1, 1),
     "ray_backend_available": (1, 1),
+    "window_on_top": (1, 1),
+    "window_fullscreen": (1, 1),
 }
 
 BUILTIN_C_NAMES = {
@@ -195,6 +197,8 @@ BUILTIN_C_NAMES = {
     "image_draw": "anvil_image_draw",
     "image_draw_scaled": "anvil_image_draw_scaled",
     "receive": "anvil_net_receive",
+    "window_on_top": "anvil_window_on_top",
+    "window_fullscreen": "anvil_window_fullscreen",
     "abs": "fabs",
     "round": "round",
     "len": "(double)strlen",
