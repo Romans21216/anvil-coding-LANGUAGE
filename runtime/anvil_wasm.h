@@ -115,6 +115,16 @@ double sin(double radians);
 double cos(double radians);
 double anvil_rnd(double min_value, double max_value);
 
+/* Saves: typed slots persisted by the host (localStorage in the browser). */
+void anvil_set_project(const char *name);
+double anvil_save_number(const char *slot, double value);
+double anvil_load_number(const char *slot);
+double anvil_save_text(const char *slot, const char *text);
+const char *anvil_load_text(const char *slot);
+double anvil_save_exists(const char *slot);
+double anvil_save_delete(const char *slot);
+const char *anvil_save_error(void);
+
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);
 void anvil_set_scene3d(int enabled);

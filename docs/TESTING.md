@@ -107,7 +107,8 @@ remote desktop can prevent window creation:
 - `test_wasm` — builds the console subset and 2D canvas scenes with
   clang/wasm-ld, runs them under Node (including the recorded draw-command
   stream, scripted keyboard/mouse input, trig/rnd results matching the C
-  backend), checks the generated host page, and asserts located refusals.
+  backend, typed saves across separate Node runs), checks the generated host
+  page, and asserts located refusals.
 - `test_particles` — argument validation, the 4,096-particle bound, clear
   counts, and window pixels for a fresh and fading particle.
 - `test_shadows` — a tilted camera samples the flattened shadow of a model and

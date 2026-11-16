@@ -57,6 +57,8 @@ Supported today:
 - input and time: `time()`, `delta()`, `pressed(key)`, `held(key)`,
   `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`,
   `mouse_wheel()`
+- saves: `save_number`, `load_number`, `save_text`, `load_text`,
+  `save_exists`, `save_delete`, `save_error`
 
 Refused with a source-located error:
 
@@ -95,6 +97,24 @@ window.anvil.exports.anvil_key(65, 1);
 window.anvil.exports.anvil_frame(16);
 ```
 
+## Saves
+
+Saves work in the browser without files. The host page backs them with
+`localStorage` under `anvil:<project>/<slot>`; the project name comes from the
+compiled program (default `Anvil_Game`). Values use the same type rules as the C
+runtime: numbers are stored as 16 hex digits of their IEEE-754 bits (so a
+round trip is exact), text as UTF-8 with a 255-byte limit, and reading the wrong
+type returns `0` with the same messages the C runtime uses ("the save holds
+text, not a number" / "the save holds a number, not text"). Slot names are 1-64
+letters, digits, `.`, `_` or `-`.
+
+The Node host keeps saves in memory unless `ANVIL_SAVE_FILE` names a JSON file,
+in which case it loads and rewrites that file so saves persist across runs.
+
+`localStorage` is synchronous and small (about 5 MB per origin). A game that
+needs larger or structured storage will get IndexedDB later; the API will not
+change.
+
 ## Hosts
 
 - `tools/wasm_host.mjs` — Node host used by tests and `--run`; writes module
@@ -111,8 +131,8 @@ identical.
   allocate more than that fail at runtime.
 - Numbers are IEEE doubles, as on the native backends, but `sin`/`cos` and other
   libm functions are not linked yet.
-- No Web Audio, IndexedDB or source maps yet; those are the remaining 8.12
-  items. 3D and images also need the C backend.
+- No Web Audio, IndexedDB or source maps yet; saves use `localStorage` for now.
+  Those are the remaining 8.12 items. 3D and images also need the C backend.
 - `sin`/`cos` lose accuracy for arguments far outside the reduced range (the
   test pins 1e6 radians, which still matches libm to six decimals); `tan`,
   `noise` and `fbm` are not available yet.

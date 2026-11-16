@@ -17,10 +17,28 @@ if (!file) {
   process.exit(2);
 }
 
+const saveFile = process.env.ANVIL_SAVE_FILE;
+const saves = new Map();
+if (saveFile && fs.existsSync(saveFile)) {
+  for (const [key, value] of Object.entries(JSON.parse(fs.readFileSync(saveFile, "utf8")))) {
+    saves.set(key, value);
+  }
+}
+const persistSaves = () => {
+  if (saveFile) fs.writeFileSync(saveFile, JSON.stringify(Object.fromEntries(saves)));
+};
+
 const bytes = fs.readFileSync(file);
 const utf8 = new TextDecoder();
 let memory = null;
 const ops = [];
+const readCString = (pointer) => {
+  const view = new Uint8Array(memory.buffer);
+  let end = pointer;
+  while (end < view.length && view[end] !== 0) end++;
+  return utf8.decode(view.subarray(pointer, end));
+};
+
 const imports = {
   env: {
     write(fd, pointer, length) {
@@ -45,6 +63,23 @@ const imports = {
     },
     present() {
       ops.push(["present"]);
+    },
+    save_read(pointer, out, capacity) {
+      const value = saves.get(readCString(pointer));
+      if (value === undefined) return -1;
+      const encoded = Buffer.from(value, "utf8");
+      const view = new Uint8Array(memory.buffer, out, Math.min(encoded.length, capacity));
+      view.set(encoded.subarray(0, view.length));
+      return view.length;
+    },
+    save_write(pointer, valuePointer) {
+      saves.set(readCString(pointer), readCString(valuePointer));
+      persistSaves();
+    },
+    save_delete(pointer) {
+      const existed = saves.delete(readCString(pointer));
+      persistSaves();
+      return existed ? 1 : 0;
     },
   },
 };

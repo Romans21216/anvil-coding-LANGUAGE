@@ -630,3 +630,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Why:** clang lowers `sin`/`cos` to libcalls in wasm (there is no trig instruction), so the freestanding shim has to provide them under the libm names the C generator already emits.
 - **Tests:** `tests/test_wasm.py` runs a ten-value trig program and pins results that match `cl.exe`'s libm byte-for-byte, including `sin(1e6)`; a 500-draw loop asserts `rnd(0,9)` never leaves its range and `rnd(4,4)` is the fixed point. 13 passed.
 - **Cross-check:** the same source compiled with the C backend and with the wasm backend produced identical ten-line output (`diff` empty).
+
+## Batch 53 — wasm saves over localStorage (8.12)
+
+- **Runtime:** the six save builtins plus `save_error` now work in wasm. Values are a type byte plus payload: numbers as 16 hex digits of the IEEE-754 bit pattern (exact round trip), text as UTF-8 (255-byte limit). Slot validation, project-name sanitizing, "not a readable Anvil save", type-mismatch and non-finite messages all match the C runtime word for word.
+- **Hosts:** the page maps `save_read`/`save_write`/`save_delete` onto `localStorage` keys of the form `anvil:<project>/<slot>`; the Node host uses a Map, optionally persisted through `ANVIL_SAVE_FILE`.
+- **Tests:** `tests/test_wasm.py` covers the round trip and every error name, two separate Node runs sharing one JSON file, invalid slots and oversized text. 16 passed.
+- **Visual check:** a program that saves "seen" on its first frame was served in Chromium. With cleared storage, frame 1 drew green and `localStorage` then held `2yes`; after a reload, frame 1 drew blue, so the page really reads the persisted slot.

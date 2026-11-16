@@ -23,6 +23,12 @@ extern void anvil_host_text(double x, double y, const char *text, int length,
                             int r, int g, int b, int a);
 __attribute__((import_module("env"), import_name("present")))
 extern void anvil_host_present(void);
+__attribute__((import_module("env"), import_name("save_read")))
+extern int anvil_host_save_read(const char *key, char *out, int capacity);
+__attribute__((import_module("env"), import_name("save_write")))
+extern void anvil_host_save_write(const char *key, const char *value);
+__attribute__((import_module("env"), import_name("save_delete")))
+extern int anvil_host_save_delete(const char *key);
 
 #define ANVIL_TEXT_BUFFERS 64
 static char anvil_text_buffers[ANVIL_TEXT_BUFFERS][ANVIL_STR_CAP];
@@ -233,7 +239,6 @@ double anvil_divide(double numerator, double denominator, const char *path,
 }
 
 void anvil_set_fixed_hz(int hz) { anvil_fixed_hz = hz; }
-void anvil_set_project(const char *name) { (void)name; }
 void anvil_net_close(void) {}
 
 void anvil_frame_enter(void) {
@@ -520,6 +525,238 @@ double anvil_rnd(double min_value, double max_value) {
     return (double)low;
   unsigned long long span = (unsigned long long)(high - low) + 1ULL;
   return (double)(low + (long long)(anvil_random_u64() % span));
+}
+
+/* ---- Saves --------------------------------------------------------------
+   The host owns persistence (localStorage in the browser, a Map or JSON file
+   under Node). Values are encoded as one type byte plus a payload: numbers as
+   16 lowercase hex bytes of the IEEE-754 bit pattern, text as its UTF-8 bytes. */
+enum {
+  ANVIL_SAVE_TEXT_MAX = 255,
+  ANVIL_SAVE_BUFFERS = 8,
+  ANVIL_SAVE_SLOT_MAX = 64
+};
+static char anvil_save_buffers[ANVIL_SAVE_BUFFERS][ANVIL_SAVE_TEXT_MAX + 1];
+static unsigned anvil_save_buffer_index;
+static char anvil_project_name[64] = "Anvil_Game";
+static const char *anvil_save_error_text = "";
+
+static int anvil_slot_ok(const char *slot) {
+  if (!slot)
+    return 0;
+  size_t length = strlen(slot);
+  if (length == 0 || length > ANVIL_SAVE_SLOT_MAX)
+    return 0;
+  for (size_t index = 0; index < length; ++index) {
+    char c = slot[index];
+    int safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+    if (!safe)
+      return 0;
+  }
+  return 1;
+}
+
+void anvil_set_project(const char *name) {
+  if (!name || name[0] == '\0')
+    return;
+  size_t index = 0;
+  for (; name[index] != '\0' && index < sizeof(anvil_project_name) - 1; ++index) {
+    char c = name[index];
+    int safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
+    anvil_project_name[index] = safe ? c : '_';
+  }
+  anvil_project_name[index] = '\0';
+}
+
+static int anvil_save_key(const char *slot, char *out, int capacity) {
+  if (!anvil_slot_ok(slot)) {
+    anvil_save_error_text = "the save slot is invalid";
+    return 0;
+  }
+  int index = 0;
+  for (const char *c = anvil_project_name; *c; ++c) {
+    if (index >= capacity - 2)
+      return 0;
+    out[index++] = *c;
+  }
+  out[index++] = '/';
+  for (const char *c = slot; *c; ++c) {
+    if (index >= capacity - 1)
+      return 0;
+    out[index++] = *c;
+  }
+  out[index] = '\0';
+  return 1;
+}
+
+static void anvil_hex16(unsigned long long value, char *out) {
+  static const char digits[] = "0123456789abcdef";
+  for (int index = 0; index < 16; ++index)
+    out[index] = digits[(value >> (60 - 4 * index)) & 0xFu];
+}
+
+static unsigned long long anvil_unhex16(const char *text) {
+  unsigned long long value = 0;
+  for (int index = 0; index < 16; ++index) {
+    char c = text[index];
+    int digit;
+    if (c >= '0' && c <= '9')
+      digit = c - '0';
+    else if (c >= 'a' && c <= 'f')
+      digit = c - 'a' + 10;
+    else if (c >= 'A' && c <= 'F')
+      digit = c - 'A' + 10;
+    else
+      return 0;
+    value = (value << 4) | (unsigned long long)digit;
+  }
+  return value;
+}
+
+static int anvil_finite_bits(unsigned long long bits) {
+  return ((bits >> 52) & 0x7FFULL) != 0x7FFULL;
+}
+
+const char *anvil_save_error(void) { return anvil_save_error_text; }
+
+double anvil_save_number(const char *slot, double value) {
+  char key[160];
+  if (!anvil_save_key(slot, key, (int)sizeof(key)))
+    return 0.0;
+  union {
+    double number;
+    unsigned long long bits;
+  } shaped;
+  shaped.number = value;
+  char payload[18];
+  payload[0] = '1';
+  anvil_hex16(shaped.bits, payload + 1);
+  payload[17] = '\0';
+  anvil_host_save_write(key, payload);
+  anvil_save_error_text = "";
+  return 1.0;
+}
+
+double anvil_load_number(const char *slot) {
+  char key[160];
+  if (!anvil_save_key(slot, key, (int)sizeof(key)))
+    return 0.0;
+  char payload[64];
+  int length = anvil_host_save_read(key, payload, (int)sizeof(payload) - 1);
+  if (length < 0) {
+    anvil_save_error_text = "";
+    return 0.0;
+  }
+  if (length > (int)sizeof(payload) - 1)
+    length = (int)sizeof(payload) - 1;
+  payload[length] = '\0';
+  if (length == 0 || (payload[0] != '1' && payload[0] != '2')) {
+    anvil_save_error_text = "the save is not a readable Anvil save";
+    return 0.0;
+  }
+  if (payload[0] != '1') {
+    anvil_save_error_text = "the save holds text, not a number";
+    return 0.0;
+  }
+  if (length < 17) {
+    anvil_save_error_text = "the save ended before its value did";
+    return 0.0;
+  }
+  union {
+    double number;
+    unsigned long long bits;
+  } shaped;
+  shaped.bits = anvil_unhex16(payload + 1);
+  if (!anvil_finite_bits(shaped.bits)) {
+    anvil_save_error_text = "the save holds a non-finite number";
+    return 0.0;
+  }
+  anvil_save_error_text = "";
+  return shaped.number;
+}
+
+double anvil_save_text(const char *slot, const char *text) {
+  const char *value = text ? text : "";
+  size_t length = strlen(value);
+  if (length > ANVIL_SAVE_TEXT_MAX) {
+    const char *count = anvil_format_number((double)length);
+    static char message[96];
+    const char *prefix = "the text is ";
+    const char *suffix = " bytes; the save limit is 255";
+    int index = 0;
+    for (const char *c = prefix; *c; ++c)
+      message[index++] = *c;
+    for (const char *c = count; *c; ++c)
+      message[index++] = *c;
+    for (const char *c = suffix; *c; ++c)
+      message[index++] = *c;
+    message[index] = '\0';
+    anvil_save_error_text = message;
+    return 0.0;
+  }
+  char key[160];
+  if (!anvil_save_key(slot, key, (int)sizeof(key)))
+    return 0.0;
+  char payload[ANVIL_SAVE_TEXT_MAX + 2];
+  payload[0] = '2';
+  for (size_t index = 0; index <= length; ++index)
+    payload[index + 1] = value[index];
+  anvil_host_save_write(key, payload);
+  anvil_save_error_text = "";
+  return 1.0;
+}
+
+const char *anvil_load_text(const char *slot) {
+  char *buffer = anvil_save_buffers[anvil_save_buffer_index &
+                                    (ANVIL_SAVE_BUFFERS - 1)];
+  anvil_save_buffer_index += 1;
+  buffer[0] = '\0';
+  char key[160];
+  if (!anvil_save_key(slot, key, (int)sizeof(key)))
+    return buffer;
+  char payload[ANVIL_SAVE_TEXT_MAX + 8];
+  int length = anvil_host_save_read(key, payload, (int)sizeof(payload) - 1);
+  if (length < 0) {
+    anvil_save_error_text = "";
+    return buffer;
+  }
+  if (length > (int)sizeof(payload) - 1)
+    length = (int)sizeof(payload) - 1;
+  payload[length] = '\0';
+  if (length == 0 || (payload[0] != '1' && payload[0] != '2')) {
+    anvil_save_error_text = "the save is not a readable Anvil save";
+    return buffer;
+  }
+  if (payload[0] != '2') {
+    anvil_save_error_text = "the save holds a number, not text";
+    return buffer;
+  }
+  int copied = length - 1;
+  if (copied > ANVIL_SAVE_TEXT_MAX)
+    copied = ANVIL_SAVE_TEXT_MAX;
+  for (int index = 0; index < copied; ++index)
+    buffer[index] = payload[index + 1];
+  buffer[copied] = '\0';
+  anvil_save_error_text = "";
+  return buffer;
+}
+
+double anvil_save_exists(const char *slot) {
+  char key[160];
+  if (!anvil_save_key(slot, key, (int)sizeof(key)))
+    return 0.0;
+  char payload[4];
+  return anvil_host_save_read(key, payload, (int)sizeof(payload)) >= 0 ? 1.0
+                                                                     : 0.0;
+}
+
+double anvil_save_delete(const char *slot) {
+  char key[160];
+  if (!anvil_save_key(slot, key, (int)sizeof(key)))
+    return 0.0;
+  return anvil_host_save_delete(key) ? 1.0 : 0.0;
 }
 
 /* ---- Canvas 2D ---------------------------------------------------------- */

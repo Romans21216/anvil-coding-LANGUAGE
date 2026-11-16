@@ -401,5 +401,126 @@ _MATH_PROGRAM = "\n".join(
 )
 
 
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmSaveTests(unittest.TestCase):
+    def test_typed_slots_round_trip_with_the_c_error_names(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "fn(main)",
+                    '  say save_number("high", 42)',
+                    '  say load_number("high")',
+                    '  say save_text("name", "Ada")',
+                    '  say load_text("name")',
+                    '  say load_number("name")',
+                    "  say save_error()",
+                    '  say load_text("high")',
+                    "  say save_error()",
+                    '  say save_exists("high")',
+                    '  say save_delete("high")',
+                    '  say save_exists("high")',
+                    '  say load_number("high")',
+                    "  say save_error()",
+                    "end",
+                    "call fn(main)",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(
+                run.stdout.splitlines(),
+                [
+                    "1",
+                    "42",
+                    "1",
+                    "Ada",
+                    "0",
+                    "the save holds text, not a number",
+                    "",
+                    "the save holds a number, not text",
+                    "1",
+                    "1",
+                    "0",
+                    "0",
+                    "",
+                ],
+            )
+
+    def test_saves_persist_across_runs(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            store = root / "saves.json"
+            write_result, write_out = build(
+                root,
+                'fn(main)\n  say save_number("level", 7)\n  say save_text("hero", "Ada")\nend\ncall fn(main)\n',
+            )
+            self.assertEqual(write_result.returncode, 0, write_result.stderr)
+            environment = {**os.environ, "ANVIL_SAVE_FILE": str(store)}
+            first = subprocess.run(
+                ["node", str(HOST), str(write_out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=environment,
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(first.stdout.splitlines(), ["1", "1"])
+
+            read_result, read_out = build(
+                root,
+                'fn(main)\n  say load_number("level")\n  say load_text("hero")\nend\ncall fn(main)\n',
+            )
+            self.assertEqual(read_result.returncode, 0, read_result.stderr)
+            second = subprocess.run(
+                ["node", str(HOST), str(read_out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=environment,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(second.stdout.splitlines(), ["7", "Ada"])
+
+    def test_invalid_slots_and_oversized_text_are_refused(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "fn(main)",
+                    '  say save_number("bad/slot", 1)',
+                    "  say save_error()",
+                    f'  say save_text("long", "{"x" * 256}")',
+                    "  say save_error()",
+                    "end",
+                    "call fn(main)",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.splitlines()
+            self.assertEqual(lines[0], "0")
+            self.assertEqual(lines[1], "the save slot is invalid")
+            self.assertEqual(lines[2], "0")
+            self.assertEqual(lines[3], "the text is 256 bytes; the save limit is 255")
+
+
 if __name__ == "__main__":
     unittest.main()

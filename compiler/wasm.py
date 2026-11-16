@@ -49,6 +49,13 @@ ALLOWED_BUILTINS = {
     "sin",
     "cos",
     "rnd",
+    "save_number",
+    "load_number",
+    "save_text",
+    "load_text",
+    "save_exists",
+    "save_delete",
+    "save_error",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
@@ -85,6 +92,12 @@ async function start() {
     const module = await WebAssembly.compile(bytes);
     let memory = null;
     let app = null;
+    const readCString = (pointer) => {
+      const bytes = new Uint8Array(memory.buffer);
+      let end = pointer;
+      while (end < bytes.length && bytes[end] !== 0) end++;
+      return utf8.decode(bytes.subarray(pointer, end));
+    };
     const imports = { env: {
       write(fd, pointer, length) {
         const view = new Uint8Array(memory.buffer, pointer, length);
@@ -120,6 +133,23 @@ async function start() {
         context.fillText(utf8.decode(view), x, y);
       },
       present() {},
+      save_read(pointer, out, capacity) {
+        const value = localStorage.getItem("anvil:" + readCString(pointer));
+        if (value === null) return -1;
+        const bytes = new TextEncoder().encode(value);
+        const view = new Uint8Array(memory.buffer, out, Math.min(bytes.length, capacity));
+        view.set(bytes.subarray(0, view.length));
+        return view.length;
+      },
+      save_write(pointer, valuePointer) {
+        localStorage.setItem("anvil:" + readCString(pointer), readCString(valuePointer));
+      },
+      save_delete(pointer) {
+        const key = "anvil:" + readCString(pointer);
+        const existed = localStorage.getItem(key) !== null;
+        localStorage.removeItem(key);
+        return existed ? 1 : 0;
+      },
     }};
     const instance = await WebAssembly.instantiate(module, imports);
     memory = instance.exports.memory;
