@@ -424,3 +424,11 @@ supported on both backends (20 of 29 shared cases).
   `hypot`, `log`, `log10`, `exp`, `tan`, `atan2`, `mod`, `len`, `upper`,
   `lower`, `trim`, `mid`, `replace`, `find`, `ord`, `chr`). `npm test
   --prefix vscode-extension` checks the new scopes against real source lines.
+
+### Test cleanliness on Windows
+
+`tests/test_runtime.py` now uses `TemporaryDirectory(ignore_cleanup_errors=True)`
+because a just-built probe executable can still be locked for a few milliseconds
+by Windows after the child exits; the run's assertions passed while the temp-dir
+teardown raised `WinError 5` and failed the test. The behaviour checks are
+unchanged.
