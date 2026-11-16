@@ -207,6 +207,43 @@ class TextAndPrintTests(unittest.TestCase):
 
 
 class DiagnosticTests(unittest.TestCase):
+    def test_a_very_long_line_is_windowed_around_the_caret(self):
+        filler = "1 + " * 120
+        source = (
+            "fn(main)\n"
+            "  set var(x) = " + filler + "nosuchname(2)\n"
+            "  output 0\n"
+            "end\n"
+        )
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            path, result = compile_source(source, temp)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown name 'nosuchname'", result.stderr)
+        self.assertIn(f"--> {path}:2:", result.stderr)
+        lines = result.stderr.splitlines()
+        excerpt = next(line for line in lines if line.startswith("2 | "))
+        caret = lines[lines.index(excerpt) + 1]
+        self.assertLess(len(excerpt), 140, "the whole runaway line was reprinted")
+        self.assertIn("\u2026", excerpt, "trimmed ends are not marked")
+        shown = excerpt.split("| ", 1)[1]
+        start = shown.index("nosuchname")
+        carets = caret.split("| ", 1)[1]
+        self.assertEqual(carets.index("^"), start, "caret does not line up")
+
+    def test_a_deeply_nested_expression_is_rejected_with_a_location(self):
+        depth = 200
+        source = (
+            "fn(main)\n"
+            "  set var(x) = " + "(" * depth + "1" + ")" * depth + "\n"
+            "  output 0\n"
+            "end\n"
+        )
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            path, result = compile_source(source, temp)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expression nesting exceeds", result.stderr)
+        self.assertIn(f"--> {path}:2:", result.stderr)
+
     def test_error_reports_location_line_caret_and_help(self):
         source = (
             "fn(main)\n"

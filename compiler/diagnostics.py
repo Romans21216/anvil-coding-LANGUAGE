@@ -17,6 +17,10 @@ import sys
 _LOCATION = re.compile(r"(?P<path>.*?):(?P<line>\d+): (?P<message>.*)", re.S)
 _QUOTED = re.compile(r"'([^']{1,80})'")
 
+# Longest source line shown in a diagnostic; longer lines are windowed around
+# the caret so one runaway line cannot flood the terminal.
+LINE_WINDOW = 100
+
 # Words a programmer can legitimately reach for that Anvil does not have.
 MISSING_LANGUAGE = {
     "print": None,  # exists now; kept out of the hint table
@@ -180,6 +184,29 @@ def as_dict(message: str, hint: str | None = None, needle: str | None = None,
     }
 
 
+def _window(shown: str, column: int, caret: int) -> tuple[str, int, int]:
+    """Trim a long source line to a window around the caret.
+
+    Returns ``(displayed_text, displayed_column, displayed_caret)``. The column
+    reported on the `-->` line stays absolute so editors can jump to it; only
+    the excerpt is shortened, with `…` marking each removed end.
+    """
+    if len(shown) <= LINE_WINDOW:
+        return shown, column, caret
+    offset = column - 1
+    start = max(0, min(offset - LINE_WINDOW // 2, len(shown) - LINE_WINDOW))
+    text = shown[start:start + LINE_WINDOW]
+    display_offset = offset - start
+    if start > 0:
+        text = "…" + text
+        display_offset += 1
+    if start + LINE_WINDOW < len(shown):
+        text = text + "…"
+    display_column = display_offset + 1
+    display_caret = max(1, min(caret, len(text) - display_offset))
+    return text, display_column, display_caret
+
+
 def render(message: str, hint: str | None = None, needle: str | None = None,
            length: int | None = None, severity: str = "error",
            color: bool | None = None) -> str:
@@ -213,12 +240,13 @@ def render(message: str, hint: str | None = None, needle: str | None = None,
            f"\x1b[1;33m{severity}\x1b[0m" if color else severity
     gutter = len(str(line_text))
     pad = " " * (gutter + 1)
+    display_text, display_column, display_caret = _window(shown, column, caret)
     out = [
         f"{head}: {text}",
         f"{pad}--> {path}:{line_text}:{column}",
         f"{pad}|",
-        f"{line_text:>{gutter}} | {shown}",
-        f"{pad}| {' ' * (column - 1)}{'^' * caret}",
+        f"{line_text:>{gutter}} | {display_text}",
+        f"{pad}| {' ' * (display_column - 1)}{'^' * display_caret}",
     ]
     if hint:
         out.append(f"{pad}|")

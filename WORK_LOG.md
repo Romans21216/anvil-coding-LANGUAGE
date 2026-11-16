@@ -808,3 +808,22 @@ produces the same answer on both.
 Measured: 12 + 30 + 30 + 20 programs across seeds 1, 7, 42, 3 produced zero
 mismatches, covering the arithmetic, loop, branch, call and rounding paths that
 recent work touched.
+
+## Diagnostics: window a runaway source line
+
+The parser already bounds expression nesting at 64 levels with a located error,
+but the renderer reprinted the entire offending line. A 3,000-deep expression
+produced a 6 KB caret section that pushed the message off the screen — the
+opposite of the "exact error" the diagnostics are meant to give.
+
+- `compiler/diagnostics.py` now windows the excerpt to 100 characters centered
+  on the caret, marking each trimmed end with `…`. The `--> path:line:column`
+  header keeps the true absolute column so editors still jump to the right
+  place, and the caret is re-based to the displayed slice.
+- The caret width is clamped to the visible text, so a long token at the window
+  edge cannot draw past the excerpt.
+
+Tests: `test_text_and_print` gains two cases — a long line with an unknown name
+in the middle asserts the excerpt stays under 140 characters, carries `…`, and
+that the caret's `^` begins exactly under the token; and a 200-deep nested
+expression asserts the "expression nesting exceeds" error keeps its location.
