@@ -85,6 +85,11 @@ ALLOWED_BUILTINS = {
     "sound_pan",
     "sound_pitch",
     "sound_duration",
+    "sound_group",
+    "sound_group_volume",
+    "sound_group_mute",
+    "sound_group_gain",
+    "sound_group_stop",
     "sound_stop",
     "sound_stop_all",
     "sound_volume",
@@ -146,11 +151,29 @@ async function start() {
     };
     window.addEventListener("keydown", resumeAudio);
     window.addEventListener("pointerdown", resumeAudio);
+    const audioGroups = [];
+    const groupVolume = { 0: 1, 1: 1, 2: 1, 3: 1 };
+    const groupMuted = { 0: false, 1: false, 2: false, 3: false };
+    const audioGroup = (index) => {
+      const ctx = audioState.ctx;
+      if (!audioGroups[0]) {
+        audioGroups[0] = ctx.createGain();
+        audioGroups[0].gain.value = groupMuted[0] ? 0 : groupVolume[0];
+        audioGroups[0].connect(ctx.destination);
+        for (let slot = 1; slot <= 3; slot++) {
+          audioGroups[slot] = ctx.createGain();
+          audioGroups[slot].gain.value = groupMuted[slot] ? 0 : groupVolume[slot];
+          audioGroups[slot].connect(audioGroups[0]);
+        }
+      }
+      return audioGroups[index] || audioGroups[1];
+    };
     window.anvilAudio = () => ({
       active: audioState.active,
       voices: audioState.voices.size,
       state: audioState.ctx ? audioState.ctx.state : "none",
       sampleRate: audioState.ctx ? audioState.ctx.sampleRate : 0,
+      groups: audioGroups.map((node) => (node ? node.gain.value : 1)),
     });
     const tintedSurface = (pointer, width, height, tintR, tintG, tintB) => {
       const key = pointer + ":" + tintR + ":" + tintG + ":" + tintB;
@@ -234,7 +257,7 @@ async function start() {
         context.drawImage(offscreen, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
         context.restore();
       },
-      sound_play(pointer, frames, channels, rate, volume, loop) {
+      sound_play(pointer, frames, channels, rate, volume, loop, group) {
         const ctx = audioContext();
         if (!ctx || frames <= 0) return 0;
         const samples = new Int16Array(memory.buffer, pointer, frames * channels);
@@ -251,12 +274,13 @@ async function start() {
         gain.gain.value = volume;
         const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
         source.connect(gain);
-        if (panner) gain.connect(panner).connect(ctx.destination);
-        else gain.connect(ctx.destination);
+        const destination = audioGroup((group === undefined ? 1 : group));
+        if (panner) gain.connect(panner).connect(destination);
+        else gain.connect(destination);
         source.loop = loop !== 0 && loop !== undefined;
         audioState.nextVoice += 1;
         const voice = audioState.nextVoice;
-        audioState.voices.set(voice, { source, gain, panner });
+        audioState.voices.set(voice, { source, gain, panner, group: group || 1 });
         audioState.active += 1;
         source.onended = () => {
           if (audioState.voices.delete(voice)) {
@@ -289,6 +313,28 @@ async function start() {
       sound_pitch(voice, rate) {
         const entry = audioState.voices.get(voice);
         if (entry) entry.source.playbackRate.value = rate;
+      },
+      sound_group_volume(group, volume) {
+        if (group >= 0 && group <= 3) groupVolume[group] = volume;
+        if (audioState.ctx && group >= 0 && group <= 3) audioGroup(group).gain.value = volume;
+      },
+      sound_group_mute(group, muted) {
+        if (group >= 0 && group <= 3) groupMuted[group] = !!muted;
+        if (audioState.ctx && group >= 0 && group <= 3) {
+          audioGroup(group).gain.value = muted ? 0 : groupVolume[group] ?? 1;
+        }
+      },
+      sound_group_stop(group) {
+        let stopped = 0;
+        for (const [voice, entry] of audioState.voices) {
+          if (group === 0 || entry.group === group) {
+            try { entry.source.stop(); } catch (error) { /* already ended */ }
+            audioState.voices.delete(voice);
+            audioState.active = Math.max(0, audioState.active - 1);
+            stopped += 1;
+          }
+        }
+        return stopped;
       },
       sound_active() {
         return audioState.active;

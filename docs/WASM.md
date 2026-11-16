@@ -65,8 +65,10 @@ Supported today:
   `image_destroy`, `image_error` (literal paths baked at build time)
 - audio: `sound_load`, `sound_play`, `sound_play_loop`, `sound_stop`,
   `sound_stop_all`, `sound_volume`, `sound_pan`, `sound_pitch`,
-  `sound_duration`, `sound_active`, `sound_destroy`, `sound_error` (literal
-  paths baked at build time; mixer groups and streaming music are not there yet)
+  `sound_duration`, `sound_group`, `sound_group_volume`, `sound_group_mute`,
+  `sound_group_gain`, `sound_group_stop`, `sound_active`, `sound_destroy`,
+  `sound_error` (literal paths baked at build time; streaming music is not there
+  yet)
 - saves: `save_number`, `load_number`, `save_text`, `load_text`,
   `save_exists`, `save_delete`, `save_error`
 
@@ -118,6 +120,13 @@ nothing is converted twice. `sound_play` and `sound_play_loop` return a host voi
 `sound_active` map onto `AudioBufferSourceNode`, a gain node and a stereo
 panner. Pan clamps to -1..1 and pitch to 0.25-4, like the C runtime, and
 `sound_duration` reports the baked length in seconds.
+
+Mixer groups work the same way as on the desktop: every voice routes through one
+of three group gain nodes into a master, groups default to gain 1 and group 1,
+`sound_group` moves a loaded sound, `sound_group_volume`/`sound_group_mute` act
+on the nodes, `sound_group_gain` reports the effective gain (0 while muted) and
+`sound_group_stop` stops the voices in a group (group 0 stops all) and returns
+how many it stopped. `window.anvilAudio().groups` shows the four live gains.
 
 Browsers refuse to start audio before a user gesture. The page listens for
 `keydown` and `pointerdown` and resumes the context then, so a game that plays a

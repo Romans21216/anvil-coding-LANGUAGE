@@ -723,7 +723,13 @@ double anvil_image_flip(double handle, double x, double y) {
 
 __attribute__((import_module("env"), import_name("sound_play")))
 extern int anvil_host_sound_play(const short *pcm, int frames, int channels,
-                                 int rate, double volume, int loop);
+                                 int rate, double volume, int loop, int group);
+__attribute__((import_module("env"), import_name("sound_group_volume")))
+extern void anvil_host_sound_group_volume(int group, double volume);
+__attribute__((import_module("env"), import_name("sound_group_mute")))
+extern void anvil_host_sound_group_mute(int group, int muted);
+__attribute__((import_module("env"), import_name("sound_group_stop")))
+extern int anvil_host_sound_group_stop(int group);
 __attribute__((import_module("env"), import_name("sound_pan")))
 extern void anvil_host_sound_pan(int voice, double pan);
 __attribute__((import_module("env"), import_name("sound_pitch")))
@@ -756,8 +762,14 @@ typedef struct {
   const AnvilWasmSound *source;
   unsigned int generation;
   double volume;
+  int group;
   int used;
 } AnvilWasmSoundSlot;
+
+/* Mirror of the host's mixer groups so group_gain can answer without a
+   round trip. Group 0 is the master. */
+static double anvil_group_volume[4] = {1.0, 1.0, 1.0, 1.0};
+static int anvil_group_muted[4];
 
 static AnvilWasmSoundSlot anvil_sound_slots[ANVIL_WASM_SOUND_SLOTS];
 
@@ -803,6 +815,7 @@ double anvil_sound_load(const char *path) {
       slot->source = &anvil_baked_sounds[index];
       slot->generation += 1;
       slot->volume = 1.0;
+      slot->group = 1;
       anvil_sound_error_text = "";
       return (double)(slot->generation - 1) * ANVIL_WASM_SOUND_STRIDE +
              slot_index + 1;
@@ -836,6 +849,45 @@ double anvil_sound_pitch(double voice, double rate) {
   anvil_host_sound_pitch((int)voice, clamped);
   return clamped;
 }
+double anvil_sound_group(double handle, double group) {
+  AnvilWasmSoundSlot *slot = anvil_sound_slot(handle);
+  if (!slot || group < 1.0 || group > 3.0)
+    return 0.0;
+  slot->group = (int)group;
+  return (double)slot->group;
+}
+
+double anvil_sound_group_volume(double group, double volume) {
+  if (group < 0.0 || group > 3.0 || !(volume == volume))
+    return 0.0;
+  double clamped = volume < 0.0 ? 0.0 : volume > 1.0 ? 1.0 : volume;
+  anvil_group_volume[(int)group] = clamped;
+  anvil_host_sound_group_volume((int)group, clamped);
+  return clamped;
+}
+
+double anvil_sound_group_mute(double group, double on) {
+  if (group < 0.0 || group > 3.0)
+    return 0.0;
+  int muted = on != 0.0;
+  anvil_group_muted[(int)group] = muted;
+  anvil_host_sound_group_mute((int)group, muted);
+  return (double)muted;
+}
+
+double anvil_sound_group_gain(double group) {
+  if (group < 0.0 || group > 3.0)
+    return 0.0;
+  int index = (int)group;
+  return anvil_group_muted[index] ? 0.0 : anvil_group_volume[index];
+}
+
+double anvil_sound_group_stop(double group) {
+  if (group < 0.0 || group > 3.0)
+    return 0.0;
+  return (double)anvil_host_sound_group_stop((int)group);
+}
+
 double anvil_sound_duration(double handle) {
   AnvilWasmSoundSlot *slot = anvil_sound_slot(handle);
   if (!slot || slot->source->rate <= 0)
@@ -849,7 +901,8 @@ double anvil_sound_start(double handle, int loop) {
     return 0.0;
   int voice = anvil_host_sound_play(slot->source->pcm, slot->source->frames,
                                     slot->source->channels,
-                                    slot->source->rate, slot->volume, loop);
+                                    slot->source->rate, slot->volume, loop,
+                                    slot->group);
   if (voice <= 0) {
     anvil_sound_error_text = "the host could not play the sound";
     return 0.0;

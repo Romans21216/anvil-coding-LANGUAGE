@@ -32,7 +32,7 @@ const bytes = fs.readFileSync(file);
 const utf8 = new TextDecoder();
 let memory = null;
 const ops = [];
-const voices = new Set();
+const voices = new Map();
 let nextVoice = 0;
 const readCString = (pointer) => {
   const view = new Uint8Array(memory.buffer);
@@ -83,7 +83,7 @@ const imports = {
       }
       ops.push(["image_region", width, height, sx, sy, sw, sh, dx, dy, dw, dh, tintR, tintG, tintB, flipX, flipY, hash]);
     },
-    sound_play(pointer, frames, channels, rate, volume, loop) {
+    sound_play(pointer, frames, channels, rate, volume, loop, group) {
       const samples = new Int16Array(memory.buffer, pointer, frames * channels);
       let peak = 0;
       for (let index = 0; index < samples.length; index++) {
@@ -91,8 +91,8 @@ const imports = {
         if (value > peak) peak = value;
       }
       nextVoice += 1;
-      voices.add(nextVoice);
-      ops.push(["sound_play", frames, channels, rate, volume, peak, nextVoice, loop ? 1 : 0]);
+      voices.set(nextVoice, group || 1);
+      ops.push(["sound_play", frames, channels, rate, volume, peak, nextVoice, loop ? 1 : 0, group || 1]);
       return nextVoice;
     },
     sound_stop(voice) {
@@ -103,6 +103,23 @@ const imports = {
       const stopped = voices.size;
       voices.clear();
       ops.push(["sound_stop_all", stopped]);
+    },
+    sound_group_volume(group, volume) {
+      ops.push(["sound_group_volume", group, volume]);
+    },
+    sound_group_mute(group, muted) {
+      ops.push(["sound_group_mute", group, muted]);
+    },
+    sound_group_stop(group) {
+      let stopped = 0;
+      for (const [voice, owner] of voices) {
+        if (group === 0 || owner === group) {
+          voices.delete(voice);
+          stopped += 1;
+        }
+      }
+      ops.push(["sound_group_stop", group, stopped]);
+      return stopped;
     },
     sound_volume(voice, volume) {
       ops.push(["sound_volume", voice, volume]);
