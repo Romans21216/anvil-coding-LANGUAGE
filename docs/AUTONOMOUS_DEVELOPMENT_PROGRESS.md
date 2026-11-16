@@ -564,3 +564,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** `tests/test_music.py` covers length/volume/clamps, five named load failures (missing, non-WAV, 3 channels, 24-bit, empty data), a playing track that reports position and rewinds on stop, a short track that finishes itself, and a looping track that keeps playing with a wrapping position. 4 passed.
 - **Fix along the way:** `say` rejected `music_error()` until the text-returning builtin was added to the codegen text-expression list (it already existed in the expression layer's set).
 - **Docs:** language spec row, evidence ledger, testing doc.
+
+## Batch 45 — particle system (8.14/8.15)
+
+- **Runtime:** a fixed 4,096-particle pool with `particle_emit(x,y,vx,vy,life,size,r,g,b)`, `particle_count`, `particle_clear` and `particle_gravity`. Particles advance every fixed update by velocity plus constant gravity, expire on their lifetime, and are drawn after the program's draw pass as squares fading from alpha 255 to 0. World-space, so the 2D camera applies.
+- **Bounds:** emit returns 0 when the pool is full or an argument is non-finite/`life <= 0`/`size <= 0`; window teardown empties the pool.
+- **Tests:** `tests/test_particles.py` covers argument rejection, filling all 4,096 slots and the next emit failing, clear returning the live count, a fresh particle reading nearly solid red, a mid-life faded value and a black frame after expiry. 3 passed.
+- **Benchmark:** `particles_2d` joins `tools/bench_runtime.py` (about 2,400 live particles at p50 0.88 ms), and its budget is enforced with the others.
+- **Bug caught:** the runtime header lacked the new prototypes, so generated C used implicit declarations and `particle_clear` returned garbage; the prototypes were added after the `anvil_rect` block.
+- **Docs:** language spec row, evidence ledger, testing doc, `examples/particles_demo.ANVL` (screenshot inspected: orange fountain over the floor band).

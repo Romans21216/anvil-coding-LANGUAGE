@@ -1115,6 +1115,99 @@ double anvil_image_draw(double handle, double x, double y) {
     return 0.0;
   return anvil_image_draw_scaled(handle, x, y, image->width, image->height);
 }
+/* ---- Particles ---------------------------------------------------------- */
+enum { ANVIL_PARTICLE_MAX = 4096 };
+
+typedef struct {
+  double x, y, vx, vy;
+  double age, life, size;
+  int r, g, b;
+  int alive;
+} AnvilParticle;
+
+static AnvilParticle anvil_particles[ANVIL_PARTICLE_MAX];
+static int anvil_particle_live;
+static double anvil_particle_gravity_y;
+
+double anvil_particle_emit(double x, double y, double vx, double vy,
+                           double life, double size, double r, double g,
+                           double b) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(vx) || !isfinite(vy) ||
+      !isfinite(life) || !isfinite(size) || !isfinite(r) || !isfinite(g) ||
+      !isfinite(b) || life <= 0.0 || size <= 0.0)
+    return 0.0;
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; ++i) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (particle->alive)
+      continue;
+    particle->x = x;
+    particle->y = y;
+    particle->vx = vx;
+    particle->vy = vy;
+    particle->age = 0.0;
+    particle->life = life;
+    particle->size = size;
+    particle->r = (int)(r < 0 ? 0 : r > 255 ? 255 : r);
+    particle->g = (int)(g < 0 ? 0 : g > 255 ? 255 : g);
+    particle->b = (int)(b < 0 ? 0 : b > 255 ? 255 : b);
+    particle->alive = 1;
+    anvil_particle_live++;
+    return 1.0;
+  }
+  return 0.0;
+}
+
+double anvil_particle_count(void) { return (double)anvil_particle_live; }
+
+double anvil_particle_clear(void) {
+  int cleared = anvil_particle_live;
+  memset(anvil_particles, 0, sizeof(anvil_particles));
+  anvil_particle_live = 0;
+  return (double)cleared;
+}
+
+double anvil_particle_gravity(double gravity) {
+  if (!isfinite(gravity))
+    return 0.0;
+  anvil_particle_gravity_y = gravity;
+  return gravity;
+}
+
+static void anvil_particles_update(double dt) {
+  if (anvil_particle_live == 0)
+    return;
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; ++i) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (!particle->alive)
+      continue;
+    particle->age += dt;
+    if (particle->age >= particle->life) {
+      particle->alive = 0;
+      anvil_particle_live--;
+      continue;
+    }
+    particle->vy += anvil_particle_gravity_y * dt;
+    particle->x += particle->vx * dt;
+    particle->y += particle->vy * dt;
+  }
+}
+
+/* Drawn after the program's own draw pass, so particles sit above the scene. */
+static void anvil_particles_draw(void) {
+  if (anvil_particle_live == 0)
+    return;
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; ++i) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (!particle->alive)
+      continue;
+    double fade = 1.0 - particle->age / particle->life;
+    int alpha = (int)(255.0 * fade);
+    anvil_rect(particle->x - particle->size * 0.5,
+               particle->y - particle->size * 0.5, particle->size,
+               particle->size, particle->r, particle->g, particle->b, alpha);
+  }
+}
+
 static void anvil_camera_update(void) {
   if (anvil_camera_move_speed <= 0.0 && anvil_camera_turn_speed <= 0.0)
     return;
@@ -3471,6 +3564,8 @@ const char *anvil_music_error(void) { return anvil_music_error_text; }
 
 static void anvil_release_frame_resources(void) {
   anvil_audio_shutdown();
+  memset(anvil_particles, 0, sizeof(anvil_particles));
+  anvil_particle_live = 0;
   if (anvil_music.file) {
     fclose(anvil_music.file);
     anvil_music.file = NULL;
@@ -3624,6 +3719,7 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
     while (accumulator >= step_seconds) {
       anvil_delta_seconds = step_seconds;
       anvil_camera_update();
+      anvil_particles_update(step_seconds);
       if (update)
         update();
       accumulator -= step_seconds;
@@ -3640,6 +3736,7 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
     anvil_clear_frame();
     if (draw)
       draw();
+    anvil_particles_draw();
     anvil_trace_finish();
     if (!update) {
       memset(anvil_pressed_keys, 0, sizeof(anvil_pressed_keys));

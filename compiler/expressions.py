@@ -213,6 +213,10 @@ BUILTINS = {
     "window_fullscreen": (1, 1),
     "camera2d": (3, 3),
     "model_draw": (8, 8),
+    "particle_emit": (9, 9),
+    "particle_count": (0, 0),
+    "particle_clear": (0, 0),
+    "particle_gravity": (1, 1),
 }
 
 BUILTIN_C_NAMES = {
@@ -280,6 +284,10 @@ BUILTIN_C_NAMES = {
     "window_on_top": "anvil_window_on_top",
     "window_fullscreen": "anvil_window_fullscreen",
     "camera2d": "anvil_camera2d",
+    "particle_emit": "anvil_particle_emit",
+    "particle_count": "anvil_particle_count",
+    "particle_clear": "anvil_particle_clear",
+    "particle_gravity": "anvil_particle_gravity",
     "abs": "fabs",
     "round": "round",
     "len": "(double)strlen",

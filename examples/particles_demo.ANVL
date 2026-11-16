@@ -1,0 +1,13 @@
+# A fountain of particles over a floor line.
+scene 2d
+clear rgba(8, 10, 16, 255)
+
+fn(update)
+  for local(i) = 0 to 5
+    set var(e) = particle_emit(480, 420, rnd(-160, 160), rnd(-330, -150), 1.4, rnd(2, 5), 255, 170, 60)
+  end
+end
+
+fn(draw)
+  display rect(0, 470, 960, 130) -rgb(20, 26, 38)
+end

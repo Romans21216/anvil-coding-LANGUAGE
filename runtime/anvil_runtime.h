@@ -118,6 +118,12 @@ int anvil_ray_backend_available(const char *name);
 void anvil_clear(int r, int g, int b, int a);
 void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
                 int a);
+double anvil_particle_emit(double x, double y, double vx, double vy,
+                           double life, double size, double r, double g,
+                           double b);
+double anvil_particle_count(void);
+double anvil_particle_clear(void);
+double anvil_particle_gravity(double gravity);
 void anvil_circle(double x, double y, double radius, int r, int g, int b,
                   int a);
 void anvil_line(double x1, double y1, double x2, double y2, int r, int g, int b,

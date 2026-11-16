@@ -117,6 +117,18 @@ SCENES = {
             "end",
         )
     ),
+    "particles_2d": "\n".join(
+        (
+            "scene 2d",
+            "clear rgba(10, 12, 18, 255)",
+            "",
+            "fn(draw)",
+            "  for local(i) = 0 to 39",
+            "    set var(e) = particle_emit(480, 300, 60, 40, 2, 3, 255, 120, 0)",
+            "  end",
+            "end",
+        )
+    ),
     "cubes_3d": "\n".join(
         (
             "scene 3d",

@@ -9,7 +9,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TOOL = ROOT / "tools" / "bench_runtime.py"
-SCENES = ("idle_2d", "overdraw_2d", "text_ui", "cubes_3d")
+SCENES = ("idle_2d", "overdraw_2d", "text_ui", "particles_2d", "cubes_3d")
 
 
 class RuntimeBudgetTests(unittest.TestCase):
