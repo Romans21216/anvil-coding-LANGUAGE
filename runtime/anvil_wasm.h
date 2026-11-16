@@ -57,4 +57,19 @@ char *anvil_text_upper(const char *source);
 char *anvil_text_mid(const char *source, double start, double count);
 double anvil_text_to_number(const char *source);
 
+/* Canvas 2D surface: every call is forwarded to the host. */
+typedef double (*AnvilCallback)(void);
+void anvil_set_scene3d(int enabled);
+void anvil_clear(int r, int g, int b, int a);
+void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
+                int a);
+void anvil_circle(double x, double y, double radius, int r, int g, int b,
+                  int a);
+void anvil_line(double x1, double y1, double x2, double y2, int r, int g, int b,
+                int a, double thickness);
+void anvil_text(double x, double y, const char *text, int r, int g, int b,
+                int a);
+void anvil_trace_finish(void);
+void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title);
+
 #endif

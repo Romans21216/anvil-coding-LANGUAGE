@@ -39,45 +39,97 @@ ALLOWED_BUILTINS = {
     "upper",
 }
 
-ENGINE_STATEMENT = re.compile(r"^\s*(display|scene|engine)\b", re.MULTILINE)
+ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
+SCENE_STATEMENT = re.compile(r"^\s*scene\s+(\w+)", re.MULTILINE)
+DISPLAY_STATEMENT = re.compile(r"^\s*display\s+([a-z_]+)\s*\(", re.MULTILINE)
+CAMERA_STATEMENT = re.compile(r"^\s*camera\b", re.MULTILINE)
+ALLOWED_SHAPES = {"rect", "circle", "line", "text"}
 
 HOST_PAGE = """<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
-<title>{title}</title>
+<title>__TITLE__</title>
 <style>
- body {{ background:#0d1117; color:#e6edf3; font:16px/1.5 ui-monospace,Consolas,monospace; }}
- pre {{ padding:24px; white-space:pre-wrap; }}
- .error {{ color:#ff7b72; }}
+ body { margin:0; background:#0d1117; }
+ canvas { display:block; margin:12px; background:#000; box-shadow:0 0 0 1px #30363d; }
+ #out { position:fixed; left:12px; bottom:12px; color:#ff7b72; font:13px ui-monospace,monospace; white-space:pre-wrap; }
 </style>
-<pre id="out"></pre>
+<canvas id="screen" width="960" height="600"></canvas>
+<div id="out"></div>
 <script>
-const output = document.getElementById("out");
-function print(text) {{ output.textContent += text; }}
-async function start() {{
-  try {{
-    if (location.protocol === "file:") {{
-      throw new Error("Serve this folder over HTTP (python -m http.server) — browsers block wasm fetches from file:// URLs.");
-    }}
-    const response = await fetch("{wasm}");
-    const bytes = await response.arrayBuffer();
+const canvas = document.getElementById("screen");
+const context = canvas.getContext("2d");
+const errors = document.getElementById("out");
+const utf8 = new TextDecoder();
+function rgba(r, g, b, a) {
+  return "rgba(" + r + "," + g + "," + b + "," + ((a === undefined ? 255 : a) / 255) + ")";
+}
+async function start() {
+  try {
+    if (location.protocol === "file:") {
+      throw new Error("Serve this folder over HTTP (python -m http.server); browsers block wasm fetches from file:// URLs.");
+    }
+    const bytes = await (await fetch("__WASM__")).arrayBuffer();
     const module = await WebAssembly.compile(bytes);
-    let memory;
-    const instance = await WebAssembly.instantiate(module, {{
-      env: {{
-        write(fd, pointer, length) {{
-          const view = new Uint8Array(memory.buffer, pointer, length);
-          print(new TextDecoder().decode(view));
-        }},
-      }},
-    }});
+    let memory = null;
+    const imports = { env: {
+      write(fd, pointer, length) {
+        const view = new Uint8Array(memory.buffer, pointer, length);
+        console.log(utf8.decode(view));
+      },
+      clear(r, g, b, a) {
+        context.fillStyle = rgba(r, g, b, a);
+        context.fillRect(0, 0, canvas.width, canvas.height);
+      },
+      rect(x, y, w, h, r, g, b, a) {
+        context.fillStyle = rgba(r, g, b, a);
+        context.fillRect(x, y, w, h);
+      },
+      circle(x, y, radius, r, g, b, a) {
+        context.fillStyle = rgba(r, g, b, a);
+        context.beginPath();
+        context.arc(x, y, Math.abs(radius), 0, Math.PI * 2);
+        context.fill();
+      },
+      line(x1, y1, x2, y2, thickness, r, g, b, a) {
+        context.strokeStyle = rgba(r, g, b, a);
+        context.lineWidth = Math.max(1, thickness);
+        context.beginPath();
+        context.moveTo(x1, y1);
+        context.lineTo(x2, y2);
+        context.stroke();
+      },
+      text(x, y, pointer, length, r, g, b, a) {
+        const view = new Uint8Array(memory.buffer, pointer, length);
+        context.fillStyle = rgba(r, g, b, a);
+        context.font = "20px 'Segoe UI', system-ui, sans-serif";
+        context.textBaseline = "top";
+        context.fillText(utf8.decode(view), x, y);
+      },
+      present() {},
+    }};
+    const instance = await WebAssembly.instantiate(module, imports);
     memory = instance.exports.memory;
     if (instance.exports.main) instance.exports.main();
-  }} catch (error) {{
-    output.className = "error";
-    print(String(error));
-  }}
-}}
+    if (instance.exports.anvil_frame) {
+      let last = performance.now();
+      const tick = (now) => {
+        const delta = now - last;
+        last = now;
+        try {
+          instance.exports.anvil_frame(delta);
+        } catch (error) {
+          errors.textContent = String(error);
+          return;
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+  } catch (error) {
+    errors.textContent = String(error);
+  }
+}
 start();
 </script>
 </html>
@@ -94,13 +146,29 @@ def validate(
     text = source_text
     if text is None:
         text = pathlib.Path(source_path).read_text(encoding="utf-8")
-    match = ENGINE_STATEMENT.search(text)
-    if match:
+    match = SCENE_STATEMENT.search(text)
+    if match and match.group(1).lower() != "2d":
         line = text.count("\n", 0, match.start()) + 1
         raise CompileError(
-            f"{source_path}:{line}: the wasm backend runs console programs only; "
-            f"'{match.group(1)}' needs the C backend"
+            f"{source_path}:{line}: the wasm backend draws 'scene 2d' only; "
+            f"'scene {match.group(1)}' needs the C backend"
         )
+    for match in DISPLAY_STATEMENT.finditer(text):
+        if match.group(1) in ALLOWED_SHAPES:
+            continue
+        line = text.count("\n", 0, match.start()) + 1
+        raise CompileError(
+            f"{source_path}:{line}: display {match.group(1)}(...) is not available "
+            "in the wasm backend yet"
+        )
+    for pattern, label in ((CAMERA_STATEMENT, "camera"), (ENGINE_STATEMENT, "engine")):
+        match = pattern.search(text)
+        if match:
+            line = text.count("\n", 0, match.start()) + 1
+            raise CompileError(
+                f"{source_path}:{line}: '{label}' statements are not available in "
+                "the wasm backend yet"
+            )
     used = used_builtins(functions, top)
     for name in used:
         if name in ALLOWED_BUILTINS:
@@ -176,5 +244,6 @@ def build(
         )
     page = out.with_suffix(".html")
     page.write_text(
-        HOST_PAGE.format(title=out.stem, wasm=out.name), encoding="utf-8"
+        HOST_PAGE.replace("__TITLE__", out.stem).replace("__WASM__", out.name),
+        encoding="utf-8",
     )

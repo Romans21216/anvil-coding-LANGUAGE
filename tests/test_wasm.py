@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -117,16 +119,16 @@ class WasmBuildTests(unittest.TestCase):
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmRejectionTests(unittest.TestCase):
-    def test_graphics_statements_are_refused_with_a_location(self) -> None:
+    def test_unsupported_shapes_name_the_line(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             result, _ = build(
                 root,
-                "scene 2d\n\nfn(draw)\n  display rect(10, 10, 20, 20) -rgb(255, 0, 0)\nend\n",
+                "scene 2d\n\nfn(draw)\n  display cube(0, 0, 0, 1) -rgb(255, 0, 0)\nend\n",
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("wasm backend runs console programs only", result.stderr)
-            self.assertIn(":1:", result.stderr)
+            self.assertIn("display cube(...) is not available", result.stderr)
+            self.assertIn(":4:", result.stderr)
 
     def test_unsupported_builtins_name_the_call_site(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -135,6 +137,71 @@ class WasmRejectionTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("'time' is not available in the wasm backend yet", result.stderr)
             self.assertIn(":2:", result.stderr)
+
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmCanvasTests(unittest.TestCase):
+    def test_a_2d_scene_emits_canvas_commands(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "scene 2d",
+                    "clear rgba(10, 20, 30, 255)",
+                    "",
+                    "fn(draw)",
+                    "  display rect(10, 20, 100, 50) -rgb(255, 0, 0)",
+                    "  display circle(200, 120, 30) -rgb(0, 255, 0)",
+                    "  display line(0, 0, 50, 50) -rgb(0, 0, 255)",
+                    '  display text("hi") -l(30, 40) -rgb(255, 255, 0)',
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            self.assertEqual(
+                ops,
+                [
+                    ["clear", 10, 20, 30, 255],
+                    ["rect", 10.0, 20.0, 100.0, 50.0, 255, 0, 0, 255],
+                    ["circle", 200.0, 120.0, 30.0, 0, 255, 0, 255],
+                    ["line", 0.0, 0.0, 50.0, 50.0, 1.0, 0, 0, 255, 255],
+                    ["text", 30.0, 40.0, "hi", 255, 255, 0, 255],
+                    ["present"],
+                ],
+            )
+
+    def test_the_host_page_draws_on_a_canvas(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, "scene 2d\n\nfn(draw)\n  display rect(0, 0, 10, 10) -rgb(1, 2, 3)\nend\n")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            page = out.with_suffix(".html").read_text(encoding="utf-8")
+            self.assertIn('<canvas id="screen"', page)
+            self.assertIn("getContext(\"2d\")", page)
+            self.assertIn("requestAnimationFrame", page)
+
+    def test_three_d_and_other_shapes_are_refused(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, _ = build(root, "scene 3d\n\nfn(draw)\n  display cube(0, 0, 0, 1) -rgb(255, 0, 0)\nend\n")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("draws 'scene 2d' only", result.stderr)
+
+            result, _ = build(root, "scene 2d\n\nfn(draw)\n  display cube(0, 0, 0, 1) -rgb(255, 0, 0)\nend\n")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("display cube(...) is not available in the wasm backend", result.stderr)
 
 
 if __name__ == "__main__":

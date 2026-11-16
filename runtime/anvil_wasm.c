@@ -7,6 +7,22 @@
 
 __attribute__((import_module("env"), import_name("write")))
 extern void anvil_host_write(int fd, const void *bytes, int length);
+__attribute__((import_module("env"), import_name("clear")))
+extern void anvil_host_clear(int r, int g, int b, int a);
+__attribute__((import_module("env"), import_name("rect")))
+extern void anvil_host_rect(double x, double y, double w, double h, int r,
+                            int g, int b, int a);
+__attribute__((import_module("env"), import_name("circle")))
+extern void anvil_host_circle(double x, double y, double radius, int r, int g,
+                              int b, int a);
+__attribute__((import_module("env"), import_name("line")))
+extern void anvil_host_line(double x1, double y1, double x2, double y2,
+                            double thickness, int r, int g, int b, int a);
+__attribute__((import_module("env"), import_name("text")))
+extern void anvil_host_text(double x, double y, const char *text, int length,
+                            int r, int g, int b, int a);
+__attribute__((import_module("env"), import_name("present")))
+extern void anvil_host_present(void);
 
 #define ANVIL_TEXT_BUFFERS 64
 static char anvil_text_buffers[ANVIL_TEXT_BUFFERS][ANVIL_STR_CAP];
@@ -366,4 +382,56 @@ double anvil_text_to_number(const char *source) {
   if (*cursor != '\0')
     return 0.0;
   return negative ? -value : value;
+}
+
+/* ---- Canvas 2D ---------------------------------------------------------- */
+static int anvil_clear_r, anvil_clear_g, anvil_clear_b, anvil_clear_a;
+static AnvilCallback anvil_frame_update, anvil_frame_draw;
+
+void anvil_set_scene3d(int enabled) { (void)enabled; }
+
+void anvil_clear(int r, int g, int b, int a) {
+  anvil_clear_r = r;
+  anvil_clear_g = g;
+  anvil_clear_b = b;
+  anvil_clear_a = a;
+}
+
+void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
+                int a) {
+  anvil_host_rect(x, y, w, h, r, g, b, a);
+}
+
+void anvil_circle(double x, double y, double radius, int r, int g, int b,
+                  int a) {
+  anvil_host_circle(x, y, radius, r, g, b, a);
+}
+
+void anvil_line(double x1, double y1, double x2, double y2, int r, int g, int b,
+                int a, double thickness) {
+  anvil_host_line(x1, y1, x2, y2, thickness, r, g, b, a);
+}
+
+void anvil_text(double x, double y, const char *text, int r, int g, int b,
+                int a) {
+  anvil_host_text(x, y, text, (int)strlen(text), r, g, b, a);
+}
+
+void anvil_trace_finish(void) {}
+
+void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
+  (void)title;
+  anvil_frame_update = update;
+  anvil_frame_draw = draw;
+}
+
+/* Called by the host once per animation frame; delta in milliseconds. */
+__attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
+  if (anvil_frame_update)
+    anvil_frame_update();
+  anvil_host_clear(anvil_clear_r, anvil_clear_g, anvil_clear_b, anvil_clear_a);
+  if (anvil_frame_draw)
+    anvil_frame_draw();
+  anvil_host_present();
+  (void)delta_ms;
 }

@@ -606,3 +606,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Host:** `tools/wasm_host.mjs` runs a module under Node and is used by `--run`.
 - **Tests:** `tests/test_wasm.py` covers hello output, strings/arrays/loops/function calls, `--check`, the generated host page, and both refusals (graphics at line 1, `time()` at line 2). 5 passed.
 - **Docs:** `docs/WASM.md`, backend list, README link, evidence ledger, testing doc.
+
+## Batch 50 — canvas 2D in the wasm target (8.12)
+
+- **Runtime:** the wasm runtime now forwards `clear`, `rect`, `circle`, `line` and `text` to host imports and stores the `update`/`draw` callbacks; `anvil_run` returns immediately and the exported `anvil_frame(delta)` runs one update, clear, draw and `present`. Strings cross the boundary as `(ptr, len)` and the host decodes UTF-8 from memory.
+- **Host page:** generated `.html` now contains a 960×600 canvas with a 2D context, real drawing for each primitive, and a `requestAnimationFrame` loop calling `anvil_frame`.
+- **Node host:** `--record` captures the draw-command stream as JSON so tests can assert order and arguments without a browser.
+- **Validation:** `scene 2d` and `display rect/circle/line/text` are allowed; `scene 3d`, `camera`, `engine` and other shapes are refused with their line number.
+- **Tests:** `tests/test_wasm.py` adds the canvas command stream (clear, rect, circle, line, text, present with exact arguments), the host page contents, and the new refusals. 8 passed.
+- **Visual check:** the generated page was served over HTTP and opened in Chromium; the canvas showed the red rectangle and yellow "hi" text, and sampled pixels matched the scene colours.
