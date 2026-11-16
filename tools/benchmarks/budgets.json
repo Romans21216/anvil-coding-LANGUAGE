@@ -6,7 +6,7 @@
     "python": "3.13.15",
     "c_compiler": "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\cl.exe",
     "bytes_per_pointer": 8,
-    "cpu_count": 32
+    "cpu_count": 8
   },
   "metrics": {
     "build_seconds": {

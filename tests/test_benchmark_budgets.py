@@ -193,6 +193,15 @@ class BudgetFileTests(unittest.TestCase):
         self.assertIn("no budget recorded", text)
         self.assertIn("ghost", text)
 
+    def test_published_benchmarks_show_the_budget_section(self):
+        """docs/BENCHMARKS.md must document the budgets it is checked against."""
+        published = (ROOT / "docs" / "BENCHMARKS.md").read_text(encoding="utf-8")
+        self.assertIn("## Regression budgets", published)
+        for metric in self.budget["metrics"]:
+            self.assertIn(metric, published)
+        for backend in self.budget["backends"]:
+            self.assertIn(f"| {backend} |", published)
+
     def test_render_budget_reports_checksum_regression(self):
         results = {
             "machine": {"platform": "test"},
