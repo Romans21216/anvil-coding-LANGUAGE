@@ -827,3 +827,24 @@ Tests: `test_text_and_print` gains two cases — a long line with an unknown nam
 in the middle asserts the excerpt stays under 140 characters, carries `…`, and
 that the caret's `^` begins exactly under the token; and a 200-deep nested
 expression asserts the "expression nesting exceeds" error keeps its location.
+
+## Bound recursion with a stack budget
+
+Deep recursion used to kill the process with `0xC00000FD` (STATUS_STACK_OVERFLOW)
+— no message, no line, no call stack — measured between 6,000 and 12,000 frames
+on this machine.
+
+- `anvil_frame_enter` now records the stack address on the first call and, on
+  every entry, compares the current address against it. Passing 512 KiB of a
+  default 1 MiB thread stack reports
+  `call depth exceeded the 512 KiB stack budget in fn(...)` with the source
+  location, the innermost 64 frames, and exit code 2. A byte budget rather than
+  a frame count is what makes this correct for functions with large local
+  arrays, whose frames are hundreds of times bigger than a scalar-only frame.
+- `tests/test_call_depth.py` pins the runaway case (100,000 deep, exit 2,
+  bounded report), a legitimate 1,000-deep recursion still printing `0`, and
+  the separate compile-time guard that rejects a recursion whose per-frame
+  local arrays would exceed the 16 MiB active-array budget.
+- Documented in `docs/ENGINE.md`; `docs/NATIVE_X64_COMPILER_MIGRATION.md` now
+  says plainly that the native backend has no such guard and dies with the OS
+  code, instead of the vaguer "unbounded recursion remains unsupported".

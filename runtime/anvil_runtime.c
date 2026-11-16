@@ -33,7 +33,30 @@ typedef struct {
 static AnvilFrame anvil_frames[ANVIL_FRAME_DEPTH];
 static int anvil_frame_depth = 0;
 
+/* Recursion guard. A Windows thread gets 1 MiB of stack by default, and an Anvil
+   frame with local arrays can be large, so a frame *count* would misjudge the
+   risk. Instead the first frame records the stack top and every entry compares
+   the current address: 512 KiB leaves headroom for the fatal report below. */
+enum { ANVIL_STACK_BUDGET_BYTES = 512 * 1024 };
+static uintptr_t anvil_stack_base = 0;
+
 void anvil_frame_enter(const char *name, const char *path, int line) {
+  char marker;
+  uintptr_t here = (uintptr_t)&marker;
+  if (anvil_stack_base == 0) {
+    anvil_stack_base = here;
+  } else if (anvil_stack_base > here &&
+             anvil_stack_base - here > (uintptr_t)ANVIL_STACK_BUDGET_BYTES) {
+    fprintf(stderr,
+            "%s:%d: call depth exceeded the %d KiB stack budget in fn(%s)\n",
+            path ? path : "<Anvil>", line, ANVIL_STACK_BUDGET_BYTES / 1024,
+            name ? name : "<unnamed>");
+    fprintf(stderr,
+            "  the recursion has no reachable base case, or the function's "
+            "local arrays are too large\n");
+    anvil_report_call_stack();
+    exit(2);
+  }
   if (anvil_frame_depth < ANVIL_FRAME_DEPTH) {
     anvil_frames[anvil_frame_depth].name = name;
     anvil_frames[anvil_frame_depth].path = path;

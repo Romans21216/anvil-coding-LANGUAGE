@@ -38,39 +38,48 @@ def free_port() -> int:
 
 
 class PacketFuzzTests(unittest.TestCase):
-    def _server(self, temporary: str, port: int, body: str):
-        """Build and start a program that hosts on ``port`` and runs ``body``."""
+    def _server(self, temporary: str, body: str):
+        """Build and start a program that hosts on a free port and runs ``body``.
+
+        Ports are chosen randomly, so a collision or a slow spawn is retried on a
+        fresh port instead of failing the suite; the chosen port lands on
+        ``self.port``.
+        """
         folder = pathlib.Path(temporary)
-        source = folder / "server.ANVL"
-        source.write_text(
-            "fn(main)\n"
-            f"  net host({port}) --local\n"
-            '  print "ready"\n'
-            + body
-            + "end\n",
-            encoding="utf-8",
-        )
-        executable = source.with_suffix(".exe")
-        build = subprocess.run(
-            [sys.executable, str(COMPILER), str(source), "-o", str(executable)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-        )
-        self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
-        process = subprocess.Popen(
-            [str(executable)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace",
-        )
-        self.addCleanup(process.kill)
-        first = process.stdout.readline().strip()
-        self.assertEqual(first, "ready", "server did not report readiness")
-        return process
+        for attempt in range(3):
+            port = free_port()
+            source = folder / f"server{attempt}.ANVL"
+            source.write_text(
+                "fn(main)\n"
+                f"  net host({port}) --local\n"
+                '  print "ready"\n'
+                + body
+                + "end\n",
+                encoding="utf-8",
+            )
+            executable = source.with_suffix(".exe")
+            build = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "-o", str(executable)],
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+            )
+            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+            process = subprocess.Popen(
+                [str(executable)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, encoding="utf-8", errors="replace",
+            )
+            self.addCleanup(process.kill)
+            first = process.stdout.readline().strip()
+            if first == "ready":
+                self.port = port
+                return process
+            process.kill()
+            process.wait(timeout=10)
+        self.fail("server did not report readiness on three ports")
 
     def test_malformed_datagrams_are_ignored(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
-            port = free_port()
             process = self._server(
                 temporary,
-                port,
                 "  set local(n) = 0\n"
                 "  while packet_id() < 0 and local(n) < 4000000\n"
                 "    add local(n) 1\n"
@@ -97,9 +106,9 @@ class PacketFuzzTests(unittest.TestCase):
                 envelope(1, 999, 1.0) + b"trailing",
             ]
             for packet in malformed:
-                sock.sendto(packet, ("127.0.0.1", port))
+                sock.sendto(packet, ("127.0.0.1", self.port))
                 time.sleep(0.004)
-            sock.sendto(envelope(1, 7, 2.5), ("127.0.0.1", port))
+            sock.sendto(envelope(1, 7, 2.5), ("127.0.0.1", self.port))
             stdout, stderr = process.communicate(timeout=30)
         self.assertEqual(process.returncode, 0, stderr)
         self.assertIn("id=7 value=2.5", stdout)
@@ -107,10 +116,8 @@ class PacketFuzzTests(unittest.TestCase):
 
     def test_replayed_and_stale_sequences_are_rejected(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
-            port = free_port()
             process = self._server(
                 temporary,
-                port,
                 "  set var(last) = -1\n"
                 "  set local(n) = 0\n"
                 "  while packet_id() != 1 and local(n) < 8000000\n"
@@ -127,7 +134,7 @@ class PacketFuzzTests(unittest.TestCase):
             for sequence, message_id in ((5, 10), (5, 11), (4, 12), (6, 13), (7, 1)):
                 sock.sendto(
                     envelope(sequence, message_id, float(message_id)),
-                    ("127.0.0.1", port),
+                    ("127.0.0.1", self.port),
                 )
                 time.sleep(0.05)
             stdout, stderr = process.communicate(timeout=30)
@@ -143,10 +150,8 @@ class PacketFuzzTests(unittest.TestCase):
 
     def test_a_malformed_flood_does_not_block_a_later_valid_packet(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
-            port = free_port()
             process = self._server(
                 temporary,
-                port,
                 "  set local(n) = 0\n"
                 "  while packet_id() < 0 and local(n) < 4000000\n"
                 "    add local(n) 1\n"
@@ -158,12 +163,12 @@ class PacketFuzzTests(unittest.TestCase):
             self.addCleanup(sock.close)
             junk = envelope(1, 999, 1.0, magic=b"JUNK")
             for _ in range(500):
-                sock.sendto(junk, ("127.0.0.1", port))
+                sock.sendto(junk, ("127.0.0.1", self.port))
                 time.sleep(0.001)
             # UDP may drop under a flood, so repeat the valid packet with fresh
             # sequences until the server has one.
             for sequence in range(1, 200):
-                sock.sendto(envelope(sequence, 7, 2.5), ("127.0.0.1", port))
+                sock.sendto(envelope(sequence, 7, 2.5), ("127.0.0.1", self.port))
                 time.sleep(0.005)
                 if process.poll() is not None:
                     break
