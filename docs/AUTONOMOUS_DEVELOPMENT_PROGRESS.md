@@ -418,3 +418,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Pre-flight:** all 36 examples parsed; zero would warn.
 - **Tests:** `test_a_typo_in_an_uncalled_function_is_reported` was red first, then green; 50 passed across `test_lints`, `test_suggestions`, `test_dead_branches`, `test_refusals`, `test_unused_imports`. CLI verified: warning with caret, `--deny-warnings` rc 1.
 - **Commit:** `a896281`.
+
+## Batch 27 — always-on-top and fullscreen (8.11/8.14)
+
+- **`window_on_top(on)`**: sets or clears `WS_EX_TOPMOST` so the game floats over other programs, or goes behind them again when clicked away.
+- **`window_fullscreen(on)`**: saves the window style and rectangle, switches to borderless `WS_POPUP` on the current monitor, and restores the exact previous style and rectangle on `0`. Both return 1 on success and 0 without a window, usable as statements or expressions.
+- **Native backend:** reports a source-located "not available in the native x64 backend yet" diagnostic instead of ignoring the call.
+- **Tests:** `tests/test_window_flags.py` drives a real window and inspects live Win32 state after each phase — `WS_EX_TOPMOST` present/absent, `WS_POPUP` plus rectangle equal to the monitor, then the original rectangle restored. 110 passed with includes, compiler, capability matrix and native x64.
+- **Also:** `examples/window_controls.ANVL` (F/T toggles), spec and engine docs, native migration note, VS Code grammar and `npm test`.
+- **Commit:** `25ac3ab`.
