@@ -28,6 +28,7 @@ is absent, tests that build C programs raise `SkipTest` instead of failing.
 | Compile-time and size budgets | `python tools/bench_anvil.py --check` (re-baseline with `--write-budgets`) |
 | Runtime frame-time budgets | `python tools/bench_runtime.py --check` (re-baseline with `--write-budgets`) |
 | Sprite atlas packing | `python tools/pack_atlas.py sheet.bmp --atlas sheet.json sprites/*.bmp` |
+| WebAssembly console build | `python compiler/anvil.py hello.ANVL --backend wasm -o hello.wasm` then `node tools/wasm_host.mjs hello.wasm` |
 | A project's own cases | `python compiler/anvil.py game.ANVLproj --test [--backend native]` |
 | Formatting | `python compiler/anvil.py file.ANVL --format-check` |
 | VS Code grammar and sample validation | `npm test --prefix vscode-extension` |
@@ -103,6 +104,8 @@ remote desktop can prevent window creation:
   messages, position/stop and loop-versus-finish behavior.
 - `test_wav_adpcm` — IMA ADPCM decoding for one-shot sounds and streaming music,
   decoded amplitude against a PCM reference, and bit-depth rejections.
+- `test_wasm` — builds the console subset with clang/wasm-ld, runs it under
+  Node, checks the generated host page, and asserts located refusals.
 - `test_particles` — argument validation, the 4,096-particle bound, clear
   counts, and window pixels for a fresh and fading particle.
 - `test_shadows` — a tilted camera samples the flattened shadow of a model and

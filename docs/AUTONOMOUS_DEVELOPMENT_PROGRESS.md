@@ -597,3 +597,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Queries:** added `sound_duration(handle)` and `sound_rms(handle)` so imported audio can be checked without playing it.
 - **Bugs fixed:** the music parser still rejected every non-PCM format (`if (format != 1) return 0`), and `frame_bytes` became 0 for 4-bit audio, dividing by zero (0xC0000094) when the stream started.
 - **Tests:** `tests/test_wav_adpcm.py` covers decoding and playing a compressed sound, streaming ADPCM music with the right length and position, decoded RMS within 600 of the PCM reference, and the 4-bit rejection messages for both loaders. 4 passed.
+
+## Batch 49 — WebAssembly console target (8.12 first slice)
+
+- **Backend:** `--backend wasm` reuses the C code generation with a freestanding runtime (`runtime/anvil_wasm.c` + `anvil_wasm.h`), links with clang 23.1.4 and wasm-ld, and writes both the `.wasm` and a host `.html` page that wires `env.write` to a `<pre>`.
+- **Runtime:** implemented `printf`/`putchar`/`strlen`/`memcpy`/`memset`/`strcmp`, a 1 MiB bump allocator, number formatting, string helpers (`str_set`, `str_cat`, `text_mid`, `text_upper`, `text_to_number`), array bounds checks and frame-depth checks; math builtins lower to wasm instructions via `__builtin_*`.
+- **Subset enforcement:** `scene`/`display`/`engine` statements and builtins outside the allowed list are refused with a source-located error before linking, instead of failing at link time with an undefined symbol.
+- **Host:** `tools/wasm_host.mjs` runs a module under Node and is used by `--run`.
+- **Tests:** `tests/test_wasm.py` covers hello output, strings/arrays/loops/function calls, `--check`, the generated host page, and both refusals (graphics at line 1, `time()` at line 2). 5 passed.
+- **Docs:** `docs/WASM.md`, backend list, README link, evidence ledger, testing doc.

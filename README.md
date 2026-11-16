@@ -171,6 +171,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Backend notes](docs/BACKENDS.md)
 - [Sprite atlases](docs/ATLAS.md)
 - [3D models (glTF)](docs/MODELS.md)
+- [WebAssembly target](docs/WASM.md)
 - [Testing and coverage labels](docs/TESTING.md)
 - [Part 8 evidence ledger](docs/PART8_EVIDENCE.md)
 - [Diagnostic codes](docs/ERRORS.md)

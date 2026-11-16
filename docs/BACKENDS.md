@@ -1,9 +1,12 @@
 # Backend capability matrix
 
-Two backends compile `.ANVL`:
+Three backends compile `.ANVL`:
 
 - **C** (default): emits C, links `runtime/anvil_runtime.c` with MSVC.
 - **native**: emits an AMD64 PE directly (`--backend native`), no C toolchain.
+- **wasm**: emits the same C against a freestanding runtime and links WebAssembly
+  with clang/wasm-ld (`--backend wasm`); console subset only, see
+  [docs/WASM.md](WASM.md).
 
 Every row marked "both" is covered by tests that compile and run the same
 program on both backends and compare stdout (see `tests/` and

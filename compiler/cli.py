@@ -506,9 +506,9 @@ def main() -> int:
     )
     ap.add_argument(
         "--backend",
-        choices=("c", "native"),
+        choices=("c", "native", "wasm"),
         default="c",
-        help="select the C toolchain or experimental Anvil-owned x64 PE backend",
+        help="select the C toolchain, the x64 PE backend, or the WebAssembly console target",
     )
     ap.add_argument(
         "--extension",
@@ -741,6 +741,10 @@ def main() -> int:
             # --check must never write files, whichever backend is selected.
             if args.backend == "native":
                 NativeCodegen(source_path, funcs, top, variables, arrays).generate()
+            elif args.backend == "wasm":
+                from compiler import wasm as wasm_backend
+
+                wasm_backend.validate(source_path, funcs, top)
             else:
                 emit_c(
                     source_path, funcs, top, variables, arrays, fixed_hz, project_name
@@ -748,6 +752,34 @@ def main() -> int:
             timings.mark("generate")
             timings.report()
             print(f"{source_path}: ok")
+            return 0
+        if args.backend == "wasm":
+            from compiler import wasm as wasm_backend
+
+            if args.package or args.package_dry_run:
+                raise CompileError("--package does not apply to the wasm backend")
+            out = args.output or source_path.with_suffix(".wasm")
+            emit_path = args.emit_c or args.generated_c
+            wasm_backend.build(
+                source_path,
+                funcs,
+                top,
+                variables,
+                arrays,
+                out,
+                fixed_hz,
+                project_name,
+                emit_c_path=pathlib.Path(emit_path) if emit_path else None,
+            )
+            timings.mark("build")
+            timings.report()
+            if emit_path:
+                print(f"Wrote {emit_path}")
+                return 0
+            print(f"Built {out} as WebAssembly; host page {out.with_suffix('.html')}")
+            if args.run:
+                host = pathlib.Path(__file__).resolve().parents[1] / "tools" / "wasm_host.mjs"
+                return subprocess.run(["node", str(host), str(out)]).returncode
             return 0
         if args.backend == "native":
             if args.emit_c or args.generated_c or args.cc or args.debug or args.dynamic_runtime:

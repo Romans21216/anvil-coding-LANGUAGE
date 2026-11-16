@@ -612,6 +612,8 @@ def emit_c(
     arrays: dict[str, int] | None = None,
     fixed_hz: int = 60,
     project_name: str = "Anvil Game",
+    runtime_header: str = "anvil_runtime.h",
+    minimal_includes: bool = False,
 ) -> str:
     arrays = arrays or {}
     from compiler import gltf as _gltf
@@ -647,18 +649,26 @@ def emit_c(
     from compiler.builtin_usage import used_builtins
 
     resolved = used_builtins(functions, top)
-    lines = [
-        "/* Generated from Anvil source. The .ANVL source remains the program. */",
-        "/* builtins used: " + (", ".join(resolved) or "none") + " */",
-        '#include "anvil_runtime.h"',
-        "#include <math.h>",
-        "#include <stdio.h>",
-        "#include <string.h>",
-        "#include <stdlib.h>",
-        "#include <io.h>",
-        "#include <fcntl.h>",
-        "",
-    ]
+    if minimal_includes:
+        lines = [
+            "/* Generated from Anvil source. The .ANVL source remains the program. */",
+            "/* builtins used: " + (", ".join(resolved) or "none") + " */",
+            f'#include "{runtime_header}"',
+            "",
+        ]
+    else:
+        lines = [
+            "/* Generated from Anvil source. The .ANVL source remains the program. */",
+            "/* builtins used: " + (", ".join(resolved) or "none") + " */",
+            f'#include "{runtime_header}"',
+            "#include <math.h>",
+            "#include <stdio.h>",
+            "#include <string.h>",
+            "#include <stdlib.h>",
+            "#include <io.h>",
+            "#include <fcntl.h>",
+            "",
+        ]
     from compiler import extensions as _extensions
 
     lines += _extensions.c_declarations()
