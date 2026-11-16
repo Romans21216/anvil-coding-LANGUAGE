@@ -104,5 +104,45 @@ class CleanTests(unittest.TestCase):
             self.assertTrue((root / "prog.exe").is_file())
 
 
+class ProjectTestCommandTests(unittest.TestCase):
+    def _project(self, root: pathlib.Path) -> pathlib.Path:
+        (root / "tests").mkdir(parents=True)
+        (root / "main.ANVL").write_text(PROGRAM, encoding="utf-8")
+        (root / "tests/ok.ANVL").write_text(PROGRAM, encoding="utf-8")
+        manifest = root / "game.ANVLproj"
+        manifest.write_text('name = "T"\nentry = "main.ANVL"\n', encoding="utf-8")
+        return manifest
+
+    def test_passing_cases_report_pass_and_exit_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            manifest = self._project(pathlib.Path(temp))
+            result = run_compiler(str(manifest), "--backend", "native", "--test")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("PASS ok.ANVL", result.stdout)
+        self.assertIn("1 passed, 0 failed", result.stdout)
+
+    def test_a_failing_case_fails_the_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            manifest = self._project(root)
+            (root / "tests/bad.ANVL").write_text(
+                "fn(main)\n  say 1 / 0\nend\ncall fn(main)\n", encoding="utf-8"
+            )
+            result = run_compiler(str(manifest), "--backend", "native", "--test")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("FAIL bad.ANVL", result.stdout)
+        self.assertIn("1 passed, 1 failed", result.stdout)
+
+    def test_a_project_without_tests_says_so(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "main.ANVL").write_text(PROGRAM, encoding="utf-8")
+            manifest = root / "game.ANVLproj"
+            manifest.write_text('name = "T"\nentry = "main.ANVL"\n', encoding="utf-8")
+            result = run_compiler(str(manifest), "--test")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no tests folder", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

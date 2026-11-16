@@ -9,7 +9,9 @@ from __future__ import annotations
 import pathlib
 import platform
 import shutil
+import subprocess
 import sys
+import tempfile
 
 STARTER_PROGRAM = """fn(main)
   say "Hello from Anvil"
@@ -81,6 +83,53 @@ def clean(root: pathlib.Path) -> int:
         print(f"removed {path}")
     print(f"cleaned {len(removed)} item(s) in {root}")
     return 0
+
+
+def run_project_tests(root: pathlib.Path, backend: str) -> int:
+    """Compile and run every tests/*.ANVL file; exit 1 if any case fails."""
+    root = root.resolve()
+    tests_dir = root / "tests"
+    if not tests_dir.is_dir():
+        print(
+            f"{tests_dir}: no tests folder; add tests/*.ANVL to use --test",
+            file=sys.stderr,
+        )
+        return 1
+    cases = sorted(tests_dir.rglob("*.ANVL"))
+    if not cases:
+        print(f"{tests_dir}: no .ANVL tests found", file=sys.stderr)
+        return 1
+    compiler = pathlib.Path(__file__).resolve().parent / "anvil.py"
+    failures = 0
+    with tempfile.TemporaryDirectory() as temp:
+        for index, case in enumerate(cases):
+            output = pathlib.Path(temp) / f"case{index}.exe"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(compiler),
+                    str(case),
+                    "--backend",
+                    backend,
+                    "--run",
+                    "-o",
+                    str(output),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=case.parent,
+            )
+            name = case.relative_to(tests_dir).as_posix()
+            if result.returncode == 0:
+                print(f"PASS {name}")
+            else:
+                failures += 1
+                print(f"FAIL {name} (exit {result.returncode})")
+                for line in (result.stdout + result.stderr).strip().splitlines():
+                    print(f"    {line}")
+    print(f"{len(cases) - failures} passed, {failures} failed")
+    return 0 if failures == 0 else 1
 
 
 def format_file(path: pathlib.Path, check: bool) -> int:

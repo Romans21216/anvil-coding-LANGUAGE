@@ -250,6 +250,11 @@ def main() -> int:
         help="exit 1 when --format would change the source file",
     )
     ap.add_argument(
+        "--test",
+        action="store_true",
+        help="compile and run every tests/*.ANVL file in the project",
+    )
+    ap.add_argument(
         "--print-imports",
         action="store_true",
         help="print the builtins this program actually uses and stop",
@@ -317,6 +322,9 @@ def main() -> int:
     if args.clean:
         root = args.source.parent if args.source else pathlib.Path(".")
         return lifecycle.clean(root)
+    if args.test:
+        root = args.source.parent if args.source else pathlib.Path(".")
+        return lifecycle.run_project_tests(root, args.backend)
     if args.run and (args.check or args.emit_c or args.package or args.package_dry_run):
         ap.error("--run builds and runs; drop --check, --emit-c or --package")
     if args.source is None:
