@@ -2910,6 +2910,7 @@ class NativeCodegen:
                 if target is None:
                     raise CompileError(
                         f"{call.source or self.path}:{call.line}: unknown function {call.name!r}"
+                        f"{suggestion_suffix(call.name, self.functions)}"
                     )
                 arguments = (", " + call.value) if call.value.strip() else ""
                 if call.name == "main" and not quiet_main:
