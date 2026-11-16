@@ -123,6 +123,9 @@ const char *anvil_text_lower(const char *text);
 const char *anvil_text_trim(const char *text);
 const char *anvil_text_mid(const char *text, double start, double count);
 const char *anvil_text_chr(double code);
+double anvil_utf8_len(const char *text);
+const char *anvil_utf8_char(const char *text, double index);
+const char *anvil_utf8_mid(const char *text, double start, double count);
 const char *anvil_text_replace(const char *text, const char *from,
                                const char *to);
 double anvil_time(void);

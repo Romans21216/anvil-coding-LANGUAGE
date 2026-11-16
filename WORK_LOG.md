@@ -432,3 +432,19 @@ because a just-built probe executable can still be locked for a few milliseconds
 by Windows after the child exits; the run's assertions passed while the temp-dir
 teardown raised `WinError 5` and failed the test. The behaviour checks are
 unchanged.
+
+## Part 8 GATE 1: explicit UTF-8 code-point operations
+
+The text contract documented bytes only, so an index could split a multi-byte
+sequence and emit invalid UTF-8. The C runtime now also provides code-point
+operations that decode UTF-8 and copy whole sequences:
+
+- `utf8_len(text)` counts code points (`len` still counts bytes).
+- `utf8_char(text, index)` returns one code point, empty when out of range.
+- `utf8_mid(text, start, count)` slices whole code points.
+
+`tests/test_text_and_print.py` covers `é` (2 bytes, 1 point), `🙂` (4 bytes,
+1 point), a mixed slice and an out-of-range index; the console capture decodes
+UTF-8 explicitly. `docs/LANGUAGE.md` documents both families, the editor grammar
+scopes the new calls, and the matrix records `utf8-codepoints` as C-supported
+with the native backend rejecting text built-ins (a documented gap).

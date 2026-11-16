@@ -110,6 +110,7 @@ async function main() {
   expect('output len("anvil")', 'len', 'support.function.anvil');
   expect('set var(text) = upper("anvil")', 'upper', 'support.function.anvil');
   expect('output hypot(3, 4)', 'hypot', 'support.function.anvil');
+  expect('print utf8_char("aé🙂", 1)', 'utf8_char', 'support.function.anvil');
   expect('output clamp(9, 1, 5)', 'clamp', 'support.function.anvil');
   expect('language version 1', 'language', 'keyword.control.anvil');
   expect('language version 1', 'version', 'keyword.control.anvil');

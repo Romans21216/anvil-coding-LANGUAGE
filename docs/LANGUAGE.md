@@ -139,6 +139,16 @@ is [BACKEND_MATRIX.md](BACKEND_MATRIX.md).
 | `replace(text, from, to)` | every occurrence replaced |
 | `chr(code)` | one-character text for a code 0..255 |
 
+Byte-based `len`/`mid`/`ord`/`find` count UTF-8 bytes. Use the code-point
+operations when you need characters rather than bytes: they decode UTF-8, never
+split a multi-byte sequence, and return empty text for an out-of-range index.
+
+| Code-point call | Result |
+| --- | --- |
+| `utf8_len(text)` | number of Unicode code points |
+| `utf8_char(text, index)` | text of the code point at `index`, empty when out of range |
+| `utf8_mid(text, start, count)` | `count` code points from `start`, clamped to the text |
+
 Text results live in a 256 KiB scratch arena and stay valid until the statement
 that built them finishes, which is all a display call or a `print` needs. There
 is no text variable type yet: build text inside the `display`/`print` expression

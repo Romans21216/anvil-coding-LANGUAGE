@@ -33,6 +33,7 @@ source with a diagnostic. Regenerate after changing either backend, and run
 | `print-literal` | text | supported | supported |
 | `print-toplevel` | text | supported | supported |
 | `text-builtins` | text | supported | rejected |
+| `utf8-codepoints` | text | supported | rejected |
 | `clear-inside-draw` | graphics | builds | rejected |
 | `display-rect` | graphics | builds | builds |
 | `display-circle` | graphics | builds | builds |
@@ -41,13 +42,14 @@ source with a diagnostic. Regenerate after changing either backend, and run
 
 ## Summary
 
-- Cases where both backends build and print the same value: **21** of 30.
-- Cases the C backend supports but the native backend rejects: **2**.
-- Cases the native backend rejects: `print-statement`, `text-builtins`.
+- Cases where both backends build and print the same value: **21** of 31.
+- Cases the C backend supports but the native backend rejects: **3**.
+- Cases the native backend rejects: `print-statement`, `text-builtins`, `utf8-codepoints`.
 
 ## Rejected-case diagnostics
 
 - `text-dynamic` on `native`: error: statement 'display' is not supported by the native x64 backend yet
 - `print-statement` on `native`: error: native print currently accepts one string literal; dynamic text needs the default C backend
 - `text-builtins` on `native`: error: unsupported native expression token 'len'
+- `utf8-codepoints` on `native`: error: native print currently accepts one string literal; dynamic text needs the default C backend
 - `clear-inside-draw` on `native`: error: statement 'clear' is not supported by the native x64 backend yet

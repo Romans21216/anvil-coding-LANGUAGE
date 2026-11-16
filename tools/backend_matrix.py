@@ -181,6 +181,12 @@ CASES = [
         "5",
     ),
     (
+        "utf8-codepoints",
+        "text",
+        'fn(main)\n print utf8_char("aé🙂", 1)\n output utf8_len("🙂")\nend\n',
+        "é\n1",
+    ),
+    (
         "clear-inside-draw",
         "graphics",
         "scene 2d\nfn(draw)\n clear rgba(0,0,0,255)\n display rect(10,10,40,40) -rgb(255,0,0)\nend\n",
@@ -259,7 +265,8 @@ def _run_case(source: str, backend: str, workdir: pathlib.Path) -> dict:
 def _run_program(output: pathlib.Path, timeout: int = 10) -> dict:
     try:
         run = subprocess.run(
-            [str(output)], capture_output=True, text=True, timeout=timeout
+            [str(output)], capture_output=True, text=True, timeout=timeout,
+            encoding="utf-8", errors="replace",
         )
     except subprocess.TimeoutExpired:
         return {"status": "timeout", "detail": "program did not exit"}

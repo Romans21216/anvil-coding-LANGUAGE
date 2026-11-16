@@ -29,7 +29,10 @@ class TextAndPrintTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             executable = path.with_suffix(".exe")
             self.assertTrue(executable.exists(), result.stdout)
-            run = subprocess.run([str(executable)], capture_output=True, text=True)
+            run = subprocess.run(
+                [str(executable)], capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
+            )
             self.assertEqual(run.returncode, 0, run.stderr)
             return run.stdout.replace("\r\n", "\n").splitlines()
 
@@ -139,6 +142,31 @@ class TextAndPrintTests(unittest.TestCase):
                 "len 5 ord 65 find 6",
                 "chr ABC",
                 "equal 1 1",
+                "0",
+            ],
+        )
+
+    def test_utf8_code_point_operations_never_split_a_code_point(self):
+        lines = self.run_program(
+            "fn(main)\n"
+            '  print "bytes " + len("é")\n'
+            '  print "points " + utf8_len("é")\n'
+            '  print "emoji points " + utf8_len("🙂")\n'
+            '  print "char " + utf8_char("aé🙂", 1)\n'
+            '  print "slice " + utf8_mid("aé🙂z", 1, 2)\n'
+            '  print "past [" + utf8_char("a", 5) + "]"\n'
+            "  output 0\n"
+            "end\n"
+        )
+        self.assertEqual(
+            lines,
+            [
+                "bytes 2",
+                "points 1",
+                "emoji points 1",
+                "char é",
+                "slice é🙂",
+                "past []",
                 "0",
             ],
         )

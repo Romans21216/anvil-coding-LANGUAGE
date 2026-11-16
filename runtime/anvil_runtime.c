@@ -736,6 +736,74 @@ const char *anvil_text_chr(double code) {
   return out;
 }
 
+/* Code-point (not byte) operations over UTF-8 text.  Invalid bytes count as one
+   code point each, and slices copy whole byte sequences so a code point is
+   never split. */
+double anvil_utf8_len(const char *text) {
+  size_t i = 0, count = 0, length;
+  if (!text)
+    return 0.0;
+  length = strlen(text);
+  while (i < length) {
+    ++count;
+    ++i;
+    while (i < length && ((unsigned char)text[i] & 0xC0) == 0x80)
+      ++i;
+  }
+  return (double)count;
+}
+
+static size_t anvil_utf8_offset(const char *text, size_t length, size_t index) {
+  size_t i = 0, at = 0;
+  while (i < length && at < index) {
+    ++i;
+    while (i < length && ((unsigned char)text[i] & 0xC0) == 0x80)
+      ++i;
+    ++at;
+  }
+  return i;
+}
+
+const char *anvil_utf8_char(const char *text, double index) {
+  size_t length, from, to, take;
+  char *out;
+  if (!text)
+    return "";
+  length = strlen(text);
+  if (!(index == index) || index < 0)
+    index = 0;
+  from = anvil_utf8_offset(text, length, (size_t)index);
+  to = from < length ? anvil_utf8_offset(text, length, (size_t)index + 1) : from;
+  take = to - from;
+  out = anvil_text_alloc(take + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  memcpy(out, text + from, take);
+  out[take] = '\0';
+  return out;
+}
+
+const char *anvil_utf8_mid(const char *text, double start, double count) {
+  size_t length, from, to, take;
+  char *out;
+  if (!text)
+    return "";
+  length = strlen(text);
+  if (!(start == start) || start < 0)
+    start = 0;
+  if (!(count == count) || count < 0)
+    count = 0;
+  from = anvil_utf8_offset(text, length, (size_t)start);
+  to = anvil_utf8_offset(text, length, (size_t)start + (size_t)count);
+  take = to - from;
+  out = anvil_text_alloc(take + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  memcpy(out, text + from, take);
+  out[take] = '\0';
+  return out;
+}
+
 const char *anvil_text_replace(const char *text, const char *from,
                                const char *to) {
   size_t text_length, from_length, to_length, i, out_length = 0, capacity;

@@ -168,6 +168,9 @@ TEXT_BUILTINS = {
     "mid": (("text", "number", "number"), "string"),
     "replace": (("text", "text", "text"), "string"),
     "chr": (("number",), "string"),
+    "utf8_len": (("text",), "number"),
+    "utf8_char": (("text", "number"), "string"),
+    "utf8_mid": (("text", "number", "number"), "string"),
 }
 
 TEXT_BUILTIN_C_NAMES = {
@@ -180,6 +183,9 @@ TEXT_BUILTIN_C_NAMES = {
     "mid": "anvil_text_mid",
     "replace": "anvil_text_replace",
     "chr": "anvil_text_chr",
+    "utf8_len": "anvil_utf8_len",
+    "utf8_char": "anvil_utf8_char",
+    "utf8_mid": "anvil_utf8_mid",
 }
 
 # Trailing arguments that a builtin fills in when the call is shorter.
