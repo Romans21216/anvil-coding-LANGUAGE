@@ -914,6 +914,8 @@ class NativeCodegen:
         self._needs_edge_helpers = False
         self._needs_compare_helper = False
         self._needs_chr_error = False
+        self._needs_frame_helper = False
+        self._frame_base_offset = None
         self._needs_equal_helper = False
         self._join_counter = 0
         self._string_offsets: dict[str, int] = {}
@@ -1781,6 +1783,8 @@ class NativeCodegen:
             raise CompileError(f"{self.path}:{fn.line}: native function frame exceeds 4096 bytes; split the function into smaller functions")
         self._scratch_depth = 0
         self.code.label(f"function:{name}")
+        self._needs_frame_helper = True
+        self.code.call("function:anvil_frame_enter")
         self.code.bytes(b"\x55\x48\x89\xe5")  # push rbp; mov rbp,rsp
         self.code.bytes(b"\x48\x81\xec" + struct.pack("<I", self._frame_size))
         for index, param in enumerate(fn.params):
@@ -2191,6 +2195,30 @@ class NativeCodegen:
         self.code.label(zero)
         self.code.bytes(b"\x66\x0f\x57\xc0")          # xorps xmm0, xmm0
         self.code.bytes(b"\x48\x83\xc4\x38\xc3")      # add rsp,0x38; ret
+
+    def _emit_frame_helper(self) -> None:
+        """Bound the call chain: a stack past 512 KiB is a controlled error."""
+        if self._frame_base_offset is None:
+            self._frame_base_offset = self.reserve_data(bytes(8))
+        self.code.label("function:anvil_frame_enter")
+        self.code.bytes(b"\x49\x89\xe2")                     # mov r10, rsp
+        self.code.rip_int(11, self._frame_base_offset)       # r11 = stack base
+        self.code.bytes(b"\x4d\x85\xdb")                     # test r11, r11
+        store = self.label("frame_store")
+        ok = self.label("frame_ok")
+        self.code.conditional_jump(0x84, store)              # je: capture base
+        self.code.bytes(b"\x4d\x29\xd3")                     # sub r11, r10
+        self.code.bytes(b"\x49\x81\xfb\x00\x00\x08\x00")     # cmp r11, 512 KiB
+        self.code.conditional_jump(0x86, ok)                 # jbe: inside budget
+        self.emit_runtime_error(
+            "Anvil call depth exceeded the 512 KiB stack budget; check for "
+            "unbounded recursion\n"
+        )
+        self.code.label(ok)
+        self.code.bytes(b"\xc3")                             # ret
+        self.code.label(store)
+        self.code.rip_int(10, self._frame_base_offset, store=True)  # base = r10
+        self.code.bytes(b"\xc3")
 
     def _emit_equal_helper(self) -> None:
         """rcx = text a, rdx = text b: rax = 1 when the bytes are identical."""
@@ -2982,6 +3010,8 @@ class NativeCodegen:
         )
 
     def _build(self, imports: list[tuple[str, str]]) -> bytes:
+        if self._needs_frame_helper:
+            self._emit_frame_helper()
         pe = Pe32Plus(bytes(self.code.code), imports)
         targets = pe.fixup_targets(len(self.code.code))
         text = self.code.finish(targets)

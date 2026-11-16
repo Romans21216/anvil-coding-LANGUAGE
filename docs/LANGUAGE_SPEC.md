@@ -52,7 +52,7 @@ global_assignment = "set var(", IDENT, ") =", expression ;
 line_end         = physical_newline | end_of_file ;
 ```
 
-There must be at least one function. Function definitions are top-level and function names must be unique. Parameter names within a function must be unique. Functions can be declared in any order and may call themselves recursively. On the C backend a call that grows the C stack past a 512 KiB budget stops with `Anvil call depth exceeded the 512 KiB stack budget` and exit code 2 instead of an OS stack crash. The compiler generates a numeric function prototype for every function before generating its body.
+There must be at least one function. Function definitions are top-level and function names must be unique. Parameter names within a function must be unique. Functions can be declared in any order and may call themselves recursively. Both backends bound the call chain: a call that grows the stack past a 512 KiB budget stops with `Anvil call depth exceeded the 512 KiB stack budget` and exit code 2 instead of an OS stack crash. The compiler generates a numeric function prototype for every function before generating its body.
 
 At most one `language version N` line may occur, and it must precede all source code; blank lines and comments may precede it. Only version 1 is supported. Malformed, repeated, misplaced, and unsupported declarations produce a source path and line diagnostic. Existing files without a declaration are interpreted as version 1.
 

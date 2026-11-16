@@ -13,6 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from compiler.build import build_c, find_compiler  # noqa: E402
 from compiler.codegen import emit_c  # noqa: E402
 from compiler.parser import parse  # noqa: E402
+from compiler.native_codegen import NativeCodegen  # noqa: E402
 
 SHALLOW = (
     "fn(sum, n)\n  if var(n) <= 0\n    output 0\n  end\n"
@@ -47,6 +48,22 @@ def run_c(text: str) -> tuple[int, str]:
     return result.returncode, (result.stdout + result.stderr).replace("\r\n", "\n")
 
 
+def run_native(text: str) -> tuple[int, str]:
+    with tempfile.TemporaryDirectory() as temp:
+        temp_path = pathlib.Path(temp)
+        source = temp_path / "sample.ANVL"
+        source.write_text(text, encoding="utf-8")
+        functions, top, variables, arrays = parse(source, text)
+        executable = temp_path / "sample.exe"
+        executable.write_bytes(
+            NativeCodegen(source, functions, top, variables, arrays).generate()
+        )
+        result = subprocess.run(
+            [str(executable)], capture_output=True, text=True, timeout=60
+        )
+    return result.returncode, (result.stdout + result.stderr).replace("\r\n", "\n")
+
+
 class RecursionBudgetTests(unittest.TestCase):
     def test_shallow_recursion_still_works(self) -> None:
         code, output = run_c(SHALLOW)
@@ -55,6 +72,17 @@ class RecursionBudgetTests(unittest.TestCase):
 
     def test_unbounded_recursion_stops_with_a_diagnostic(self) -> None:
         code, output = run_c(DEEP)
+        self.assertEqual(code, 2, output)
+        self.assertIn("stack budget", output)
+        self.assertIn("unbounded recursion", output)
+
+    def test_native_shallow_recursion_still_works(self) -> None:
+        code, output = run_native(SHALLOW)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(output, "5050\n")
+
+    def test_native_unbounded_recursion_stops_with_a_diagnostic(self) -> None:
+        code, output = run_native(DEEP)
         self.assertEqual(code, 2, output)
         self.assertIn("stack budget", output)
         self.assertIn("unbounded recursion", output)
