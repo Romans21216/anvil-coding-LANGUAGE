@@ -193,6 +193,7 @@ def _artifact_paths(source: pathlib.Path) -> list[pathlib.Path]:
     stem = source.with_suffix("")
     candidates = [
         source.with_suffix(".exe"),
+        stem.with_suffix(".partial.exe"),
         stem.with_suffix(".c"),
         pathlib.Path(f"{stem}.generated.c"),
     ]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -337,7 +338,14 @@ def main() -> int:
             ).generate()
             out = args.output or source_path.with_suffix(".exe")
             out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(executable)
+            # Write beside the target and rename on success so a mid-write
+            # failure cannot truncate the last good executable.
+            staging = out.with_name(f"{out.stem}.partial{out.suffix}")
+            try:
+                staging.write_bytes(executable)
+                os.replace(staging, out)
+            finally:
+                staging.unlink(missing_ok=True)
             print(f"Built {out} as native AMD64 PE (no C/Rust compiler)")
             if args.run:
                 return subprocess.run([str(out)]).returncode

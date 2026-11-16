@@ -35,6 +35,8 @@ python compiler/anvil.py examples/image_sprite.ANVL --release --output build/ima
 
 `--run` builds and immediately launches the executable, returning the program's exit code, so edit → build → run is one command. `--format` restores canonical indentation and `--format-check` fails on unformatted files; `--deny-warnings` turns lint warnings into a failing build for CI.
 
+Builds are written beside the target and renamed into place only after the toolchain succeeds, so a compile or link failure leaves the previous executable untouched and never leaves a `.partial.exe` behind.
+
 Three project commands round out the lifecycle. `--new DEMO` scaffolds a `DEMO/DEMO.ANVLproj`, a `main.ANVL` starter scene and an `assets/` folder that builds unmodified on either backend; `--clean` removes the executable and generated C for a source or manifest so the next build starts from zero; `--doctor` prints which toolchains, runtime files and assets this checkout can actually use, and exits non-zero only when no backend can build. `--package` builds the project and writes `dist/<name>/` with the executable, the manifest, the project's assets and a `package.json` recording the compiler, target, feature groups, per-file sizes and SHA-256 checksums; add `--dry-run` to print that plan and validate every `image_load(...)` asset without writing anything. `--test` builds and runs every `tests/*.ANVL` and `*_test.ANVL` file in the project against the selected backend and fails when any run exits non-zero.
 
 ```powershell

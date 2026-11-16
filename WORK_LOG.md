@@ -649,3 +649,23 @@ file exits zero proves nothing, so this adds the assertion primitive too.
 Tests: `tests/test_expect.py` (4 cases: passing checks, failing number, failing
 text, top-level assertion) and `tests/test_commands.py` grows to 14 with the
 test-command pass/fail/no-tests paths.
+
+## Preserve the last good output
+
+Part 8 §8.14 asks that a failed build preserve the last good output. Both
+backends used to write the executable in place, so a toolchain that died
+halfway could leave a truncated or absent PE where a working one had been.
+
+- `build_c` now writes `<stem>.partial<ext>` next to the target through the
+  same MSVC/GCC path and `os.replace`s it over the real name only after the
+  toolchain returns 0. The staging file is removed in a `finally`, so a failed
+  compile or link leaves the previous executable byte-for-byte intact and no
+  stray `.partial.exe`.
+- The native backend writes its generated PE through the same staging step.
+- `--clean` also removes a leftover `<stem>.partial.exe` from an interrupted
+  build.
+
+Tests: `tests/test_build_artifacts.py` (4 cases) asserts a failed toolchain run
+keeps the old bytes and leaves no extra file, a successful C build replaces a
+stale executable with no `.partial` left behind, a native build stages and
+renames, and a rejected program leaves the previous build untouched.
