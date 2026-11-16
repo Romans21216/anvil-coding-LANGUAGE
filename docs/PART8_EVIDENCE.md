@@ -18,7 +18,7 @@ for the headless/interactive split and the recorded environment.
 | 8.12 Browser target | Not implemented | Repository search finds no WASM/Emscripten target; README describes the desktop editor as a preview workbench | Whole target: WASM ABI, canvas/WebGL, input, audio, storage |
 | 8.13 3D content pipeline | Partial | `scene 3d`, perspective camera, plane/cube/sphere and `ray_sphere` with CPU BVH and a 32-sphere batch; `examples/first_world.ANVL` builds and is run interactively (not automated) | No glTF import, animation, shadows, culling/batching or GPU path |
 | 8.14 2D, audio, physics, network, packaging | Partial, commands complete | BMP sprite builtins with documented limits and source-located errors (`tests/test_image_error.py`, `tests/test_compiler.py`); no boundary tests for the size caps; 2D physics with restitution and friction (`tests/test_compiler.py`); UDP double transport with malformed-packet fuzzing (`tests/test_net_fuzz.py`, `031bfb0`); `--package` with dry run, asset validation and hashed manifest (`79d8af3`); `new`/`run`/`build`/`test`/`format`/`clean`/`doctor`/`package` all exist (`75a4805`, `5967fdb`, `44dcd1b`) | Audio and saves are absent; no atlas, rotation or camera systems; transport is one-peer unauthenticated UDP |
-| 8.15 Testing, security, efficiency | Partial | `docs/TESTING.md` labels 91 headless/interactive modules; packet fuzzing; capability matrix under test; per-line output flush (`tests/test_output_flush.py`); recursion bound; package asset validation | No performance thresholds or measured benchmark baselines; Windows x64 only; extension visuals validated by grammar tests |
+| 8.15 Testing, security, efficiency | Partial | `docs/TESTING.md` labels 91 headless/interactive modules; packet fuzzing; capability matrix under test; per-line output flush (`tests/test_output_flush.py`); recursion bound; package asset validation | Measured with `--timings`: parse+generate ~3 ms, cold C build 413 ms after the toolset environment is cached (`1148433`), cache hit 41 ms; thresholds still not enforced in CI; Windows x64 only |
 | 8.16 Delivery order and evidence | This ledger plus generated matrix | `docs/CAPABILITY_MATRIX.md` (12 of 14 cases identical across backends), `docs/AUTONOMOUS_DEVELOPMENT_PROGRESS.md` batches 14–22, commit list below | Browser and 3D rows remain open before the delivery order can complete |
 | 8.17 New-user trial | Not performed | — | Requires observing new programmers and recording pauses, commands and repairs |
 
@@ -45,6 +45,7 @@ for the headless/interactive split and the recorded environment.
 - `c8f7c76`, `fbf87ee` did-you-mean suggestions on both backends
 - `a896281` unused-function typo warning
 - `50bb070` `--diagnostics editor` prints file:line:column
+- `1148433` cached toolset environment makes cold builds ~4x faster
 
 ## How to re-check
 
