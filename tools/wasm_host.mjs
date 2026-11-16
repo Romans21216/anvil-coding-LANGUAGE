@@ -32,6 +32,8 @@ const bytes = fs.readFileSync(file);
 const utf8 = new TextDecoder();
 let memory = null;
 const ops = [];
+const voices = new Set();
+let nextVoice = 0;
 const readCString = (pointer) => {
   const view = new Uint8Array(memory.buffer);
   let end = pointer;
@@ -80,6 +82,33 @@ const imports = {
         hash = Math.imul(hash, 16777619) >>> 0;
       }
       ops.push(["image_region", width, height, sx, sy, sw, sh, dx, dy, dw, dh, tintR, tintG, tintB, flipX, flipY, hash]);
+    },
+    sound_play(pointer, frames, channels, rate, volume) {
+      const samples = new Int16Array(memory.buffer, pointer, frames * channels);
+      let peak = 0;
+      for (let index = 0; index < samples.length; index++) {
+        const value = Math.abs(samples[index]);
+        if (value > peak) peak = value;
+      }
+      nextVoice += 1;
+      voices.add(nextVoice);
+      ops.push(["sound_play", frames, channels, rate, volume, peak, nextVoice]);
+      return nextVoice;
+    },
+    sound_stop(voice) {
+      const existed = voices.delete(voice);
+      ops.push(["sound_stop", voice, existed ? 1 : 0]);
+    },
+    sound_stop_all() {
+      const stopped = voices.size;
+      voices.clear();
+      ops.push(["sound_stop_all", stopped]);
+    },
+    sound_volume(voice, volume) {
+      ops.push(["sound_volume", voice, volume]);
+    },
+    sound_active() {
+      return voices.size;
     },
     present() {
       ops.push(["present"]);

@@ -133,9 +133,9 @@ class WasmRejectionTests(unittest.TestCase):
     def test_unsupported_builtins_name_the_call_site(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(root, "fn(main)\n  say sound_load(\"beep.wav\")\nend\ncall fn(main)\n")
+            result, _ = build(root, "fn(main)\n  say music_load(\"song.wav\")\nend\ncall fn(main)\n")
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("'sound_load' is not available in the wasm backend yet", result.stderr)
+            self.assertIn("'music_load' is not available in the wasm backend yet", result.stderr)
             self.assertIn(":2:", result.stderr)
 
 
@@ -853,6 +853,98 @@ class WasmRegionTests(unittest.TestCase):
             self.assertEqual(len(images), 1)
             self.assertEqual(images[0][1:7], [2, 1, 300, 100, 20, 10])
             self.assertEqual(images[0][-1], 4067206025)
+
+
+
+def _write_tone(path: pathlib.Path, frames: int = 800, rate: int = 8000, tag: int = 1) -> None:
+    import math
+    import struct
+
+    samples = b"".join(
+        struct.pack("<h", int(12000 * math.sin(2 * math.pi * 440 * index / rate)))
+        for index in range(frames)
+    )
+    header = b"RIFF" + struct.pack("<I", 36 + len(samples)) + b"WAVE"
+    fmt = b"fmt " + struct.pack("<IHHIIHH", 16, tag, 1, rate, rate * 2, 2, 16)
+    path.write_bytes(header + fmt + b"data" + struct.pack("<I", len(samples)) + samples)
+
+
+_SOUND_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "set var(s) = 0",
+        "set var(report) = 0",
+        "",
+        "fn(update)",
+        "  if var(report) = 0",
+        '    set var(s) = sound_load("tone.wav")',
+        "    say var(s)",
+        "    say sound_play(var(s))",
+        "    say sound_active()",
+        "    say sound_volume(1, 0.5)",
+        "    say sound_stop_all()",
+        "    say sound_active()",
+        "    say sound_destroy(var(s))",
+        "    say sound_error()",
+        "    set var(report) = 1",
+        "  end",
+        "end",
+        "",
+        "fn(draw)",
+        "  display rect(0, 0, 1, 1) -rgb(0, 0, 0)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmSoundTests(unittest.TestCase):
+    def test_literal_wavs_are_baked_and_played(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            _write_tone(root / "tone.wav")
+            result, out = build(root, _SOUND_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertEqual(
+                lines[:8], ["1", "1", "1", "0.5", "1", "0", "1", ""]
+            )
+            ops = json.loads(lines[-1])
+            played = [op for op in ops if op[0] == "sound_play"]
+            self.assertEqual(played, [["sound_play", 800, 1, 8000, 1, 12000, 1]])
+            self.assertIn(["sound_volume", 1, 0.5], ops)
+            self.assertIn(["sound_stop_all", 1], ops)
+
+    def test_a_missing_wav_is_a_located_build_error(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, _ = build(
+                root,
+                'scene 2d\n\nfn(draw)\n  set var(s) = sound_load("nope.wav")\nend\n',
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('sound_load cannot read "nope.wav"', result.stderr)
+            self.assertIn(":4:", result.stderr)
+
+    def test_compressed_wavs_are_refused_at_build_time(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            _write_tone(root / "float.wav", tag=3)
+            result, _ = build(
+                root,
+                'scene 2d\n\nfn(draw)\n  set var(s) = sound_load("float.wav")\nend\n',
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("PCM only", result.stderr)
 
 
 if __name__ == "__main__":

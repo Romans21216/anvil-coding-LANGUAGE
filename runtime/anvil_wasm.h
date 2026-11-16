@@ -166,6 +166,23 @@ double anvil_image_flip(double handle, double x, double y);
 double anvil_image_destroy(double handle);
 const char *anvil_image_error(void);
 
+/* Sounds are baked into the module by the compiler. */
+typedef struct {
+  const char *path;
+  int channels, rate, frames;
+  const short *pcm;
+} AnvilWasmSound;
+
+void anvil_wasm_set_sounds(const AnvilWasmSound *sounds, int count);
+double anvil_sound_load(const char *path);
+double anvil_sound_play(double handle);
+double anvil_sound_stop(double voice);
+double anvil_sound_stop_all(void);
+double anvil_sound_volume(double voice, double volume);
+double anvil_sound_active(void);
+double anvil_sound_destroy(double handle);
+const char *anvil_sound_error(void);
+
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);
 void anvil_set_scene3d(int enabled);

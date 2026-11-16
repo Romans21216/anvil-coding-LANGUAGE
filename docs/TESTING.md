@@ -117,8 +117,8 @@ remote desktop can prevent window creation:
   clang/wasm-ld, runs them under Node (including the recorded draw-command
   stream, scripted keyboard/mouse input, trig/rnd results matching the C
   backend, typed saves across separate Node runs, text helpers, `ord`/`chr`, `noise`/`fbm`, the `chr` failure path
-  compared against the C backend, and baked sprites and atlas regions through
-  recorded draw streams), checks the generated host
+  compared against the C backend, baked sprites and atlas regions through
+  recorded draw streams, and baked sounds through recorded play ops), checks the generated host
   page, and asserts located refusals.
 - `test_particles` — argument validation, the 4,096-particle bound, clear
   counts, and window pixels for a fresh and fading particle.

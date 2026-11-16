@@ -79,6 +79,14 @@ ALLOWED_BUILTINS = {
     "image_flip",
     "image_destroy",
     "image_error",
+    "sound_load",
+    "sound_play",
+    "sound_stop",
+    "sound_stop_all",
+    "sound_volume",
+    "sound_active",
+    "sound_destroy",
+    "sound_error",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
@@ -117,6 +125,29 @@ async function start() {
     let memory = null;
     let app = null;
     const imageCache = new Map();
+    const audioState = { ctx: null, voices: new Map(), nextVoice: 0, active: 0 };
+    const audioContext = () => {
+      if (!audioState.ctx) {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return null;
+        audioState.ctx = new Ctor();
+      }
+      if (audioState.ctx.state === "suspended") audioState.ctx.resume();
+      return audioState.ctx;
+    };
+    const resumeAudio = () => {
+      if (audioState.ctx && audioState.ctx.state === "suspended") {
+        audioState.ctx.resume();
+      }
+    };
+    window.addEventListener("keydown", resumeAudio);
+    window.addEventListener("pointerdown", resumeAudio);
+    window.anvilAudio = () => ({
+      active: audioState.active,
+      voices: audioState.voices.size,
+      state: audioState.ctx ? audioState.ctx.state : "none",
+      sampleRate: audioState.ctx ? audioState.ctx.sampleRate : 0,
+    });
     const tintedSurface = (pointer, width, height, tintR, tintG, tintB) => {
       const key = pointer + ":" + tintR + ":" + tintG + ":" + tintB;
       let offscreen = imageCache.get(key);
@@ -198,6 +229,53 @@ async function start() {
         context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
         context.drawImage(offscreen, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
         context.restore();
+      },
+      sound_play(pointer, frames, channels, rate, volume) {
+        const ctx = audioContext();
+        if (!ctx || frames <= 0) return 0;
+        const samples = new Int16Array(memory.buffer, pointer, frames * channels);
+        const buffer = ctx.createBuffer(channels, frames, rate);
+        for (let channel = 0; channel < channels; channel++) {
+          const data = buffer.getChannelData(channel);
+          for (let frame = 0; frame < frames; frame++) {
+            data[frame] = samples[frame * channels + channel] / 32768;
+          }
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.value = volume;
+        source.connect(gain).connect(ctx.destination);
+        audioState.nextVoice += 1;
+        const voice = audioState.nextVoice;
+        audioState.voices.set(voice, { source, gain });
+        audioState.active += 1;
+        source.onended = () => {
+          if (audioState.voices.delete(voice)) {
+            audioState.active = Math.max(0, audioState.active - 1);
+          }
+        };
+        source.start();
+        return voice;
+      },
+      sound_stop(voice) {
+        const entry = audioState.voices.get(voice);
+        if (!entry) return;
+        try { entry.source.stop(); } catch (error) { /* already ended */ }
+      },
+      sound_stop_all() {
+        for (const entry of audioState.voices.values()) {
+          try { entry.source.stop(); } catch (error) { /* already ended */ }
+        }
+        audioState.voices.clear();
+        audioState.active = 0;
+      },
+      sound_volume(voice, volume) {
+        const entry = audioState.voices.get(voice);
+        if (entry) entry.gain.gain.value = volume;
+      },
+      sound_active() {
+        return audioState.active;
       },
       present() {},
       save_read(pointer, out, capacity) {
@@ -433,6 +511,116 @@ def bake_images(source_path: pathlib.Path, text: str) -> str:
     )
     return "\n".join(chunks)
 
+SOUND_LOAD = re.compile(r'sound_load\(\s*"((?:\\.|[^"\\])*)"')
+MAX_BAKED_SOUND_BYTES = 8 * 1024 * 1024
+
+
+def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
+    """Decode a PCM WAV into (channels, rate, frames, interleaved int16)."""
+    data = path.read_bytes()
+    if len(data) < 44 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise ValueError("not a RIFF WAVE file")
+    position = 12
+    fmt = None
+    payload = None
+    while position + 8 <= len(data):
+        chunk = data[position : position + 4]
+        size = int.from_bytes(data[position + 4 : position + 8], "little")
+        body = data[position + 8 : position + 8 + size]
+        position += 8 + size + (size & 1)
+        if chunk == b"fmt ":
+            fmt = body
+        elif chunk == b"data":
+            payload = body
+        if fmt is not None and payload is not None:
+            break
+    if fmt is None or payload is None or len(fmt) < 16:
+        raise ValueError("the file has no fmt or data chunk")
+    tag = int.from_bytes(fmt[0:2], "little")
+    channels = int.from_bytes(fmt[2:4], "little")
+    rate = int.from_bytes(fmt[4:8], "little")
+    bits = int.from_bytes(fmt[14:16], "little")
+    if tag not in (1, 0xFFFE):
+        raise ValueError("compressed WAVs are not supported (PCM only)")
+    if channels not in (1, 2):
+        raise ValueError("only mono or stereo WAVs are supported")
+    if bits not in (8, 16):
+        raise ValueError("only 8- or 16-bit PCM is supported")
+    if not 8000 <= rate <= 192000:
+        raise ValueError("the sample rate is outside 8,000-192,000")
+    frame_bytes = channels * (bits // 8)
+    frames = len(payload) // frame_bytes
+    if frames == 0:
+        raise ValueError("the WAV holds no samples")
+    samples: list[int] = []
+    for index in range(frames * channels):
+        if bits == 8:
+            samples.append((payload[index] - 128) << 8)
+        else:
+            at = index * 2
+            samples.append(int.from_bytes(payload[at : at + 2], "little", signed=True))
+    return channels, rate, frames, samples
+
+
+def bake_sounds(source_path: pathlib.Path, text: str) -> str:
+    """Bake literal sound_load() WAVs into C arrays the runtime can serve."""
+    sounds: dict[str, tuple[int, int, int, list[int]]] = {}
+    total = 0
+    for match in SOUND_LOAD.finditer(text):
+        literal = match.group(1).replace("\\\\", "\\")
+        if literal in sounds:
+            continue
+        target = (source_path.parent / literal).resolve()
+        line = text.count("\n", 0, match.start()) + 1
+        try:
+            channels, rate, frames, samples = _wav_pcm(target)
+        except FileNotFoundError:
+            raise CompileError(
+                f'{source_path}:{line}: sound_load cannot read "{literal}"'
+            ) from None
+        except ValueError as error:
+            raise CompileError(
+                f'{source_path}:{line}: sound_load "{literal}": {error}'
+            ) from None
+        total += len(samples) * 2
+        if total > MAX_BAKED_SOUND_BYTES:
+            raise CompileError(
+                f"{source_path}:{line}: baked sounds exceed the 8 MiB budget"
+            )
+        sounds[literal] = (channels, rate, frames, samples)
+    chunks: list[str] = ["\n/* Baked sounds: the browser cannot stream from disk. */"]
+    for index, (_literal, (_channels, _rate, _frames, samples)) in enumerate(
+        sounds.items()
+    ):
+        chunks.append(f"static const short anvil_baked_sound_{index}[] = {{")
+        row: list[str] = []
+        for sample in samples:
+            row.append(str(sample))
+            if len(row) == 16:
+                chunks.append("  " + ", ".join(row) + ",")
+                row = []
+        if row:
+            chunks.append("  " + ", ".join(row) + ",")
+        chunks.append("};")
+    if sounds:
+        chunks.append("static const AnvilWasmSound anvil_baked_sounds[] = {")
+        for index, (literal, (channels, rate, frames, _samples)) in enumerate(
+            sounds.items()
+        ):
+            escaped = literal.replace("\\", "\\\\")
+            chunks.append(
+                f'  {{"{escaped}", {channels}, {rate}, {frames}, anvil_baked_sound_{index}}},'
+            )
+        chunks.append("};")
+    chunks.append(
+        "void anvil_wasm_register_sounds(void) {\n"
+        f"  anvil_wasm_set_sounds(anvil_baked_sounds, {len(sounds)});\n"
+        "}\n"
+        if sounds
+        else "void anvil_wasm_register_sounds(void) {}\n"
+    )
+    return "\n".join(chunks)
+
 def build(
     source_path: pathlib.Path,
     functions,
@@ -456,7 +644,9 @@ def build(
         runtime_header="anvil_wasm.h",
         minimal_includes=True,
     )
-    generated += bake_images(source_path, source_path.read_text(encoding="utf-8"))
+    source_text = source_path.read_text(encoding="utf-8")
+    generated += bake_images(source_path, source_text)
+    generated += bake_sounds(source_path, source_text)
     if emit_c_path is not None:
         emit_c_path.parent.mkdir(parents=True, exist_ok=True)
         emit_c_path.write_text(generated, encoding="utf-8")

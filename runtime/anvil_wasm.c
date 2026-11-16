@@ -721,6 +721,145 @@ double anvil_image_flip(double handle, double x, double y) {
   return 1.0;
 }
 
+__attribute__((import_module("env"), import_name("sound_play")))
+extern int anvil_host_sound_play(const short *pcm, int frames, int channels,
+                                 int rate, double volume);
+__attribute__((import_module("env"), import_name("sound_stop")))
+extern void anvil_host_sound_stop(int voice);
+__attribute__((import_module("env"), import_name("sound_stop_all")))
+extern void anvil_host_sound_stop_all(void);
+__attribute__((import_module("env"), import_name("sound_volume")))
+extern void anvil_host_sound_volume(int voice, double volume);
+__attribute__((import_module("env"), import_name("sound_active")))
+extern int anvil_host_sound_active(void);
+
+/* ---- Sounds, baked at compile time --------------------------------------
+   The browser cannot stream a file synchronously, so literal sound_load()
+   files are decoded while compiling and baked as int16 samples at their own
+   sample rate. The host builds an AudioBuffer from them, so the browser does
+   the resampling. */
+enum {
+  ANVIL_WASM_SOUND_SLOTS = 16,
+  ANVIL_WASM_SOUND_STRIDE = 16
+};
+
+static const AnvilWasmSound *anvil_baked_sounds;
+static int anvil_baked_sound_count;
+static int anvil_sounds_ready;
+static const char *anvil_sound_error_text = "";
+
+typedef struct {
+  const AnvilWasmSound *source;
+  unsigned int generation;
+  double volume;
+  int used;
+} AnvilWasmSoundSlot;
+
+static AnvilWasmSoundSlot anvil_sound_slots[ANVIL_WASM_SOUND_SLOTS];
+
+void anvil_wasm_set_sounds(const AnvilWasmSound *sounds, int count) {
+  anvil_baked_sounds = sounds;
+  anvil_baked_sound_count = count;
+}
+
+void anvil_wasm_register_sounds(void) __attribute__((weak));
+
+static void anvil_sounds_ensure(void) {
+  if (anvil_sounds_ready)
+    return;
+  anvil_sounds_ready = 1;
+  if (anvil_wasm_register_sounds)
+    anvil_wasm_register_sounds();
+}
+
+const char *anvil_sound_error(void) { return anvil_sound_error_text; }
+
+static AnvilWasmSoundSlot *anvil_sound_slot(double handle) {
+  if (!(handle >= 1.0) || handle > 1.0e9)
+    return NULL;
+  int index = (int)(handle - 1.0) % ANVIL_WASM_SOUND_STRIDE;
+  unsigned int generation =
+      (unsigned int)((handle - 1.0) / ANVIL_WASM_SOUND_STRIDE) + 1;
+  AnvilWasmSoundSlot *slot = &anvil_sound_slots[index];
+  if (!slot->used || slot->generation != generation)
+    return NULL;
+  return slot;
+}
+
+double anvil_sound_load(const char *path) {
+  anvil_sounds_ensure();
+  for (int index = 0; index < anvil_baked_sound_count; ++index) {
+    if (strcmp(anvil_baked_sounds[index].path, path) != 0)
+      continue;
+    for (int slot_index = 0; slot_index < ANVIL_WASM_SOUND_SLOTS; ++slot_index) {
+      AnvilWasmSoundSlot *slot = &anvil_sound_slots[slot_index];
+      if (slot->used)
+        continue;
+      slot->used = 1;
+      slot->source = &anvil_baked_sounds[index];
+      slot->generation += 1;
+      slot->volume = 1.0;
+      anvil_sound_error_text = "";
+      return (double)(slot->generation - 1) * ANVIL_WASM_SOUND_STRIDE +
+             slot_index + 1;
+    }
+    anvil_sound_error_text = "the sound slots are full";
+    return 0.0;
+  }
+  anvil_sound_error_text =
+      "the sound was not baked into this build; only literal sound_load() "
+      "paths are available in the wasm backend";
+  return 0.0;
+}
+
+double anvil_sound_play(double handle) {
+  AnvilWasmSoundSlot *slot = anvil_sound_slot(handle);
+  if (!slot)
+    return 0.0;
+  int voice = anvil_host_sound_play(slot->source->pcm, slot->source->frames,
+                                    slot->source->channels,
+                                    slot->source->rate, slot->volume);
+  if (voice <= 0) {
+    anvil_sound_error_text = "the host could not play the sound";
+    return 0.0;
+  }
+  anvil_sound_error_text = "";
+  return (double)voice;
+}
+
+double anvil_sound_stop(double voice) {
+  if (!(voice >= 1.0))
+    return 0.0;
+  anvil_host_sound_stop((int)voice);
+  return 1.0;
+}
+
+double anvil_sound_stop_all(void) {
+  anvil_host_sound_stop_all();
+  return 1.0;
+}
+
+double anvil_sound_volume(double voice, double volume) {
+  if (!(voice >= 1.0) || !(volume == volume))
+    return 0.0;
+  double clamped = volume < 0.0 ? 0.0 : volume > 1.0 ? 1.0 : volume;
+  anvil_host_sound_volume((int)voice, clamped);
+  return clamped;
+}
+
+double anvil_sound_active(void) {
+  return (double)anvil_host_sound_active();
+}
+
+double anvil_sound_destroy(double handle) {
+  AnvilWasmSoundSlot *slot = anvil_sound_slot(handle);
+  if (!slot)
+    return 0.0;
+  slot->used = 0;
+  slot->source = NULL;
+  return 1.0;
+}
+
 /* ---- Noise and characters ----------------------------------------------- */
 static int anvil_noise_hash(int x, int y, int z) {
   unsigned int h = (unsigned int)x * 374761393u +
