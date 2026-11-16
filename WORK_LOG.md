@@ -786,3 +786,25 @@ project as one.
 
 Tests: `WebPackageTests` (3 cases) in `tests/test_commands.py` cover the
 self-contained bundle, the escaping case, and `--web` without `--package`.
+
+## Seeded C/native differential fuzz
+
+Part 8 §8.15 asks for seeded C/native differentials. The backend matrix shows
+*which* features each backend claims; nothing checked that the same program
+produces the same answer on both.
+
+- `tools/differential.py` generates programs from the shared subset (numeric
+  literals, locals, `+ - * /`, `if`/`else`, bounded `for` with `add`, user
+  functions with parameters, and `floor`/`ceil`/`abs`/`round`/`min`/`max`/`mod`)
+  with a fixed seed, builds each on `c` and `native`, runs both, and compares
+  exit code and stdout. Dividers are constrained away from zero so the
+  comparison tests arithmetic rather than the shared fatal path.
+- Mismatches print the generated program, so a failure is reproducible; the
+  tool exits 1 when any program disagrees.
+- `tests/test_differential.py` runs a seeded batch in CI (seed 1, six programs)
+  and asserts the generator never emits a C-only feature, which would make the
+  comparison meaningless.
+
+Measured: 12 + 30 + 30 + 20 programs across seeds 1, 7, 42, 3 produced zero
+mismatches, covering the arithmetic, loop, branch, call and rounding paths that
+recent work touched.
