@@ -437,3 +437,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** header edit, library edit, unchanged control, newer version directory and missing SDK; same-size script replacement, changed nested script, unchanged script. 27 passed.
 - **Cost after the change:** cold build 451 ms (was 413 ms), cache hit 53 ms (was 41 ms).
 - **Commit:** `a4eafbc`.
+
+## Batch 29 — window flags, first-hour workflow and a green checkpoint
+
+- **Suite:** 742 passed, 1 skipped, 1 xfailed in 190 s on `fab2030` (was 646 passed in 618 s before this work stream; the 3.3x speedup comes from the cached toolset environment).
+- **Window controls:** `window_on_top` / `window_fullscreen` with live Win32 state assertions, including repeated toggles that must not re-save the fullscreen geometry.
+- **Diagnostics:** closest-name suggestions, stable codes for ten errors, `--explain CODE`, `--diagnostics editor` with `file:line:column`.
+- **Build loop:** compiler/linker/SDK/environment identity all content-based; `--timings` shows parse+generate ~3 ms against a ~450 ms cold build.
+- **First hour:** `tests/test_first_hour.py` runs the documented scaffold → check → build → run → format → package → doctor → explain path.
+- **Open roadmap items are features, not defects:** browser target (no WASM toolchain in this environment), glTF/animation, audio, records. All audit findings C8-1..C8-12 are closed.
