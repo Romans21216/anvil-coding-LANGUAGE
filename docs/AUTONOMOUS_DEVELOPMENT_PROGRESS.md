@@ -318,4 +318,4 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Files:** `compiler/build.py`, `compiler/cli.py`, `compiler/codegen.py`, `compiler/common.py`, `runtime/anvil_runtime.c`, `runtime/anvil_runtime.h`, `docs/COMPILER.md`, `docs/INCLUDES.md`, `docs/LANGUAGE_SPEC.md`, and four new test files.
 - **Tests:** full suite on `0b0130d` 646 passed, 1 skipped, 1 xfailed; targeted batch after the recursion change 128 passed.
 - **Commits:** `dd40769`, `0b0130d`, `a24a071`, `6f0f3e8`.
-- **Remaining:** the native backend still lacks the call-depth guard; it dies silently between 5000 and 20000 frames.
+- **Native guard:** the same 512 KiB budget now applies to the native backend through an inline `anvil_frame_enter` helper with a writable .data base slot; 20000-deep recursion reports the diagnostic instead of dying silently. Tests cover both backends.
