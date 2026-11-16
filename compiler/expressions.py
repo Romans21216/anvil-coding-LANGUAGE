@@ -155,6 +155,11 @@ BUILTINS = {
     "mod": (2, 2),
     "hypot": (2, 2),
     "expect": (2, 2),
+    "sound_load": (1, 1),
+    "sound_play": (1, 1),
+    "sound_stop": (0, 0),
+    "sound_rate": (1, 1),
+    "sound_length": (1, 1),
 }
 
 # Text builtins take text arguments and return text or a number.  The spec is
@@ -200,6 +205,11 @@ TEXT_BUILTIN_LOCATION_ARGUMENTS = {"expect_text"}
 
 BUILTIN_C_NAMES = {
     "expect": "anvil_expect",
+    "sound_load": "anvil_sound_load",
+    "sound_play": "anvil_sound_play",
+    "sound_stop": "anvil_sound_stop",
+    "sound_rate": "anvil_sound_rate",
+    "sound_length": "anvil_sound_length_ms",
     "time": "anvil_time",
     "delta": "anvil_delta",
     "rnd": "anvil_rnd",
@@ -262,6 +272,7 @@ BUILTIN_STRING_ARGUMENTS = {
     "mouse_pressed",
     "mouse_held",
     "image_load",
+    "sound_load",
 }
 
 

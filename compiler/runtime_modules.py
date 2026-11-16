@@ -13,6 +13,7 @@ from compiler.common import CompileError, ROOT
 class RuntimeModule:
     source: pathlib.Path
     gcc_libraries: tuple[str, ...] = ()
+    msvc_libraries: tuple[str, ...] = ()
     trigger_patterns: tuple[str, ...] = ()
 
 
@@ -25,6 +26,12 @@ MODULES = {
         ROOT / "runtime" / "anvil_network.c",
         gcc_libraries=("-lws2_32",),
         trigger_patterns=(r"\banvil_net_[A-Za-z0-9_]*\s*\(",),
+    ),
+    "audio": RuntimeModule(
+        ROOT / "runtime" / "anvil_audio.c",
+        gcc_libraries=("-lwinmm",),
+        msvc_libraries=("winmm.lib",),
+        trigger_patterns=(r"\banvil_sound_[A-Za-z0-9_]*\s*\(",),
     ),
     "physics": RuntimeModule(
         ROOT / "runtime" / "anvil_physics.c",

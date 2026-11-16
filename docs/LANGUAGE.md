@@ -174,6 +174,39 @@ fn(main)
 end
 ```
 
+## Audio
+
+`anvil_audio.c` is a runtime module selected only when a program calls one of
+these functions, so programs that stay silent do not link the multimedia
+library.
+
+| Call | Result |
+| --- | --- |
+| `sound_load(path)` | handle 1–8 for a usable PCM WAV, or 0 when the file is missing, larger than 32 MiB, or not PCM |
+| `sound_play(handle)` | 1 when playback started, 0 for an unknown handle or a device that refused it |
+| `sound_stop()` | stops the current sound and returns 0 |
+| `sound_rate(handle)` | sample rate in Hz, 0 for an unknown handle |
+| `sound_length(handle)` | size of the loaded file in bytes, 0 for an unknown handle |
+
+Limits, stated so nobody plans around a promise that is not there: uncompressed
+PCM WAV only (8- or 16-bit, mono or stereo); at most eight files loaded at
+once, each held whole in memory; one sound plays at a time and a new
+`sound_play` replaces it; there is no volume, pan, mixing, or streaming, and no
+device-loss recovery. `sound_load` returning 0 is a normal result, not an error
+— check it before playing.
+
+```anvil
+set var(jump) = sound_load("assets/jump.wav")
+fn(update)
+  if pressed(SPACE)
+    set var(played) = sound_play(var(jump))
+  end
+end
+```
+
+The native backend rejects every `sound_*` call with a located diagnostic, so
+audio games need the default C backend today.
+
 ## Number format
 
 Console output and `display text(...)` use one rule, so a value never changes

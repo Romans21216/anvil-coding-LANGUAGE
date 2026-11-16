@@ -689,3 +689,33 @@ end-to-end build time, not where the time goes.
   budgeted, because they are far below the noise floor of the build medians.
 
 Measured on this run: `--runs 5`, all eight budget metrics `ok`.
+
+## Audio: PCM WAV playback as a runtime module
+
+Part 8's audio section starts with a specified playback path and honest limits,
+and the engine had none. Added `runtime/anvil_audio.c`, selected only when a
+program calls a `sound_*` builtin, so silent programs keep their current link
+line.
+
+- `sound_load(path)` reads a file, validates the RIFF/WAVE structure and the
+  PCM format chunk (8- or 16-bit, 1 or 2 channels), and returns a handle 1–8.
+  A missing file, a malformed header, a non-PCM encoding or a file over 32 MiB
+  returns 0 rather than crashing; the caller decides what a silent miss means.
+- `sound_play(handle)` starts asynchronous playback through `PlaySoundA` with
+  the loaded bytes as an in-memory WAVE; an unknown handle or a refusing device
+  returns 0. `sound_stop()` stops playback. `sound_rate(handle)` and
+  `sound_length(handle)` expose the sample rate and byte length.
+- Limits are stated in `docs/LANGUAGE.md`: one sound at a time, whole file in
+  memory, no volume/pan/mixing/streaming, no device-loss recovery, and no music
+  formats. The native backend rejects every `sound_*` call with a located
+  diagnostic, and the matrix now carries a `sound-api` row.
+- Build wiring: `RuntimeModule` gained `msvc_libraries`, so a module can add
+  `winmm.lib` on MSVC and `-lwinmm` on GCC without special-casing the toolchain
+  in `build.py`.
+
+Tests: `tests/test_audio.py` (4 cases) builds WAVs in the test process — invalid
+and missing files return 0, a valid file reports its rate and byte length,
+invalid handles play/stop/rate/length as 0, and the native backend rejects
+`sound_load` with a located error. `test_runtime_modules` gained the audio
+marker case; its unknown-marker test now uses `video`, since `audio` became a
+real module.

@@ -31,6 +31,12 @@ LIBRARY = "fn(twice, n)\n output var(n) * 2\nend\n"
 # program that is compiled but not launched (a window would block the run).
 CASES = [
     (
+        "sound-api",
+        "audio",
+        "fn(main)\n set var(s) = sound_load(\"missing.wav\")\n output var(s)\nend\n",
+        "0",
+    ),
+    (
         "expect-assertions",
         "tests",
         "fn(main)\n expect(2 + 2, 4)\n expect_text(upper(\"ok\"), \"OK\")\n output 42\nend\n",

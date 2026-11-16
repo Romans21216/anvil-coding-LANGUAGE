@@ -36,10 +36,20 @@ class RuntimeModuleSelectionTests(unittest.TestCase):
         self.assertEqual(modules[0].source.name, "anvil_image.c")
         self.assertEqual(modules[0].gcc_libraries, ())
 
+    def test_audio_marker_selects_its_translation_unit_and_library(self):
+        modules = select_runtime_modules(
+            "/* ANVIL_RUNTIME_MODULE: audio */\nint main(void) { return 0; }"
+        )
+        self.assertEqual(modules, (MODULES["audio"],))
+        self.assertEqual(modules[0].source.name, "anvil_audio.c")
+        self.assertIn("-lwinmm", modules[0].gcc_libraries)
+        self.assertIn("winmm.lib", modules[0].msvc_libraries)
+
     def test_modules_declare_reachable_call_triggers(self):
         self.assertTrue(MODULES["networking"].trigger_patterns)
         self.assertTrue(MODULES["physics"].trigger_patterns)
         self.assertTrue(MODULES["images"].trigger_patterns)
+        self.assertTrue(MODULES["audio"].trigger_patterns)
 
     def test_duplicate_markers_select_module_once(self):
         generated = "\n".join(
@@ -48,8 +58,8 @@ class RuntimeModuleSelectionTests(unittest.TestCase):
         self.assertEqual(select_runtime_modules(generated), (MODULES["physics"],))
 
     def test_unknown_marker_fails_explicitly(self):
-        with self.assertRaisesRegex(CompileError, "unknown runtime module.*audio"):
-            select_runtime_modules("/* ANVIL_RUNTIME_MODULE: audio */")
+        with self.assertRaisesRegex(CompileError, "unknown runtime module.*video"):
+            select_runtime_modules("/* ANVIL_RUNTIME_MODULE: video */")
 
 
 if __name__ == "__main__":

@@ -43,6 +43,13 @@ def _msvc_arguments(
         if "/link" not in args:
             args.append("/link")
         args.append(str(resource_file))
+    libraries = sorted(
+        {library for module in runtime_modules for library in module.msvc_libraries}
+    )
+    if libraries:
+        if "/link" not in args:
+            args.append("/link")
+        args.extend(libraries)
     return args
 
 
