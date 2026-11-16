@@ -1,0 +1,112 @@
+# Testing Anvil
+
+This page labels what the automated tests actually cover, what they need to run,
+and which tolerances they assume. It exists so no claim rests on an unlabelled
+test run (Part 8 section 8.15).
+
+## Recorded environment
+
+| Item | Value |
+| --- | --- |
+| OS | Windows 11 (10.0.26200) |
+| Python | 3.13.15 (64-bit) |
+| C compiler | MSVC `cl.exe` 14.51.36231 (Visual Studio 18 Community, x64) |
+| Shell used for the commands below | Git Bash, run from the repository root |
+| Window tests | An unlocked interactive desktop session |
+
+The C backend needs MSVC; the native backend needs only Python. When `cl.exe`
+is absent, tests that build C programs raise `SkipTest` instead of failing.
+
+## Commands
+
+| Purpose | Command |
+| --- | --- |
+| Full suite (headless and interactive) | `python -m pytest tests -q` |
+| Headless only | `python -m pytest tests -q --ignore=tests/test_native_keyboard.py --ignore=tests/test_native_mouse.py --ignore=tests/test_native_window.py --ignore=tests/test_native_procedural.py` |
+| One area | `python -m pytest tests/test_number.py tests/test_mid.py -q` |
+| Backend capability drift | `python tools/capability_matrix.py --check` |
+| A project's own cases | `python compiler/anvil.py game.ANVLproj --test [--backend native]` |
+| Formatting | `python compiler/anvil.py file.ANVL --format-check` |
+| VS Code grammar and sample validation | `npm test --prefix vscode-extension` |
+
+`--test` compiles and runs every `tests/**/*.ANVL` file in a project. A case
+passes when the built program exits 0; failures print the captured build and
+run output.
+
+## Headless coverage
+
+These suites never create a window. They compile and run console programs,
+inspect generated C or PE bytes, or test compiler behaviour directly:
+
+- Compiler and language: `test_compiler`, `test_compiler_limits`,
+  `test_compiler_modules`, `test_refusals`, `test_diagnostics`, `test_lints`,
+  `test_includes`, `test_selective_imports`, `test_import_statement`,
+  `test_unused_imports`, `test_deadcode`, `test_dead_branches`, `test_enums`,
+  `test_declared_types`, `test_bool_values`, `test_break_continue`, `test_elif`,
+  `test_repeat`, `test_for_each`, `test_not`, `test_literal_dedupe`,
+  `test_generated_agreement`, `test_backend_agreement`.
+- Text, numbers and collections: `test_number`, `test_number_format`,
+  `test_ask_number`, `test_mid`, `test_chrorrd`, `test_char`, `test_len`,
+  `test_trim`, `test_contains`, `test_edges`, `test_left_right`, `test_strings`,
+  `test_text_compare`, `test_text_functions`, `test_text_lists`,
+  `test_text_list_link`, `test_text_order`, `test_text_params`,
+  `test_text_recursion`, `test_textcase`, `test_lists`, `test_list_remove`,
+  `test_round`, `test_mod`.
+- Runtime behaviour without a window: `test_runtime`,
+  `test_runtime_prototypes`, `test_noise_bounds`, `test_recursion_budget`,
+  `test_random_builtin`, `test_random_pipeline`, `test_net_status`,
+  `test_clock`, `test_wait`, `test_say`, `test_say_expressions`, `test_write`,
+  `test_ask`, `test_press_enter`, `test_stop`, `test_grade`, `test_qa_report`,
+  `test_tutorial`, `test_repl`.
+- Tooling and delivery: `test_build_cache`, `test_build_atomic`,
+  `test_thin_build`, `test_commands`, `test_format`, `test_package`,
+  `test_source_limits`, `test_capability_matrix`, `test_native_x64` (byte-level
+  PE inspection), `test_extensions`, `test_libraries`, `test_more_libraries`,
+  `test_all_libraries_import`, `test_library_edges`, `test_essentials`,
+  `test_geometry`, `test_vector`, `test_units_validate`, `test_image_error`,
+  `test_native_trig`, `test_bench`.
+
+## Interactive coverage
+
+These suites launch a generated Windows PE and drive it through real window
+messages. They require an unlocked desktop; a locked session or a disconnected
+remote desktop can prevent window creation:
+
+- `test_native_keyboard` — key down/up, held/pressed edges, repeat
+  suppression, focus loss.
+- `test_native_mouse` — client-pixel mapping, letterbox rejection, all three
+  buttons, wheel accumulation.
+- `test_native_window` — visible pixels during and after drawing, resize,
+  minimize/restore, close, and injected backbuffer-allocation failure.
+- `test_native_procedural` — gradient noise, FBM and procedural helpers in a
+  running image.
+- `test_includes` — the subset that runs an included graphical sample.
+
+The harness (`tests/native_app.py`) builds the PE, starts it, finds the window
+belonging to that process id, and sends only bounded messages to it. It never
+posts to unrelated windows. Global state is read with `ReadProcessMemory`, so
+assertions cover the program's own memory rather than screenshots.
+
+## Tolerances and assumptions
+
+- The runtime uses a fixed 960×600 virtual framebuffer; window resizing
+  letterboxes and never scales the pixel grid. Pixel assertions sample the
+  framebuffer after a frame has been presented.
+- Fixed updates run at `engine.fixed_hz` (1–240, default 60). Tests wait on
+  process state with explicit timeouts (15–60 s); no correctness check depends
+  on wall-clock sleeps.
+- Native PE tests compare exact bytes for generated code and exact values for
+  runtime results. C tests build with MSVC release settings.
+- The capability matrix is a behaviour record, not a performance benchmark; no
+  speed claim is made from these tests.
+
+## Known gaps
+
+- Only Windows x64 is exercised. Linux, macOS, browser and mobile targets have
+  no automated runs.
+- The VS Code extension is validated by grammar and sample checks
+  (`npm test`), not by inspecting a live editor window.
+- Automated window tests verify pixels and state; they are not a substitute for
+  a manual look at a game running on real hardware.
+- The full-suite count changes as tests are added; the latest recorded run is
+  in `docs/AUTONOMOUS_DEVELOPMENT_PROGRESS.md`.

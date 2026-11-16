@@ -167,7 +167,9 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 
 - [Language guide](docs/LANGUAGE.md)
 - [Formal language specification](docs/LANGUAGE_SPEC.md)
-- [Backend capability matrix](docs/BACKENDS.md)
+- [Backend capability matrix (measured)](docs/CAPABILITY_MATRIX.md)
+- [Backend notes](docs/BACKENDS.md)
+- [Testing and coverage labels](docs/TESTING.md)
 - [Versioning and stability policy](docs/VERSIONING.md)
 - [Response to the commit review and language roadmap](docs/REVIEW_RESPONSE.md)
 - [Engine runtime](docs/ENGINE.md)
