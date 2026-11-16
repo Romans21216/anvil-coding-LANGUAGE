@@ -12,7 +12,7 @@ for the headless/interactive split and the recorded environment.
 | Section | Status | Evidence | Remaining gap |
 | --- | --- | --- | --- |
 | 8.8 Language contract | Verified for numbers, text, enums and control flow | `fdb6344`, `e6513b4`: whole-text `number(text)`, `chr(0)` contract, native mantissa/exponent parity; cross-backend tests in `tests/test_number.py`, `tests/test_mid.py`, `tests/test_chrorrd.py`; `tools/capability_matrix.py` runs enums, lists, arrays, loops, recursion on both backends | Records/structures, general text variables beyond the current model |
-| 8.9 Ownership and budgets | Verified for the existing resources | Local arrays capped at 8,192 elements and 16 MiB active (`tests/test_compiler.py`); calls capped at a 512 KiB stack budget on both backends (`tests/test_recursion_budget.py`, `6f0f3e8`, `506664d`); image caps (8,192 px/side, 16.7 Mpx, 128 MiB) documented in the spec and enforced in the loader, with missing-file diagnostics covered by `tests/test_image_error.py` | No boundary tests for the image dimension/memory caps and no general allocator auditing |
+| 8.9 Ownership and budgets | Verified for the existing resources | Local arrays capped at 8,192 elements and 16 MiB active (`tests/test_compiler.py`); calls capped at a 512 KiB stack budget on both backends (`tests/test_recursion_budget.py`, `6f0f3e8`, `506664d`); image caps (8,192 px/side, 16.7 Mpx, 128 MiB) enforced with a named `image_error()` reason per limit (`tests/test_image_limits.py`, `e4de27d`), plus missing-file diagnostics (`tests/test_image_error.py`) | No general allocator auditing or leak instrumentation |
 | 8.10 Compiler and build loop | Verified | `dd40769` staging output; `40bf89d` cache key covers every runtime header plus compiler identity; `0b0130d` `--no-cache`; `a24a071` 4 MiB entry budget; `--check` runs backend lowering; `--print-imports`; `--doctor`; `2fe1008` idempotent native guard | No source-level debugger, source maps or breakpoints |
 | 8.11 Window loop and flicker | Partial | Buffered presentation with visible-pixel checks, resize and close, and injected backbuffer-allocation failure (`tests/test_native_window.py`); keyboard/mouse edge state (`test_native_keyboard`, `test_native_mouse`) | Minimize/restore, occlusion, DPI changes and rapid-resize matrices are not covered; no manual visual run this session |
 | 8.12 Browser target | Not implemented | Repository search finds no WASM/Emscripten target; README describes the desktop editor as a preview workbench | Whole target: WASM ABI, canvas/WebGL, input, audio, storage |
@@ -40,6 +40,7 @@ for the headless/interactive split and the recorded environment.
 - `1afefc5` measured capability matrix
 - `2fe1008` single-emission native frame guard
 - `031bfb0`, `fafc438` non-finite network payloads ignored; per-line `say` flush
+- `e4de27d` image load failures name the exact limit
 
 ## How to re-check
 

@@ -393,3 +393,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Index:** 17 commits from the C8 parity work through the network fuzz and per-line flush.
 - **Files:** `docs/PART8_EVIDENCE.md` (new), `README.md`.
 - **Commit:** `27be76d`.
+
+## Batch 24 — image limit diagnostics (8.9/8.10)
+
+- **Specific rejections:** `image_load` used one generic message for every failure. Each check now returns early with the reason: width or height over 8,192 (naming the value), pixel count over 16,777,216, the remaining 128 MiB budget in MiB, a file shorter than its declared rows, or an allocation failure.
+- **Tests:** `tests/test_image_limits.py` covers the width, height, pixel-count and short-file messages plus an 8,192-pixel-wide image that still loads; `tests/test_image_error.py` still passes unchanged. 8 passed.
+- **Docs:** `ENGINE.md` and `LANGUAGE_SPEC.md` describe the named reasons; `TESTING.md` lists the new module.
+- **Commit:** `e4de27d`.
