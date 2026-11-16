@@ -20,6 +20,7 @@ from compiler.parser import parse
 
 
 CACHE_DIR_NAME = ".anvil-cache"
+SOURCE_LIMIT_BYTES = 4 * 1024 * 1024
 
 
 CACHE_KEY_VERSION = b"anvil-cache-v2"
@@ -284,6 +285,12 @@ def main() -> int:
                     f"{args.source}: entry must resolve inside the project folder"
                 ) from exc
         try:
+            size = source_path.stat().st_size
+            if size > SOURCE_LIMIT_BYTES:
+                raise CompileError(
+                    f"{source_path}: source file is {size} bytes, over the "
+                    f"{SOURCE_LIMIT_BYTES // (1024 * 1024)} MiB budget"
+                )
             source = source_path.read_text(encoding="utf-8")
         except OSError as error:
             if manifest_path is not None:
