@@ -516,3 +516,10 @@ edit → build → run is a single command on both backends. `--run` refuses
 `tests/test_run.py` covers output capture, exit-code propagation
 (`1 / 0` → 2), and the invalid combination; `README.md` documents the flag next
 to `--format` and `--deny-warnings`.
+
+## Examples are part of the contract
+
+`tests/test_examples.py` now checks every `examples/*.ANVL` with `--check` on its
+declared backend (native examples with `--backend native`, the rest with C) and
+also asserts each example is canonically formatted. All 22 examples pass both,
+so "small examples build from a clean checkout" is enforced instead of assumed.
