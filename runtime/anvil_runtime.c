@@ -2277,6 +2277,12 @@ double anvil_text_to_number(const char *source) {
             value = exponent_negative ? value / 10.0 : value * 10.0;
         }
     }
+    if (!(value <= 1.7976931348623157e308)) {
+        /* Overflow to infinity (or a NaN) is not a usable number: both
+           backends read it as 0 instead of one overflowing and the other
+           clamping silently. */
+        return 0.0;
+    }
     while (*cursor == ' ' || *cursor == '\t') {
         cursor++;
     }

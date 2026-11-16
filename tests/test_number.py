@@ -247,6 +247,28 @@ class NumberNativeTests(NativeRunMixin, unittest.TestCase):
         self.assertEqual(run_c(source), expected)
         self.assertEqual(self._run(source), expected)
 
+    def test_huge_integers_and_extreme_exponents_match_the_c_backend(self) -> None:
+        # C8-4/C8-8: the native parser accumulates the mantissa in double like
+        # C instead of wrapping an int64, stops consuming exponent digits at
+        # C's 1000 boundary, and both backends read a magnitude outside the
+        # finite binary64 range as 0.
+        source = (
+            'fn(main)\n'
+            '  say number("9223372036854775808") > 0\n'
+            '  say number("18446744073709551616") > 0\n'
+            '  say number("99999999999999999999") > 0\n'
+            '  say number("1e10000") > 1e300\n'
+            '  say number("1e9999") > 1e300\n'
+            '  say number("1e308") > 1e307\n'
+            '  say number("1e-323") > 0\n'
+            '  say number("1e-324") > 0\n'
+            '  say number("-9223372036854775809") < 0\n'
+            'end\ncall fn(main)\n'
+        )
+        expected = "1\n1\n1\n0\n0\n1\n1\n0\n1\n"
+        self.assertEqual(self._run(source), expected)
+        self.assertEqual(run_c(source), expected)
+
     def test_native_roundtrip_with_chr(self) -> None:
         self.assertEqual(
             self._run(

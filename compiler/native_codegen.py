@@ -2013,7 +2013,10 @@ class NativeCodegen:
         trail_advance = self.label("num_trail_advance")
         trail_end = self.label("num_trail_end")
         zero = self.label("num_zero")
-        self.code.bytes(b"\x31\xc0")                    # xor eax, eax (value)
+        num_ret = self.label("num_ret")
+        self.code.bytes(b"\x0f\x57\xc0")                 # xorps xmm0, xmm0 (value)
+        self.code.mov_imm(0, 0x4024000000000000)         # rax = 10.0
+        self.code.bytes(b"\x66\x48\x0f\x6e\xd8")         # movq xmm3, rax
         self.code.bytes(b"\x45\x31\xc0")               # xor r8d, r8d (sign)
         skip = self.label("num_skip_space")
         sign = self.label("num_sign")
@@ -2042,9 +2045,9 @@ class NativeCodegen:
         self.code.bytes(b"\x80\xea\x30")               # sub dl, '0'
         self.code.bytes(b"\x80\xfa\x09")               # cmp dl, 9
         self.code.conditional_jump(0x87, frac)           # ja: not a digit
-        self.code.bytes(b"\x48\x6b\xc0\x0a")          # imul rax, rax, 10
-        self.code.bytes(b"\x44\x0f\xb6\xca")          # movzx r9d, dl
-        self.code.bytes(b"\x4c\x01\xc8")               # add rax, r9
+        self.code.bytes(b"\xf2\x0f\x59\xc3")          # mulsd xmm0, xmm3
+        self.code.bytes(b"\xf2\x0f\x2a\xd2")          # cvtsi2sd xmm2, edx
+        self.code.bytes(b"\xf2\x0f\x58\xc2")          # addsd xmm0, xmm2
         self.code.bytes(b"\x48\xff\xc1")               # inc rcx
         self.code.jump(intloop)
         self.code.label(frac)
@@ -2078,33 +2081,20 @@ class NativeCodegen:
         self.code.bytes(b"\x45\x31\xc9")               # xor r9d, r9d
         self.code.bytes(b"\x45\x31\xd2")               # xor r10d, r10d
         self.code.label(finish)
-        self.code.bytes(b"\x48\x89\x44\x24\x10")      # [rsp+10] = rax (int)
+        self.code.bytes(b"\xf2\x0f\x11\x44\x24\x10")  # movsd [rsp+10], xmm0 (int)
         self.code.bytes(b"\x44\x89\x4c\x24\x18")      # [rsp+18] = r9d (fraction)
         self.code.bytes(b"\x44\x89\x54\x24\x1c")      # [rsp+1c] = r10d (scale)
         self.code.bytes(b"\x44\x89\x44\x24\x28")      # [rsp+28] = r8d (sign)
-        # real logic, entirely from slots
-        self.code.bytes(b"\x48\x8b\x44\x24\x10")      # rax = int
-        self.code.bytes(b"\x44\x8b\x44\x24\x28")      # r8d = sign
-        self.code.bytes(b"\x45\x85\xc0")               # test r8d, r8d
-        self.code.conditional_jump(0x84, positive)       # je: positive
-        self.code.bytes(b"\x48\xf7\xd8")               # neg rax
-        self.code.label(positive)
-        self.code.bytes(b"\xf2\x48\x0f\x2a\xc0")     # cvtsi2sd xmm0, rax
+        # The sign is applied once at the end so both backends do the same
+        # positive accumulation and the same final rounding.
+        self.code.bytes(b"\xf2\x0f\x10\x44\x24\x10")  # xmm0 = the integer part
         self.code.bytes(b"\x44\x8b\x4c\x24\x1c")      # r9d = scale
         self.code.bytes(b"\x45\x85\xc9")               # test r9d, r9d
         self.code.conditional_jump(0x84, exp_check)      # je: no fraction
         self.code.bytes(b"\xf2\x0f\x2a\x4c\x24\x18")  # cvtsi2sd xmm1, [rsp+18]
         self.code.bytes(b"\xf2\x0f\x2a\x54\x24\x1c")  # cvtsi2sd xmm2, [rsp+1c]
         self.code.bytes(b"\xf2\x0f\x5e\xca")          # divsd xmm1, xmm2
-        negative_frac = self.label("num_frac_negative")
-        add_frac = self.label("num_frac_add")
-        self.code.bytes(b"\x45\x85\xc0")               # test r8d, r8d (sign)
-        self.code.conditional_jump(0x85, negative_frac)  # jne: negative value
-        self.code.label(add_frac)
         self.code.bytes(b"\xf2\x0f\x58\xc1")          # addsd xmm0, xmm1
-        self.code.jump(exp_check)
-        self.code.label(negative_frac)
-        self.code.bytes(b"\xf2\x0f\x5c\xc1")          # subsd xmm0, xmm1
         # --- optional exponent: 1e3, -2.5E-2 (only after a mantissa) ---
         self.code.label(exp_check)
         exp_begin = self.label("num_exp_begin")
@@ -2144,17 +2134,12 @@ class NativeCodegen:
         self.code.bytes(b"\x44\x0f\xb6\xda")          # movzx r11d, dl
         self.code.bytes(b"\x45\x01\xd9")               # add r9d, r11d
         self.code.bytes(b"\x48\xff\xc1")               # inc rcx
-        self.code.bytes(b"\x41\x81\xf9\x34\x01\x00\x00")  # cmp r9d, 308
-        self.code.conditional_jump(0x86, exp_loop)       # jbe: keep reading
-        # The exponent is out of double range; consume the remaining digits so
-        # the number still ends at the end of the text.
-        self.code.label(exp_skip)
-        self.code.bytes(b"\x0f\xb6\x11")               # movzx edx, byte [rcx]
-        self.code.bytes(b"\x80\xea\x30")               # sub dl, '0'
-        self.code.bytes(b"\x80\xfa\x09")               # cmp dl, 9
-        self.code.conditional_jump(0x87, exp_apply)      # ja: done
-        self.code.bytes(b"\x48\xff\xc1")               # inc rcx
-        self.code.jump(exp_skip)
+        self.code.bytes(b"\x41\x81\xf9\xe8\x03\x00\x00")  # cmp r9d, 1000
+        self.code.conditional_jump(0x82, exp_loop)       # jb: keep reading
+        # The C parser stops consuming exponent digits once the exponent
+        # reaches 1000, leaving any further digit to fail the whole-text check.
+        # Doing the same here keeps 1e10000 at 0 on both backends instead of
+        # one backend reading infinity.
         self.code.label(exp_apply)
         self.code.bytes(b"\x83\x7c\x24\x30\x00")      # cmp dword [rsp+30], 0
         self.code.conditional_jump(0x84, zero)           # je: 'e' with no digits
@@ -2174,6 +2159,14 @@ class NativeCodegen:
         self.code.bytes(b"\x41\xff\xc9")               # dec r9d
         self.code.conditional_jump(0x85, exp_div)        # jne: keep scaling
         self.code.label(done)
+        # Overflow to infinity or NaN is not a usable number: read it as 0 so
+        # both backends agree (C applies the same rule after scaling).
+        self.code.bytes(b"\x66\x48\x0f\x7e\xc0")         # movq rax, xmm0
+        self.code.mov_imm(11, 0x7FFFFFFFFFFFFFFF)
+        self.code.bytes(b"\x4c\x21\xd8")                 # and rax, r11
+        self.code.mov_imm(11, 0x7FF0000000000000)
+        self.code.bytes(b"\x4c\x39\xd8")                 # cmp rax, r11
+        self.code.conditional_jump(0x83, zero)           # jae: inf or NaN
         # The whole text must be a number: only spaces and tabs may follow.
         self.code.label(trail)
         self.code.bytes(b"\x0f\xb6\x11")               # movzx edx, byte [rcx]
@@ -2187,6 +2180,13 @@ class NativeCodegen:
         self.code.label(trail_end)
         self.code.bytes(b"\x84\xd2")                     # test dl, dl
         self.code.conditional_jump(0x85, zero)           # jne: trailing junk reads 0
+        self.code.bytes(b"\x44\x8b\x44\x24\x28")      # r8d = sign
+        self.code.bytes(b"\x45\x85\xc0")               # test r8d, r8d
+        self.code.conditional_jump(0x84, num_ret)        # je: positive
+        self.code.bytes(b"\x66\x0f\x57\xd2")          # xorpd xmm2, xmm2
+        self.code.bytes(b"\xf2\x0f\x5c\xd0")          # subsd xmm2, xmm0
+        self.code.bytes(b"\xf2\x0f\x10\xc2")          # movsd xmm0, xmm2
+        self.code.label(num_ret)
         self.code.bytes(b"\x48\x83\xc4\x38\xc3")      # add rsp,0x38; ret
         self.code.label(zero)
         self.code.bytes(b"\x66\x0f\x57\xc0")          # xorps xmm0, xmm0
