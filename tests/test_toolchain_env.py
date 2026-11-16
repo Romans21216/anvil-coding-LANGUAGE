@@ -90,5 +90,48 @@ class CacheTests(unittest.TestCase):
         self.assertIsNone(toolchain_env.ensure(missing))
 
 
+class ContentKeyTests(unittest.TestCase):
+    """C8-12: the cache name follows batch-file contents, not metadata."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = pathlib.Path(self.tmp.name)
+        self.patch = mock.patch.dict(os.environ, {CACHE_ENV_VAR: str(self.root / "cache")})
+        self.patch.start()
+
+    def tearDown(self) -> None:
+        self.patch.stop()
+        self.tmp.cleanup()
+
+    def _script(self, body: bytes) -> pathlib.Path:
+        path = self.root / "VsDevCmd.bat"
+        path.write_bytes(body)
+        return path
+
+    def test_same_size_content_with_restored_time_changes_the_key(self) -> None:
+        script = self._script(b"@echo off" + bytes([10]) + b"rem one" + bytes([10]))
+        stat = script.stat()
+        before = cache_path(script)
+        script.write_bytes(b"@echo off" + bytes([10]) + b"rem TWO" + bytes([10]))
+        os.utime(script, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        self.assertEqual(len(script.read_bytes()), stat.st_size)
+        self.assertNotEqual(before, cache_path(script))
+
+    def test_a_changed_nested_script_changes_the_key(self) -> None:
+        script = self._script(b"@echo off" + bytes([10]))
+        before = cache_path(script)
+        nested = self.root / "vcvarsall.bat"
+        nested.write_bytes(b"@echo off" + bytes([10]) + b"call one" + bytes([10]))
+        middle = cache_path(script)
+        nested.write_bytes(b"@echo off" + bytes([10]) + b"call two" + bytes([10]))
+        after = cache_path(script)
+        self.assertNotEqual(before, middle)
+        self.assertNotEqual(middle, after)
+
+    def test_an_unchanged_script_keeps_the_key(self) -> None:
+        script = self._script(b"@echo off" + bytes([10]))
+        self.assertEqual(cache_path(script), cache_path(script))
+
+
 if __name__ == "__main__":
     unittest.main()

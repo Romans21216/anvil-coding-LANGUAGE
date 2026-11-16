@@ -29,12 +29,35 @@ def cache_directory() -> pathlib.Path:
     return pathlib.Path(base) / "anvil" / "toolchain"
 
 
+def _file_digest(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def cache_path(devcmd: pathlib.Path, arch: str = "x64") -> pathlib.Path:
-    info = devcmd.stat()
-    key = hashlib.sha256(
-        f"{devcmd}|{info.st_size}|{info.st_mtime_ns}|{arch}".encode("utf-8")
-    ).hexdigest()[:16]
-    return cache_directory() / f"vsenv-{key}.json"
+    """Cache file named from the batch files' contents, not their metadata.
+
+    A script replaced in place with different same-size content and a restored
+    timestamp must produce a different cache name, otherwise a stale captured
+    environment (PATH, INCLUDE, LIB) could select the wrong toolset.
+    """
+    digest = hashlib.sha256()
+    digest.update(str(devcmd).encode("utf-8", "replace"))
+    try:
+        digest.update(_file_digest(devcmd).encode("utf-8"))
+    except OSError:
+        digest.update(b"unreadable")
+    nested = devcmd.with_name("vcvarsall.bat")
+    if nested.is_file():
+        try:
+            digest.update(_file_digest(nested).encode("utf-8"))
+        except OSError:
+            digest.update(b"unreadable-nested")
+    digest.update(arch.encode("utf-8", "replace"))
+    return cache_directory() / f"vsenv-{digest.hexdigest()[:16]}.json"
 
 
 def parse_environment(text: str) -> dict[str, str]:

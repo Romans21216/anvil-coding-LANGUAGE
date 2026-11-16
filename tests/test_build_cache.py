@@ -14,7 +14,7 @@ COMPILER = ROOT / "compiler" / "anvil.py"
 
 sys.path.insert(0, str(ROOT))
 
-from compiler.cli import _cache_key  # noqa: E402
+from compiler.cli import _cache_key, _sdk_fingerprint  # noqa: E402
 
 PROGRAM = 'fn(main)\n  say "cached"\nend\ncall fn(main)\n'
 
@@ -202,6 +202,61 @@ class CacheKeyInputTests(unittest.TestCase):
             first = _cache_key("int main(void){}", str(compiler), True, runtime)
             second = _cache_key("int main(void){}", str(compiler), True, runtime)
         self.assertEqual(first, second)
+
+
+class SdkFingerprintTests(unittest.TestCase):
+    """C8-11: SDK contents, not just version-directory names, decide the key."""
+
+    VERSION = "10.0.26100.0"
+
+    def _sdk(self, root: pathlib.Path) -> pathlib.Path:
+        include = root / "Include" / self.VERSION / "um"
+        include.mkdir(parents=True)
+        library = root / "Lib" / self.VERSION / "um" / "x64"
+        library.mkdir(parents=True)
+        (include / "windows.h").write_text("header one", encoding="utf-8")
+        (library / "kernel32.lib").write_text("library one", encoding="utf-8")
+        return root
+
+    def test_a_header_changed_in_place_changes_the_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = self._sdk(pathlib.Path(temp))
+            before = _sdk_fingerprint(root)
+            (root / "Include" / self.VERSION / "um" / "windows.h").write_text(
+                "header two, longer", encoding="utf-8"
+            )
+            after = _sdk_fingerprint(root)
+        self.assertNotEqual(before, after)
+
+    def test_a_library_changed_in_place_changes_the_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = self._sdk(pathlib.Path(temp))
+            before = _sdk_fingerprint(root)
+            (root / "Lib" / self.VERSION / "um" / "x64" / "kernel32.lib").write_text(
+                "library two, longer", encoding="utf-8"
+            )
+            after = _sdk_fingerprint(root)
+        self.assertNotEqual(before, after)
+
+    def test_an_unchanged_sdk_keeps_the_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = self._sdk(pathlib.Path(temp))
+            self.assertEqual(_sdk_fingerprint(root), _sdk_fingerprint(root))
+
+    def test_a_newer_version_directory_is_the_selected_one(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = self._sdk(pathlib.Path(temp))
+            before = _sdk_fingerprint(root)
+            newer = root / "Include" / "10.0.27000.0" / "um"
+            newer.mkdir(parents=True)
+            (newer / "windows.h").write_text("newer sdk", encoding="utf-8")
+            (root / "Lib" / "10.0.27000.0" / "um" / "x64").mkdir(parents=True)
+            after = _sdk_fingerprint(root)
+        self.assertNotEqual(before, after)
+
+    def test_a_missing_sdk_is_marked_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            self.assertEqual(_sdk_fingerprint(pathlib.Path(temp) / "absent"), b"missing")
 
 
 if __name__ == "__main__":

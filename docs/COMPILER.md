@@ -67,9 +67,14 @@ the build cache.
 
 The cache key covers the generated C, every runtime source and header, the compiler
 Python sources, the **contents** of `cl.exe`, the contents of the `link.exe` beside it,
-and the installed Windows SDK version directories. A compiler replaced in place with the
-same size and a restored timestamp, or a different linker in the same toolset, therefore
-misses the cache instead of reusing a stale executable. Libraries passed to `build_c`
+and a content fingerprint of the selected Windows SDK (every file under the newest
+version's Include and Lib trees, by path, size and modification time; about 10-40 ms
+thanks to directory-enumeration metadata, so an SDK library or header changed in place
+inside an unchanged version directory still invalidates the cache). A compiler replaced
+in place with the same size and a restored timestamp, or a different linker in the same
+toolset, therefore misses the cache instead of reusing a stale executable. The captured
+Visual Studio environment is named from a digest of `VsDevCmd.bat` and `vcvarsall.bat`
+contents, so a same-size script replacement cannot revive a stale environment. Libraries passed to `build_c`
 through `libraries=` are not part of the key yet.
 
 ## Native backend limits
