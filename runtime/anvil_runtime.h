@@ -72,6 +72,9 @@ double anvil_image_draw_scaled(double handle, double x, double y, double width,
                                double height);
 double anvil_image_draw_rotated(double handle, double cx, double cy,
                                 double degrees, double scale);
+double anvil_image_draw_region(double handle, double sx, double sy, double sw,
+                               double sh, double dx, double dy, double dw,
+                               double dh);
 double anvil_image_tint(double handle, double r, double g, double b);
 double anvil_image_flip(double handle, double x, double y);
 const char *anvil_save_error(void);

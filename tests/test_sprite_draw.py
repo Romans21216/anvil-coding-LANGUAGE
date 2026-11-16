@@ -48,6 +48,33 @@ def quadrant_bmp() -> bytes:
     return bytes(header) + bottom + top
 
 
+def quadrant4_bmp() -> bytes:
+    """A 4x4, 32-bit BMP with 2x2 quadrants: TL red, TR green, BL blue, BR white."""
+    width = height = 4
+    header = bytearray(54)
+    header[0:2] = b"BM"
+    struct.pack_into("<I", header, 2, 54 + width * height * 4)
+    struct.pack_into("<I", header, 10, 54)
+    struct.pack_into("<I", header, 14, 40)
+    struct.pack_into("<i", header, 18, width)
+    struct.pack_into("<i", header, 22, height)
+    struct.pack_into("<H", header, 26, 1)
+    struct.pack_into("<H", header, 28, 32)
+    struct.pack_into("<I", header, 34, width * height * 4)
+
+    def rgba(colour: tuple[int, int, int]) -> bytes:
+        b, g, r = colour[2], colour[1], colour[0]
+        return bytes((b, g, r, 255))
+
+    red, green, blue, white = RED, GREEN, BLUE, WHITE
+    rows = []
+    for _ in range(2):  # bottom two rows: blue | white
+        rows.append(rgba(blue) * 2 + rgba(white) * 2)
+    for _ in range(2):  # top two rows: red | green
+        rows.append(rgba(red) * 2 + rgba(green) * 2)
+    return bytes(header) + b"".join(rows)
+
+
 PROGRAM = "\n".join(
     (
         "scene 2d",
@@ -275,6 +302,146 @@ class SpriteDrawTests(unittest.TestCase):
                 self.assertEqual(reader.pixel(37, 43), WHITE)
                 self.assertEqual(reader.pixel(43, 43), GREEN)
 
+                wait_for("done")
+            finally:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+
+
+REGION_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "clear rgba(0, 0, 0, 255)",
+        'set var(img) = image_load("quad4.bmp")',
+        "set var(frame) = 0",
+        "set var(rx) = 0",
+        "set var(ry) = 0",
+        "set var(rw) = 2",
+        "set var(rh) = 2",
+        "set var(dw) = 4",
+        "set var(dh) = 4",
+        "",
+        "fn(draw)",
+        "  add var(frame) 1",
+        "  if var(frame) = 5",
+        '    say "tl"',
+        "  end",
+        "  if var(frame) = 35",
+        "    set var(rx) = 2",
+        '    say "tr"',
+        "  end",
+        "  if var(frame) = 65",
+        "    set var(ry) = 2",
+        '    say "br"',
+        "  end",
+        "  if var(frame) = 95",
+        "    set var(rx) = 0",
+        '    say "bl"',
+        "  end",
+        "  if var(frame) = 125",
+        "    set var(ry) = 0",
+        "    set var(rw) = 4",
+        "    set var(rh) = 2",
+        "    set var(dw) = 8",
+        "    set var(dh) = 4",
+        "    set var(f) = image_flip(var(img), 1, 0)",
+        '    say "flip"',
+        "  end",
+        "  if var(frame) = 155",
+        "    set var(f2) = image_flip(var(img), 0, 0)",
+        "    set var(bad) = image_draw_region(var(img), 3, 3, 3, 3, 10, 10, 4, 4)",
+        '    say "bad"',
+        "    say var(bad)",
+        "  end",
+        "  if var(frame) = 180",
+        '    say "done"',
+        "    stop",
+        "  end",
+        "  set var(d) = image_draw_region(var(img), var(rx), var(ry), var(rw), var(rh), 10, 10, var(dw), var(dh))",
+        "end",
+        "",
+    )
+)
+
+
+class SpriteRegionTests(unittest.TestCase):
+    def test_atlas_regions_draw_the_requested_cell(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            (root / "quad4.bmp").write_bytes(quadrant4_bmp())
+            source = root / "region.ANVL"
+            source.write_text(REGION_PROGRAM, encoding="utf-8")
+            executable = root / "region.exe"
+            build = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "-o", str(executable)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            if build.returncode != 0:
+                if "No C compiler found" in build.stderr:
+                    raise unittest.SkipTest("MSVC is not available")
+                self.fail(build.stderr)
+
+            process = subprocess.Popen(
+                [str(executable)],
+                cwd=root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            lines: queue.Queue[str] = queue.Queue()
+
+            def pump() -> None:
+                assert process.stdout is not None
+                for line in process.stdout:
+                    lines.put(line.strip())
+
+            threading.Thread(target=pump, daemon=True).start()
+            reader = WindowReader(process.pid)
+
+            def wait_for(marker: str) -> None:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    try:
+                        if lines.get(timeout=0.2) == marker:
+                            return
+                    except queue.Empty:
+                        continue
+                self.fail(f"marker {marker!r} never arrived")
+
+            def next_line(timeout: float = 5.0) -> str:
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    try:
+                        return lines.get(timeout=0.2)
+                    except queue.Empty:
+                        continue
+                self.fail("expected another output line")
+
+            try:
+                self.assertIsNotNone(reader.find(time.monotonic() + 10), "no window")
+                reader.force_client_size(960, 600)
+
+                wait_for("tl")
+                reader.settle(RED, 11, 11)
+                wait_for("tr")
+                reader.settle(GREEN, 11, 11)
+                wait_for("br")
+                reader.settle(WHITE, 11, 11)
+                wait_for("bl")
+                reader.settle(BLUE, 11, 11)
+
+                wait_for("flip")
+                # The top half (red | green) is mirrored inside its region.
+                reader.settle(GREEN, 11, 11)
+                self.assertEqual(reader.pixel(16, 11), RED)
+
+                wait_for("bad")
+                self.assertEqual(next_line(), "0")
                 wait_for("done")
             finally:
                 process.terminate()

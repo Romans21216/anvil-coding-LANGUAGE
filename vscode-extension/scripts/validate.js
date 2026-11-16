@@ -98,6 +98,12 @@ async function main() {
   expect('set var(ok) = image_destroy(var(handle))', 'image_destroy', 'support.function.anvil');
   expect('set var(ok) = image_draw(var(handle), 1, 2)', 'image_draw', 'support.function.anvil');
   expect('set var(ok) = image_draw_scaled(var(handle), 1, 2, 4, 5)', 'image_draw_scaled', 'support.function.anvil');
+  expect('set var(ok) = image_draw_rotated(var(handle), 10, 10, 45, 2)', 'image_draw_rotated', 'support.function.anvil');
+  expect('set var(ok) = image_draw_region(var(handle), 0, 0, 8, 8, 1, 2, 16, 16)', 'image_draw_region', 'support.function.anvil');
+  expect('set var(ok) = image_tint(var(handle), 255, 128, 0)', 'image_tint', 'support.function.anvil');
+  expect('set var(ok) = image_flip(var(handle), 1, 0)', 'image_flip', 'support.function.anvil');
+  expect('set var(voice) = sound_play(var(sound))', 'sound_play', 'support.function.anvil');
+  expect('set var(ok) = save_number("slot", 1)', 'save_number', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
   expect('set var(size) = 3 + 4', '+', 'keyword.operator.anvil');

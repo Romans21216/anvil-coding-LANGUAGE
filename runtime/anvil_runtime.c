@@ -946,6 +946,54 @@ double anvil_image_draw_rotated(double handle, double cx, double cy,
   }
   return 1.0;
 }
+/* Draw a sub-rectangle of an image (an atlas cell) into a destination
+   rectangle. The source rect must lie fully inside the image; a rect that does
+   not is a layout bug, so it returns 0 instead of silently clamping. Flip and
+   tint are the image's state, with flip mirrored inside the source rect. */
+double anvil_image_draw_region(double handle, double sx, double sy, double sw,
+                               double sh, double dx, double dy, double dw,
+                               double dh) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !anvil_pixels || !isfinite(sx) || !isfinite(sy) ||
+      !isfinite(sw) || !isfinite(sh) || !isfinite(dx) || !isfinite(dy) ||
+      !isfinite(dw) || !isfinite(dh) || sw <= 0.0 || sh <= 0.0 || dw <= 0.0 ||
+      dh <= 0.0)
+    return 0.0;
+  if (sx < 0.0 || sy < 0.0 || sx + sw > (double)image->width ||
+      sy + sh > (double)image->height || !isfinite(sx + sw) ||
+      !isfinite(sy + sh))
+    return 0.0;
+  int isx = (int)sx, isy = (int)sy, isw = (int)sw, ish = (int)sh;
+  double left = fmax(0.0, floor(dx));
+  double top = fmax(0.0, floor(dy));
+  double right = fmin((double)ANVIL_WIDTH, ceil(dx + dw));
+  double bottom = fmin((double)ANVIL_HEIGHT, ceil(dy + dh));
+  if (left >= right || top >= bottom)
+    return 1.0;
+  int x0 = (int)left, y0 = (int)top, x1 = (int)right, y1 = (int)bottom;
+  for (int py = y0; py < y1; ++py) {
+    int v = isy + (int)(((py + 0.5 - dy) / dh) * sh);
+    if (v < isy)
+      v = isy;
+    if (v >= isy + ish)
+      v = isy + ish - 1;
+    for (int px = x0; px < x1; ++px) {
+      int u = isx + (int)(((px + 0.5 - dx) / dw) * sw);
+      if (u < isx)
+        u = isx;
+      if (u >= isx + isw)
+        u = isx + isw - 1;
+      int sample_x = image->flip_x ? isx + (isw - 1 - (u - isx)) : u;
+      int sample_y = image->flip_y ? isy + (ish - 1 - (v - isy)) : v;
+      uint32_t color =
+          image->pixels[(size_t)sample_y * image->width + sample_x];
+      anvil_pixel(px, py, anvil_image_shaded(image, color) & UINT32_C(0x00ffffff),
+                  (int)(color >> 24));
+    }
+  }
+  return 1.0;
+}
+
 double anvil_image_draw(double handle, double x, double y) {
   AnvilImage *image = anvil_image_from_handle(handle);
   if (!image)

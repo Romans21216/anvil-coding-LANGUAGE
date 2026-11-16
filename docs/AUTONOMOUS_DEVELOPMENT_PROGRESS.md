@@ -498,3 +498,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Implementation:** the scaled path samples the source with the flip applied and shades through the tint before alpha-blending; the rotated path inverse-transforms each destination pixel around the centre and samples nearest-neighbour, matching the existing scaled draw's filtering.
 - **Tests:** `tests/test_sprite_draw.py` draws a 2x2 quadrant BMP, resizes the window until the client is exactly 960x600 (so the framebuffer maps 1:1), and reads the presented pixels with GetPixel. It asserts the four plain quadrants, the horizontal flip, a 128-grey tint, and the 90-degree clockwise arrangement (top-left blue, top-right red, bottom-left white, bottom-right green). 1 passed in 2.8 s.
 - **Also:** `examples/sprite_transform_demo.ANVL`, spec table and grammar, evidence ledger, testing doc.
+
+## Batch 36 — atlas-region drawing (8.14)
+
+- **Builtin:** `image_draw_region(handle,sx,sy,sw,sh,dx,dy,dw,dh)` copies a source rectangle (a sprite-sheet cell) into a destination rectangle with the existing nearest-neighbour scaling, tint and flip; flip mirrors inside the cell. A source rect outside the image returns 0 and draws nothing, so a wrong atlas layout is visible instead of silently clamped.
+- **Tests:** the second case in `tests/test_sprite_draw.py` loads a 4x4 four-quadrant BMP, draws each 2x2 cell into a 4x4 destination and checks the centre pixel, mirrors the top half (red|green becomes green|red) and asserts an out-of-range region returns 0 and leaves the frame untouched. 2 passed in 6.1 s.
+- **Editor:** the TextMate grammar and `validate.js` now list the sprite, sound and save builtins (they had lagged behind the runtime); `npm test` passes.
+- **Docs:** language spec row and grammar, evidence ledger, testing doc.

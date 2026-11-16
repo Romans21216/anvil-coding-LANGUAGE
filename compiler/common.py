@@ -139,6 +139,7 @@ RUNTIME_C_NAMES = {
     "anvil_image_draw",
     "anvil_image_draw_scaled",
     "anvil_image_draw_rotated",
+    "anvil_image_draw_region",
     "anvil_image_tint",
     "anvil_image_flip",
     "anvil_sound_error",
