@@ -52,6 +52,9 @@ Supported today:
 - text values, `&` joining, and the builtins `len`, `mid`, `upper`, `number`
 - `floor`, `ceil`, `sqrt`, `abs`, `min`, `max`, `clamp`, `round`
 - `scene 2d` with `fn(draw)`, `clear`, and `display rect/circle/line/text`
+- input and time: `time()`, `delta()`, `pressed(key)`, `held(key)`,
+  `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`,
+  `mouse_wheel()`
 
 Refused with a source-located error:
 
@@ -64,6 +67,30 @@ For example:
 
 ```text
 hello.ANVL:2: 'time' is not available in the wasm backend yet
+```
+
+## Input
+
+The host page listens on the window and canvas and calls exported setters:
+
+| Browser event | Export | Notes |
+| --- | --- | --- |
+| `keydown` / `keyup` | `anvil_key(code, down)` | `KeyA`–`KeyZ` map to `A`–`Z` (65–90); Space 32, Enter 13, Escape 27, arrows 37–40 |
+| `mousemove` | `anvil_mouse(x, y)` | scaled from the canvas CSS size to its 960×600 buffer |
+| `mousedown` / `mouseup` | `anvil_mouse_button(index, down)` | index 0 left, 1 right, 2 middle |
+| `wheel` | `anvil_wheel(delta)` | `deltaY` |
+
+`anvil_frame(delta_ms)` advances `time()` by the delta (clamped to 0–250 ms) and
+sets `delta()` in seconds; pressed edges and wheel deltas last one frame, like
+the C runtime's first-update clearing. `mouse_x()`/`mouse_y()` are `-1` until the
+pointer first moves.
+
+The page exposes `window.anvil` (the instance) so a console or test can step
+frames and inject input deterministically:
+
+```js
+window.anvil.exports.anvil_key(65, 1);
+window.anvil.exports.anvil_frame(16);
 ```
 
 ## Hosts
@@ -82,6 +109,6 @@ identical.
   allocate more than that fail at runtime.
 - Numbers are IEEE doubles, as on the native backends, but `sin`/`cos` and other
   libm functions are not linked yet.
-- No keyboard/mouse, Web Audio, IndexedDB or source maps yet; those are the
-  remaining 8.12 items. 3D and images also need the C backend.
+- No Web Audio, IndexedDB or source maps yet; those are the remaining 8.12
+  items. 3D and images also need the C backend.
 - `anvil_frame` ignores its delta argument; animations advance per host frame.

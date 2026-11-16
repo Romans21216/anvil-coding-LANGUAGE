@@ -6,9 +6,14 @@ import fs from "node:fs";
 
 const args = process.argv.slice(2);
 const record = args.includes("--record");
-const file = args.find((argument) => !argument.startsWith("--"));
+const inputIndex = args.indexOf("--input");
+const script = inputIndex >= 0 ? JSON.parse(args[inputIndex + 1]) : null;
+const file = args.find(
+  (argument, index) =>
+    !argument.startsWith("--") && !(inputIndex >= 0 && index === inputIndex + 1),
+);
 if (!file) {
-  console.error("usage: node tools/wasm_host.mjs [--record] program.wasm");
+  console.error("usage: node tools/wasm_host.mjs [--record] [--input JSON] program.wasm");
   process.exit(2);
 }
 
@@ -48,7 +53,15 @@ const module = await WebAssembly.compile(bytes);
 const instance = await WebAssembly.instantiate(module, imports);
 memory = instance.exports.memory;
 if (instance.exports.main) instance.exports.main();
-if (instance.exports.anvil_frame) {
+if (script) {
+  for (const step of script) {
+    if (step[0] === "frame") instance.exports.anvil_frame(step[1] ?? 1000 / 60);
+    else if (step[0] === "key") instance.exports.anvil_key(step[1], step[2]);
+    else if (step[0] === "mouse") instance.exports.anvil_mouse(step[1], step[2]);
+    else if (step[0] === "button") instance.exports.anvil_mouse_button(step[1], step[2]);
+    else if (step[0] === "wheel") instance.exports.anvil_wheel(step[1]);
+  }
+} else if (instance.exports.anvil_frame) {
   const frames = Number(process.env.ANVIL_WASM_FRAMES ?? "3");
   for (let index = 0; index < frames; index++) {
     instance.exports.anvil_frame(1000 / 60);

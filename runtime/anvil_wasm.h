@@ -33,7 +33,15 @@ static inline double floor(double value) { return __builtin_floor(value); }
 static inline double ceil(double value) { return __builtin_ceil(value); }
 static inline double sqrt(double value) { return __builtin_sqrt(value); }
 static inline double trunc(double value) { return __builtin_trunc(value); }
-static inline double round(double value) { return __builtin_round(value); }
+static inline double round(double value) {
+  double truncated = __builtin_trunc(value);
+  double fraction = value - truncated;
+  if (fraction >= 0.5)
+    return truncated + 1.0;
+  if (fraction <= -0.5)
+    return truncated - 1.0;
+  return truncated;
+}
 
 double anvil_divide(double numerator, double denominator, const char *path,
                     int line);
@@ -56,6 +64,53 @@ char *anvil_str_cat(char *dest, const char *a, const char *b, const char *path,
 char *anvil_text_upper(const char *source);
 char *anvil_text_mid(const char *source, double start, double count);
 double anvil_text_to_number(const char *source);
+
+/* Input and time, matching the C runtime's key codes. */
+enum {
+  ANVIL_KEY_ENTER = 13,
+  ANVIL_KEY_ESCAPE = 27,
+  ANVIL_KEY_SPACE = 32,
+  ANVIL_KEY_LEFT = 37,
+  ANVIL_KEY_UP = 38,
+  ANVIL_KEY_RIGHT = 39,
+  ANVIL_KEY_DOWN = 40,
+  ANVIL_KEY_A = 'A',
+  ANVIL_KEY_B = 'B',
+  ANVIL_KEY_C = 'C',
+  ANVIL_KEY_D = 'D',
+  ANVIL_KEY_E = 'E',
+  ANVIL_KEY_F = 'F',
+  ANVIL_KEY_G = 'G',
+  ANVIL_KEY_H = 'H',
+  ANVIL_KEY_I = 'I',
+  ANVIL_KEY_J = 'J',
+  ANVIL_KEY_K = 'K',
+  ANVIL_KEY_L = 'L',
+  ANVIL_KEY_M = 'M',
+  ANVIL_KEY_N = 'N',
+  ANVIL_KEY_O = 'O',
+  ANVIL_KEY_P = 'P',
+  ANVIL_KEY_Q = 'Q',
+  ANVIL_KEY_R = 'R',
+  ANVIL_KEY_S = 'S',
+  ANVIL_KEY_T = 'T',
+  ANVIL_KEY_U = 'U',
+  ANVIL_KEY_V = 'V',
+  ANVIL_KEY_W = 'W',
+  ANVIL_KEY_X = 'X',
+  ANVIL_KEY_Y = 'Y',
+  ANVIL_KEY_Z = 'Z'
+};
+
+double anvil_time(void);
+double anvil_delta(void);
+double anvil_pressed(int key);
+double anvil_held(int key);
+double anvil_mouse_x(void);
+double anvil_mouse_y(void);
+double anvil_mouse_pressed(const char *button);
+double anvil_mouse_held(const char *button);
+double anvil_mouse_wheel(void);
 
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);

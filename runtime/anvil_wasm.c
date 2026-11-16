@@ -384,6 +384,86 @@ double anvil_text_to_number(const char *source) {
   return negative ? -value : value;
 }
 
+/* ---- Input and time ----------------------------------------------------- */
+static unsigned char anvil_keys[256];
+static unsigned char anvil_keys_pressed[256];
+static unsigned char anvil_mouse_buttons[3];
+static unsigned char anvil_mouse_pressed_buttons[3];
+static double anvil_mouse_x_value = -1.0, anvil_mouse_y_value = -1.0;
+static double anvil_mouse_wheel_value;
+static double anvil_time_seconds, anvil_delta_seconds = 1.0 / 60.0;
+
+static int anvil_button_index(const char *button) {
+  if (!button)
+    return -1;
+  const char *names[3] = {"left", "right", "middle"};
+  for (int index = 0; index < 3; ++index) {
+    const char *a = button;
+    const char *b = names[index];
+    int same = 1;
+    while (*a && *b) {
+      char ca = *a >= 'A' && *a <= 'Z' ? (char)(*a + 32) : *a;
+      if (ca != *b) {
+        same = 0;
+        break;
+      }
+      a++;
+      b++;
+    }
+    if (same && *a == ' ' && *b == ' ')
+      return index;
+  }
+  return -1;
+}
+
+double anvil_time(void) { return anvil_time_seconds; }
+double anvil_delta(void) { return anvil_delta_seconds; }
+double anvil_pressed(int key) {
+  return key > 0 && key < 256 ? (double)anvil_keys_pressed[key] : 0.0;
+}
+double anvil_held(int key) {
+  return key > 0 && key < 256 ? (double)anvil_keys[key] : 0.0;
+}
+double anvil_mouse_x(void) { return anvil_mouse_x_value; }
+double anvil_mouse_y(void) { return anvil_mouse_y_value; }
+double anvil_mouse_wheel(void) { return anvil_mouse_wheel_value; }
+double anvil_mouse_pressed(const char *button) {
+  int index = anvil_button_index(button);
+  return index >= 0 ? (double)anvil_mouse_pressed_buttons[index] : 0.0;
+}
+double anvil_mouse_held(const char *button) {
+  int index = anvil_button_index(button);
+  return index >= 0 ? (double)anvil_mouse_buttons[index] : 0.0;
+}
+
+__attribute__((export_name("anvil_key"))) void anvil_host_key(int key, int down) {
+  if (key <= 0 || key > 255)
+    return;
+  if (down && !anvil_keys[key])
+    anvil_keys_pressed[key] = 1;
+  anvil_keys[key] = down != 0;
+}
+
+__attribute__((export_name("anvil_mouse"))) void anvil_host_mouse(double x,
+                                                                  double y) {
+  anvil_mouse_x_value = x;
+  anvil_mouse_y_value = y;
+}
+
+__attribute__((export_name("anvil_mouse_button"))) void anvil_host_mouse_button(
+    int button, int down) {
+  if (button < 0 || button > 2)
+    return;
+  if (down && !anvil_mouse_buttons[button])
+    anvil_mouse_pressed_buttons[button] = 1;
+  anvil_mouse_buttons[button] = down != 0;
+}
+
+__attribute__((export_name("anvil_wheel"))) void anvil_host_wheel(
+    double delta) {
+  anvil_mouse_wheel_value += delta;
+}
+
 /* ---- Canvas 2D ---------------------------------------------------------- */
 static int anvil_clear_r, anvil_clear_g, anvil_clear_b, anvil_clear_a;
 static AnvilCallback anvil_frame_update, anvil_frame_draw;
@@ -427,11 +507,20 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
 
 /* Called by the host once per animation frame; delta in milliseconds. */
 __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
+  if (delta_ms < 0.0)
+    delta_ms = 0.0;
+  if (delta_ms > 250.0)
+    delta_ms = 250.0;
+  anvil_delta_seconds = delta_ms / 1000.0;
+  anvil_time_seconds += anvil_delta_seconds;
   if (anvil_frame_update)
     anvil_frame_update();
+  /* Edges last one frame, like the C runtime's first-update clearing. */
+  memset(anvil_keys_pressed, 0, sizeof(anvil_keys_pressed));
+  memset(anvil_mouse_pressed_buttons, 0, sizeof(anvil_mouse_pressed_buttons));
+  anvil_mouse_wheel_value = 0.0;
   anvil_host_clear(anvil_clear_r, anvil_clear_g, anvil_clear_b, anvil_clear_a);
   if (anvil_frame_draw)
     anvil_frame_draw();
   anvil_host_present();
-  (void)delta_ms;
 }

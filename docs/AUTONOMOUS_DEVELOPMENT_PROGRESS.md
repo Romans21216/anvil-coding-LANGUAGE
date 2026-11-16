@@ -615,3 +615,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Validation:** `scene 2d` and `display rect/circle/line/text` are allowed; `scene 3d`, `camera`, `engine` and other shapes are refused with their line number.
 - **Tests:** `tests/test_wasm.py` adds the canvas command stream (clear, rect, circle, line, text, present with exact arguments), the host page contents, and the new refusals. 8 passed.
 - **Visual check:** the generated page was served over HTTP and opened in Chromium; the canvas showed the red rectangle and yellow "hi" text, and sampled pixels matched the scene colours.
+
+## Batch 51 — wasm input and time (8.12)
+
+- **Runtime:** keyboard/mouse state with one-frame pressed edges, `time()`/`delta()` driven by the host's frame delta (clamped 0-250 ms), and exported setters `anvil_key`, `anvil_mouse`, `anvil_mouse_button` and `anvil_wheel`. Key codes match the C runtime (A-Z 65-90, Space 32, Enter 13, Escape 27, arrows 37-40); mouse buttons are left/right/middle.
+- **Host page:** window keydown/keyup listeners (with `KeyA` mapping and arrow/space scroll suppression), canvas-relative mousemove, mouse buttons and wheel; `window.anvil` exposes the instance so frames can be stepped deterministically.
+- **Node host:** `--input JSON` drives a script of `key`/`mouse`/`button`/`wheel`/`frame` steps for tests.
+- **Tests:** `tests/test_wasm.py` adds exact output for pressed/held edges, mouse coordinates and per-frame delta, time accumulation across frames, and the host page's input listeners. 11 passed.
+- **Visual check:** a colour-flag program was served and opened in Chromium; stepping frames showed blue when idle, red while `A` was held, and blue again on release, both through the exported API and through real DOM `KeyboardEvent`s.

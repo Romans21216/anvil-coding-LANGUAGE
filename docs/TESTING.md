@@ -106,7 +106,8 @@ remote desktop can prevent window creation:
   decoded amplitude against a PCM reference, and bit-depth rejections.
 - `test_wasm` — builds the console subset and 2D canvas scenes with
   clang/wasm-ld, runs them under Node (including the recorded draw-command
-  stream), checks the generated host page, and asserts located refusals.
+  stream and scripted keyboard/mouse input), checks the generated host page, and
+  asserts located refusals.
 - `test_particles` — argument validation, the 4,096-particle bound, clear
   counts, and window pixels for a fresh and fading particle.
 - `test_shadows` — a tilted camera samples the flattened shadow of a model and

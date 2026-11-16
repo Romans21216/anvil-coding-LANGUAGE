@@ -133,9 +133,9 @@ class WasmRejectionTests(unittest.TestCase):
     def test_unsupported_builtins_name_the_call_site(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(root, "fn(main)\n  say time()\nend\ncall fn(main)\n")
+            result, _ = build(root, "fn(main)\n  say rnd(0, 1)\nend\ncall fn(main)\n")
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("'time' is not available in the wasm backend yet", result.stderr)
+            self.assertIn("'rnd' is not available in the wasm backend yet", result.stderr)
             self.assertIn(":2:", result.stderr)
 
 
@@ -202,6 +202,115 @@ class WasmCanvasTests(unittest.TestCase):
             result, _ = build(root, "scene 2d\n\nfn(draw)\n  display cube(0, 0, 0, 1) -rgb(255, 0, 0)\nend\n")
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("display cube(...) is not available in the wasm backend", result.stderr)
+
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmInputTests(unittest.TestCase):
+    def test_keyboard_mouse_and_time_reach_the_program(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "scene 2d",
+                    "",
+                    "fn(update)",
+                    "  if pressed(A)",
+                    '    say "pressed"',
+                    "  end",
+                    "  if held(A)",
+                    '    say "held"',
+                    "  end",
+                    "  say mouse_x()",
+                    "  say mouse_y()",
+                    "  say round(delta() * 1000)",
+                    "end",
+                    "",
+                    "fn(draw)",
+                    "  display rect(0, 0, 1, 1) -rgb(0, 0, 0)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            script = json.dumps(
+                [
+                    ["key", 65, 1],
+                    ["frame", 16],
+                    ["frame", 16],
+                    ["key", 65, 0],
+                    ["frame", 16],
+                    ["mouse", 100, 50],
+                    ["frame", 16],
+                ]
+            )
+            run = subprocess.run(
+                ["node", str(HOST), "--input", script, str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(
+                run.stdout.splitlines(),
+                [
+                    "pressed",
+                    "held",
+                    "-1",
+                    "-1",
+                    "16",
+                    "held",
+                    "-1",
+                    "-1",
+                    "16",
+                    "-1",
+                    "-1",
+                    "16",
+                    "100",
+                    "50",
+                    "16",
+                ],
+            )
+
+    def test_time_accumulates_across_frames(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "scene 2d",
+                    "",
+                    "fn(update)",
+                    "  say round(delta() * 1000)",
+                    "  say round(time() * 1000)",
+                    "end",
+                    "",
+                    "fn(draw)",
+                    "  display rect(0, 0, 1, 1) -rgb(0, 0, 0)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            script = json.dumps([["frame", 100], ["frame", 100]])
+            run = subprocess.run(
+                ["node", str(HOST), "--input", script, str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines(), ["100", "100", "100", "200"])
+
+    def test_the_host_page_wires_input_events(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, "scene 2d\n\nfn(draw)\n  display rect(0, 0, 1, 1) -rgb(0, 0, 0)\nend\n")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            page = out.with_suffix(".html").read_text(encoding="utf-8")
+            for needle in ("keydown", "keyup", "mousemove", "mousedown", "wheel", "anvil_key"):
+                self.assertIn(needle, page)
 
 
 if __name__ == "__main__":

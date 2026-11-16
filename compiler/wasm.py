@@ -37,6 +37,15 @@ ALLOWED_BUILTINS = {
     "round",
     "sqrt",
     "upper",
+    "time",
+    "delta",
+    "pressed",
+    "held",
+    "mouse_x",
+    "mouse_y",
+    "mouse_pressed",
+    "mouse_held",
+    "mouse_wheel",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
@@ -72,6 +81,7 @@ async function start() {
     const bytes = await (await fetch("__WASM__")).arrayBuffer();
     const module = await WebAssembly.compile(bytes);
     let memory = null;
+    let app = null;
     const imports = { env: {
       write(fd, pointer, length) {
         const view = new Uint8Array(memory.buffer, pointer, length);
@@ -110,6 +120,40 @@ async function start() {
     }};
     const instance = await WebAssembly.instantiate(module, imports);
     memory = instance.exports.memory;
+    app = instance;
+    // Exposed so a test page or console can step frames deterministically.
+    window.anvil = instance;
+    const keyCodes = { Space: 32, Enter: 13, Escape: 27, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40 };
+    const keyCode = (event) => {
+      if (event.code && event.code.indexOf("Key") === 0) return event.code.charCodeAt(3);
+      if (keyCodes[event.code] !== undefined) return keyCodes[event.code];
+      return event.keyCode || 0;
+    };
+    window.addEventListener("keydown", (event) => {
+      if (!app) return;
+      app.exports.anvil_key(keyCode(event), 1);
+      if ([32, 37, 38, 39, 40].indexOf(keyCode(event)) >= 0) event.preventDefault();
+    });
+    window.addEventListener("keyup", (event) => {
+      if (app) app.exports.anvil_key(keyCode(event), 0);
+    });
+    canvas.addEventListener("mousemove", (event) => {
+      if (!app) return;
+      const rect = canvas.getBoundingClientRect();
+      app.exports.anvil_mouse(
+        (event.clientX - rect.left) * canvas.width / rect.width,
+        (event.clientY - rect.top) * canvas.height / rect.height
+      );
+    });
+    canvas.addEventListener("mousedown", (event) => {
+      if (app) app.exports.anvil_mouse_button([0, 2, 1][event.button] || 0, 1);
+    });
+    canvas.addEventListener("mouseup", (event) => {
+      if (app) app.exports.anvil_mouse_button([0, 2, 1][event.button] || 0, 0);
+    });
+    canvas.addEventListener("wheel", (event) => {
+      if (app) app.exports.anvil_wheel(event.deltaY);
+    }, { passive: true });
     if (instance.exports.main) instance.exports.main();
     if (instance.exports.anvil_frame) {
       let last = performance.now();
