@@ -339,3 +339,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** 7 passed. Manual: `--new` then `--run` printed `Hello from Anvil`; `--clean` removed 3 artifacts and kept `main.exe`.
 - **Commit:** `75a4805`.
 - **Remaining from the 8.14 command list:** `test` and `format` are still unimplemented.
+
+## Batch 18 — format command (8.14)
+
+- **`--format`:** normalises line endings, trailing whitespace, runs of blank lines, the final newline and block indentation. Because Anvil ignores indentation, the formatter only touches whitespace and never rewrites a token; `else` dedents then re-indents, and repeated runs are idempotent.
+- **`--format-check`:** exits 1 when a file would change, so CI can require formatted sources.
+- **Safety evidence:** every file under `examples/` was copied, formatted and re-checked; all still compiled (`fail=0`). A unit test formats a copy of `first_world.ANVL` and asserts `--check` still reports ok.
+- **Files:** `compiler/formatting.py` (new), `compiler/commands.py`, `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_format.py`.
+- **Tests:** 6 passed.
+- **Commit:** `5967fdb`.
+- **Remaining from the 8.14 command list:** `test` only.
