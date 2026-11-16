@@ -22,9 +22,29 @@ from compiler.parser import parse
 CACHE_DIR_NAME = ".anvil-cache"
 
 
-def _cache_key(generated: str, compiler: str, release: bool) -> str:
+CACHE_KEY_VERSION = b"anvil-cache-v2"
+
+
+def _compiler_identity(compiler: str) -> bytes:
+    """Compiler path plus a cheap identity, so replacing the compiler binary at
+    the same path cannot reuse an executable the old one produced."""
+    path = pathlib.Path(compiler)
+    try:
+        info = path.stat()
+    except OSError:
+        return str(path).encode("utf-8", "replace")
+    return f"{path}\0{info.st_size}\0{info.st_mtime_ns}".encode("utf-8", "replace")
+
+
+def _cache_key(
+    generated: str,
+    compiler: str,
+    release: bool,
+    runtime: pathlib.Path | None = None,
+) -> str:
     """Hash everything that decides the executable's bytes."""
     digest = hashlib.sha256()
+    digest.update(CACHE_KEY_VERSION)
     digest.update(generated.encode("utf-8"))
     tag = (
         release.encode("utf-8")
@@ -32,11 +52,16 @@ def _cache_key(generated: str, compiler: str, release: bool) -> str:
         else (b"release" if release else b"debug")
     )
     digest.update(chr(0).encode("utf-8") + tag)
-    digest.update(str(pathlib.Path(compiler)).encode("utf-8", "replace"))
-    runtime = pathlib.Path(__file__).resolve().parents[1] / "runtime"
-    for name in ("anvil_runtime.c", "anvil_runtime.h"):
-        file = runtime / name
-        if file.exists():
+    digest.update(_compiler_identity(compiler))
+    if runtime is None:
+        runtime = pathlib.Path(__file__).resolve().parents[1] / "runtime"
+    # Every top-level runtime source and header belongs to the C build's
+    # transitive input. anvil_runtime.c includes anvil_projection.h, whose
+    # inline projection and clipping change output without changing the
+    # generated C, so hashing only the .c/.h pair can return a stale artifact.
+    for file in sorted(runtime.glob("*")):
+        if file.is_file() and file.suffix in (".c", ".h"):
+            digest.update(file.name.encode("utf-8"))
             digest.update(file.read_bytes())
     for source_file in sorted((pathlib.Path(__file__).resolve().parent).glob("*.py")):
         digest.update(source_file.read_bytes())

@@ -11,6 +11,10 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPILER = ROOT / "compiler" / "anvil.py"
 
+sys.path.insert(0, str(ROOT))
+
+from compiler.cli import _cache_key  # noqa: E402
+
 PROGRAM = 'fn(main)\n  say "cached"\nend\ncall fn(main)\n'
 
 
@@ -87,6 +91,53 @@ class BuildCacheTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.replace("\r\n", "\n"), "cached\n")
+
+
+class CacheKeyInputTests(unittest.TestCase):
+    """C8-6: the key must cover every transitive build input."""
+
+    def _runtime_dir(self, root: pathlib.Path) -> pathlib.Path:
+        runtime = root / "runtime"
+        runtime.mkdir()
+        for name in ("anvil_runtime.c", "anvil_runtime.h", "anvil_projection.h"):
+            (runtime / name).write_text(f"/* {name} */\n", encoding="utf-8")
+        return runtime
+
+    def _compiler(self, root: pathlib.Path) -> pathlib.Path:
+        compiler = root / "cl.exe"
+        compiler.write_bytes(b"fake compiler one")
+        return compiler
+
+    def test_projection_header_edit_changes_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            runtime = self._runtime_dir(root)
+            compiler = self._compiler(root)
+            before = _cache_key("int main(void){}", str(compiler), True, runtime)
+            (runtime / "anvil_projection.h").write_text(
+                "/* changed projection */\n", encoding="utf-8"
+            )
+            after = _cache_key("int main(void){}", str(compiler), True, runtime)
+        self.assertNotEqual(before, after)
+
+    def test_replacing_the_compiler_at_the_same_path_changes_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            runtime = self._runtime_dir(root)
+            compiler = self._compiler(root)
+            before = _cache_key("int main(void){}", str(compiler), True, runtime)
+            compiler.write_bytes(b"fake compiler two, a different binary")
+            after = _cache_key("int main(void){}", str(compiler), True, runtime)
+        self.assertNotEqual(before, after)
+
+    def test_unchanged_inputs_keep_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            runtime = self._runtime_dir(root)
+            compiler = self._compiler(root)
+            first = _cache_key("int main(void){}", str(compiler), True, runtime)
+            second = _cache_key("int main(void){}", str(compiler), True, runtime)
+        self.assertEqual(first, second)
 
 
 if __name__ == "__main__":
