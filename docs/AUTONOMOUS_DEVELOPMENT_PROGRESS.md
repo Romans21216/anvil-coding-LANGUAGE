@@ -455,3 +455,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Measured cost:** `examples/first_world.ANVL` consumes 120 distinct headers (5.45 MB); digesting them costs 9-10 ms, and `/sourceDependencies` adds no measurable compile time (315 ms with and without the flag; the dependency list was identical across runs).
 - **Tests:** same-size/same-mtime replacement changes the key; unchanged headers keep it; missing, unreadable and deleted-dependency cases. `tests/test_build_cache.py` 20 passed; with build-atomic, toolchain-env, timings and compiler suites 85 passed. End to end the second build printed `(reused build cache)` and wrote a 147-entry sidecar.
 - **Still open:** the library half. Default `.lib` files are resolved by the linker, not named on the command line, so a same-size replacement of one is still invisible to the key.
+
+## Batch 31 — C8-11 library half: hash the libraries the linker resolved
+
+- **Problem:** default `.lib` files are chosen by `#pragma comment(lib, …)` inside SDK headers, so they appear on neither the command line nor the header dependency list. A same-size, same-mtime replacement of a static library could still return a stale executable.
+- **Capture:** `build_c(..., libs_path=...)` adds `/link /VERBOSE` and parses the `Searching <path>.lib:` lines the linker prints, writing `<base-key>.libs.json` beside the cache entry. On failure the captured output is echoed to stderr before the build error propagates.
+- **Keying:** `_library_digest` folds a SHA-256 over each resolved library's path and bytes into the cache key, independent of the header sidecar; either list may be missing and its half falls back to the metadata key.
+- **Measured:** a real build resolves nine libraries totalling 62 MB; digesting them costs about 36 ms, taking a `first_world` cache hit from ~145 ms to 169-177 ms against a 315 ms cold build. sha256 was the fastest option here (blake2b was 1.6x slower).
+- **Verified end to end:** second build printed `(reused build cache)`; folded key `3b0ba6cd…` equals the cached executable's name; `.libs.json` lists 9 libraries.
+- **Tests:** same-size/same-mtime library replacement changes the key, missing library list falls back, `/VERBOSE` parsing keeps only files that exist. `tests/test_build_cache.py` 24 passed.
+- **Closes:** C8-11 entirely — headers (Batch 30) and libraries (this batch).

@@ -19,8 +19,10 @@ from compiler.cli import (  # noqa: E402
     _cache_key,
     _dependency_digest,
     _key_with_dependencies,
+    _library_digest,
     _sdk_fingerprint,
 )
+from compiler.build import record_link_libraries  # noqa: E402
 
 PROGRAM = 'fn(main)\n  say "cached"\nend\ncall fn(main)\n'
 
@@ -360,6 +362,61 @@ class DependencyListTests(unittest.TestCase):
             os.utime(second, ns=(st.st_atime_ns, st.st_mtime_ns))
             after = _key_with_dependencies("base-key", sidecar)
         self.assertNotEqual(before, after)
+
+
+class LinkLibraryTests(unittest.TestCase):
+    """C8-11, library half: resolved `.lib` bytes decide the key."""
+
+    def _libs(self, root: pathlib.Path, libraries: list[pathlib.Path]) -> pathlib.Path:
+        root.mkdir(parents=True, exist_ok=True)
+        sidecar = root / "base.libs.json"
+        sidecar.write_text(
+            json.dumps([str(library) for library in libraries]), encoding="utf-8"
+        )
+        return sidecar
+
+    def test_same_size_same_mtime_library_replacement_changes_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            library = root / "kernel32.lib"
+            library.write_text("AAAA", encoding="utf-8")
+            st = library.stat()
+            sidecar = self._libs(root, [library])
+            absent_deps = root / "absent.deps.json"
+            before = _key_with_dependencies("base-key", absent_deps, sidecar)
+
+            library.write_text("BBBB", encoding="utf-8")
+            os.utime(library, ns=(st.st_atime_ns, st.st_mtime_ns))
+            self.assertEqual(library.stat().st_size, 4)
+            after = _key_with_dependencies("base-key", absent_deps, sidecar)
+
+        self.assertNotEqual(before, after)
+
+    def test_a_missing_library_list_falls_back_to_the_base_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            absent = root / "absent.libs.json"
+            self.assertEqual(_library_digest(absent), b"")
+            self.assertEqual(
+                _key_with_dependencies("base-key", root / "absent.deps.json", absent),
+                "base-key",
+            )
+
+    def test_link_verbose_output_records_resolved_libraries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            library = root / "LIBCMT.lib"
+            library.write_text("archive", encoding="utf-8")
+            destination = root / "libs.json"
+            doubled = str(library).replace("\\", "\\\\")
+            record_link_libraries(
+                "Searching " + doubled + ":\n"
+                "Found mainCRTStartup\n"
+                "Searching " + str(root / "absent.lib") + ":\n",
+                destination,
+            )
+            recorded = json.loads(destination.read_text(encoding="utf-8"))
+        self.assertEqual(recorded, [str(library)])
 
 
 if __name__ == "__main__":

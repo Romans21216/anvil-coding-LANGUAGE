@@ -87,6 +87,15 @@ without paying the ~5.9 s that hashing the whole 1.2 GB SDK tree would cost. The
 absent after the first build with an older cache entry, in which case the build falls back
 to the metadata key and rewrites it on the next real build.
 
+Static libraries get the same treatment from the other end of the toolchain. A cached
+build runs the linker with `/VERBOSE` and records every `.lib` it resolved (the
+`#pragma comment(lib, …)` defaults inside SDK headers never appear on the command line)
+into `<cache>/<base-key>.libs.json`; those files' bytes are folded into the key too. A real
+build resolves nine libraries totalling 62 MB, which costs about 36 ms to digest, taking a
+`first_world` cache hit from ~145 ms to ~170 ms against a 315 ms cold build. Header and
+library sidecars are independent: either may be missing, and the key falls back for that
+half alone.
+
 ## Native backend limits
 
 The direct backend handles console programs (numeric functions with up to sixteen

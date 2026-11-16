@@ -2,13 +2,37 @@
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
+import sys
 
 from compiler.common import INCLUDE, RUNTIME
 from compiler import toolchain_env
+
+_LIBRARY_LINE = re.compile(r"Searching (.+?\.lib):", re.IGNORECASE)
+
+
+def record_link_libraries(output: str, destination: pathlib.Path) -> None:
+    """Save the library files the linker resolved, for cache-key hashing.
+
+    `link /VERBOSE` prints the full path of every `.lib` it opens. The paths are
+    the linker's own resolution of `#pragma comment(lib, …)` directives, which
+    never appear on the command line, so they are the only reliable way to know
+    which static libraries a build consumed (C8-11, library half).
+    """
+    libraries: list[str] = []
+    for raw in _LIBRARY_LINE.findall(output):
+        path = pathlib.Path(re.sub(r"\\+", r"\\", raw))
+        if path.is_file() and str(path) not in libraries:
+            libraries.append(str(path))
+    try:
+        destination.write_text(json.dumps(libraries, indent=1), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def find_compiler(requested: str | None):
@@ -36,6 +60,7 @@ def build_c(
     libraries=(),
     dynamic_runtime: bool = False,
     deps_path: pathlib.Path | None = None,
+    libs_path: pathlib.Path | None = None,
 ):
     output.parent.mkdir(parents=True, exist_ok=True)
     # Link into a sibling file and only replace the previous output once the
@@ -70,11 +95,15 @@ def build_c(
             # Record every header this build read so the cache key can hash
             # their bytes instead of the whole SDK tree (C8-11).
             args.append(f"/sourceDependencies{deps_path}")
+        if libs_path is not None and not (release or libraries):
+            args.append("/link")
         if release or libraries:
             args.append("/link")
             if release:
                 args.extend(["/OPT:REF", "/OPT:ICF"])
             args.extend(str(library) for library in libraries)
+        if libs_path is not None:
+            args.append("/VERBOSE")
         install_root = pathlib.Path(compiler).parents[7]
         devcmd = install_root / "Common7" / "Tools" / "VsDevCmd.bat"
         if os.name == "nt" and devcmd.exists():
@@ -88,7 +117,24 @@ def build_c(
                 # values win where they overlap.
                 child_env = dict(os.environ)
                 child_env.update(environment)
-                subprocess.run(args, check=True, env=child_env)
+                if libs_path is None:
+                    subprocess.run(args, check=True, env=child_env)
+                else:
+                    # /VERBOSE output is the only record of the libraries the
+                    # linker resolved, so capture it and keep the console quiet
+                    # unless the build fails.
+                    completed = subprocess.run(
+                        args,
+                        env=child_env,
+                        capture_output=True,
+                        text=True,
+                        errors="replace",
+                    )
+                    if completed.returncode != 0:
+                        sys.stderr.write(completed.stdout)
+                        sys.stderr.write(completed.stderr)
+                        completed.check_returncode()
+                    record_link_libraries(completed.stdout, libs_path)
             else:
                 helper = output.parent / (output.stem + ".build.cmd")
                 helper.write_text(

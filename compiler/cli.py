@@ -222,22 +222,69 @@ def _dependency_digest(deps_file: pathlib.Path) -> bytes:
     return digest.digest()
 
 
-def _key_with_dependencies(base_key: str, deps_file: pathlib.Path) -> str:
-    """Fold the consumed-header bytes into the base key when a list exists."""
+def _libs_sidecar(out: pathlib.Path, base_key: str) -> pathlib.Path:
+    """Where the previous build's resolved static-library list lives."""
+    return out.parent / CACHE_DIR_NAME / f"{base_key}.libs.json"
+
+
+def _library_digest(libs_file: pathlib.Path) -> bytes:
+    """Hash the bytes of every `.lib` the linker resolved for the last build.
+
+    These files are chosen by `#pragma comment(lib, …)` inside SDK headers, so
+    they never appear on the command line or in the header list; without this
+    a same-size, same-mtime library replacement would reuse a stale executable
+    (C8-11, library half). A real build resolves nine libraries, 62 MB, which
+    costs about 36 ms to digest. A missing or unreadable list yields b"".
+    """
+    try:
+        libraries = json.loads(libs_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return b""
+    if not isinstance(libraries, list):
+        return b""
+    digest = hashlib.sha256()
+    seen: set[str] = set()
+    for entry in libraries:
+        if not isinstance(entry, str):
+            continue
+        path = pathlib.Path(entry)
+        name = str(path).lower()
+        if name in seen:
+            continue
+        seen.add(name)
+        digest.update(name.encode("utf-8", "replace"))
+        try:
+            digest.update(path.read_bytes())
+        except OSError:
+            digest.update(b"missing")
+    return digest.digest()
+
+
+def _key_with_dependencies(
+    base_key: str,
+    deps_file: pathlib.Path,
+    libs_file: pathlib.Path | None = None,
+) -> str:
+    """Fold the consumed-header and resolved-library bytes into the base key."""
     extra = _dependency_digest(deps_file)
-    if not extra:
+    library_extra = _library_digest(libs_file) if libs_file is not None else b""
+    if not extra and not library_extra:
         return base_key
     digest = hashlib.sha256()
     digest.update(base_key.encode("utf-8"))
     digest.update(b"\0deps\0")
     digest.update(extra)
+    digest.update(b"\0libs\0")
+    digest.update(library_extra)
     return digest.hexdigest()
 
 
 def cached_build(generated: str, compiler: str, out: pathlib.Path, release: bool) -> bool:
     """Copy a cached executable into place; True when the cache answered."""
     base_key = _cache_key(generated, compiler, release)
-    key = _key_with_dependencies(base_key, _deps_sidecar(out, base_key))
+    key = _key_with_dependencies(
+        base_key, _deps_sidecar(out, base_key), _libs_sidecar(out, base_key)
+    )
     entry = _cache_path(out, key)
     if not entry.exists():
         return False
@@ -252,18 +299,22 @@ def store_build(
     out: pathlib.Path,
     release: bool,
     deps_source: pathlib.Path | None = None,
+    libs_source: pathlib.Path | None = None,
 ) -> None:
     if not out.exists():
         return
     base_key = _cache_key(generated, compiler, release)
-    sidecar = _deps_sidecar(out, base_key)
-    if deps_source is not None:
+    deps_sidecar = _deps_sidecar(out, base_key)
+    libs_sidecar = _libs_sidecar(out, base_key)
+    for source, sidecar in ((deps_source, deps_sidecar), (libs_source, libs_sidecar)):
+        if source is None:
+            continue
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         try:
-            shutil.copyfile(deps_source, sidecar)
+            shutil.copyfile(source, sidecar)
         except OSError:
             pass
-    key = _key_with_dependencies(base_key, sidecar)
+    key = _key_with_dependencies(base_key, deps_sidecar, libs_sidecar)
     entry = _cache_path(out, key)
     entry.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(out, entry)
@@ -777,6 +828,9 @@ def main() -> int:
                 deps_tmp = out.parent / CACHE_DIR_NAME / (
                     f".pending-{os.getpid()}.deps.json"
                 )
+                libs_tmp = out.parent / CACHE_DIR_NAME / (
+                    f".pending-{os.getpid()}.libs.json"
+                )
                 deps_tmp.parent.mkdir(parents=True, exist_ok=True)
                 try:
                     build_c(
@@ -787,6 +841,7 @@ def main() -> int:
                         (),
                         args.dynamic_runtime,
                         None if args.no_cache else deps_tmp,
+                        None if args.no_cache else libs_tmp,
                     )
                     if not args.no_cache:
                         store_build(
@@ -795,9 +850,11 @@ def main() -> int:
                             out,
                             f"r{int(args.release)}d{int(args.dynamic_runtime)}",
                             deps_tmp if deps_tmp.exists() else None,
+                            libs_tmp if libs_tmp.exists() else None,
                         )
                 finally:
                     deps_tmp.unlink(missing_ok=True)
+                    libs_tmp.unlink(missing_ok=True)
                 timings.mark("build")
                 timings.report()
                 print(f"Built {out} using {compiler[0]}")
