@@ -10,6 +10,7 @@ claims can be checked instead of guessed; they are not a target to tune against.
 
 from __future__ import annotations
 
+import json
 import pathlib
 import statistics
 import subprocess
@@ -112,7 +113,33 @@ def measure_c(source: str, repeats: int = 3) -> tuple[float, int] | None:
     return statistics.median(timings), size
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail when a measured time or size exceeds tools/bench_budgets.json",
+    )
+    parser.add_argument(
+        "--write-budgets",
+        action="store_true",
+        help="re-measure this machine and rewrite tools/bench_budgets.json",
+    )
+    arguments = parser.parse_args(argv)
+    if arguments.write_budgets:
+        budgets = write_budgets()
+        print(f"Wrote {BUDGETS_PATH}")
+        for name, entry in budgets.items():
+            for backend, values in entry.items():
+                print(
+                    f"  {name:<10} {backend:<8} {values['seconds']:>7.3f}s "
+                    f"{values['bytes']:>8} B"
+                )
+        return 0
+    if arguments.check:
+        return check(load_budgets())
     print(f"{'program':<10} {'backend':<8} {'compile s':>10} {'exe bytes':>10}")
     for name, source in CASES:
         native_time, native_size = measure_native(source)
@@ -126,6 +153,96 @@ def main() -> int:
     print()
     print("Try a generated program yourself: build it, then time it with")
     print('  powershell "Measure-Command { .\\build\\app.exe }"')
+    return 0
+
+
+BUDGETS_PATH = pathlib.Path(__file__).with_name("bench_budgets.json")
+
+
+def load_budgets(path: pathlib.Path = BUDGETS_PATH) -> dict:
+    """The published budgets; see the docstring for how they are set."""
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_budgets(
+    path: pathlib.Path = BUDGETS_PATH,
+    time_multiplier: float = 3.0,
+    size_multiplier: float = 1.25,
+) -> dict:
+    """Measure this machine and publish budgets with headroom.
+
+    A budget is the measured median times a multiplier, rounded up. Three times
+    the median absorbs scheduler noise and a slower machine of the same class;
+    the source numbers stay in the JSON so a later reading can be compared.
+    """
+    budgets: dict[str, dict[str, dict[str, float]]] = {}
+    for name, source in CASES:
+        native_time, native_size = measure_native(source)
+        entry = {
+            "native": {
+                "seconds": round(native_time * time_multiplier, 3),
+                "bytes": int(native_size * size_multiplier),
+                "measured_seconds": round(native_time, 4),
+                "measured_bytes": native_size,
+            }
+        }
+        measured = measure_c(source)
+        if measured is not None:
+            c_time, c_size = measured
+            entry["c"] = {
+                "seconds": round(c_time * time_multiplier, 3),
+                "bytes": int(c_size * size_multiplier),
+                "measured_seconds": round(c_time, 4),
+                "measured_bytes": c_size,
+            }
+        budgets[name] = entry
+    path.write_text(json.dumps(budgets, indent=2) + "\n", encoding="utf-8")
+    return budgets
+
+
+def violations(cases, budgets: dict, c_repeats: int = 1, native_repeats: int = 3) -> list[str]:
+    """Measured values that exceed a published budget, as readable lines."""
+    problems: list[str] = []
+    for name, source in cases:
+        native_time, native_size = measure_native(source, repeats=native_repeats)
+        budget = budgets.get(name, {}).get("native")
+        if budget:
+            if native_time > budget["seconds"]:
+                problems.append(
+                    f"{name} native compile {native_time:.3f}s exceeds the "
+                    f"{budget['seconds']:.3f}s budget"
+                )
+            if native_size > budget["bytes"]:
+                problems.append(
+                    f"{name} native image {native_size} bytes exceeds the "
+                    f"{budget['bytes']} byte budget"
+                )
+        measured = measure_c(source, repeats=c_repeats)
+        if measured is None:
+            continue
+        c_time, c_size = measured
+        budget = budgets.get(name, {}).get("c")
+        if budget:
+            if c_time > budget["seconds"]:
+                problems.append(
+                    f"{name} c compile {c_time:.3f}s exceeds the "
+                    f"{budget['seconds']:.3f}s budget"
+                )
+            if c_size > budget["bytes"]:
+                problems.append(
+                    f"{name} c image {c_size} bytes exceeds the "
+                    f"{budget['bytes']} byte budget"
+                )
+    return problems
+
+
+def check(budgets: dict) -> int:
+    problems = violations(CASES, budgets, c_repeats=2, native_repeats=5)
+    if problems:
+        for problem in problems:
+            print(f"BUDGET EXCEEDED: {problem}")
+        return 1
+    print("All measured times and sizes are inside the published budgets.")
     return 0
 
 

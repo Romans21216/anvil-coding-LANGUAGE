@@ -1,0 +1,58 @@
+{
+  "tiny": {
+    "native": {
+      "seconds": 0.003,
+      "bytes": 3840,
+      "measured_seconds": 0.001,
+      "measured_bytes": 3072
+    },
+    "c": {
+      "seconds": 1.19,
+      "bytes": 180480,
+      "measured_seconds": 0.3968,
+      "measured_bytes": 144384
+    }
+  },
+  "texty": {
+    "native": {
+      "seconds": 0.005,
+      "bytes": 11520,
+      "measured_seconds": 0.0016,
+      "measured_bytes": 9216
+    },
+    "c": {
+      "seconds": 1.192,
+      "bytes": 188800,
+      "measured_seconds": 0.3972,
+      "measured_bytes": 151040
+    }
+  },
+  "big": {
+    "native": {
+      "seconds": 0.014,
+      "bytes": 33280,
+      "measured_seconds": 0.0048,
+      "measured_bytes": 26624
+    },
+    "c": {
+      "seconds": 1.248,
+      "bytes": 193280,
+      "measured_seconds": 0.4159,
+      "measured_bytes": 154624
+    }
+  },
+  "big_trim": {
+    "native": {
+      "seconds": 0.007,
+      "bytes": 3840,
+      "measured_seconds": 0.0022,
+      "measured_bytes": 3072
+    },
+    "c": {
+      "seconds": 1.179,
+      "bytes": 180480,
+      "measured_seconds": 0.3931,
+      "measured_bytes": 144384
+    }
+  }
+}

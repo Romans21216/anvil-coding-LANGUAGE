@@ -484,3 +484,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** round trip, cross-run persistence, missing slot, type mismatch in both directions, delete, traversal/oversized/invalid slots, 255-byte boundary and the default `%LOCALAPPDATA%` root. `tests/test_saves.py` 9 passed.
 - **Also:** `examples/save_demo.ANVL`, spec table and grammar, engine/language docs, evidence ledger, testing doc.
 - **Fixed en route:** the `number("...")` lint matched the `number(` inside `load_number(`, warning about every non-numeric save slot; the matcher now requires a name boundary, with a regression test.
+
+## Batch 34 — compile-time and size budgets are enforced (8.15)
+
+- **Published budgets:** `tools/bench_budgets.json` now records, per benchmark case and backend, a time ceiling and an executable-size ceiling plus the measured median they came from. Budgets are 3x the measured time and 1.25x the measured size, which absorbs scheduler noise without hiding a real regression.
+- **Enforcement:** `python tools/bench_anvil.py --check` exits 1 and prints every exceeded budget; `--write-budgets` re-measures the current machine and rewrites the file, so re-baselining is a command rather than an edit.
+- **Tests:** `tests/test_perf_thresholds.py` covers the budget file (every case and backend present, all ceilings positive), runs the four cases against the published budgets (fails on any regression), and feeds a deliberately impossible budget through the checker to prove it is not vacuous. 3 passed in 2.1 s.
+- **Measured baseline on this machine:** tiny C 0.397 s / 144,384 B; texty 0.411 s / 151,040 B; big 0.424 s / 154,624 B; big_trim 0.397 s / 144,384 B; native 0.001-0.005 s and 3-27 KB. Published ceilings: C 1.18-1.25 s and 180-193 KB; native 3-14 ms and 3.8-33 KB.

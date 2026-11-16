@@ -63,7 +63,7 @@ The native build has no external toolchain to start and no cache, so it is stead
 the C build's first run pays for loading the MSVC environment and later runs reuse
 the build cache.
 
-`--timings` reports each phase separately so a slow step is identifiable: a cold C build on this machine measured read 0 ms, parse 2 ms, generate 1 ms, build 413 ms, total 416 ms, while a cache hit replaced build with a 41 ms copy. The build phase was 1,597 ms before the Visual Studio environment was cached: `VsDevCmd.bat -arch=x64` costs 1.3-1.7 s and is now run once per toolset, with the captured environment reused for later builds.
+`--timings` reports each phase separately so a slow step is identifiable: a cold C build on this machine measured about 0.4-0.6 s depending on load (parse and generate are ~3 ms each; the rest is `cl.exe`), while a cache hit replaces the build with a ~0.11-0.18 s copy plus the dependency-sidecar digests. The build phase was 1,597 ms before the Visual Studio environment was cached: `VsDevCmd.bat -arch=x64` costs 1.3-1.7 s and is now run once per toolset, with the captured environment reused for later builds. Published ceilings for compile time and executable size live in `tools/bench_budgets.json` and are enforced by `python tools/bench_anvil.py --check`.
 
 The cache key covers the generated C, every runtime source and header, the compiler
 Python sources, the **contents** of `cl.exe`, the contents of the `link.exe` beside it,

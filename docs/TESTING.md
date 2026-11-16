@@ -25,6 +25,7 @@ is absent, tests that build C programs raise `SkipTest` instead of failing.
 | Headless only | `python -m pytest tests -q --ignore=tests/test_native_keyboard.py --ignore=tests/test_native_mouse.py --ignore=tests/test_native_window.py --ignore=tests/test_native_procedural.py` |
 | One area | `python -m pytest tests/test_number.py tests/test_mid.py -q` |
 | Backend capability drift | `python tools/capability_matrix.py --check` |
+| Compile-time and size budgets | `python tools/bench_anvil.py --check` (re-baseline with `--write-budgets`) |
 | A project's own cases | `python compiler/anvil.py game.ANVLproj --test [--backend native]` |
 | Formatting | `python compiler/anvil.py file.ANVL --format-check` |
 | VS Code grammar and sample validation | `npm test --prefix vscode-extension` |
@@ -69,7 +70,7 @@ inspect generated C or PE bytes, or test compiler behaviour directly:
   `test_suggestions`, `test_opt_parity`, `test_timing`, `test_timings_cli`,
   `test_first_hour`,
   `test_image_limits`, `test_output_flush`, `test_net_fuzz`,
-  `test_native_trig`, `test_bench`.
+  `test_native_trig`, `test_bench`, `test_perf_thresholds`.
 
 ## Interactive coverage
 
