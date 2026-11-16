@@ -240,6 +240,16 @@ def main() -> int:
         help="create a starter project in DIR",
     )
     ap.add_argument(
+        "--format",
+        action="store_true",
+        help="normalise whitespace and indentation in the source file",
+    )
+    ap.add_argument(
+        "--format-check",
+        action="store_true",
+        help="exit 1 when --format would change the source file",
+    )
+    ap.add_argument(
         "--print-imports",
         action="store_true",
         help="print the builtins this program actually uses and stop",
@@ -311,6 +321,8 @@ def main() -> int:
         ap.error("--run builds and runs; drop --check, --emit-c or --package")
     if args.source is None:
         ap.error("a source file is required unless --repl is used")
+    if args.format or args.format_check:
+        return lifecycle.format_file(args.source, args.format_check)
     try:
         source_path = args.source
         include_root = None

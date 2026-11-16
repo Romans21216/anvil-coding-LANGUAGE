@@ -83,6 +83,28 @@ def clean(root: pathlib.Path) -> int:
     return 0
 
 
+def format_file(path: pathlib.Path, check: bool) -> int:
+    """Normalise whitespace and indentation; --format-check only reports."""
+    from compiler.formatting import format_source
+
+    path = path.resolve()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
+        print(f"cannot read {path}: {error.strerror or error}", file=sys.stderr)
+        return 1
+    formatted = format_source(text)
+    if formatted == text:
+        print(f"{path}: already formatted")
+        return 0
+    if check:
+        print(f"{path}: would be reformatted", file=sys.stderr)
+        return 1
+    path.write_text(formatted, encoding="utf-8", newline="\n")
+    print(f"{path}: formatted")
+    return 0
+
+
 def new_project(destination: pathlib.Path) -> int:
     """Scaffold a runnable project in an empty directory."""
     destination = destination.resolve()
