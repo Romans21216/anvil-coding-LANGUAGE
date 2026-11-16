@@ -113,6 +113,7 @@ must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
 | `--generated-c <path>` | choose where the generated C is written |
 | `--check` | parse and validate only, with no output written |
 | `--deny-warnings` | treat warnings as build failures |
+| `--no-cache` | ignore the build cache and do not store a new entry |
 | `--print-imports` | print the builtins the program actually uses and stop |
 | `--extension <manifest>` | register an extension (repeatable), see `docs/EXTENSIONS.md` |
 | `--repl-backend c\|native` | backend used by the interactive shell |

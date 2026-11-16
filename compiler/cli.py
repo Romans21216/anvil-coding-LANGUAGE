@@ -153,6 +153,11 @@ def main() -> int:
         help="treat compiler warnings (such as an unused import) as errors",
     )
     ap.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="ignore the build cache and do not store a new entry",
+    )
+    ap.add_argument(
         "--print-imports",
         action="store_true",
         help="print the builtins this program actually uses and stop",
@@ -398,7 +403,7 @@ def main() -> int:
             )
             print(f"Built {out} using {compiler[0]}")
         else:
-            cached = cached_build(
+            cached = False if args.no_cache else cached_build(
                 generated,
                 compiler[1],
                 out,
@@ -408,12 +413,13 @@ def main() -> int:
                 print(f"Built {out} using {compiler[0]} (reused build cache)")
             else:
                 build_c(compiler[1], c_path, out, args.release, (), args.dynamic_runtime)
-                store_build(
-                    generated,
-                    compiler[1],
-                    out,
-                    f"r{int(args.release)}d{int(args.dynamic_runtime)}",
-                )
+                if not args.no_cache:
+                    store_build(
+                        generated,
+                        compiler[1],
+                        out,
+                        f"r{int(args.release)}d{int(args.dynamic_runtime)}",
+                    )
                 print(f"Built {out} using {compiler[0]}")
         _place_extension_dlls(out)
         return 0
