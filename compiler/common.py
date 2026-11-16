@@ -114,6 +114,7 @@ RUNTIME_C_NAMES = {
     "anvil_check_number",
     "anvil_set_scene3d",
     "anvil_camera_perspective",
+    "anvil_camera2d",
     "anvil_clear",
     "anvil_rect",
     "anvil_circle",

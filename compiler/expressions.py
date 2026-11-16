@@ -194,6 +194,7 @@ BUILTINS = {
     "ray_backend_available": (1, 1),
     "window_on_top": (1, 1),
     "window_fullscreen": (1, 1),
+    "camera2d": (3, 3),
 }
 
 BUILTIN_C_NAMES = {
@@ -243,6 +244,7 @@ BUILTIN_C_NAMES = {
     "receive": "anvil_net_receive",
     "window_on_top": "anvil_window_on_top",
     "window_fullscreen": "anvil_window_fullscreen",
+    "camera2d": "anvil_camera2d",
     "abs": "fabs",
     "round": "round",
     "len": "(double)strlen",

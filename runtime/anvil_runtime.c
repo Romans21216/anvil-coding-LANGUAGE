@@ -116,6 +116,25 @@ static double anvil_camera_x = 0.0, anvil_camera_y = 3.0, anvil_camera_z = 8.0;
 static double anvil_camera_yaw, anvil_camera_pitch;
 static double anvil_camera_focal = 520.0;
 static double anvil_camera_move_speed, anvil_camera_turn_speed;
+/* 2D camera: screen = (world - pan) * zoom. Defaults are the identity, so
+   existing programs draw exactly where they did before. */
+static double anvil_camera2d_x, anvil_camera2d_y;
+static double anvil_camera2d_zoom = 1.0;
+
+static void anvil_camera2d_point(double *x, double *y) {
+  *x = (*x - anvil_camera2d_x) * anvil_camera2d_zoom;
+  *y = (*y - anvil_camera2d_y) * anvil_camera2d_zoom;
+}
+
+double anvil_camera2d(double x, double y, double zoom) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(zoom) || zoom <= 0.0)
+    return 0.0;
+  anvil_camera2d_x = x;
+  anvil_camera2d_y = y;
+  anvil_camera2d_zoom =
+      zoom < 0.05 ? 0.05 : zoom > 20.0 ? 20.0 : zoom;
+  return 1.0;
+}
 static AnvilTraceSphere anvil_trace_spheres[ANVIL_TRACE_SPHERES];
 static int anvil_trace_sphere_count;
 static AnvilBvhNode anvil_trace_bvh[ANVIL_TRACE_SPHERES * 2];
@@ -326,6 +345,9 @@ void anvil_clear(int r, int g, int b, int a) {
 
 void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
                 int a) {
+  anvil_camera2d_point(&x, &y);
+  w *= anvil_camera2d_zoom;
+  h *= anvil_camera2d_zoom;
   int x0 = (int)floor(x), y0 = (int)floor(y), x1 = (int)ceil(x + w),
       y1 = (int)ceil(y + h);
   if (x0 < 0)
@@ -344,6 +366,8 @@ void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
 
 void anvil_circle(double x, double y, double radius, int r, int g, int b,
                   int a) {
+  anvil_camera2d_point(&x, &y);
+  radius *= anvil_camera2d_zoom;
   int rr = (int)ceil(fabs(radius)), cx = (int)lrint(x), cy = (int)lrint(y);
   uint32_t c = anvil_color(r, g, b);
   double r2 = radius * radius;
@@ -357,6 +381,9 @@ void anvil_circle(double x, double y, double radius, int r, int g, int b,
 
 void anvil_line(double x1, double y1, double x2, double y2, int r, int g, int b,
                 int a, double thickness) {
+  anvil_camera2d_point(&x1, &y1);
+  anvil_camera2d_point(&x2, &y2);
+  thickness *= anvil_camera2d_zoom;
   AnvilScreenPoint start = {x1, y1}, end = {x2, y2};
   if (!isfinite(thickness) ||
       !anvil_clip_screen_line(&start, &end, ANVIL_WIDTH, ANVIL_HEIGHT))
@@ -542,6 +569,9 @@ void anvil_text(double x, double y, const char *text, int r, int g, int b,
                 int a) {
   if (!anvil_memory_dc || !text)
     return;
+  /* Text follows the 2D camera's position; glyphs keep their pixel size
+     because the runtime has no scalable font yet. */
+  anvil_camera2d_point(&x, &y);
   SetBkMode(anvil_memory_dc, TRANSPARENT);
   SetTextColor(anvil_memory_dc, RGB(r, g, b));
   HFONT font =
@@ -629,9 +659,12 @@ static double anvil_mouse_coordinate(int horizontal) {
   if (x < viewport.x || y < viewport.y || x >= viewport.x + viewport.width ||
       y >= viewport.y + viewport.height)
     return -1.0;
-  if (horizontal)
-    return (double)(x - viewport.x) * ANVIL_WIDTH / viewport.width;
-  return (double)(y - viewport.y) * ANVIL_HEIGHT / viewport.height;
+  double screen = horizontal
+                      ? (double)(x - viewport.x) * ANVIL_WIDTH / viewport.width
+                      : (double)(y - viewport.y) * ANVIL_HEIGHT / viewport.height;
+  /* Inverse of the 2D camera so pointer coordinates are world coordinates. */
+  return screen / anvil_camera2d_zoom +
+         (horizontal ? anvil_camera2d_x : anvil_camera2d_y);
 }
 double anvil_mouse_x(void) { return anvil_mouse_coordinate(1); }
 double anvil_mouse_y(void) { return anvil_mouse_coordinate(0); }
@@ -869,6 +902,9 @@ double anvil_image_draw_scaled(double handle, double x, double y, double width,
       !isfinite(width) || !isfinite(height) || width <= 0.0 || height <= 0.0 ||
       !isfinite(x + width) || !isfinite(y + height))
     return 0.0;
+  anvil_camera2d_point(&x, &y);
+  width *= anvil_camera2d_zoom;
+  height *= anvil_camera2d_zoom;
   double left = fmax(0.0, floor(x));
   double top = fmax(0.0, floor(y));
   double right = fmin((double)ANVIL_WIDTH, ceil(x + width));
@@ -908,6 +944,8 @@ double anvil_image_draw_rotated(double handle, double cx, double cy,
   if (!image || !anvil_pixels || !isfinite(cx) || !isfinite(cy) ||
       !isfinite(degrees) || !isfinite(scale) || scale <= 0.0)
     return 0.0;
+  anvil_camera2d_point(&cx, &cy);
+  scale *= anvil_camera2d_zoom;
   const double radians = 0.017453292519943295769 * degrees;
   double cos_angle = cos(radians);
   double sin_angle = sin(radians);
@@ -964,6 +1002,9 @@ double anvil_image_draw_region(double handle, double sx, double sy, double sw,
       !isfinite(sy + sh))
     return 0.0;
   int isx = (int)sx, isy = (int)sy, isw = (int)sw, ish = (int)sh;
+  anvil_camera2d_point(&dx, &dy);
+  dw *= anvil_camera2d_zoom;
+  dh *= anvil_camera2d_zoom;
   double left = fmax(0.0, floor(dx));
   double top = fmax(0.0, floor(dy));
   double right = fmin((double)ANVIL_WIDTH, ceil(dx + dw));

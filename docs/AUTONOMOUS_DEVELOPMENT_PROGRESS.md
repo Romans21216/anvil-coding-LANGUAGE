@@ -505,3 +505,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** the second case in `tests/test_sprite_draw.py` loads a 4x4 four-quadrant BMP, draws each 2x2 cell into a 4x4 destination and checks the centre pixel, mirrors the top half (red|green becomes green|red) and asserts an out-of-range region returns 0 and leaves the frame untouched. 2 passed in 6.1 s.
 - **Editor:** the TextMate grammar and `validate.js` now list the sprite, sound and save builtins (they had lagged behind the runtime); `npm test` passes.
 - **Docs:** language spec row and grammar, evidence ledger, testing doc.
+
+## Batch 37 — 2D camera (8.14)
+
+- **API:** `camera2d(pan_x,pan_y,zoom)` sets a world→screen transform `screen = (world - pan) * zoom` used by rect, circle, line, text position and every sprite draw path. The identity default keeps existing programs unchanged; zoom is clamped to 0.05–20, and a non-finite or non-positive zoom returns 0 and leaves the camera alone. `mouse_x`/`mouse_y` invert the transform, so pointer coordinates are world coordinates. Text moves with the camera but keeps its pixel size because there is no scalable font yet; 3D drawing is untouched.
+- **Tests:** `tests/test_camera2d.py` draws a world-space rect and samples the window at the identity position, after a (50,50) pan, after 2× zoom, after a rejected zero-zoom call and after reset. 1 passed.
+- **Harness fix:** two window-reading tests in the same run interfered — the second window could be occluded, and `GetPixel` on a window DC then reads the covering window. `WindowReader.force_client_size` now raises its window with `HWND_TOPMOST`, which made the three window tests pass together.
+- **Docs:** language spec row and grammar, editor grammar/validator, evidence ledger, testing doc.

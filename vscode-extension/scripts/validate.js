@@ -104,6 +104,7 @@ async function main() {
   expect('set var(ok) = image_flip(var(handle), 1, 0)', 'image_flip', 'support.function.anvil');
   expect('set var(voice) = sound_play(var(sound))', 'sound_play', 'support.function.anvil');
   expect('set var(ok) = save_number("slot", 1)', 'save_number', 'support.function.anvil');
+  expect('set var(ok) = camera2d(0, 0, 2)', 'camera2d', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
   expect('set var(size) = 3 + 4', '+', 'keyword.operator.anvil');

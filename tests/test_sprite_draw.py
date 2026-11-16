@@ -141,7 +141,7 @@ class WindowReader:
         self.user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
         self.user32.SetWindowPos.argtypes = [
             wintypes.HWND,
-            wintypes.HWND,
+            ctypes.c_void_p,
             ctypes.c_int,
             ctypes.c_int,
             ctypes.c_int,
@@ -187,12 +187,12 @@ class WindowReader:
         )
         self.user32.SetWindowPos(
             self.hwnd,
-            None,
+            ctypes.c_void_p(-1),  # HWND_TOPMOST: an occluded window reads wrong pixels
             60,
             60,
             width + border_x,
             height + border_y,
-            0x0004 | 0x0010,  # SWP_NOZORDER | SWP_NOACTIVATE
+            0x0004 | 0x0010,  # SWP_NOZORDER is deliberately NOT set
         )
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline:

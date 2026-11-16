@@ -88,6 +88,8 @@ remote desktop can prevent window creation:
   running image.
 - `test_sprite_draw` — C-backend sprite tint, horizontal flip, 90° rotation and
   atlas-region draws checked by reading the pixels the program presented.
+- `test_camera2d` — C-backend `camera2d` pan, zoom, rejection of a zero zoom
+  and reset, sampled from the presented window.
 - `test_includes` — the subset that runs an included graphical sample.
 
 The harness (`tests/native_app.py`) builds the PE, starts it, finds the window
