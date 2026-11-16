@@ -1,6 +1,9 @@
 # Anvil Language Guide
 
-For the normative version 1 syntax and behavior contract, see the [formal language specification](LANGUAGE_SPEC.md).
+The broader engine APIs below describe the C/MSVC-backed Windows runtime. Direct `--backend native` output currently supports a smaller numeric and 2D rectangle/input/procedural subset; see [native backend availability](NATIVE_X64_COMPILER_MIGRATION.md).
+
+
+For the normative versioned syntax and behavior contract, see the [formal language specification](LANGUAGE_SPEC.md).
 
 Anvil uses UTF-8 text in `.ANVL` files. Its syntax is designed to read like a small BASIC/Lua-inspired scripting language: define a function with `fn(name)` or `fn(name, parameter, ...)`, indent the body for readability, and close it with `end`. Indentation is optional; `end` defines the block.
 
@@ -33,12 +36,36 @@ Comments begin with `#` outside a quoted string. Names are case-sensitive. A fun
 An optional version declaration may appear once, before any other source code:
 
 ```anv
-language version 1
+language version 2
 ```
 
-Blank lines and comments may appear before it. Version 1 is the current language definition. If the declaration is omitted, the compiler treats the file as version 1 so existing `.ANVL` projects continue to build. Unsupported versions, malformed declarations, duplicates, and declarations after source code receive a path-and-line diagnostic. A future incompatible syntax change can introduce a newer version without silently changing the meaning of older files.
+Blank lines and comments may appear before it. The compiler supports versions 1 and 2. If the declaration is omitted, the compiler treats the file as version 1 so existing `.ANVL` projects continue to build. Unsupported versions, malformed declarations, duplicates, and declarations after source code receive a path-and-line diagnostic.
 
 `var(name)` reads a global numeric variable, except that a function parameter with the same name takes precedence inside that function. `set local(name) = expression` declares function-local numeric state, initialized to `0` at function entry; `local(name)` reads it, and `add local(name) amount` / `sub local(name) amount` update it. Local names are visible only in their declaring function. Existing `set var(name)` assignments continue to use global state unless `name` is a parameter of the current function. The compiler validates local/global references and function-call arity before generating C.
+
+Version 2 keeps `local(name)` available and changes `var(name)` to function-local storage. `var(name)` can be assigned/read inside a function and follows the function's local lifetime; it cannot be used at top level. `varl(name)` always addresses a global in both versions. Thus a parameter or local may share a name with a global accessed explicitly through `varl(name)`. Version 1 keeps its established `var(name)` global/parameter-shadowing behavior.
+
+Version 2 also supports program metadata and checked function references:
+
+```anv
+language version 2
+name "Anvil Example"
+author("Romans21216")
+version("1.0.0")
+
+fn(move, distance)
+  output distance + 1
+end
+
+fn(main)
+  set var(movement) = fnref(move)
+  output call var(movement, 9)
+end
+```
+
+Metadata values are quoted Unicode strings. `name`, `author`, and program `version` each appear at most once at the top level. The name is embedded in the executable metadata; a project manifest's `name` is used as a fallback when source metadata omits it. `python compiler/anvil.py build/game.exe --inspect-metadata` prints embedded metadata as JSON.
+
+`fnref(function)` creates an opaque, checked callback value. Store it in a local (`var(name)` in version 2) or global (`varl(name)`) and invoke it with `call var(name, arguments...)`, `call local(name, arguments...)`, or `call varl(name, arguments...)`. Assigning another callback or `null` is supported. Calling an unset callback reports the original source location and exits with code 2. Referenced functions must use the same numeric arity; callback values cannot be passed as function parameters or returned, put in arrays, or used as numbers. The initial callback signature limit is 15 numeric arguments. Version 1 retains its old `var(name)` meaning; use `varl(name)` for global callback storage there.
 
 Arithmetic uses `+`, `-`, `*`, `/`, and `%`; division by a value equal to zero (including negative zero) terminates the program with exit code 2 and reports the `.ANVL` source path and line. Nonzero division keeps normal floating-point behavior. Every numeric expression must produce a finite value: overflow to positive/negative infinity or an invalid result such as `sqrt(-1)` reports the source path and line and exits with code 2. The check happens before comparisons too, so an overflowing intermediate cannot silently become a true/false result.
 
@@ -194,7 +221,7 @@ The current experimental API is `net host(port)`, `net join("IPv4",port)`, `net 
 
 ## Project and file formats
 
-`.ANVL` is the source extension. `.ANVLproj` is the TOML project manifest. It accepts a project `name`, an `entry` path that must stay inside the project folder, and optional `[engine].fixed_hz` from 1 to 240. Unsupported settings are reported instead of silently ignored.
+`.ANVL` is the source extension. `.ANVLproj` is the TOML project manifest. It accepts a project `name`, an `entry` path that must stay inside the project folder, and optional `[engine].fixed_hz` from 1 to 240. Optional `[memory]` settings are `local_array_elements` (1–1,048,576 per function, default 8,192) and `active_call_memory_mib` (1–2,048 MiB total across active local arrays, default 16 MiB). These settings apply to both the C and direct-native backends; unsupported settings are reported instead of silently ignored.
 
 ```toml
 name = "First World"
@@ -202,6 +229,10 @@ entry = "examples/first_world.ANVL"
 
 [engine]
 fixed_hz = 60
+
+[memory]
+local_array_elements = 8192
+active_call_memory_mib = 16
 ```
 
 ## Not implemented yet
@@ -209,4 +240,4 @@ fixed_hz = 60
 Static types, dynamically sized arrays, structures, modules/imports, general asset formats and 3D mesh assets, sprite animation, audio mixing groups/streaming music, 3D/polygon physics, save-file migration/versioning, full 2D/3D scene management, a GPU renderer, reliable Internet multiplayer, and Rust code generation are future work. Parameters, returns, recursion, function-local numeric variables and arrays, `while`/inclusive numeric `for` loops, fixed-size global numeric arrays, BMP-based 2D sprites, bounded PCM WAV audio, typed key/value saves, and fixed-step 2D circle/axis-aligned-box physics are supported, but the language and engine remain much smaller than a general-purpose game engine today.
 
 
-Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
+Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Selective imports use `include fn(move) - "lib/player.ANVL"`, with `call fn(move - player, 10)` and optional `as alias` for same-basename files. Private helper functions and state stay with their source module. Package registries and separate object linking remain unfinished.

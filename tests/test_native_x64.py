@@ -10,6 +10,7 @@ from compiler.native_x64 import minimal_exit_exe
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class NativeRunMixin:
     """Compiles a snippet with the native backend and runs the EXE."""

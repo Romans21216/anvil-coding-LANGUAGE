@@ -54,7 +54,7 @@ line_end         = physical_newline | end_of_file ;
 
 There must be at least one function. Function definitions are top-level and function names must be unique. Parameter names within a function must be unique. Functions can be declared in any order and may call themselves recursively. Both backends bound the call chain: a call that grows the stack past a 512 KiB budget stops with `Anvil call depth exceeded the 512 KiB stack budget` and exit code 2 instead of an OS stack crash. The compiler generates a numeric function prototype for every function before generating its body.
 
-At most one `language version N` line may occur, and it must precede all source code; blank lines and comments may precede it. Only version 1 is supported. Malformed, repeated, misplaced, and unsupported declarations produce a source path and line diagnostic. Existing files without a declaration are interpreted as version 1.
+At most one `language version N` line may occur, and it must precede all source code; blank lines and comments may precede it. Versions 1 and 2 are supported. Malformed, repeated, misplaced, and unsupported declarations produce a source path and line diagnostic. Existing files without a declaration are interpreted as version 1. This section defines version 1; version 2 changes and additions are listed in §8.
 
 Scalar globals are introduced by `set var(name) = expression`. Globals begin at zero. A global fixed-size numeric array is declared at top level as `array name(size)`; its elements begin at zero and `size` must be from 1 through 1,048,576.
 
@@ -116,7 +116,7 @@ A function parameter is numeric. `var(name)` inside a function resolves to a sam
 
 `array(name, index)` reads a numeric element. `set array(name, index) = expression` writes an element and is only valid in a function. Indexes are zero-based finite whole numbers in `[0, size)`. Invalid indexes terminate execution with a path-and-line diagnostic and exit code 2.
 
-An array may be global or local to a function. Arrays cannot be resized. A function may declare at most 8,192 local array elements in total; active local-array storage across recursive calls is capped at 16 MiB. Local arrays are zero-initialized, allocated per invocation, and freed on every generated return. Allocation failure or budget exhaustion is a source-located runtime error. Each global array has a maximum size of 1,048,576 elements.
+An array may be global or local to a function. Arrays cannot be resized. The default project limit is 8,192 local array elements per function and 16 MiB of active local-array storage across recursive calls. An `.ANVLproj` may override these with `[memory].local_array_elements` (1–1,048,576) and `[memory].active_call_memory_mib` (1–2,048 MiB). The compiler rejects a function whose statically declared local arrays cannot fit its active-call budget; the shared budget also guards simultaneous recursive invocations at runtime. Local arrays are zero-initialized, allocated per invocation, and freed on every generated return. Allocation failure or budget exhaustion is a source-located runtime error. Each global array has a maximum size of 1,048,576 elements.
 
 ### 3.3 Branches and loops
 
@@ -163,6 +163,11 @@ key_name         = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
                  | "U" | "V" | "W" | "X" | "Y" | "Z" | "SPACE" | "UP" | "DOWN"
                  | "LEFT" | "RIGHT" | "ENTER" | "ESCAPE" ;
 ```
+
+User-defined function call arguments are evaluated exactly once, from left to
+right, including nested calls. The compiler preserves this order regardless of
+the selected C compiler. For example, in `call fn(pair, call fn(next), call
+fn(next))`, the first `next` call supplies the first argument to `pair`.
 
 All binary operators associate left-to-right. Precedence, from lowest to highest, is:
 
@@ -230,7 +235,7 @@ camera_coordinate = ? one whitespace-free expression token sequence accepted by 
 
 `ray_sphere` submits a sphere to the per-frame CPU BVH ray tracer. The current batch supports at most 32 ray-traced spheres. Hardware RTX/DXR and Embree are unavailable. Conventional 2D/3D primitives use the current fixed-size software renderer.
 
-The native runtime starts when the program has an `update` or `draw` callback, or top-level engine configuration. It calls `update` at the configured fixed rate and `draw` to render. A `.ANVLproj` manifest may set `[engine].fixed_hz` from 1 through 240; default is 60. Without engine mode, a top-level `call fn(...)` invokes a function; absent explicit calls, a zero-argument `main` function is invoked and its numeric result is printed.
+The runtime starts when the program has an `update` or `draw` callback, or top-level engine configuration. It calls `update` at the configured fixed rate and `draw` to render. In engine mode, top-level `call fn(...)` initializers run once after project setup and before the runtime loop. A `.ANVLproj` manifest may set `[engine].fixed_hz` from 1 through 240; default is 60. Without engine mode, a top-level `call fn(...)` invokes a function; absent explicit calls, a zero-argument `main` function is invoked and its numeric result is printed.
 
 ## 7. Static validation, runtime errors, and compilation
 
@@ -271,3 +276,21 @@ For the reader-friendly guide and engine-specific examples, see [Language Guide]
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
 
 Compiler resource validation bounds expressions to64 delimiter/parser levels and control-flow nesting to128 blocks before code generation. Both backends issue a source-located compile error above these limits; split complex code into variables and functions. String-literal parentheses are excluded from delimiter counting.
+
+Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
+
+## Selective source functions
+
+`include fn(move) - "lib/player.ANVL"` imports `move` with the filename qualifier; `call fn(move - player, 10)` invokes it. `as alias` overrides the qualifier. Helpers, globals and arrays are private to the canonical selectively imported module. Aliases/exports are local to the including file. Whole-file includes retain their shared namespace. See [include rules](INCLUDES.md) for dependency closure, initialization, diagnostics and limits.
+
+## Version 2 additions
+
+Version 2 retains the statements and expressions above, with these variable meanings and additions:
+
+- `var(name)` is function-local state and may be used only in a function. `varl(name)` explicitly refers to global numeric state. `local(name)` remains supported. Version 1 keeps the global/parameter-shadowing meaning of `var(name)`.
+- Top-level metadata uses `name "program name"`, `author("author name")`, and `version("version text")`. Each key can appear once. Values are quoted Unicode strings. The compiler embeds metadata in the executable; it is available through `--inspect-metadata`.
+- `fnref(function)` produces an opaque callback handle assignable to a local or global variable. `call var(callback, args...)`, `call local(callback, args...)`, or `call varl(callback, args...)` invokes the stored target. Callback variables may also be copied or cleared with `null`. Targets assigned to one callback must agree on numeric arity; the initial callback lowering supports at most 15 numeric arguments. A callback cannot be passed or returned as a value, stored in an array, or used in numeric expressions. An unset callback fails at its call site.
+- Selective imports and qualified calls accept the preferred double-dash form: `include fn(move) -- "lib/player.ANVL"` and `call fn(move -- player, 10)`. Existing single-dash forms remain accepted.
+- Networking accepts `netip("IPv4")` (also `netIP`), `nethost(port) --local`, `nethost(port)`, and `netleave()`. `--local` binds loopback. Without it, the host binds the configured IPv4 address; the default `0.0.0.0` listens on all local interfaces. Firewall and router configuration determine external reachability.
+
+The required build path is Anvil parsing and validation → generated C → the selected C compiler/linker → machine code and executable. The direct x64 backend is an optional experiment, not the required project architecture.

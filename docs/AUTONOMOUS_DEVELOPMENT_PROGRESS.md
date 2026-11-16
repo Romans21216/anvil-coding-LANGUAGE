@@ -1,6 +1,6 @@
 # Anvil autonomous development progress
 
-This log records verified implementation batches and is reconciled with Git before each continuation. GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) remains the user-maintained master backlog and source of truth.
+This is a historical batch log. Each entry describes the state at that batch, including then-pending findings and then-latest reviews. For current capability and verification state, use [QA_REPORT.md](QA_REPORT.md), [capability matrix](COMPLETION_MATRIX.md) and [structured state](CODEX_AUTONOMOUS_STATE.json). GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) remains the user-maintained master backlog and source of truth.
 
 ## Batch 1 — configurable Coulomb friction
 

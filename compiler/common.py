@@ -90,6 +90,26 @@ def c_name(name: str) -> str:
     return "anvil_" + re.sub(r"[^A-Za-z0-9_]", "_", name)
 
 
+def c_string_literal(value: str) -> str:
+    """Encode UTF-8 bytes as a C narrow literal, without JSON surrogate escapes.
+
+    Fixed three-digit octal escapes cannot consume a following hex digit.
+    Keep ordinary ASCII readable and independent of the C execution charset.
+    """
+    try:
+        payload = value.encode("utf-8")
+    except UnicodeError as error:
+        raise CompileError("C string requires valid Unicode scalar values") from error
+    return c_bytes_literal(payload)
+
+
+def c_bytes_literal(payload: bytes) -> str:
+    escapes = {8: r"\b", 9: r"\t", 10: r"\n", 12: r"\f", 13: r"\r",
+               34: r'\"', 92: r"\\"}
+    return '"' + ''.join(escapes.get(byte, chr(byte) if 32 <= byte < 127
+                                   else f"\\{byte:03o}") for byte in payload) + '"'
+
+
 def variable_code(name: str, scope: Node | None = None) -> str:
     if scope and name in scope.params:
         return c_name(scope.name + "__" + name)
@@ -110,9 +130,16 @@ def array_code(name: str, scope: Node | None) -> str:
 
 RUNTIME_C_NAMES = {
     "anvil_run",
+    "anvil_runtime_register_shutdown_hook",
+    "anvil_runtime_framebuffer",
     "anvil_divide",
     "anvil_check_number",
     "anvil_set_scene3d",
+    "anvil_set_fixed_hz",
+    "anvil_camera_fov",
+    "anvil_camera_control",
+    "anvil_trace_sphere",
+    "anvil_trace_finish",
     "anvil_camera_perspective",
     "anvil_camera2d",
     "anvil_camera_angle",
@@ -147,6 +174,7 @@ RUNTIME_C_NAMES = {
     "anvil_mouse_pressed",
     "anvil_mouse_held",
     "anvil_mouse_wheel",
+    "anvil_image_shutdown",
     "anvil_image_load",
     "anvil_image_width",
     "anvil_image_height",
@@ -197,9 +225,14 @@ RUNTIME_C_NAMES = {
     "anvil_noise",
     "anvil_fbm",
     "anvil_net_host",
+    "anvil_net_host_at",
+    "anvil_net_set_ip",
     "anvil_net_join",
     "anvil_net_send",
     "anvil_net_receive",
+    "anvil_net_packet_send",
+    "anvil_net_packet_receive",
+    "anvil_net_packet_id",
     "anvil_net_close",
     "anvil_array_get",
     "anvil_array_set",
@@ -232,6 +265,7 @@ MAX_ARRAY_SIZE = 1_048_576
 MAX_LOCAL_ARRAY_ELEMENTS = 8_192
 
 MAX_ACTIVE_LOCAL_ARRAY_BYTES = 16 * 1024 * 1024
+MAX_ACTIVE_LOCAL_ARRAY_MIB = 2048
 
 LANGUAGE_VERSION = 1
 

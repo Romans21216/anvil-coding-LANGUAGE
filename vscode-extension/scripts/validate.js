@@ -28,6 +28,33 @@ check(manifest.contributes.grammars.some(x => x.language === 'anvil' && x.scopeN
 check(config.comments.lineComment === '#', 'line comment configuration is missing');
 check(config.brackets.some(pair => pair[0] === '(' && pair[1] === ')'), 'parenthesis pairing is missing');
 
+// Exercise actual block syntax, including nested indentation and comments.
+const increase = new RegExp(config.indentationRules.increaseIndentPattern);
+const decrease = new RegExp(config.indentationRules.decreaseIndentPattern);
+const foldStart = new RegExp(config.folding.markers.start);
+const foldEnd = new RegExp(config.folding.markers.end);
+for (const line of ['fn(main)', '  fn(add, left, right) # helper', 'if true',
+  '  if local(x) > 0 # condition', 'while local(i) < 3',
+  'for local(i) = 1 to 3', '  for local(i) = 3 to 1 step -1 # backwards']) {
+  check(increase.test(line), `block does not increase indentation: ${line}`);
+  check(foldStart.test(line), `block does not start folding: ${line}`);
+}
+for (const line of ['else', '  else # alternative']) {
+  check(increase.test(line) && decrease.test(line), `else indentation failed: ${line}`);
+  check(!foldStart.test(line), `else incorrectly starts a new fold: ${line}`);
+}
+for (const line of ['end', '  end # finish']) {
+  check(decrease.test(line) && foldEnd.test(line), `end does not close block: ${line}`);
+  check(!increase.test(line), `end incorrectly increases indentation: ${line}`);
+}
+for (const line of ['# if true', '  # for local(i) = 1 to 3', 'output "if true"',
+  '"while local(i) < 3"', 'different', 'while-loop', 'forage', 'elsewhere',
+  'endless', 'if', 'if # missing condition', 'while # missing condition',
+  'for local(i) = # missing range', 'repeat', 'set var(end) = 1']) {
+  check(!increase.test(line) && !decrease.test(line), `unrelated line changes indentation: ${line}`);
+  check(!foldStart.test(line) && !foldEnd.test(line), `unrelated line changes folding: ${line}`);
+}
+
 async function main() {
   const wasmBuffer = fs.readFileSync(require.resolve('vscode-oniguruma/release/onig.wasm'));
   await oniguruma.loadWASM(wasmBuffer.buffer.slice(wasmBuffer.byteOffset, wasmBuffer.byteOffset + wasmBuffer.byteLength));
@@ -57,6 +84,24 @@ async function main() {
   }
   expect('include \"lib/math.ANVL\"', 'include', 'keyword.control.anvil');
   expect('include \"lib/math.ANVL\"', 'lib/math.ANVL', 'string.quoted.double.anvil');
+  expect('include fn(move) - "lib/player.ANVL" as input', 'move', 'variable.function.anvil');
+  expect('include fn(move) - "lib/player.ANVL" as input', 'fn', 'support.type.function.anvil');
+  expect('include fn(move) - "lib/player.ANVL" as input', 'as', 'keyword.control.anvil');
+  expect('include fn(move) - "lib/player.ANVL" as input', 'lib/player.ANVL', 'string.quoted.double.anvil');
+  expect('include fn(move) -- "lib/player.ANVL"', 'move', 'variable.function.anvil');
+  check(!scopesAt('include fn(move) - "lib/player.ANVL"', 'move').includes('entity.name.function.anvil'), 'selective import is not a function declaration');
+  expect('output call fn(move-fast - player, 10)', 'move-fast', 'variable.function.anvil');
+  expect('output call fn(move-fast - player, 10)', 'player', 'entity.name.namespace.anvil');
+  expect('output call fn(move -- player, 10)', 'player', 'entity.name.namespace.anvil');
+  expect('set var(callback) = fnref(move -- player)', 'fnref', 'support.function.anvil');
+  expect('set var(callback) = fnref(move -- player)', 'player', 'entity.name.namespace.anvil');
+  expect('set varl(score) = 1', 'score', 'variable.other.anvil');
+  expect('name "Anvil 🙂"', 'name', 'storage.modifier.anvil');
+  expect('author("Romans21216")', 'author', 'storage.modifier.anvil');
+  expect('version("0.2.0")', 'version', 'storage.modifier.anvil');
+  expect('nethost(7777) --local', 'nethost', 'support.function.engine.anvil');
+  expect('netIP("127.0.0.1")', 'netIP', 'support.function.engine.anvil');
+  expect('call fn(move - input, call fn(value - other))', 'other', 'entity.name.namespace.anvil');
   expect('fn(update)', 'fn', 'keyword.declaration.function.anvil');
   expect('language version 1', 'language', 'keyword.control.anvil');
   expect('language version 1', 'version', 'keyword.control.anvil');

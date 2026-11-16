@@ -1,6 +1,9 @@
 #ifndef ANVIL_RUNTIME_H
 #define ANVIL_RUNTIME_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -10,6 +13,9 @@
 #endif
 
 typedef double (*AnvilCallback)(void);
+typedef void (*AnvilRuntimeShutdownHook)(void);
+
+enum { ANVIL_FRAME_WIDTH = 960, ANVIL_FRAME_HEIGHT = 600 };
 
 enum {
   ANVIL_KEY_SPACE = VK_SPACE,
@@ -48,6 +54,8 @@ enum {
 };
 
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title);
+int anvil_runtime_register_shutdown_hook(AnvilRuntimeShutdownHook hook);
+uint32_t *anvil_runtime_framebuffer(void);
 double anvil_divide(double numerator, double denominator, const char *path,
                     int line);
 double anvil_check_number(double value, const char *path, int line);
@@ -64,6 +72,7 @@ double anvil_mouse_y(void);
 double anvil_mouse_pressed(const char *button);
 double anvil_mouse_held(const char *button);
 double anvil_mouse_wheel(void);
+void anvil_image_shutdown(void);
 double anvil_image_load(const char *path);
 double anvil_image_width(double handle);
 double anvil_image_height(double handle);
@@ -182,9 +191,14 @@ double anvil_noise(double x, double y, double z);
 double anvil_fbm(double x, double y, double z, int octaves, double lacunarity,
                  double gain);
 int anvil_net_host(int port);
+int anvil_net_host_at(int port, int local_only);
+int anvil_net_set_ip(const char *address);
 int anvil_net_join(const char *address, int port);
 int anvil_net_send(double value);
 double anvil_net_receive(void);
+double anvil_net_packet_send(double message_id, double value);
+double anvil_net_packet_receive(void);
+double anvil_net_packet_id(void);
 void anvil_net_close(void);
 double anvil_body_create(double x, double y, double radius, double mass);
 double anvil_body_create_box(double x, double y, double width, double height,

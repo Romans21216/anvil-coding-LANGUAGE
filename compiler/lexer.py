@@ -22,6 +22,25 @@ def strip_comment(line: str) -> str:
     return line
 
 
+def mask_strings(text: str) -> str:
+    """Blank quoted contents and delimiters while preserving source positions."""
+    result = list(text)
+    quoted = escaped = False
+    for index, char in enumerate(text):
+        if quoted:
+            result[index] = " "
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            result[index] = " "
+            quoted = True
+    return "".join(result)
+
+
 def validate_port(path: pathlib.Path, line: int, text: str) -> None:
     try:
         port = int(text)

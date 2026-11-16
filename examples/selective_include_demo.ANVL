@@ -1,0 +1,6 @@
+include fn(move) - "modules/player.ANVL"
+include fn(move) - "modules/camera.ANVL"
+
+fn(main)
+  output call fn(move - player, 10) + call fn(move - camera, 10)
+end

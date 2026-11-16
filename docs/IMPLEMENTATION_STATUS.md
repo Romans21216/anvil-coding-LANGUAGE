@@ -1,12 +1,11 @@
 # Anvil implementation status
 
-The master backlog is maintained only in the body and comments of GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23): its original 450-item inventory and the later additions remain there. This compact ledger records evidence only for audited items and does not duplicate the backlog. `IMPLEMENTATION_STATUS.json` holds the same audited subset as structured data.
+The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
 Updated 2026-10-28. Latest full review exact `edfbe86252deb5af39504161f6e8571ae917fbb9`: 71/100 — FAIL against 98; 125 tests pass. Source includes work; #64 provenance and #65 compiler recursion were independently found. Follow-up fixes are pending review. #63 remains open; all full backlog additions stay only in issue 23 comments.
 
-Latest reviewed native follow-up: direct AMD64/PE compilation supports numeric programs, checked global arrays and an initial Win32 2D runtime with fixed updates, buffered presentation and keyboard and mouse input. C remains default pending broader parity. Forge artifact/target/media/package requirements are listed as backlog items 451–457 in issue #23 only.
 
-Verified flicker fix: persistent offscreen bitmap/DC resources compose each frame before one BitBlt presentation, replacing the bitmap only on client-size changes. The reviewer independently confirmed slow-draw visibility, repeated-resize GDI counts, and controlled bitmap-allocation failure. The same test fails against the former renderer. Earlier metadata corrections are recorded in issue #58. Its new historical/current wording finding is corrected in this documentation follow-up, pending independent recheck; the renderer fix itself remains verified.
+The primary build translates `.ANVL` to inspectable C and invokes MSVC to compile and link the executable. The direct AMD64/PE path is an optional experiment for numeric functions, checked arrays, source includes, a limited 2D surface, input, and procedural math. It is not a prerequisite for C-backend features. Engine breadth, Forge/media/OS targets, actual DXR/Embree backends, richer types, portability, measurements, and #63 remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [experimental native backend](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 
 Historical keyboard milestone (21fc960, 73/100, 99 tests): held/pressed, repeat/focus/system-key handling, numeric key bounds and edge lifetimes were independently verified. Those regressions also passed in the later 111-test reviewed snapshot; the unreviewed include candidate now passes 125 tests.
 
@@ -34,8 +33,8 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 | 46 | Add short-circuit Boolean evaluation. | COMPLETE | `compiler/anvil.py` maps `and`/`or` to C `&&`/`||`; the native side-effect test confirms false `and` / true `or` skip calls while true `and` / false `or` execute them. The independent reviewer confirmed behavior on `83cf626` (57 tests passed). The overall QA score was 89/100 due to unrelated stale count text in the QA report; see issue #28. |
 | 47 | Add explicit overflow behavior. | COMPLETE | `anvil_check_number` guards arithmetic and all numeric built-in results, including `receive()`. Native cases cover arithmetic, comparison, invalid math, accumulation, loop-step overflow, end-to-end NaN/finite UDP datagrams, and no-socket receive behavior. The full suite passed on the reviewed compiler refactor (72 tests); extension and static checks pass; independent review of `15439b5` confirmed the behavior. Issues #30 and #31 are resolved and closed. Overall QA remains below 98/100. |
 | 48 | Add division-by-zero diagnostics. | COMPLETE | `compiler/anvil.py` lowers `/` through `anvil_divide`; `runtime/anvil_runtime.c` reports path/line and exits 2 on zero (including negative zero). Native tests cover zero diagnostic and regular division; the independent reviewer confirmed the behavior on commit `12b4e55` (90/100 PASS). Runtime detection only; no compile-time constant analysis. |
-| 49 | Add language feature versioning. | COMPLETE | Optional leading `language version 1` declaration; unversioned files keep version 1 behavior. Independent review `ed08f43` verified all 64 tests and the 5,000-digit source-located diagnostic. Issues #32/#33 are fixed and closed. Only version 1 is implemented. |
-| 50 | Publish a complete formal language specification. | COMPLETE | `docs/LANGUAGE_SPEC.md` records the v1 contract and links from README/guide/wiki; its example builds and prints `6`. Critic `65c15bf` confirmed the duplicate-modifier rule matches compiler behavior and issues #37–#43 are resolved. The critic verified 67 tests on `65c15bf`; independent review of `96b71fe` passed 72 tests and confirmed compiler compatibility. Latest overall score is 90/100, below 98 because of broader engine scope, platform limits, and editor verification; QA issue #44 is closed. |
+| 49 | Add language feature versioning. | COMPLETE | Optional leading `language version 1` declaration; unversioned files keep version 1 behavior. Independent review `ed08f43` verified all 64 tests and the 5,000-digit source-located diagnostic. Version 2 local/global variable meanings and current compatibility checks passed on c06744a. Issues #32/#33 are fixed and closed. |
+| 50 | Publish a complete formal language specification. | COMPLETE | `docs/LANGUAGE_SPEC.md` records the v1 contract and links from README/guide/wiki; its example builds and prints `6`. Critic `65c15bf` confirmed the duplicate-modifier rule matches compiler behavior and issues #37–#43 are resolved. The critic verified 67 tests on `65c15bf`; independent review of `96b71fe` passed 72 tests and confirmed compiler compatibility. The historical overall score for that review was 90/100, below 98 because of broader engine scope, platform limits, and editor verification; QA issue #44 is closed. |
 | 101 | Separate lexical analysis from parsing. | COMPLETE | Independent critic `96b71fe` confirmed lexer/parser module separation, preserved CLI/facade behavior, 72 passing tests, and byte-identical generated C for 12 examples. Formatting follow-up is tracked separately in issue #12. |
 | 102 | Separate parsing from semantic validation. | COMPLETE | `parse_syntax` produces a `ParsedProgram`; `validate_program` resolves references and C symbol collisions. Phase-boundary tests and the independent critic verified the split on exact review `96b71fe`. |
 | 103 | Separate semantic validation from C generation. | COMPLETE | `compiler/semantics.py` validates before `compiler/codegen.py` emits C. The independent critic confirmed generated output is byte-identical for 12 representative examples against `854d36c`. |
@@ -62,6 +61,10 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 | 376 | Add backend capability detection. | PARTIALLY IMPLEMENTED | runtime/anvil_runtime.c: ray_backend_available reports backend availability. Detection is limited to current compiled backend support; broader hardware/backend capability probing is absent. Issue #5; commit `51deb5d`. |
 | 449 | Keep the existing automated tests, extension validation, and QA reports synchronized with every release. | PARTIALLY IMPLEMENTED | docs/QA_REPORT.md; tests/; vscode-extension/scripts/validate.js. This remains an ongoing release-process requirement; future releases must keep status synchronized. Issue #15; commit `f7c91b0`. |
 
+## Historical review snapshot — registry-trigger candidate
+
+Latest independent full50 review of `de68679f1f05a3a5db7b5eadbf20989e43321a76` against base `2a0f52306363d4bba3e51730148f899f42cc1474`: **78/100 raw, 79/100 after criterion38 record sync; FAIL against98**. Categories after sync:13/20 requirements,19/20 functionality,15/20 architecture,17/20 verification,15/20 delivery. Five-path diff SHA256 `c80724f6849b798a025bdfc8f59d77a211fb1bef18ce144113810740680d15f2` (all changed paths are compiler/runtime-module codegen and tests); implementation-only SHA256 `459ecd965c2f87e0d7f7194bd0dcd073b78620763ef29ef1b0d0f1db47d468a5`. Local full suite253/285.750s; independent full suite253/283.720s; compileall, npm extension validation, QA validator, strict JSON and diff checks pass. No reproducible defect found. Installed VS Code0.1.4 remains unchanged. Issue #23 evaluation comment [issuecomment-6585531493](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6585531493) posted; issue has74 comments. Registry-driven reachable module triggers are implemented. Goal remains active below98; packages/imports, renderer/core separation, full engine, DXR/Embree, Forge/media, OS/UEFI, portability, editor workflows and performance evidence remain incomplete.
+
 ## Audit policy
 
 - `COMPLETE` means the item-specific behavior has source evidence, tests, documentation, and review; preserve any listed limits.
@@ -70,4 +73,23 @@ Item #172 resize was reviewed on `f12c0ac` (92/100), and item #185 on `eec0608` 
 - Do not close issue #23 until all backlog requirements are genuinely delivered or explicitly resolved by the user.
 
 
-Historical issue#48 is resolved. Current reviewedfbe86 scores71/100 with125tests;#58 wording verified;#64/#65 fixes pending and#63 remains open. Scores always identify exact snapshots.
+Historical memory-budget review reread #23 and all68 then-existing comments, including the C/OS/modular-core clarification: C/assembly may be used for boot/kernel layers, but the intended user interface is authored in Anvil and compiled to loadable output, with optional modular feature imports. Current implementation does not provide that OS/package target.
+
+Historical publication record for the prior project-memory-budget candidate: its independent record-only recheck passed, and it was pushed to `main` at `b4e8a20ee511388123f4982001ac997c6c720e4f`. Issue #90 was closed there and its evaluation is https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6583162339. This does not describe the current release-pruning candidate. Its six-record parity recheck now passes; source commit `18ec564a53b79dc7577e804f78bf6a5cebeff7d1` is published on `origin/main`.
+
+
+## Latest independent evaluation — optional image runtime module
+
+Issue #23 evaluation comment: [6588183804](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6588183804).
+
+**Reviewed candidate:** `9d69a44e563373e5085fb30445c29312ec793ed3` (base `513b1d02de3b599070d04324a8d3460300e40241`). **Independent full50 score: 78/100 raw; 79/100 after criterion 38 record synchronization — FAIL against 98.** Categories: requirements 13/20, functionality/reliability 19/20, architecture 15/20, testing/verification 17/20, delivery 15/20. No reproducible defect was found.
+
+- Full binary Git diff SHA256: `0c365af6b748171406d69b554485e8013eb1cc3c9c6f2edb6e1cf8baba614651`
+- All-text sorted unified diff SHA256: `f66d13c0eec7cc08a00281116e8ce7d3e831bb78763502a293067516d219e654`
+- Compiler/runtime/tests unified diff SHA256: `9ff18d6826b7b907558789a1de8f5505f6b4618cdbd393aa3b29e207d8d36ebd`
+- Documentation unified diff SHA256: `02273fa646348096ac1abdd91ef3fb44fad3e99a2a0e382c008648f3cbe2f7a1`
+- Local full suite: **266 tests passed in 366.905s**. Independent full suite: **266 tests passed in 416.764s**. Four focused image tests passed independently in 5.239s. Evaluation comment: [6588183804](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23#issuecomment-6588183804); issue #23 now has 76 comments.
+- The C build compiles `runtime/anvil_image.c` only when reachable Anvil image calls use it. Shutdown hooks release loaded image memory.
+- Full requirements remain in issue #23. User-facing packages, broad language/engine capabilities, DXR/Embree, Forge/media, OS/UEFI targets, portability, editor workflows, and measured performance remain incomplete. Goal stays active.
+
+The full 50-row rubric is in [QA_REPORT.md](QA_REPORT.md) and [ANVIL_EVALUATION.txt](ANVIL_EVALUATION.txt).

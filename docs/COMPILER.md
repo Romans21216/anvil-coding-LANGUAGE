@@ -3,10 +3,10 @@
 ## What the compiler does
 
 ```text
-.ANVL source → parser and source-located validation → backend → Windows .exe
+.ANVL source → Anvil parser and source-located validation → generated C → C compiler/linker → machine-code executable
 ```
 
-`compiler/anvil.py` is the command-line compiler. The default backend remains the existing C implementation for full current engine coverage. An experimental `--backend native` path writes x64 machine code and a PE32+ executable directly, without generating C/Rust or invoking another compiler. Its language coverage is currently limited; see [the native compiler migration status](NATIVE_X64_COMPILER_MIGRATION.md). The target direction is a complete Anvil-owned native backend and runtime, with no C or Rust dependency.
+`compiler/anvil.py` is the command-line compiler. A normal build performs both stages automatically: Anvil validates and translates the source to ordinary C in a temporary build directory, invokes the selected C compiler and linker, then removes the C and object intermediates. `--generated-c PATH` preserves the translated C alongside the executable for inspection; `--emit-c PATH` stops after translation. The C toolchain is responsible for machine-code generation and linking. The `--backend native` switch is an optional direct-x64 experiment, not the required architecture; its limited feature coverage is documented in [the experimental backend status](NATIVE_X64_COMPILER_MIGRATION.md).
 
 ## Compiler architecture
 
@@ -21,22 +21,27 @@ The command-line path remains `compiler/anvil.py`; it is now a small compatibili
 | `compiler/codegen.py` | Emit C statements, runtime calls, and complete translation units from validated nodes. |
 | `compiler/build.py` | Discover MSVC and invoke the native compiler/linker. |
 | `compiler/cli.py` | Parse CLI/project settings and orchestrate source loading, semantic validation, C generation, and build output. |
-| `compiler/native_codegen.py` | Experimental direct x64 code generation for a limited numeric Anvil subset. |
+| `compiler/native_codegen.py` | Direct x64 code generation for numeric programs and an initial 2D runtime. |
 | `compiler/native_x64.py` | Anvil-owned x64 code fixups and PE32+ executable image writing. |
 | `compiler/common.py` | Shared AST/data types, language limits, runtime names, and repository paths. |
 
-The C CLI order is source reading → syntax parsing → semantic validation → C generation → optional MSVC build. The native order is source reading → syntax parsing and validation → x64 code generation → PE writing. The parser and semantic checker expose phase-level entry points for focused tests, while existing `compiler/anvil.py` commands and importable functions remain compatible. The phase boundary regression tests live in `tests/test_compiler_modules.py`.
+The production CLI order is source reading → syntax parsing → semantic validation → C generation → C compiler/linker. The optional native experiment uses source reading → syntax parsing and validation → x64 code generation → PE writing. The parser and semantic checker expose phase-level entry points for focused tests, while existing `compiler/anvil.py` commands and importable functions remain compatible. The phase boundary regression tests live in `tests/test_compiler_modules.py`.
 
-Python compiler files use Black's default 88-column formatting. Contributors can check formatting with `python -m black --check compiler tests/test_compiler_modules.py` when Black is installed. The project does not require Black to run or build Anvil.
+The compiler formatting convention is Black's default 88-column style; some native emitters still require formatting and instruction abstractions. Contributors can check formatting with `python -m black --check compiler tests/test_compiler_modules.py` when Black is installed. The project does not require Black to run or build Anvil.
+
+## Reachability and dead-code elimination
+
+The C backend emits only Anvil functions reachable from the program entry calls or engine callbacks. It follows ordinary calls and the generated dispatch calls for function-reference variables, so callback targets remain present. Graphical startup runs top-level `call fn(...)` initializers after project setup and before `anvil_run`. Semantic checks still validate every declared function before emission; an unused function with an invalid reference remains a compile error. After validation, the C pass removes unreachable function definitions and global scalar/array declarations unused by top-level initialization and emitted functions. It preserves reachable writes and expression evaluation. A runtime-module registry emits image, networking, and physics markers only when reachable code uses their built-ins; the build compiles `runtime/anvil_image.c`, `runtime/anvil_network.c`, and `runtime/anvil_physics.c` separately and links Winsock only for networking. Image storage registers a cleanup hook with the core runtime, which executes registered module cleanup before releasing its framebuffer. Core renderer and other runtime APIs remain in `runtime/anvil_runtime.c`. The registry is internal; user-facing package imports and external dependency resolution remain unfinished. Release MSVC builds package functions/data with `/Gy` and `/Gw` and pass `/OPT:REF` to the linker; GCC-compatible release invocations use function/data sections and `--gc-sections`. User-facing package imports, external dependency resolution and separate object caches remain unfinished.
 
 ```powershell
 python compiler/anvil.py examples/first_world.ANVL --emit-c build/first_world.c
+python compiler/anvil.py examples/first_world.ANVL --release --output build/first_world.exe
 python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
 python compiler/anvil.py examples/functions.ANVL --backend native --output build/functions-native.exe
 ```
 
-The existing C backend requires Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC `cl` is the verified native compiler and is the only automatic compiler choice. `--emit-c` stops after C generation. The experimental `--backend native` path requires only Python and Windows; it supports a limited numeric subset and writes an EXE directly.
+The existing C backend requires Python 3.11+ and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC `cl` is the verified native compiler and is the only automatic compiler choice. Normal C builds keep their C and object intermediates in temporary directories; `--generated-c` preserves C and `--emit-c` stops after generation. The experimental `--backend native` path requires only Python and Windows; it supports numeric programs and an initial 2D runtime and writes an EXE directly.
 
 ## Current language slice
 

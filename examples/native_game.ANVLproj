@@ -1,0 +1,5 @@
+name = "Anvil Native Project"
+entry = "native_2d.ANVL"
+
+[engine]
+fixed_hz = 120

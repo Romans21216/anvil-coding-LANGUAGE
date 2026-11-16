@@ -17,12 +17,10 @@
 #pragma comment(lib, "winmm.lib")
 
 enum {
-  ANVIL_WIDTH = 960,
-  ANVIL_HEIGHT = 600,
+  ANVIL_WIDTH = ANVIL_FRAME_WIDTH,
+  ANVIL_HEIGHT = ANVIL_FRAME_HEIGHT,
   ANVIL_KEYS = 256,
-  ANVIL_MOUSE_BUTTONS = 3,
-  ANVIL_IMAGES = 64,
-  ANVIL_IMAGE_MAX_DIMENSION = 8192
+  ANVIL_MOUSE_BUTTONS = 3
 };
 /* Bounded recursion: generated functions enter and leave a frame, and a call
    that grows the C stack past this budget stops with a diagnostic instead of
@@ -54,11 +52,6 @@ enum {
   ANVIL_RAY_BACKEND_DXR,
   ANVIL_RAY_BACKEND_EMBREE
 };
-enum { ANVIL_PHYSICS_BODIES = 128, ANVIL_PHYSICS_SOLVER_ITERATIONS = 4 };
-enum { ANVIL_PHYSICS_CIRCLE, ANVIL_PHYSICS_BOX };
-#define ANVIL_PHYSICS_MAX_COORDINATE 1000000000.0
-#define ANVIL_PHYSICS_MAX_RADIUS 1000000.0
-#define ANVIL_PHYSICS_MAX_SPEED 1000000.0
 typedef struct {
   double x, y, z;
 } AnvilVec3;
@@ -108,8 +101,8 @@ static int anvil_mouse_client_y = -1;
 static int anvil_mouse_has_position;
 static double anvil_mouse_wheel_delta;
 static int anvil_mouse_invalid_button_warned;
-static AnvilImage anvil_images[ANVIL_IMAGES];
-static size_t anvil_image_memory_used;
+static AnvilRuntimeShutdownHook anvil_shutdown_hooks[16];
+static size_t anvil_shutdown_hook_count;
 static int anvil_clear_color[4] = {12, 17, 29, 255};
 static int anvil_scene_is_3d = 1;
 static double anvil_camera_x = 0.0, anvil_camera_y = 3.0, anvil_camera_z = 8.0;
@@ -157,15 +150,6 @@ static double anvil_elapsed_seconds;
 static LARGE_INTEGER anvil_clock_frequency;
 static LARGE_INTEGER anvil_clock_start;
 static unsigned long long anvil_rng_state = 0x9e3779b97f4a7c15ULL;
-static SOCKET anvil_net_socket = INVALID_SOCKET;
-static SOCKADDR_IN anvil_net_peer;
-static int anvil_net_has_peer;
-static int anvil_winsock_started;
-static double anvil_net_value;
-static AnvilPhysicsBody anvil_physics_bodies[ANVIL_PHYSICS_BODIES];
-static int anvil_physics_active_capacity = ANVIL_PHYSICS_BODIES;
-static double anvil_physics_gravity_x;
-static double anvil_physics_gravity_y = -9.81;
 
 static uint32_t anvil_color(int r, int g, int b) {
   if (r < 0)
@@ -198,6 +182,21 @@ static void anvil_pixel(int x, int y, uint32_t color, int alpha) {
   int g = (((color >> 8) & 255) * alpha + ((old >> 8) & 255) * inv) / 255;
   int b = ((color & 255) * alpha + (old & 255) * inv) / 255;
   anvil_pixels[index] = anvil_color(r, g, b);
+}
+
+uint32_t *anvil_runtime_framebuffer(void) { return anvil_pixels; }
+
+int anvil_runtime_register_shutdown_hook(AnvilRuntimeShutdownHook hook) {
+  if (!hook)
+    return 0;
+  for (size_t i = 0; i < anvil_shutdown_hook_count; ++i)
+    if (anvil_shutdown_hooks[i] == hook)
+      return 1;
+  if (anvil_shutdown_hook_count >=
+      sizeof(anvil_shutdown_hooks) / sizeof(anvil_shutdown_hooks[0]))
+    return 0;
+  anvil_shutdown_hooks[anvil_shutdown_hook_count++] = hook;
+  return 1;
 }
 
 static void anvil_clear_frame(void) {
@@ -394,11 +393,14 @@ void anvil_circle(double x, double y, double radius, int r, int g, int b,
   radius *= anvil_camera2d_zoom;
   int rr = (int)ceil(fabs(radius)), cx = (int)lrint(x), cy = (int)lrint(y);
   uint32_t c = anvil_color(r, g, b);
-  double r2 = radius * radius;
-  for (int py = cy - rr; py <= cy + rr; ++py)
-    for (int px = cx - rr; px <= cx + rr; ++px) {
+  /* Preserve the existing squared-distance predicate in its safe domain.
+     Hypot avoids overflowing squares for extreme finite C-API arguments. */
+  int squared = magnitude <= 1.0e150;
+  double r2 = squared ? radius * radius : 0.0;
+  for (int py = miny; py <= maxy; ++py)
+    for (int px = minx; px <= maxx; ++px) {
       double dx = px - x, dy = py - y;
-      if (dx * dx + dy * dy <= r2)
+      if (squared ? dx * dx + dy * dy <= r2 : hypot(dx, dy) <= radius)
         anvil_pixel(px, py, c, a);
     }
 }
@@ -2476,7 +2478,7 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     return 0;
   }
   }
-  return DefWindowProcA(window, message, wparam, lparam);
+  return DefWindowProcW(window, message, wparam, lparam);
 }
 
 /* ---- Saves -------------------------------------------------------------
@@ -3934,7 +3936,7 @@ static void anvil_release_frame_resources(void) {
     free(anvil_images[i].pixels);
     memset(&anvil_images[i], 0, sizeof(anvil_images[i]));
   }
-  anvil_image_memory_used = 0;
+  anvil_shutdown_hook_count = 0;
   if (anvil_memory_dc && anvil_old_bitmap)
     SelectObject(anvil_memory_dc, anvil_old_bitmap);
   if (anvil_bitmap)
@@ -4002,8 +4004,16 @@ double anvil_window_fullscreen(double on) {
 }
 
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
-  HINSTANCE instance = GetModuleHandleA(NULL);
-  WNDCLASSEXA wc;
+  HINSTANCE instance = GetModuleHandleW(NULL);
+  const char *utf8_title = title ? title : "Anvil Game";
+  int title_units = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_title, -1, NULL, 0);
+  if (title_units <= 0) return;
+  wchar_t *wide_title = (wchar_t *)malloc((size_t)title_units * sizeof(wchar_t));
+  if (!wide_title) return;
+  if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_title, -1, wide_title, title_units)) {
+    free(wide_title); return;
+  }
+  WNDCLASSEXW wc;
   memset(&wc, 0, sizeof(wc));
   wc.cbSize = sizeof(wc);
   wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -4011,16 +4021,17 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   wc.hInstance = instance;
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-  wc.lpszClassName = "AnvilNativeGameWindow";
-  RegisterClassExA(&wc);
+  wc.lpszClassName = L"AnvilNativeGameWindow";
+  if (!RegisterClassExW(&wc)) { free(wide_title); return; }
   RECT rect = {0, 0, ANVIL_WIDTH, ANVIL_HEIGHT};
   AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
-  anvil_window = CreateWindowExA(
-      0, wc.lpszClassName, title ? title : "Anvil Game", WS_OVERLAPPEDWINDOW,
+  anvil_window = CreateWindowExW(
+      0, wc.lpszClassName, wide_title, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left,
       rect.bottom - rect.top, NULL, NULL, instance, NULL);
+  free(wide_title);
   if (!anvil_window) {
-    UnregisterClassA(wc.lpszClassName, instance);
+    UnregisterClassW(wc.lpszClassName, instance);
     return;
   }
   anvil_memory_dc = CreateCompatibleDC(NULL);
@@ -4051,13 +4062,13 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   anvil_running = 1;
   MSG msg;
   while (anvil_running) {
-    while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) {
         anvil_running = 0;
         break;
       }
       TranslateMessage(&msg);
-      DispatchMessageA(&msg);
+      DispatchMessageW(&msg);
     }
     if (!anvil_running)
       break;
@@ -4123,14 +4134,14 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
       Sleep(0);
   }
   anvil_release_frame_resources();
-  UnregisterClassA(wc.lpszClassName, instance);
+  UnregisterClassW(wc.lpszClassName, instance);
   return;
 
 failed_startup:
   anvil_release_frame_resources();
   if (anvil_window)
     DestroyWindow(anvil_window);
-  UnregisterClassA(wc.lpszClassName, instance);
+  UnregisterClassW(wc.lpszClassName, instance);
 }
 
 static size_t anvil_array_checked_index(const double *values, int size,

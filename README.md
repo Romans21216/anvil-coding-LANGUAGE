@@ -1,6 +1,6 @@
 # Anvil
 
-**Anvil** is a small BASIC/Lua-inspired game language with its own `.ANVL` source format. The current default compiler emits C and invokes MSVC for broader engine coverage. An experimental direct x64 backend (`--backend native`) writes a Windows `.exe` without emitting C/Rust or invoking another compiler; it supports numeric programs and an initial 2D window runtime. The project target is a complete Anvil-owned compiler and runtime with no C or Rust dependency.
+**Anvil** is a small BASIC/Lua-inspired game language with its own `.ANVL` source format. The intended build is one command: Anvil parses and validates the source, generates C, then invokes the selected C compiler to produce machine code and an executable. The C translation is available for inspection with `--emit-c`. An experimental direct x64 backend (`--backend native`) remains optional; it is not the required architecture or a prerequisite for engine features.
 
 Try the language without writing a file first:
 
@@ -101,7 +101,7 @@ hello, Ada
 - A configurable fixed-step 2D circle and axis-aligned box-body system (up to 128 slots) with forces, gravity, restitution, mixed-shape collision response, and Coulomb friction.
 - A VS Code language extension and a browser-based preview workbench.
 
-This is an early prototype. Conventional primitives use a fixed-size software rasterizer, and ray-traced spheres use CPU BVH traversal; hardware DXR is not implemented. Image loading supports uncompressed BMP only; 3D mesh textures, image compression, and sprite animation are not implemented. Physics supports up to 128 fixed-step 2D circles and axis-aligned boxes, including mixed-shape contacts and per-body Coulomb friction, but has no rotation, continuous collision detection, or broad phase. The networking sample is a bare LAN prototype, not a secure or reliable Internet multiplayer stack. Rust output, audio, 3D physics, a full editor, portability, and performance benchmarks are future work. “Hyper-efficient” is a design goal, not a measured result.
+This is an early prototype. Conventional primitives use a fixed-size software rasterizer, and ray-traced spheres use CPU BVH traversal; hardware DXR is not implemented. Image loading supports uncompressed BMP only; 3D mesh textures, image compression, and sprite animation are not implemented. Physics supports up to 128 fixed-step 2D circles and axis-aligned boxes, including mixed-shape contacts and per-body Coulomb friction, but has no rotation, continuous collision detection, or broad phase. The networking sample is a bare LAN prototype, not a secure or reliable Internet multiplayer stack. Audio, 3D physics, a full editor, portability, and performance benchmarks are future work. “Hyper-efficient” is a design goal, not a measured result.
 
 ## Diagnose without building
 
@@ -128,7 +128,7 @@ python compiler/anvil.py game.ANVLproj --check
 On Windows, install Python 3.11 or newer and Visual Studio 2022 Build Tools with the **Desktop development with C++** workload. MSVC is the verified compiler. Then run:
 
 ```powershell
-python compiler/anvil.py examples/first_world.ANVL --release --generated-c build/first_world.c --output build/first_world.exe
+python compiler/anvil.py examples/first_world.ANVL --release --output build/first_world.exe
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
 python compiler/anvil.py examples/loops.ANVL --release --output build/loops.exe
 python compiler/anvil.py examples/arrays.ANVL --release --output build/arrays.exe
@@ -138,7 +138,7 @@ python compiler/anvil.py examples/physics_friction.ANVL --release --output build
 python compiler/anvil.py examples/image_sprite.ANVL --release --output build/image_sprite.exe
 ```
 
-This writes inspectable C and compiles it with MSVC. To only translate Anvil to C, add `--emit-c build/first_world.c`. The generated C is ordinary C, while the runtime currently targets Windows.
+This compiles through temporary C with MSVC in the same build command, then removes the C and object intermediates automatically. Generated C keeps functions and global scalar/array storage reachable from selected entry points and callbacks, including function-reference targets. Release builds enable MSVC function/data sections and linker elimination. A runtime-module registry compiles image loading, networking, and 2D physics in separate C translation units only when reachable Anvil code uses those features. The renderer and remaining runtime systems still share the core translation unit. Image resources are released through the core runtime shutdown-hook interface. These are internal feature boundaries, not yet a user-facing package/import system. To preserve translated C for inspection, add `--generated-c build/first_world.c`; to only translate without building, use `--emit-c build/first_world.c`. The generated C is ordinary C, while the supplied runtime currently targets Windows. Anvil owns the language front end, validation, reachability analysis, and runtime; the C toolchain performs machine-code generation and linking.
 
 To try the experimental direct backend, only Python 3.11 or newer is required on Windows x64:
 
@@ -148,7 +148,7 @@ python compiler/anvil.py examples/native_2d.ANVL --backend native --output build
 ./build/native_2d.exe
 ```
 
-This backend writes x64 machine code and a PE32+ executable directly. In the native 2D sample, Left/Right move the panel, Space pauses the animated marker, and R resets its position. Left drag positions the panel, the wheel moves it horizontally, right click pauses, and middle click resets. Closing the window ends the program. Native rendering supports opaque rectangles in client pixels, with keyboard input and client-pixel mouse queries for pointer position, three buttons, and vertical wheel input. Other shapes, text, 3D, assets, physics, networking, and project manifests remain unavailable on this path. See [the native compiler migration plan](docs/NATIVE_X64_COMPILER_MIGRATION.md) for its exact limits and status.
+This backend writes x64 machine code and a PE32+ executable directly. In the native 2D sample, Left/Right move the panel, Space pauses the animated marker, and R resets its position. Left drag positions the panel, the wheel moves it horizontally, right click pauses, and middle click resets. Closing the window ends the program. Native rendering supports RGB/RGBA rectangles, filled circles, clipped lines and literal Unicode text in client pixels, with keyboard input and client-pixel mouse queries for pointer position, three buttons, and vertical wheel input. General strings/numeric HUD formatting, text opacity, 3D, assets, physics and networking remain unavailable on this path. Text currently accepts a single-line literal with -l(x,y). Build `examples/native_shapes.ANVL` with `--backend native` for the new Anvil-written drawing kernels. See [the native compiler migration plan](docs/NATIVE_X64_COMPILER_MIGRATION.md) for its exact limits and status.
 
 The direct backend also supports basic math, deterministic seeded integer random numbers, gradient noise and fBm. Build `examples/native_procedural.ANVL` with `--backend native` for terrain generated by an Anvil-written procedural runtime. Space or left click regenerates it. See the migration guide for numeric domains and remaining native limitations; package registries/binary plugins and Forge targets remain unfinished.
 
@@ -197,11 +197,24 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Mouse input sample](examples/mouse_input.ANVL)
 - [BMP image sprite sample](examples/image_sprite.ANVL)
 - [VS Code extension](vscode-extension/README.md)
+- [Windows file icons and registration](docs/WINDOWS_FILE_ICONS.md)
 - [Full improvement backlog](docs/IMPROVEMENT_BACKLOG.md)
 - [Wiki pages](docs/Wiki/Home.md)
 - [Contribution and bug reporting rules](CONTRIBUTING.md)
 
-`.ANVL` is the source extension and `.ANVLproj` is the TOML project manifest. The compiler resolves the manifest's entry path within the project folder and applies its project name and fixed update rate. Anvil is a working project name; it has not had trademark clearance.
+`.ANVL` is the source extension and `.ANVLproj` is the TOML project manifest. The compiler resolves the manifest's entry path within the project folder and applies its project name and fixed update rate. An optional `[memory]` table can set `local_array_elements` (1–1,048,576 per function, default 8,192) and `active_call_memory_mib` (1–2,048 MiB across active local arrays, default 16 MiB). The compiler rejects settings outside those ranges, and rejects a function whose local arrays cannot fit in the configured active-call budget. These settings apply to both build backends. Anvil is a working project name; it has not had trademark clearance.
+
+```toml
+name = "My Game"
+entry = "src/main.ANVL"
+
+[engine]
+fixed_hz = 60
+
+[memory]
+local_array_elements = 8192
+active_call_memory_mib = 16
+```
 
 ## Troubleshooting
 
@@ -209,7 +222,13 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - **Manifest entry is rejected:** use a path relative to `game.ANVLproj`; entries must stay inside that project folder.
 - **VS Code validation cannot find a package:** run `npm ci --prefix vscode-extension` once, then rerun the validation command.
 
+Version 2 programs may declare `name "..."`, `author("...")`, and `version("...")`, use `var(name)` for local variables and `varl(name)` for globals, and store checked function references with `fnref(function)`. Selective imports and qualified calls accept the clearer two-dash form: `include fn(move) -- "lib/player.ANVL"` and `call fn(move -- player, 10)`. The older single-dash qualifier and version 1 variable meanings remain supported.
+
 The `.ANVL` suffix is used here for Anvil source; the name also appears in an unrelated metadata serialization format, so the suffix is not globally unique.
 
 
-Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](docs/INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
+Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph and emit reachable Anvil functions; the native backend also emits its reachable runtime dependencies. The C backend removes unused global scalar and array storage, and release linking can discard unused runtime functions/data. See [include semantics and limits](docs/INCLUDES.md). Selective imports use `include fn(move) - "lib/player.ANVL"`, with `call fn(move - player, 10)` and optional `as alias` for same-basename files. Private helper functions and state stay with their source module. Package registries and separate object linking remain unfinished.
+
+Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
+
+Direct native function-local arrays now use zeroed per-call heap storage with checked indexing, cleanup and an active allocation budget; see [native array semantics](docs/NATIVE_X64_COMPILER_MIGRATION.md#native-local-arrays). Exact review status is recorded in docs/QA_REPORT.md.

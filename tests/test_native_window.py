@@ -220,7 +220,7 @@ end
             sections = pe + 24 + struct.unpack_from("<H", image, pe + 20)[0]
             text_raw = struct.unpack_from("<I", image, sections + 20)[0]
             call = next(offset - 2 for offset, target in generator.code.fixups
-                        if target == "iat:CreateCompatibleBitmap")
+                        if target == "iat:CreateDIBSection")
             # Simulate a NULL allocation result at the emitted API call itself.
             image[text_raw + call:text_raw + call + 6] = b"\x31\xc0\x90\x90\x90\x90"
             executable = pathlib.Path(temp) / "failure.exe"
@@ -238,7 +238,7 @@ end
             ("scene 3d\nfn(draw)\nend\n", "one scene 2d"),
             ("scene 2d\nfn(draw, x)\nend\n", "fn(draw) with no parameters"),
             ("scene 2d\nfn(update, value)\nend\nfn(draw)\nend\n", "fn(update) cannot have parameters"),
-            ("scene 2d\nfn(draw)\n display circle(0,0,4)\nend\n", "display rect only"),
+            ("scene 2d\nfn(draw)\n display plane(0,0,4,4,5)\nend\n", "display rect, circle, line or text only"),
             ("scene 2d\nclear rgba(0,0,0,20)\nfn(draw)\nend\n", "alpha 255"),
         ]
         for source, diagnostic in cases:
