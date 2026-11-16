@@ -399,27 +399,27 @@ class SpriteDrawTests(unittest.TestCase):
 
                 wait_for("plain")
                 reader.settle(RED, 10, 10)
-                self.assertEqual(reader.pixel(12, 10), GREEN)
-                self.assertEqual(reader.pixel(10, 12), BLUE)
-                self.assertEqual(reader.pixel(12, 12), WHITE)
+                reader.settle(GREEN, 12, 10)
+                reader.settle(BLUE, 10, 12)
+                reader.settle(WHITE, 12, 12)
 
                 wait_for("flip")
                 reader.settle(GREEN, 10, 10)
-                self.assertEqual(reader.pixel(12, 10), RED)
-                self.assertEqual(reader.pixel(10, 12), WHITE)
-                self.assertEqual(reader.pixel(12, 12), BLUE)
+                reader.settle(RED, 12, 10)
+                reader.settle(WHITE, 10, 12)
+                reader.settle(BLUE, 12, 12)
 
                 wait_for("tint")
                 reader.settle((128, 0, 0), 10, 10)
-                self.assertEqual(reader.pixel(12, 10), (0, 128, 0))
+                reader.settle((0, 128, 0), 12, 10)
 
                 wait_for("rot")
                 # 90 degrees clockwise: top-left blue, top-right red,
                 # bottom-left white, bottom-right green.
                 reader.settle(BLUE, 37, 37)
-                self.assertEqual(reader.pixel(43, 37), RED)
-                self.assertEqual(reader.pixel(37, 43), WHITE)
-                self.assertEqual(reader.pixel(43, 43), GREEN)
+                reader.settle(RED, 43, 37)
+                reader.settle(WHITE, 37, 43)
+                reader.settle(GREEN, 43, 43)
 
                 wait_for("done")
             finally:
@@ -557,7 +557,7 @@ class SpriteRegionTests(unittest.TestCase):
                 wait_for("flip")
                 # The top half (red | green) is mirrored inside its region.
                 reader.settle(GREEN, 11, 11)
-                self.assertEqual(reader.pixel(16, 11), RED)
+                reader.settle(RED, 16, 11)
 
                 wait_for("bad")
                 self.assertEqual(next_line(), "0")

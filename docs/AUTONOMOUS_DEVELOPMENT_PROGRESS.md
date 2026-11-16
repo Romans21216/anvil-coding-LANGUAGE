@@ -534,3 +534,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Bug caught by the test:** the width guard unpacked the sprite tuple with the fields in the wrong position, so it compared heights and allowed a 5 px image into a 4 px sheet. `pack()` now indexes the width field directly.
 - **Tests:** `tests/test_atlas_pack.py` packs three solid sprites, reads the sheet back and checks every cell pixel against the manifest rectangle, verifies rectangles do not overlap with padding, requires byte-identical sheet and JSON across runs, and covers the duplicate-name and oversized-image errors; 4 passed.
 - **Docs:** `docs/ATLAS.md` documents the workflow, options, manifest and `image_draw_region` usage.
+
+## Batch 41 — audio mixer groups (8.14)
+
+- **Runtime:** every loaded sound carries a group (1..3, default 1). Three group gains plus a master gain (group 0) multiply into the mixer, with mute tracked separately so a muted group keeps its volume. `sound_group(handle,group)`, `sound_group_volume(group,v)` (0..1), `sound_group_mute(group,on)`, `sound_group_gain(group)` (effective, 0 while muted) and `sound_group_stop(group)` (0 stops all) are exposed.
+- **Compatibility:** the default group is 1 and its gain is 1.0, so existing programs mix exactly as before.
+- **Tests:** `tests/test_audio_groups.py` covers assignment, invalid groups and fractional groups, gain clamping, master gain and mute, and stop isolation with two looping voices in groups 1 and 2 plus a stop-all; 3 passed. Playback cases skip when the machine has no audio device.
+- **Docs:** language spec audio row, evidence ledger, testing doc.

@@ -2501,6 +2501,7 @@ typedef struct {
   short *frames;
   size_t frame_count;
   int used;
+  int group;  /* 1..3; master is group 0 and applies to every sound */
 } AnvilSound;
 
 typedef struct {
@@ -2514,6 +2515,10 @@ typedef struct {
 
 static AnvilSound anvil_sounds[ANVIL_SOUND_SLOTS];
 static AnvilVoice anvil_voices[ANVIL_SOUND_VOICES];
+/* Index 0 is the master gain; 1..3 are mixer groups. Muting is separate so a
+   group keeps its volume while silent. */
+static double anvil_group_gain[4] = {1.0, 1.0, 1.0, 1.0};
+static int anvil_group_muted[4];
 static size_t anvil_sound_bytes;
 static CRITICAL_SECTION anvil_audio_lock;
 static int anvil_audio_lock_ready;
@@ -2590,8 +2595,12 @@ static void anvil_audio_mix(short *out, int frames) {
       voice->sound = 0;
       continue;
     }
-    double left = voice->volume * (voice->pan > 0.0 ? 1.0 - voice->pan : 1.0);
-    double right = voice->volume * (voice->pan < 0.0 ? 1.0 + voice->pan : 1.0);
+    double master = anvil_group_muted[0] ? 0.0 : anvil_group_gain[0];
+    int group = sound->group >= 1 && sound->group <= 3 ? sound->group : 1;
+    double group_gain = anvil_group_muted[group] ? 0.0 : anvil_group_gain[group];
+    double gain = voice->volume * group_gain * master;
+    double left = gain * (voice->pan > 0.0 ? 1.0 - voice->pan : 1.0);
+    double right = gain * (voice->pan < 0.0 ? 1.0 + voice->pan : 1.0);
     for (int i = 0; i < frames; ++i) {
       if (voice->position >= (double)sound->frame_count) {
         if (!voice->loop) {
@@ -2896,6 +2905,7 @@ double anvil_sound_load(const char *path) {
   anvil_sounds[slot].frames = frames;
   anvil_sounds[slot].frame_count = frame_count;
   anvil_sounds[slot].used = 1;
+  anvil_sounds[slot].group = 1;
   anvil_sound_bytes += bytes;
   return (double)(slot + 1);
 }
@@ -2971,6 +2981,78 @@ double anvil_sound_stop_all(void) {
   EnterCriticalSection(&anvil_audio_lock);
   for (int i = 0; i < ANVIL_SOUND_VOICES; ++i) {
     if (anvil_voices[i].sound) {
+      memset(&anvil_voices[i], 0, sizeof(AnvilVoice));
+      stopped++;
+    }
+  }
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)stopped;
+}
+
+/* Mixer groups: 0 is the master gain, 1..3 are assignable groups. A sound is
+   in group 1 until moved, so existing programs are unaffected. */
+static int anvil_sound_group_index(double value, int allow_master) {
+  int low = allow_master ? 0 : 1;
+  if (!isfinite(value) || value < (double)low || value > 3.0 ||
+      floor(value) != value)
+    return -1;
+  return (int)value;
+}
+
+double anvil_sound_group(double handle, double group) {
+  int index = anvil_sound_group_index(group, 0);
+  if (!anvil_sound_valid(handle) || index < 0)
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_sounds[(int)handle - 1].group = index;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)index;
+}
+
+double anvil_sound_group_volume(double group, double volume) {
+  int index = anvil_sound_group_index(group, 1);
+  if (index < 0)
+    return 0.0;
+  double applied = anvil_audio_clamp(volume, 0.0, 1.0);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_group_gain[index] = applied;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return applied;
+}
+
+double anvil_sound_group_mute(double group, double on) {
+  int index = anvil_sound_group_index(group, 1);
+  if (index < 0)
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_group_muted[index] = on != 0.0;
+  int muted = anvil_group_muted[index];
+  LeaveCriticalSection(&anvil_audio_lock);
+  return muted ? 1.0 : 0.0;
+}
+
+double anvil_sound_group_gain(double group) {
+  int index = anvil_sound_group_index(group, 1);
+  if (index < 0 || anvil_group_muted[index])
+    return 0.0;
+  return anvil_group_gain[index];
+}
+
+double anvil_sound_group_stop(double group) {
+  int index = anvil_sound_group_index(group, 1);
+  if (index < 0 || !anvil_audio_lock_ready)
+    return 0.0;
+  int stopped = 0;
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i) {
+    if (!anvil_voices[i].sound)
+      continue;
+    int slot = anvil_voices[i].sound - 1;
+    int voice_group = anvil_sounds[slot].used ? anvil_sounds[slot].group : 0;
+    if (index == 0 || voice_group == index) {
       memset(&anvil_voices[i], 0, sizeof(AnvilVoice));
       stopped++;
     }
