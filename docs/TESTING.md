@@ -24,7 +24,7 @@ is absent, tests that build C programs raise `SkipTest` instead of failing.
 | Full suite (headless and interactive) | `python -m pytest tests -q` |
 | Headless only | `python -m pytest tests -q --ignore=tests/test_native_keyboard.py --ignore=tests/test_native_mouse.py --ignore=tests/test_native_window.py --ignore=tests/test_native_procedural.py` |
 | One area | `python -m pytest tests/test_number.py tests/test_mid.py -q` |
-| Backend capability drift | `python tools/capability_matrix.py --check` |
+| Backend capability drift (C, native, wasm) | `python tools/capability_matrix.py --check` |
 | Compile-time and size budgets | `python tools/bench_anvil.py --check` (re-baseline with `--write-budgets`) |
 | Runtime frame-time budgets | `python tools/bench_runtime.py --check` (re-baseline with `--write-budgets`) |
 | Compile and runtime memory budgets | `python tools/bench_memory.py --check` (re-baseline with `--write-budgets`) |
