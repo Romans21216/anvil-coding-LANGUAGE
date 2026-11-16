@@ -35,6 +35,7 @@ const ops = [];
 const voices = new Map();
 const triangles = [];
 let nextVoice = 0;
+let musicPlaying = false;
 const readCString = (pointer) => {
   const view = new Uint8Array(memory.buffer);
   let end = pointer;
@@ -83,6 +84,24 @@ const imports = {
         hash = Math.imul(hash, 16777619) >>> 0;
       }
       ops.push(["image_region", width, height, sx, sy, sw, sh, dx, dy, dw, dh, tintR, tintG, tintB, flipX, flipY, hash]);
+    },
+    music_play(pointer, frames, channels, rate, volume, loop) {
+      musicPlaying = true;
+      ops.push(["music_play", frames, channels, rate, volume, loop ? 1 : 0]);
+      return 1;
+    },
+    music_stop() {
+      musicPlaying = false;
+      ops.push(["music_stop"]);
+    },
+    music_playing() {
+      return musicPlaying ? 1 : 0;
+    },
+    music_volume(volume) {
+      ops.push(["music_volume", volume]);
+    },
+    music_position() {
+      return 0;
     },
     sound_play(pointer, frames, channels, rate, volume, loop, group) {
       const samples = new Int16Array(memory.buffer, pointer, frames * channels);

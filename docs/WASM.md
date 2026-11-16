@@ -71,6 +71,9 @@ Supported today:
   `sound_group_gain`, `sound_group_stop`, `sound_active`, `sound_destroy`,
   `sound_error` (literal paths baked at build time; streaming music is not there
   yet)
+- music: `music_load`, `music_play`, `music_play_loop`, `music_stop`,
+  `music_playing`, `music_volume`, `music_position`, `music_length`,
+  `music_error` (one literal track, baked at build time)
 - saves: `save_number`, `load_number`, `save_text`, `load_text`,
   `save_exists`, `save_delete`, `save_error`
 
@@ -195,6 +198,18 @@ the C runtime.
 
 Not implemented yet: 4-bit BMPs and any image loaded through a non-literal
 path.
+
+## Music
+
+One looping track per build, like the desktop streaming player, with one
+difference worth stating plainly: the browser build cannot stream from disk
+without an async fetch contract, and the music API is synchronous, so the track
+is decoded at build time and baked into the module (16 MiB of samples, PCM WAV
+mono/stereo, 8/16-bit, 8,000-192,000 Hz). `music_length()` is the decoded
+duration, `music_position()` comes from the host's audio clock and wraps on a
+looping track, and `music_stop` stops and resets the source. A computed path
+cannot be baked and reports that through `music_error()`; a missing file is a
+located build error.
 
 ## Saves
 

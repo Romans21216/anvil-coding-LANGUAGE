@@ -192,6 +192,24 @@ double anvil_sound_active(void);
 double anvil_sound_destroy(double handle);
 const char *anvil_sound_error(void);
 
+/* One music track, baked into the module by the compiler. */
+typedef struct {
+  const char *path;
+  int channels, rate, frames;
+  const short *pcm;
+} AnvilWasmMusic;
+
+void anvil_wasm_set_music(const AnvilWasmMusic *music);
+double anvil_music_load(const char *path);
+double anvil_music_play(void);
+double anvil_music_play_loop(void);
+double anvil_music_stop(void);
+double anvil_music_playing(void);
+double anvil_music_volume(double volume);
+double anvil_music_position(void);
+double anvil_music_length(void);
+const char *anvil_music_error(void);
+
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);
 void anvil_set_scene3d(int enabled);

@@ -745,6 +745,100 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
 }
 
 
+__attribute__((import_module("env"), import_name("music_play")))
+extern int anvil_host_music_play(const short *pcm, int frames, int channels,
+                                 int rate, double volume, int loop);
+__attribute__((import_module("env"), import_name("music_stop")))
+extern void anvil_host_music_stop(void);
+__attribute__((import_module("env"), import_name("music_playing")))
+extern int anvil_host_music_playing(void);
+__attribute__((import_module("env"), import_name("music_volume")))
+extern void anvil_host_music_volume(double volume);
+__attribute__((import_module("env"), import_name("music_position")))
+extern double anvil_host_music_position(void);
+
+/* ---- Music, baked at compile time --------------------------------------
+   One looping track, like the desktop runtime's streaming player, except the
+   browser build carries the decoded samples in the module: a browser cannot
+   stream from disk without an async fetch contract, and the music API is
+   synchronous. The host owns playback position. */
+static const AnvilWasmMusic *anvil_baked_music_value;
+static int anvil_music_loaded;
+static int anvil_music_ready;
+static const char *anvil_music_error_text = "";
+static double anvil_music_volume_value = 1.0;
+
+void anvil_wasm_set_music(const AnvilWasmMusic *music) {
+  anvil_baked_music_value = music;
+  if (music)
+    anvil_music_loaded = 1;
+}
+
+void anvil_wasm_register_music(void) __attribute__((weak));
+
+static void anvil_music_ensure(void) {
+  if (anvil_music_ready)
+    return;
+  anvil_music_ready = 1;
+  if (anvil_wasm_register_music)
+    anvil_wasm_register_music();
+}
+
+const char *anvil_music_error(void) { return anvil_music_error_text; }
+
+double anvil_music_load(const char *path) {
+  anvil_music_ensure();
+  if (!anvil_baked_music_value ||
+      strcmp(anvil_baked_music_value->path, path) != 0) {
+    anvil_music_error_text =
+        "the music was not baked into this build; only the literal "
+        "music_load() path is available in the wasm backend";
+    return 0.0;
+  }
+  anvil_music_error_text = "";
+  return 1.0;
+}
+
+static double anvil_music_start(int loop) {
+  if (!anvil_music_loaded || !anvil_baked_music_value)
+    return 0.0;
+  int voice = anvil_host_music_play(
+      anvil_baked_music_value->pcm, anvil_baked_music_value->frames,
+      anvil_baked_music_value->channels, anvil_baked_music_value->rate,
+      anvil_music_volume_value, loop);
+  if (voice <= 0)
+    return 0.0;
+  return 1.0;
+}
+
+double anvil_music_play(void) { return anvil_music_start(0); }
+double anvil_music_play_loop(void) { return anvil_music_start(1); }
+
+double anvil_music_stop(void) {
+  anvil_host_music_stop();
+  return 1.0;
+}
+
+double anvil_music_playing(void) { return (double)anvil_host_music_playing(); }
+
+double anvil_music_volume(double volume) {
+  if (!(volume == volume))
+    return 0.0;
+  double clamped = volume < 0.0 ? 0.0 : volume > 1.0 ? 1.0 : volume;
+  anvil_music_volume_value = clamped;
+  anvil_host_music_volume(clamped);
+  return clamped;
+}
+
+double anvil_music_position(void) { return anvil_host_music_position(); }
+
+double anvil_music_length(void) {
+  if (!anvil_baked_music_value || anvil_baked_music_value->rate <= 0)
+    return 0.0;
+  return (double)anvil_baked_music_value->frames /
+         (double)anvil_baked_music_value->rate;
+}
+
 /* ---- Shadows and culling ------------------------------------------------ */
 static int anvil_shadows_enabled;
 static double anvil_shadow_ground_y;

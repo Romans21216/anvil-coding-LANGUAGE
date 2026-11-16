@@ -133,9 +133,9 @@ class WasmRejectionTests(unittest.TestCase):
     def test_unsupported_builtins_name_the_call_site(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(root, "fn(main)\n  say music_load(\"song.wav\")\nend\ncall fn(main)\n")
+            result, _ = build(root, "fn(main)\n  say body_create(0, 0, 1, 1)\nend\ncall fn(main)\n")
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("'music_load' is not available in the wasm backend yet", result.stderr)
+            self.assertIn("'body_create' is not available in the wasm backend yet", result.stderr)
             self.assertIn(":2:", result.stderr)
 
 
@@ -1317,6 +1317,103 @@ class WasmShadowCullingTests(unittest.TestCase):
             ops = json.loads(run.stdout.strip().splitlines()[-1])
             summary = [op for op in ops if op[0] == "triangles"][0]
             self.assertEqual(summary[1], 4, "two model triangles plus two shadow triangles")
+
+
+
+_MUSIC_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "set var(report) = 0",
+        "",
+        "fn(update)",
+        "  if var(report) = 0",
+        '    set var(loaded) = music_load("song.wav")',
+        "    say var(loaded)",
+        "    say music_length()",
+        "    say music_play_loop()",
+        "    say music_playing()",
+        "    say music_volume(0.5)",
+        "    say music_position()",
+        "    set var(report) = 1",
+        "  end",
+        "end",
+        "",
+        "fn(draw)",
+        "  display rect(0, 0, 1, 1) -rgb(0, 0, 0)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmMusicTests(unittest.TestCase):
+    def test_a_baked_track_plays_and_reports_its_length(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            _write_tone(root / "song.wav", frames=1600)
+            result, out = build(root, _MUSIC_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertEqual(lines[:6], ["1", "0.2", "1", "1", "0.5", "0"])
+            ops = json.loads(lines[-1])
+            self.assertIn(["music_play", 1600, 1, 8000, 1, 1], ops)
+            self.assertIn(["music_volume", 0.5], ops)
+
+    def test_a_missing_track_is_a_located_build_error(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, _ = build(
+                root,
+                'scene 2d\n\nfn(draw)\n  set var(m) = music_load("nope.wav")\nend\n',
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('music_load cannot read "nope.wav"', result.stderr)
+            self.assertIn(":4:", result.stderr)
+
+    def test_a_computed_track_path_reports_the_bake_limit(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            _write_tone(root / "song.wav", frames=800)
+            program = "\n".join(
+                (
+                    "scene 2d",
+                    'set var(name) = "song.wav"',
+                    "set var(report) = 0",
+                    "",
+                    "fn(update)",
+                    "  if var(report) = 0",
+                    "    say music_load(var(name))",
+                    "    say music_error()",
+                    "    set var(report) = 1",
+                    "  end",
+                    "end",
+                    "",
+                    "fn(draw)",
+                    "  display rect(0, 0, 1, 1) -rgb(0, 0, 0)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertIn("only the literal music_load() path", run.stdout)
 
 
 if __name__ == "__main__":

@@ -104,6 +104,15 @@ ALLOWED_BUILTINS = {
     "shadow",
     "shadow_height",
     "shadow_alpha",
+    "music_load",
+    "music_play",
+    "music_play_loop",
+    "music_stop",
+    "music_playing",
+    "music_volume",
+    "music_position",
+    "music_length",
+    "music_error",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
@@ -143,6 +152,7 @@ async function start() {
     let app = null;
     const imageCache = new Map();
     const audioState = { ctx: null, voices: new Map(), nextVoice: 0, active: 0 };
+    const musicState = { source: null, gain: null, startedAt: 0, loop: false, length: 0 };
     const triangles = [];
     const audioContext = () => {
       if (!audioState.ctx) {
@@ -183,6 +193,12 @@ async function start() {
       state: audioState.ctx ? audioState.ctx.state : "none",
       sampleRate: audioState.ctx ? audioState.ctx.sampleRate : 0,
       groups: audioGroups.map((node) => (node ? node.gain.value : 1)),
+      music: {
+        playing: musicState.source ? true : false,
+        position: musicState.source && audioState.ctx
+          ? audioState.ctx.currentTime - musicState.startedAt
+          : 0,
+      },
     });
     const tintedSurface = (pointer, width, height, tintR, tintG, tintB) => {
       const key = pointer + ":" + tintR + ":" + tintG + ":" + tintB;
@@ -265,6 +281,58 @@ async function start() {
         context.scale(flipX ? -1 : 1, flipY ? -1 : 1);
         context.drawImage(offscreen, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
         context.restore();
+      },
+      music_play(pointer, frames, channels, rate, volume, loop) {
+        const ctx = audioContext();
+        if (!ctx || frames <= 0) return 0;
+        if (musicState.source) {
+          try { musicState.source.stop(); } catch (error) { /* ended */ }
+          musicState.source = null;
+        }
+        const samples = new Int16Array(memory.buffer, pointer, frames * channels);
+        const buffer = ctx.createBuffer(channels, frames, rate);
+        for (let channel = 0; channel < channels; channel++) {
+          const data = buffer.getChannelData(channel);
+          for (let frame = 0; frame < frames; frame++) {
+            data[frame] = samples[frame * channels + channel] / 32768;
+          }
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = !!loop;
+        const gain = ctx.createGain();
+        gain.gain.value = volume;
+        source.connect(gain).connect(audioGroup(1));
+        source.onended = () => {
+          if (musicState.source === source) musicState.source = null;
+        };
+        source.start();
+        musicState.source = source;
+        musicState.gain = gain;
+        musicState.startedAt = ctx.currentTime;
+        musicState.loop = !!loop;
+        musicState.length = frames / rate;
+        return 1;
+      },
+      music_stop() {
+        if (musicState.source) {
+          try { musicState.source.stop(); } catch (error) { /* ended */ }
+          musicState.source = null;
+        }
+      },
+      music_playing() {
+        return musicState.source ? 1 : 0;
+      },
+      music_volume(volume) {
+        if (musicState.gain) musicState.gain.gain.value = volume;
+      },
+      music_position() {
+        if (!musicState.source || !audioState.ctx) return 0;
+        const elapsed = audioState.ctx.currentTime - musicState.startedAt;
+        if (musicState.loop && musicState.length > 0) {
+          return elapsed % musicState.length;
+        }
+        return Math.min(elapsed, musicState.length);
       },
       sound_play(pointer, frames, channels, rate, volume, loop, group) {
         const ctx = audioContext();
@@ -596,6 +664,9 @@ def bake_images(source_path: pathlib.Path, text: str) -> str:
 
 SOUND_LOAD = re.compile(r'sound_load\(\s*"((?:\\.|[^"\\])*)"')
 MAX_BAKED_SOUND_BYTES = 8 * 1024 * 1024
+MAX_BAKED_MUSIC_BYTES = 16 * 1024 * 1024
+
+MUSIC_LOAD = re.compile(r'music_load\(\s*"((?:\\.|[^"\\])*)"')
 
 
 def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
@@ -643,6 +714,52 @@ def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
             at = index * 2
             samples.append(int.from_bytes(payload[at : at + 2], "little", signed=True))
     return channels, rate, frames, samples
+
+
+def bake_music(source_path: pathlib.Path, text: str) -> str:
+    """Bake the single literal music_load() track into a C array."""
+    match = MUSIC_LOAD.search(text)
+    if not match:
+        return "\nvoid anvil_wasm_register_music(void) {}\n"
+    literal = match.group(1).replace("\\\\", "\\")
+    target = (source_path.parent / literal).resolve()
+    line = text.count("\n", 0, match.start()) + 1
+    try:
+        channels, rate, frames, samples = _wav_pcm(target)
+    except FileNotFoundError:
+        raise CompileError(
+            f'{source_path}:{line}: music_load cannot read "{literal}"'
+        ) from None
+    except ValueError as error:
+        raise CompileError(
+            f'{source_path}:{line}: music_load "{literal}": {error}'
+        ) from None
+    if len(samples) * 2 > MAX_BAKED_MUSIC_BYTES:
+        raise CompileError(
+            f"{source_path}:{line}: baked music exceeds the 16 MiB budget"
+        )
+    chunks = ["\n/* Baked music: one looping track, decoded once at load. */"]
+    chunks.append("static const short anvil_baked_music_pcm[] = {")
+    row: list[str] = []
+    for sample in samples:
+        row.append(str(sample))
+        if len(row) == 16:
+            chunks.append("  " + ", ".join(row) + ",")
+            row = []
+    if row:
+        chunks.append("  " + ", ".join(row) + ",")
+    chunks.append("};")
+    escaped = literal.replace("\\", "\\\\")
+    chunks.append(
+        "static const AnvilWasmMusic anvil_baked_music = "
+        f'{{"{escaped}", {channels}, {rate}, {frames}, anvil_baked_music_pcm}};'
+    )
+    chunks.append(
+        "void anvil_wasm_register_music(void) {\n"
+        "  anvil_wasm_set_music(&anvil_baked_music);\n"
+        "}\n"
+    )
+    return "\n".join(chunks)
 
 
 def bake_sounds(source_path: pathlib.Path, text: str) -> str:
@@ -730,6 +847,7 @@ def build(
     source_text = source_path.read_text(encoding="utf-8")
     generated += bake_images(source_path, source_text)
     generated += bake_sounds(source_path, source_text)
+    generated += bake_music(source_path, source_text)
     if emit_c_path is not None:
         emit_c_path.parent.mkdir(parents=True, exist_ok=True)
         emit_c_path.write_text(generated, encoding="utf-8")
