@@ -82,6 +82,17 @@ class ChrOrdCRuntimeTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(out, "")
 
+    def test_chr_zero_is_empty_text_because_text_is_zero_terminated(self) -> None:
+        # C8-5: the contract used to claim one-byte text for 0-255.  Anvil text
+        # is NUL-terminated, so 0 is the terminator and chr(0) is empty text;
+        # the written contract now says that instead of implying a byte.
+        code, out = self._run(
+            'fn(main)\n  say len(chr(0))\n  say ord(chr(0))\n'
+            '  say chr(0) = ""\n  say len(chr(0) & "x")\nend\ncall fn(main)\n'
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "0\n0\n1\n1\n")
+
 
 class ChrOrdNativeTests(NativeRunMixin, unittest.TestCase):
     def _run(self, text: str) -> tuple[int, str]:
@@ -127,6 +138,14 @@ class ChrOrdNativeTests(NativeRunMixin, unittest.TestCase):
         )
         self.assertEqual(code, 0)
         self.assertEqual(out, "0\n")
+
+    def test_native_chr_zero_is_empty_text(self) -> None:
+        code, out = self._run(
+            'fn(main)\n  say len(chr(0))\n  say ord(chr(0))\n'
+            '  say chr(0) = ""\n  say len(chr(0) & "x")\nend\ncall fn(main)\n'
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "0\n0\n1\n1\n")
 
 
 if __name__ == "__main__":

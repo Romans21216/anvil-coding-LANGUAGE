@@ -511,7 +511,28 @@ class _Expression:
                 self.owner.code.bytes(
                     self.owner._memory_operand(1, 5, count_disp)  # xmm1 = count
                 )
-                self.owner.code.bytes(b"\xf2\x48\x0f\x2c\xc1")  # rax = (int)count
+                # Clamp the count in floating point, then truncate it before
+                # subtracting.  A huge count must not convert to INT64_MIN, and
+                # a fractional count must take the same whole characters as the
+                # C runtime: right("abcdef", 1.9) is "f", not "e".
+                count_zero = self.owner.label("right_count_zero")
+                count_len = self.owner.label("right_count_len")
+                count_ok = self.owner.label("right_count_ok")
+                self.owner.code.bytes(b"\x66\x0f\x2e\xc9")      # ucomisd xmm1, xmm1
+                self.owner.code.conditional_jump(0x8a, count_zero)  # jp: NaN
+                self.owner.code.bytes(b"\x0f\x57\xdb")           # xorps xmm3, xmm3
+                self.owner.code.bytes(b"\x66\x0f\x2e\xcb")      # ucomisd xmm1, xmm3
+                self.owner.code.conditional_jump(0x86, count_zero)  # jbe: count <= 0
+                self.owner.code.bytes(b"\x66\x0f\x2e\xca")      # ucomisd xmm1, xmm2
+                self.owner.code.conditional_jump(0x83, count_len)   # jae: count >= len
+                self.owner.code.jump(count_ok)
+                self.owner.code.label(count_zero)
+                self.owner.code.bytes(b"\x0f\x57\xc9")           # xorps xmm1, xmm1
+                self.owner.code.jump(count_ok)
+                self.owner.code.label(count_len)
+                self.owner.code.bytes(b"\x66\x0f\x28\xca")      # movapd xmm1, xmm2
+                self.owner.code.label(count_ok)
+                self.owner.code.bytes(b"\xf2\x48\x0f\x2c\xc1")  # rax = (int64)count
                 self.owner.code.bytes(b"\xf2\x48\x0f\x2a\xc8")  # cvtsi2sd xmm1, rax
                 self.owner.code.bytes(b"\xf2\x0f\x5c\xd1")      # subsd xmm2, xmm1
                 start_ok = self.owner.label("right_start_ok")
@@ -1986,6 +2007,12 @@ class NativeCodegen:
         positive = self.label("num_positive_value")
         done = self.label("num_done")
         exp_check = self.label("num_exp_check")
+        exp_skip = self.label("num_exp_skip")
+        frac_skip = self.label("num_frac_skip")
+        trail = self.label("num_trail")
+        trail_advance = self.label("num_trail_advance")
+        trail_end = self.label("num_trail_end")
+        zero = self.label("num_zero")
         self.code.bytes(b"\x31\xc0")                    # xor eax, eax (value)
         self.code.bytes(b"\x45\x31\xc0")               # xor r8d, r8d (sign)
         skip = self.label("num_skip_space")
@@ -2038,7 +2065,15 @@ class NativeCodegen:
         self.code.bytes(b"\x48\xff\xc1")               # inc rcx
         self.code.bytes(b"\x41\x81\xfa\x00\xca\x9a\x3b")  # cmp r10d, 1e9
         self.code.conditional_jump(0x82, fracloop)       # jb: keep reading digits
-        self.code.jump(finish)
+        # Nine fraction digits filled the accumulator; consume any further
+        # digits without adding them so a trailing exponent still applies.
+        self.code.label(frac_skip)
+        self.code.bytes(b"\x0f\xb6\x11")               # movzx edx, byte [rcx]
+        self.code.bytes(b"\x80\xea\x30")               # sub dl, '0'
+        self.code.bytes(b"\x80\xfa\x09")               # cmp dl, 9
+        self.code.conditional_jump(0x87, finish)         # ja: not a digit
+        self.code.bytes(b"\x48\xff\xc1")               # inc rcx
+        self.code.jump(frac_skip)
         self.code.label(nofrac)
         self.code.bytes(b"\x45\x31\xc9")               # xor r9d, r9d
         self.code.bytes(b"\x45\x31\xd2")               # xor r10d, r10d
@@ -2098,18 +2133,31 @@ class NativeCodegen:
         self.code.bytes(b"\x48\xff\xc1")               # inc rcx
         self.code.label(exp_digits)
         self.code.bytes(b"\x45\x31\xc9")               # r9d = 0 (exponent)
+        self.code.bytes(b"\xc7\x44\x24\x30\x00\x00\x00\x00")  # [rsp+30] = 0 (no digits yet)
         self.code.label(exp_loop)
         self.code.bytes(b"\x0f\xb6\x11")               # movzx edx, byte [rcx]
         self.code.bytes(b"\x80\xea\x30")               # sub dl, '0'
         self.code.bytes(b"\x80\xfa\x09")               # cmp dl, 9
         self.code.conditional_jump(0x87, exp_apply)      # ja: exponent done
+        self.code.bytes(b"\xc7\x44\x24\x30\x01\x00\x00\x00")  # [rsp+30] = 1 (saw a digit)
         self.code.bytes(b"\x45\x6b\xc9\x0a")          # imul r9d, r9d, 10
         self.code.bytes(b"\x44\x0f\xb6\xda")          # movzx r11d, dl
         self.code.bytes(b"\x45\x01\xd9")               # add r9d, r11d
         self.code.bytes(b"\x48\xff\xc1")               # inc rcx
         self.code.bytes(b"\x41\x81\xf9\x34\x01\x00\x00")  # cmp r9d, 308
         self.code.conditional_jump(0x86, exp_loop)       # jbe: keep reading
+        # The exponent is out of double range; consume the remaining digits so
+        # the number still ends at the end of the text.
+        self.code.label(exp_skip)
+        self.code.bytes(b"\x0f\xb6\x11")               # movzx edx, byte [rcx]
+        self.code.bytes(b"\x80\xea\x30")               # sub dl, '0'
+        self.code.bytes(b"\x80\xfa\x09")               # cmp dl, 9
+        self.code.conditional_jump(0x87, exp_apply)      # ja: done
+        self.code.bytes(b"\x48\xff\xc1")               # inc rcx
+        self.code.jump(exp_skip)
         self.code.label(exp_apply)
+        self.code.bytes(b"\x83\x7c\x24\x30\x00")      # cmp dword [rsp+30], 0
+        self.code.conditional_jump(0x84, zero)           # je: 'e' with no digits
         self.code.bytes(b"\x45\x85\xc9")               # test r9d, r9d
         self.code.conditional_jump(0x84, done)           # je: no exponent
         self.code.mov_imm(0, 0x4024000000000000)        # rax = 10.0
@@ -2126,6 +2174,22 @@ class NativeCodegen:
         self.code.bytes(b"\x41\xff\xc9")               # dec r9d
         self.code.conditional_jump(0x85, exp_div)        # jne: keep scaling
         self.code.label(done)
+        # The whole text must be a number: only spaces and tabs may follow.
+        self.code.label(trail)
+        self.code.bytes(b"\x0f\xb6\x11")               # movzx edx, byte [rcx]
+        self.code.bytes(b"\x80\xfa\x20")               # cmp dl, ' '
+        self.code.conditional_jump(0x84, trail_advance)
+        self.code.bytes(b"\x80\xfa\x09")               # cmp dl, tab
+        self.code.conditional_jump(0x85, trail_end)
+        self.code.label(trail_advance)
+        self.code.bytes(b"\x48\xff\xc1")               # inc rcx
+        self.code.jump(trail)
+        self.code.label(trail_end)
+        self.code.bytes(b"\x84\xd2")                     # test dl, dl
+        self.code.conditional_jump(0x85, zero)           # jne: trailing junk reads 0
+        self.code.bytes(b"\x48\x83\xc4\x38\xc3")      # add rsp,0x38; ret
+        self.code.label(zero)
+        self.code.bytes(b"\x66\x0f\x57\xc0")          # xorps xmm0, xmm0
         self.code.bytes(b"\x48\x83\xc4\x38\xc3")      # add rsp,0x38; ret
 
     def _emit_equal_helper(self) -> None:
@@ -2356,35 +2420,72 @@ class NativeCodegen:
         self.code.bytes(b"\x48\x83\xc4\x28\xc3")      # add rsp,0x28; ret
 
     def _emit_mid_helper(self) -> None:
-        """rcx = dst, rdx = src, xmm0 = start, xmm1 = count: bounded slice."""
+        """rcx = dst, rdx = src, xmm0 = start, xmm1 = count: bounded slice.
+
+        Both arguments are clamped in the double domain before any integer
+        conversion.  A huge or non-finite double converts to INT64_MIN on x86,
+        which would read a huge start as zero and a huge count as negative; the
+        C runtime instead clamps a start to the text length and a count to the
+        remaining length, so the same rule is applied here before converting.
+        """
         self.code.label("function:anvil_text_mid")
         self.code.mov_reg(10, 1)                          # r10 = destination
         self.code.mov_reg(11, 2)                          # r11 = source
-        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")      # rax = start
-        self.code.bytes(b"\xf2\x4c\x0f\x2c\xc9")      # r9 = count
-        empty = self.label("mid_empty")
-        start_ok = self.label("mid_start_ok")
-        self.code.bytes(b"\x48\x85\xc0")                 # test rax, rax
-        self.code.conditional_jump(0x89, start_ok)         # jns: start fine
-        self.code.bytes(b"\x31\xc0")                     # clamp: start = 0
-        self.code.label(start_ok)
-        self.code.bytes(b"\x4d\x85\xc9")                 # test r9, r9
-        self.code.conditional_jump(0x8c, empty)            # jl: negative count
         self.code.bytes(b"\x45\x31\xc0")                 # r8d = 0 (length)
         len_loop = self.label("mid_len_loop")
         have_len = self.label("mid_have_len")
+        start_zero = self.label("mid_start_zero")
+        start_len = self.label("mid_start_len")
+        start_done = self.label("mid_start_done")
+        count_zero = self.label("mid_count_zero")
+        count_rem = self.label("mid_count_rem")
+        count_done = self.label("mid_count_done")
         copy_init = self.label("mid_copy_init")
         copy_loop = self.label("mid_copy_loop")
         copy_done = self.label("mid_copy_done")
         self.code.label(len_loop)
         self.code.bytes(b"\x43\x0f\xb6\x0c\x03")       # movzx ecx, [r11+r8]
         self.code.bytes(b"\x85\xc9")                     # test ecx, ecx
-        self.code.conditional_jump(0x84, have_len)
+        self.code.conditional_jump(0x84, have_len)         # je: got the length
         self.code.bytes(b"\x41\xff\xc0")                 # ++r8d
         self.code.jump(len_loop)
         self.code.label(have_len)
-        self.code.bytes(b"\x4c\x39\xc0")                 # cmp rax, r8
-        self.code.conditional_jump(0x87, empty)            # ja: start past the end
+        # rax = clamp(start, 0, length) in the double domain.
+        self.code.bytes(b"\x66\x0f\x2e\xc0")            # ucomisd xmm0, xmm0
+        self.code.conditional_jump(0x8a, start_zero)       # jp: NaN
+        self.code.bytes(b"\x0f\x57\xdb")                 # xorps xmm3, xmm3
+        self.code.bytes(b"\x66\x0f\x2e\xc3")            # ucomisd xmm0, xmm3
+        self.code.conditional_jump(0x86, start_zero)       # jbe: start <= 0
+        self.code.bytes(b"\xf2\x49\x0f\x2a\xd0")        # cvtsi2sd xmm2, r8
+        self.code.bytes(b"\x66\x0f\x2e\xc2")            # ucomisd xmm0, xmm2
+        self.code.conditional_jump(0x83, start_len)        # jae: start >= length
+        self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")        # rax = (int64)start
+        self.code.jump(start_done)
+        self.code.label(start_zero)
+        self.code.bytes(b"\x31\xc0")                     # rax = 0
+        self.code.jump(start_done)
+        self.code.label(start_len)
+        self.code.mov_reg(0, 8)                            # rax = length
+        self.code.label(start_done)
+        # r9 = clamp(count, 0, length - start) in the double domain.
+        self.code.bytes(b"\x66\x0f\x2e\xc9")            # ucomisd xmm1, xmm1
+        self.code.conditional_jump(0x8a, count_zero)       # jp: NaN
+        self.code.bytes(b"\x0f\x57\xdb")                 # xorps xmm3, xmm3
+        self.code.bytes(b"\x66\x0f\x2e\xcb")            # ucomisd xmm1, xmm3
+        self.code.conditional_jump(0x86, count_zero)       # jbe: count <= 0
+        self.code.bytes(b"\x4c\x89\xc1")                 # rcx = length
+        self.code.bytes(b"\x48\x29\xc1")                 # rcx -= start
+        self.code.bytes(b"\xf2\x48\x0f\x2a\xd1")        # cvtsi2sd xmm2, rcx
+        self.code.bytes(b"\x66\x0f\x2e\xca")            # ucomisd xmm1, xmm2
+        self.code.conditional_jump(0x83, count_rem)        # jae: all that is left
+        self.code.bytes(b"\xf2\x4c\x0f\x2c\xc9")        # r9 = (int64)count
+        self.code.jump(count_done)
+        self.code.label(count_zero)
+        self.code.bytes(b"\x45\x31\xc9")                 # r9d = 0
+        self.code.jump(count_done)
+        self.code.label(count_rem)
+        self.code.mov_reg(9, 1)                            # r9 = rcx (remaining)
+        self.code.label(count_done)
         self.code.bytes(b"\x4a\x8d\x0c\x08")            # rcx = start + count
         self.code.bytes(b"\x4c\x39\xc1")                 # cmp rcx, r8
         self.code.conditional_jump(0x86, copy_init)        # jbe: end within bounds
@@ -2401,10 +2502,6 @@ class NativeCodegen:
         self.code.jump(copy_loop)
         self.code.label(copy_done)
         self.code.bytes(b"\x43\xc6\x04\x0a\x00")       # mov byte [r10+r9], 0
-        self.code.mov_reg(0, 10)
-        self.code.bytes(b"\xc3")
-        self.code.label(empty)
-        self.code.bytes(b"\x41\xc6\x02\x00")            # mov byte [r10], 0
         self.code.mov_reg(0, 10)
         self.code.bytes(b"\xc3")
 

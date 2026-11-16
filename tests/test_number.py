@@ -41,6 +41,24 @@ def run_c(text: str) -> str:
     return result.stdout
 
 
+def run_native(text: str) -> str:
+    with tempfile.TemporaryDirectory() as temp:
+        temp_path = pathlib.Path(temp)
+        source = temp_path / "sample.ANVL"
+        source.write_text(text, encoding="utf-8")
+        functions, top, variables, arrays = parse(source, text)
+        executable = temp_path / "sample.exe"
+        executable.write_bytes(
+            NativeCodegen(source, functions, top, variables, arrays).generate()
+        )
+        result = subprocess.run(
+            [str(executable)], capture_output=True, text=True, timeout=15
+        )
+    if result.returncode != 0:
+        raise AssertionError(f"exit {result.returncode}: {result.stdout}{result.stderr}")
+    return result.stdout
+
+
 class NumberParseTests(unittest.TestCase):
     def test_number_rejects_a_number_argument(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -98,13 +116,15 @@ class NumberDecimalOnlyTests(unittest.TestCase):
     """`number()` reads decimal text only; hex, inf and nan read as 0."""
 
     def test_hex_and_inf_read_as_zero(self) -> None:
+        # Whole-text validation: hex, inf, nan, underscore grouping and a valid
+        # prefix followed by junk all read 0 rather than a truncated prefix.
         self.assertEqual(
             run_c(
                 'fn(main)\n  say number("0x10")\n  say number("inf")\n'
                 '  say number("nan")\n  say number("1_000")\n'
                 '  say number("12abc")\nend\ncall fn(main)\n'
             ),
-            "0\n0\n0\n1\n12\n",
+            "0\n0\n0\n0\n0\n",
         )
 
     def test_exponent_and_signs(self) -> None:
@@ -150,6 +170,22 @@ class NumberNativeTests(NativeRunMixin, unittest.TestCase):
             "0\n",
         )
 
+    def test_number_grammar_matches_the_c_backend(self) -> None:
+        # One grammar for both backends: the whole text must be a decimal
+        # number after optional surrounding spaces.  A valid prefix followed by
+        # junk, a bare exponent marker, hex, inf, nan and digit grouping all
+        # read 0 on each backend instead of a truncated prefix.
+        source = (
+            'fn(main)\n  say number("0x10")\n  say number("inf")\n'
+            '  say number("nan")\n  say number("1_000")\n'
+            '  say number("12abc")\n  say number("12 ")\n'
+            '  say number(" 12")\n  say number("1e")\n'
+            '  say number("1e3")\n  say number("1E2")\n'
+            '  say number("+5")\n  say number("2.5e-2")\n'
+            '  say number("-3.5")\n  say number("  7 ")\nend\ncall fn(main)\n'
+        )
+        self.assertEqual(self._run(source), run_c(source))
+
     def test_native_arithmetic_on_the_result(self) -> None:
         self.assertEqual(
             self._run(
@@ -193,8 +229,23 @@ class NumberNativeTests(NativeRunMixin, unittest.TestCase):
                 '  say number("-1.5e2")\n  say number("1e0")\n'
                 '  say number("1e")\n  say number("1x")\nend\ncall fn(main)\n'
             ),
-            "1000\n5\n100\n0.025\n-150\n1\n1\n1\n",
+            "1000\n5\n100\n0.025\n-150\n1\n0\n0\n",
         )
+
+    def test_both_backends_agree_on_the_whole_number_grammar(self) -> None:
+        # C8-3: one grammar for both backends. A complete decimal after optional
+        # surrounding spaces parses; a valid prefix followed by junk, a bare
+        # exponent marker, hex, "inf"/"nan" and digit grouping all read 0.
+        source = (
+            'fn(main)\n  say number("12")\n  say number(" 12 ")\n'
+            '  say number("-3.5")\n  say number("2.5e-2")\n'
+            '  say number("12abc")\n  say number("1x")\n'
+            '  say number("1e")\n  say number("0x10")\n'
+            '  say number("inf")\n  say number("1_000")\nend\ncall fn(main)\n'
+        )
+        expected = "12\n12\n-3.5\n0.025\n0\n0\n0\n0\n0\n0\n"
+        self.assertEqual(run_c(source), expected)
+        self.assertEqual(self._run(source), expected)
 
     def test_native_roundtrip_with_chr(self) -> None:
         self.assertEqual(

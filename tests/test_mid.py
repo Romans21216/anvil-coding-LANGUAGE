@@ -153,6 +153,26 @@ class MidNativeTests(NativeRunMixin, unittest.TestCase):
             "cut: good\ncd\n",
         )
 
+    def test_huge_and_fractional_arguments_match_the_c_backend(self) -> None:
+        # C8-1: a start or count that cannot be represented as int64 must clamp
+        # the same way on both backends, and fractional arguments truncate
+        # toward zero.  Converting a huge double to int64 yields INT64_MIN on
+        # x86, which is where the native helper used to disagree with C.
+        source = (
+            'fn(main)\n  set var(t) = "abcdef"\n'
+            '  say "[" & mid(var(t), 1e300, 2) & "]"\n'
+            '  say "[" & mid(var(t), -1e300, 2) & "]"\n'
+            '  say "[" & mid(var(t), 2, 1e300) & "]"\n'
+            '  say "[" & mid(var(t), 1.9, 2.9) & "]"\n'
+            '  say "[" & mid(var(t), -1.9, 2) & "]"\n'
+            '  say "[" & left(var(t), 1e300) & "]"\n'
+            '  say "[" & right(var(t), 1e300) & "]"\n'
+            '  say "[" & right(var(t), 1.9) & "]"\n'
+            '  say "[" & char(var(t), 1e300) & "]"\n'
+            'end\ncall fn(main)\n'
+        )
+        self.assertEqual(self._run(source), run_c(source))
+
 
 if __name__ == "__main__":
     unittest.main()

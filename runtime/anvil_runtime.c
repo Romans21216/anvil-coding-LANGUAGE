@@ -2112,7 +2112,8 @@ double anvil_list_get(const double *values, int index, double count,
 
 
 #define ANVIL_TEXT_BUFFERS 64
-static char anvil_text_buffers[ANVIL_TEXT_BUFFERS][256];
+#define ANVIL_TEXT_CAPACITY 256
+static char anvil_text_buffers[ANVIL_TEXT_BUFFERS][ANVIL_TEXT_CAPACITY];
 static int anvil_text_buffer_index = 0;
 
 static char *anvil_text_buffer(void) {
@@ -2149,14 +2150,26 @@ char *anvil_text_lower(const char *source) {
     return anvil_text_case(source, 1);
 }
 
+/* Clamp a numeric text argument into [0, limit] without converting a value
+   whose truncation C leaves undefined.  NaN and non-finite values become 0,
+   and anything at or past the limit clamps to the limit. */
+static size_t anvil_text_index(double value, size_t limit) {
+    if (!(value == value) || value <= 0.0) {
+        return 0;
+    }
+    if (value >= (double)limit) {
+        return limit;
+    }
+    return (size_t)value;
+}
+
 char *anvil_text_chr(double code) {
     char *destination = anvil_text_buffer();
-    int value = (int)code;
-    if (value < 0 || value > 255) {
+    if (!(code == code) || code < 0.0 || code > 255.0) {
         fprintf(stderr, "Anvil chr out of range\n");
         exit(1);
     }
-    destination[0] = (char)value;
+    destination[0] = (char)(int)code;
     destination[1] = '\0';
     return destination;
 }
@@ -2182,9 +2195,14 @@ char *anvil_text_trim(const char *source) {
 }
 
 double anvil_text_to_number(const char *source) {
-    /* Decimal only, matching the native backend: optional whitespace and sign,
-       digits, an optional fraction, an optional exponent. Hex, "inf" and "nan"
-       read as 0 instead of strtod's surprises. */
+    /* Decimal only, matching the native backend: optional leading spaces, a
+       sign, digits, an optional fraction, an optional exponent, optional
+       trailing spaces and then the end of the text.  Hex, "inf" and "nan" read
+       as 0 instead of strtod's surprises, and so does any text that is not a
+       complete number: a valid prefix followed by junk reads 0 rather than a
+       silently truncated value.  At most nine fraction digits are accumulated,
+       so the fixed-point accumulator cannot overflow; further digits are
+       skipped and the value stays within the documented rounding rule. */
     const char *cursor = source;
     while (*cursor == ' ' || *cursor == '\t') {
         cursor++;
@@ -2208,8 +2226,12 @@ double anvil_text_to_number(const char *source) {
         long long fraction = 0;
         long long scale = 1;
         while (*cursor >= '0' && *cursor <= '9') {
-            fraction = fraction * 10 + (*cursor - '0');
-            scale *= 10;
+            /* Nine fraction digits stay well inside signed 64-bit range; extra
+               digits are skipped so the accumulator can never overflow. */
+            if (scale < 1000000000LL) {
+                fraction = fraction * 10 + (*cursor - '0');
+                scale *= 10;
+            }
             cursor++;
             digits++;
         }
@@ -2221,7 +2243,6 @@ double anvil_text_to_number(const char *source) {
         return 0.0;
     }
     if (*cursor == 'e' || *cursor == 'E') {
-        const char *mark = cursor;
         cursor++;
         int exponent_negative = 0;
         if (*cursor == '-') {
@@ -2238,25 +2259,33 @@ double anvil_text_to_number(const char *source) {
             exponent_digits++;
         }
         if (exponent_digits == 0) {
-            cursor = mark;
-        } else {
-            while (exponent-- > 0) {
-                value = exponent_negative ? value / 10.0 : value * 10.0;
-            }
+            /* 'e' with no exponent digits is malformed, not a mantissa. */
+            return 0.0;
         }
+        while (exponent-- > 0) {
+            value = exponent_negative ? value / 10.0 : value * 10.0;
+        }
+    }
+    while (*cursor == ' ' || *cursor == '\t') {
+        cursor++;
+    }
+    if (*cursor != '\0') {
+        /* A valid prefix followed by junk is not a number. */
+        return 0.0;
     }
     return negative ? -value : value;
 }
 
 char *anvil_text_char(const char *source, double index) {
     char *destination = anvil_text_buffer();
-    int position = (int)index;
     size_t length = strlen(source);
-    if (position < 0 || (size_t)position >= length) {
+    /* Fractional indexes truncate toward zero.  NaN and the infinities have no
+       sensible character, so they read as empty text. */
+    if (!(index == index) || index < 0.0 || index >= (double)length) {
         destination[0] = '\0';
         return destination;
     }
-    destination[0] = source[position];
+    destination[0] = source[(size_t)index];
     destination[1] = '\0';
     return destination;
 }
@@ -2268,21 +2297,12 @@ int anvil_str_contains(const char *source, const char *needle) {
 char *anvil_text_mid(const char *source, double start, double count) {
     char *destination = anvil_text_buffer();
     size_t length = strlen(source);
-    int from = (int)start;
-    int take = (int)count;
-    if (from < 0) {
-        from = 0;
+    size_t from = anvil_text_index(start, length);
+    size_t take = anvil_text_index(count, length);
+    if (take > length - from) {
+        take = length - from;
     }
-    if (take < 0) {
-        take = 0;
-    }
-    if (from > (int)length) {
-        from = (int)length;
-    }
-    if (from + take > (int)length) {
-        take = (int)length - from;
-    }
-    memcpy(destination, source + from, (size_t)take);
+    memcpy(destination, source + from, take);
     destination[take] = '\0';
     return destination;
 }
@@ -2290,14 +2310,8 @@ char *anvil_text_mid(const char *source, double start, double count) {
 char *anvil_text_left(const char *source, double count) {
     char *destination = anvil_text_buffer();
     size_t length = strlen(source);
-    int take = (int)count;
-    if (take < 0) {
-        take = 0;
-    }
-    if (take > (int)length) {
-        take = (int)length;
-    }
-    memcpy(destination, source, (size_t)take);
+    size_t take = anvil_text_index(count, length);
+    memcpy(destination, source, take);
     destination[take] = '\0';
     return destination;
 }
@@ -2305,14 +2319,8 @@ char *anvil_text_left(const char *source, double count) {
 char *anvil_text_right(const char *source, double count) {
     char *destination = anvil_text_buffer();
     size_t length = strlen(source);
-    int take = (int)count;
-    if (take < 0) {
-        take = 0;
-    }
-    if (take > (int)length) {
-        take = (int)length;
-    }
-    memcpy(destination, source + (length - (size_t)take), (size_t)take);
+    size_t take = anvil_text_index(count, length);
+    memcpy(destination, source + (length - take), take);
     destination[take] = '\0';
     return destination;
 }
