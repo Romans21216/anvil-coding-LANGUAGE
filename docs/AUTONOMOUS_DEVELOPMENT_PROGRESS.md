@@ -349,3 +349,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** 6 passed.
 - **Commit:** `5967fdb`.
 - **Remaining from the 8.14 command list:** `test` only.
+
+## Batch 19 — project test runner (8.14)
+
+- **`--test`:** compiles and runs every `tests/**/*.ANVL` case with the selected backend into a temporary output directory, running each case from its own folder so relative includes and assets resolve. A case passes when the built program exits 0.
+- **Reporting:** `PASS name` per case, `FAIL name (exit N)` plus the captured build/run output, then a `N passed, M failed` summary; exit 1 if any case fails or the project has no `tests/` folder or no cases.
+- **Files:** `compiler/commands.py`, `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_commands.py`.
+- **Tests:** 10 passed. Manual: one passing plus one failing case reported `1 passed, 1 failed` and exit 1; removing the failing case gave exit 0.
+- **Commit:** `44dcd1b`.
+- **Command surface:** `new`, `run`, `build`, `test`, `format`, `clean`, `doctor` and `package` now all exist, completing the 8.14 command list for this checkout.
