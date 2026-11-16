@@ -78,9 +78,9 @@ hello, Ada
 - Functions both take and return text on both backends: `fn(greet, who) output "hi " & var(who) end` called as `call fn(greet, "Ada")`. A parameter is text when the body uses it as text (a join with a literal, a text builtin, a text comparison, or returning it from a text-returning function) or when every caller passes text; otherwise it stays a number, and a mismatch is reported at the call site.
 - `mid(text, start, count)` extracts a bounded slice: the count clamps to the text's end, a start past the end or a negative count gives empty text. Both backends.
 - `char(text, n)` yields the nth character as text, 0-based; out-of-range indexes give empty text. Both backends.
-- `number(text)` parses a text value into a number: optional spaces and sign, digits, a fraction, and an `e` exponent (`number("1e3")` = 1000). Hex, `inf` and `nan` read as 0, and non-numeric input reads as 0. Both backends.
+- `number(text)` parses a text value into a number: optional spaces and sign, digits, a fraction, and an `e` exponent (`number("1e3")` = 1000). The whole text must be one number, so `12abc`, `1e`, hex, `inf`, `nan` and digit underscores read as 0; a magnitude outside the finite double range also reads 0. Both backends.
 - `trim(text)` removes leading and trailing spaces/tabs (inner spaces survive); an all-whitespace value becomes empty. Both backends.
-- `chr(n)` / `ord(text)` convert between numbers and characters (`chr(65)` = "A", `ord("A")` = 65; `ord` reads the first character, `chr` accepts 0-255 and stops with an error outside that range). Both backends.
+- `chr(n)` / `ord(text)` convert between numbers and characters (`chr(65)` = "A", `ord("A")` = 65; `ord` reads the first character, `chr` accepts 1-255 and stops with an error outside that range; `chr(0)` is empty text because text is zero-terminated). Both backends.
 - `upper(text)` / `lower(text)` convert case and yield text, usable anywhere text works (say, `&` joins, assignments); other characters pass through unchanged. Both backends.
 - `round(x)` rounds to the nearest whole number, halves away from zero (2.5 → 3, -2.5 → -3), in both backends.
 - `len(var(name))` counts the characters of a text value (both backends); `len(42)` is a compile error.
