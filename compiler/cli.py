@@ -62,9 +62,38 @@ def main() -> int:
         default="c",
         help="select the C toolchain or experimental Anvil-owned x64 PE backend",
     )
+    ap.add_argument(
+        "--format",
+        action="store_true",
+        help="rewrite the .ANVL source with canonical block indentation and stop",
+    )
+    ap.add_argument(
+        "--format-check",
+        action="store_true",
+        help="exit 1 when the .ANVL source is not canonically indented",
+    )
     args = ap.parse_args()
     known_functions: list[str] = []
     try:
+        if args.format or args.format_check:
+            if args.source.suffix.lower() != ".anvl":
+                raise CompileError(
+                    f"{args.source}: formatting applies to .ANVL source files"
+                )
+            from compiler.formatter import format_source
+
+            original = args.source.read_text(encoding="utf-8")
+            formatted = format_source(original)
+            if args.format_check:
+                if formatted != original:
+                    print(f"{args.source}: needs formatting", file=sys.stderr)
+                    return 1
+                print(f"{args.source}: formatted")
+                return 0
+            if formatted != original:
+                args.source.write_text(formatted, encoding="utf-8")
+            print(f"{args.source}: formatted")
+            return 0
         if args.inspect_metadata:
             from compiler.program_metadata import unpack
             sys.stdout.buffer.write((json.dumps(unpack(args.source.read_bytes()),ensure_ascii=False,indent=2)+'\n').encode('utf-8'))

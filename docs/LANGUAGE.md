@@ -251,6 +251,21 @@ local_array_elements = 8192
 active_call_memory_mib = 16
 ```
 
+## Formatting
+
+Indentation is cosmetic, so the compiler can restore it without changing
+meaning:
+
+```powershell
+python compiler/anvil.py game.ANVL --format        # rewrite in place
+python compiler/anvil.py game.ANVL --format-check  # exit 1 when unformatted
+```
+
+Blocks indent two spaces; `else` and `else if` line up with their `if`; blank
+lines and trailing whitespace are normalized. The parser ignores indentation, so
+a formatted file compiles exactly like the original — the formatter only rewrites
+leading whitespace.
+
 ## Not implemented yet
 
 Static types, dynamically sized arrays, structures, separately compiled modules, general asset formats and 3D mesh assets, sprite animation, audio, 3D/polygon physics, save files, full 2D/3D scene management, a GPU renderer, and reliable Internet multiplayer remain future work. Parameters, returns, recursion, function-local numeric variables and arrays, `while`/inclusive numeric `for` loops, fixed-size global numeric arrays, BMP-based 2D sprites, and fixed-step 2D circle/axis-aligned-box physics are supported, but the language and engine remain much smaller than a general-purpose game engine today.

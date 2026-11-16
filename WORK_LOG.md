@@ -448,3 +448,17 @@ operations that decode UTF-8 and copy whole sequences:
 UTF-8 explicitly. `docs/LANGUAGE.md` documents both families, the editor grammar
 scopes the new calls, and the matrix records `utf8-codepoints` as C-supported
 with the native backend rejecting text built-ins (a documented gap).
+
+## Part 8 GATE 2: formatter and format check
+
+`compiler/formatter.py` re-indents `.ANVL` source without touching meaning
+(indentation is cosmetic in Anvil). `--format` rewrites in place and
+`--format-check` exits 1 when a file is not canonical, for CI or editor tasks.
+
+- Two-space blocks; `else`/`else if` align with their `if`; blank lines keep no
+  trailing spaces; `\r\n` is normalized.
+- `tests/test_formatter.py` covers nested blocks, an `else if` chain,
+  idempotence, the CLI exit codes, and that a formatted file still passes
+  `--check`.
+- Existing `examples/*.ANVL` already pass `--format-check`, so adopting the
+  formatter causes no churn.
