@@ -27,14 +27,19 @@ class PerformanceBudgetTests(unittest.TestCase):
 
     def test_the_budget_file_covers_every_case(self) -> None:
         names = {name for name, _ in bench_anvil.CASES}
-        self.assertEqual(set(self.budgets), names)
-        for name, entry in self.budgets.items():
+        program_budgets = {
+            key: value for key, value in self.budgets.items() if key != "runtime"
+        }
+        self.assertEqual(set(program_budgets), names)
+        for name, entry in program_budgets.items():
             self.assertIn("native", entry, name)
             self.assertGreater(entry["native"]["seconds"], 0.0, name)
             self.assertGreater(entry["native"]["bytes"], 0, name)
             self.assertIn("c", entry, name)
             self.assertGreater(entry["c"]["seconds"], 0.0, name)
             self.assertGreater(entry["c"]["bytes"], 0, name)
+        # Runtime frame budgets share the file but have their own schema.
+        self.assertIn("scenes", self.budgets.get("runtime", {}))
 
     def test_measured_builds_stay_inside_the_published_budgets(self) -> None:
         problems = bench_anvil.violations(

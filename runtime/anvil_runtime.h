@@ -119,6 +119,9 @@ void anvil_text(double x, double y, const char *text, int r, int g, int b,
 void anvil_text_number(double x, double y, const char *format, double value,
                        int r, int g, int b, int a);
 double anvil_time(void);
+double anvil_frame_tick(void);
+double anvil_frame_render(void);
+double anvil_frame_present(void);
 double anvil_clock(void);
 double anvil_delta(void);
 double anvil_pressed(int key);

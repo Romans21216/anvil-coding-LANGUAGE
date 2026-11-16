@@ -519,3 +519,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Harness:** `WindowReader.bounding_box` first read pixels one at a time with GetPixel, which took seconds per scan and made timing-sensitive tests read stale frames. It now grabs the rectangle in one BitBlt through a DIB section (`grab`), so a scan is milliseconds.
 - **Test:** `tests/test_text_zoom.py` holds identity, 2x zoom and reset frames for 2.5 s each and measures the bounding box of the glyphs; 2x must be at least 1.6x wider and taller and moved right, and reset must return to the original box. 1 passed; the three window suites together 4 passed in 17.1 s.
 - **Docs:** language spec camera row, evidence ledger, testing doc.
+
+## Batch 39 — runtime frame benchmarks with enforced budgets (8.15)
+
+- **Builtins:** `frame_tick()`, `frame_render()` and `frame_present()` return the last frame's update, draw and presentation times in seconds; the main loop records them with QueryPerformanceCounter around each phase. This is the first way for a program to see real per-frame work instead of the fixed 60 Hz `delta()`.
+- **Harness:** `tools/bench_runtime.py` builds four ordinary Anvil scenes (idle 2D, 2D overdraw with 1,200 rects and 120 circles, 40 text lines, 20 cubes plus a plane), skips 30 warm-up frames, buckets 120 frame totals at 0.25 ms resolution (no runtime sort), prints p50/p95/worst and compares against `runtime` budgets in `tools/bench_budgets.json`. `--write-budgets` re-measures (2.5x headroom); `--check` exits 1 on a miss.
+- **Measured here:** idle 0.38 ms, overdraw 3.88 ms, text 1.12 ms, cubes 2.88 ms p50.
+- **Test:** `tests/test_runtime_budget.py` runs `--check` and asserts the scene list matches the budgets file; 2 passed in 13 s.
+- **Docs:** language spec clock row, evidence ledger, testing doc.

@@ -54,5 +54,44 @@
       "measured_seconds": 0.3931,
       "measured_bytes": 144384
     }
+  },
+  "runtime": {
+    "samples": 120,
+    "warmup": 30,
+    "machine": "Windows-11-10.0.26200-SP0",
+    "scenes": {
+      "cubes_3d": {
+        "p50_ms": 7.2,
+        "p95_ms": 9.05,
+        "max_ms": 11.35,
+        "measured_p50_ms": 2.88,
+        "measured_p95_ms": 3.62,
+        "measured_max_ms": 4.54
+      },
+      "idle_2d": {
+        "p50_ms": 0.95,
+        "p95_ms": 2.8,
+        "max_ms": 12.12,
+        "measured_p50_ms": 0.38,
+        "measured_p95_ms": 1.12,
+        "measured_max_ms": 4.85
+      },
+      "overdraw_2d": {
+        "p50_ms": 9.7,
+        "p95_ms": 10.95,
+        "max_ms": 19.48,
+        "measured_p50_ms": 3.88,
+        "measured_p95_ms": 4.38,
+        "measured_max_ms": 7.79
+      },
+      "text_ui": {
+        "p50_ms": 2.8,
+        "p95_ms": 4.7,
+        "max_ms": 11.05,
+        "measured_p50_ms": 1.12,
+        "measured_p95_ms": 1.88,
+        "measured_max_ms": 4.42
+      }
+    }
   }
 }

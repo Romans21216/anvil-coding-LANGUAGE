@@ -142,6 +142,8 @@ static int anvil_trace_bvh_count;
 static int anvil_active_ray_backend = ANVIL_RAY_BACKEND_BVH;
 static unsigned int anvil_ray_backend_warnings;
 static double anvil_delta_seconds = 1.0 / 60.0;
+static double anvil_frame_tick_seconds, anvil_frame_render_seconds,
+    anvil_frame_present_seconds;
 static int anvil_fixed_hz = 60;
 static double anvil_elapsed_seconds;
 static LARGE_INTEGER anvil_clock_frequency;
@@ -599,6 +601,13 @@ void anvil_text_number(double x, double y, const char *format, double value,
 double anvil_time(void) { return anvil_elapsed_seconds; }
 double anvil_clock(void) { return (double)GetTickCount64(); }
 double anvil_delta(void) { return anvil_delta_seconds; }
+
+/* Phase timings for the last frame, in seconds. The main loop records how long
+   the fixed-step update, the draw pass and the presentation each took, so a
+   benchmark can report real per-frame work instead of the 60 Hz pacing. */
+double anvil_frame_tick(void) { return anvil_frame_tick_seconds; }
+double anvil_frame_render(void) { return anvil_frame_render_seconds; }
+double anvil_frame_present(void) { return anvil_frame_present_seconds; }
 double anvil_check_number(double value, const char *path, int line) {
   if (!isfinite(value)) {
     fprintf(stderr, "%s:%d: numeric overflow or non-finite result\n",
@@ -3175,6 +3184,8 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
         (double)(now.QuadPart - anvil_clock_start.QuadPart) /
         (double)anvil_clock_frequency.QuadPart;
     accumulator += frame_elapsed;
+    LARGE_INTEGER phase_start, phase_update_end, phase_render_end, phase_present_end;
+    QueryPerformanceCounter(&phase_start);
     int update_count = 0;
     while (accumulator >= step_seconds) {
       anvil_delta_seconds = step_seconds;
@@ -3191,6 +3202,7 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
         anvil_mouse_wheel_delta = 0.0;
       }
     }
+    QueryPerformanceCounter(&phase_update_end);
     anvil_clear_frame();
     if (draw)
       draw();
@@ -3201,8 +3213,19 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
              sizeof(anvil_mouse_pressed_buttons));
       anvil_mouse_wheel_delta = 0.0;
     }
+    QueryPerformanceCounter(&phase_render_end);
     InvalidateRect(anvil_window, NULL, FALSE);
     UpdateWindow(anvil_window);
+    QueryPerformanceCounter(&phase_present_end);
+    anvil_frame_tick_seconds =
+        (double)(phase_update_end.QuadPart - phase_start.QuadPart) /
+        (double)anvil_clock_frequency.QuadPart;
+    anvil_frame_render_seconds =
+        (double)(phase_render_end.QuadPart - phase_update_end.QuadPart) /
+        (double)anvil_clock_frequency.QuadPart;
+    anvil_frame_present_seconds =
+        (double)(phase_present_end.QuadPart - phase_render_end.QuadPart) /
+        (double)anvil_clock_frequency.QuadPart;
     double sleep_seconds = step_seconds - accumulator;
     if (sleep_seconds > 0.002)
       Sleep((DWORD)(sleep_seconds * 1000.0));
