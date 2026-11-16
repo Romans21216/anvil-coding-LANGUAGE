@@ -114,8 +114,9 @@ assertions cover the program's own memory rather than screenshots.
   drives a real window and cursor, and has failed once under full-suite load
   while passing alone in 1.7 s. Treat a lone failure there as a flake only
   after re-running it in isolation.
-- `test_native_window.py` covers resize, close and allocation failure;
-  minimize/restore, occlusion and DPI changes have no automated case yet.
+- `test_native_window.py` covers pixels during a slow draw, rapid resize,
+  GDI counts, minimize/restore and allocation failure; occlusion and DPI
+  changes still have no automated case.
 - The full suite took 180 s with a warm toolset-environment cache (719 passed); the
   first run after a Visual Studio update pays one ~1.2 s environment capture.
 - The full-suite count changes as tests are added; the latest recorded run is

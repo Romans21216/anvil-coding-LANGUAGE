@@ -63,6 +63,8 @@ end
         user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
         user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
         user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+        user.ShowWindow.restype = wintypes.BOOL
         user.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int,
                                      ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT]
         gdi.GetPixel.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int]
@@ -179,6 +181,18 @@ end
                     time.sleep(0.05)
                 self.assertLessEqual(user.GetGuiResources(process_handle, 0), gdi_before + 2,
                                      "resizing leaked GDI bitmaps or device contexts")
+                # Minimize and restore: the OS discards the visible surface, so
+                # the window must repaint from the backbuffer afterwards (8.11).
+                self.assertTrue(user.ShowWindow(hwnd, 6))  # SW_MINIMIZE
+                time.sleep(0.25)
+                self.assertTrue(user.ShowWindow(hwnd, 9))  # SW_RESTORE
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline and pixel(hwnd, 20, 20) != colour:
+                    time.sleep(0.05)
+                self.assertEqual(pixel(hwnd, 20, 20), colour,
+                                 "window did not repaint after minimize/restore")
+                self.assertLessEqual(user.GetGuiResources(process_handle, 0), gdi_before + 2,
+                                     "minimize/restore leaked GDI objects")
                 user.PostMessageW(hwnd, 0x10, 0, 0)  # WM_CLOSE
                 stdout, stderr = process.communicate(timeout=5)
                 self.assertEqual(process.returncode, 0, (stdout, stderr))
