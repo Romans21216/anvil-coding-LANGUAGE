@@ -35,6 +35,7 @@ def build_c(
     release: bool,
     libraries=(),
     dynamic_runtime: bool = False,
+    deps_path: pathlib.Path | None = None,
 ):
     output.parent.mkdir(parents=True, exist_ok=True)
     # Link into a sibling file and only replace the previous output once the
@@ -65,6 +66,10 @@ def build_c(
         # everything the program never reaches (and folding of identical bodies).
         if release:
             args.append("/Gy")
+        if deps_path is not None:
+            # Record every header this build read so the cache key can hash
+            # their bytes instead of the whole SDK tree (C8-11).
+            args.append(f"/sourceDependencies{deps_path}")
         if release or libraries:
             args.append("/link")
             if release:

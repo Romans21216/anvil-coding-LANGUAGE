@@ -77,6 +77,16 @@ Visual Studio environment is named from a digest of `VsDevCmd.bat` and `vcvarsal
 contents, so a same-size script replacement cannot revive a stale environment. Libraries passed to `build_c`
 through `libraries=` are not part of the key yet.
 
+On top of the metadata fingerprint, a successful C build records the headers it actually
+read with `cl /sourceDependencies` into `<cache>/<base-key>.deps.json`, and the cache key
+then folds in the **bytes** of those headers. A real program (`examples/first_world.ANVL`)
+consumes 120 distinct headers, 5.45 MB, and digesting them costs about 10 ms per cache
+lookup; the flag adds no measurable compile time (315 ms with and without it). This closes
+the same-size, same-mtime header collision that a metadata-only fingerprint cannot see,
+without paying the ~5.9 s that hashing the whole 1.2 GB SDK tree would cost. The sidecar is
+absent after the first build with an older cache entry, in which case the build falls back
+to the metadata key and rewrites it on the next real build.
+
 ## Native backend limits
 
 The direct backend handles console programs (numeric functions with up to sixteen

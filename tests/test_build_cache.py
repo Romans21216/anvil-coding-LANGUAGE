@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import json
 import pathlib
 import subprocess
 import sys
@@ -14,7 +15,12 @@ COMPILER = ROOT / "compiler" / "anvil.py"
 
 sys.path.insert(0, str(ROOT))
 
-from compiler.cli import _cache_key, _sdk_fingerprint  # noqa: E402
+from compiler.cli import (  # noqa: E402
+    _cache_key,
+    _dependency_digest,
+    _key_with_dependencies,
+    _sdk_fingerprint,
+)
 
 PROGRAM = 'fn(main)\n  say "cached"\nend\ncall fn(main)\n'
 
@@ -257,6 +263,103 @@ class SdkFingerprintTests(unittest.TestCase):
     def test_a_missing_sdk_is_marked_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             self.assertEqual(_sdk_fingerprint(pathlib.Path(temp) / "absent"), b"missing")
+
+
+class DependencyListTests(unittest.TestCase):
+    """C8-11: the bytes of consumed headers, not their metadata, decide the key."""
+
+    def _sidecar(self, root: pathlib.Path, headers: list[pathlib.Path]) -> pathlib.Path:
+        root.mkdir(parents=True, exist_ok=True)
+        sidecar = root / "base.deps.json"
+        sidecar.write_text(
+            json.dumps(
+                {
+                    "Version": "1.2",
+                    "Data": {"Includes": [str(header) for header in headers]},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return sidecar
+
+    def test_same_size_same_mtime_header_replacement_changes_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            header = root / "windows.h"
+            header.write_text("AAAA", encoding="utf-8")
+            st = header.stat()
+            sidecar = self._sidecar(root, [header])
+            before = _key_with_dependencies("base-key", sidecar)
+
+            header.write_text("BBBB", encoding="utf-8")
+            os.utime(header, ns=(st.st_atime_ns, st.st_mtime_ns))
+            self.assertEqual(header.stat().st_size, 4)
+            after = _key_with_dependencies("base-key", sidecar)
+
+        self.assertNotEqual(before, after)
+
+    def test_an_unchanged_dependency_keeps_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            header = root / "windows.h"
+            header.write_text("AAAA", encoding="utf-8")
+            sidecar = self._sidecar(root, [header])
+            self.assertEqual(
+                _key_with_dependencies("base-key", sidecar),
+                _key_with_dependencies("base-key", sidecar),
+            )
+
+    def test_a_missing_sidecar_falls_back_to_the_base_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            absent = pathlib.Path(temp) / "absent.deps.json"
+            self.assertEqual(_key_with_dependencies("base-key", absent), "base-key")
+            self.assertEqual(_dependency_digest(absent), b"")
+
+    def test_an_unreadable_sidecar_falls_back_to_the_base_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            sidecar = pathlib.Path(temp) / "broken.deps.json"
+            sidecar.write_text("not json", encoding="utf-8")
+            self.assertEqual(_key_with_dependencies("base-key", sidecar), "base-key")
+
+    def test_a_deleted_dependency_changes_the_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            header = root / "windows.h"
+            header.write_text("AAAA", encoding="utf-8")
+            sidecar = self._sidecar(root, [header])
+            before = _key_with_dependencies("base-key", sidecar)
+            header.unlink()
+            after = _key_with_dependencies("base-key", sidecar)
+        self.assertNotEqual(before, after)
+
+    def test_a_multi_source_document_is_read(self) -> None:
+        """MSVC emits a list of Data records when several sources compile."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            first = root / "windows.h"
+            second = root / "stdio.h"
+            first.write_text("AAAA", encoding="utf-8")
+            second.write_text("BBBB", encoding="utf-8")
+            sidecar = root / "multi.deps.json"
+            sidecar.write_text(
+                json.dumps(
+                    {
+                        "Version": "1.2",
+                        "Data": [
+                            {"Source": "a.c", "Includes": [str(first)]},
+                            {"Source": "b.c", "Includes": [str(second)]},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            before = _key_with_dependencies("base-key", sidecar)
+            self.assertNotEqual(before, "base-key")
+            st = second.stat()
+            second.write_text("CCCC", encoding="utf-8")
+            os.utime(second, ns=(st.st_atime_ns, st.st_mtime_ns))
+            after = _key_with_dependencies("base-key", sidecar)
+        self.assertNotEqual(before, after)
 
 
 if __name__ == "__main__":

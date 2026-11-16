@@ -161,9 +161,84 @@ def _cache_path(out: pathlib.Path, key: str) -> pathlib.Path:
     return out.parent / CACHE_DIR_NAME / f"{key}.exe"
 
 
+def _deps_sidecar(out: pathlib.Path, base_key: str) -> pathlib.Path:
+    """Where the previous build's consumed-header list lives for a base key."""
+    return out.parent / CACHE_DIR_NAME / f"{base_key}.deps.json"
+
+
+def _dependency_paths(deps_file: pathlib.Path) -> list[str]:
+    """Every include path listed anywhere in a `/sourceDependencies` document.
+
+    MSVC emits one `Data` record for a single source and a list of records when
+    the command line names several, so walk the document instead of assuming a
+    shape. An unreadable or unrecognised file yields no paths.
+    """
+    try:
+        data = json.loads(deps_file.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return []
+    found: list[str] = []
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "Includes" and isinstance(value, list):
+                    found.extend(item for item in value if isinstance(item, str))
+                else:
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(data)
+    return found
+
+
+def _dependency_digest(deps_file: pathlib.Path) -> bytes:
+    """Hash the bytes of every header the previous build actually consumed.
+
+    `cl.exe /sourceDependencies` lists the headers a build read. Hashing those
+    files' contents closes the same-size/same-mtime SDK collision (C8-11) for
+    the header half of the input set at the cost of a few megabytes read,
+    instead of the 1.2 GB a whole-SDK content walk would cost. A missing or
+    unreadable sidecar yields b"" so the build falls back to the metadata key.
+    """
+    includes = _dependency_paths(deps_file)
+    if not includes:
+        return b""
+    digest = hashlib.sha256()
+    seen: set[str] = set()
+    for entry in includes:
+        path = pathlib.Path(entry)
+        name = str(path).lower()
+        if name in seen:
+            continue
+        seen.add(name)
+        digest.update(name.encode("utf-8", "replace"))
+        try:
+            digest.update(path.read_bytes())
+        except OSError:
+            digest.update(b"missing")
+    return digest.digest()
+
+
+def _key_with_dependencies(base_key: str, deps_file: pathlib.Path) -> str:
+    """Fold the consumed-header bytes into the base key when a list exists."""
+    extra = _dependency_digest(deps_file)
+    if not extra:
+        return base_key
+    digest = hashlib.sha256()
+    digest.update(base_key.encode("utf-8"))
+    digest.update(b"\0deps\0")
+    digest.update(extra)
+    return digest.hexdigest()
+
+
 def cached_build(generated: str, compiler: str, out: pathlib.Path, release: bool) -> bool:
     """Copy a cached executable into place; True when the cache answered."""
-    entry = _cache_path(out, _cache_key(generated, compiler, release))
+    base_key = _cache_key(generated, compiler, release)
+    key = _key_with_dependencies(base_key, _deps_sidecar(out, base_key))
+    entry = _cache_path(out, key)
     if not entry.exists():
         return False
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -171,10 +246,25 @@ def cached_build(generated: str, compiler: str, out: pathlib.Path, release: bool
     return True
 
 
-def store_build(generated: str, compiler: str, out: pathlib.Path, release: bool) -> None:
+def store_build(
+    generated: str,
+    compiler: str,
+    out: pathlib.Path,
+    release: bool,
+    deps_source: pathlib.Path | None = None,
+) -> None:
     if not out.exists():
         return
-    entry = _cache_path(out, _cache_key(generated, compiler, release))
+    base_key = _cache_key(generated, compiler, release)
+    sidecar = _deps_sidecar(out, base_key)
+    if deps_source is not None:
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copyfile(deps_source, sidecar)
+        except OSError:
+            pass
+    key = _key_with_dependencies(base_key, sidecar)
+    entry = _cache_path(out, key)
     entry.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(out, entry)
 
@@ -684,14 +774,30 @@ def main() -> int:
                 timings.report()
                 print(f"Built {out} using {compiler[0]} (reused build cache)")
             else:
-                build_c(compiler[1], c_path, out, args.release, (), args.dynamic_runtime)
-                if not args.no_cache:
-                    store_build(
-                        generated,
+                deps_tmp = out.parent / CACHE_DIR_NAME / (
+                    f".pending-{os.getpid()}.deps.json"
+                )
+                deps_tmp.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    build_c(
                         compiler[1],
+                        c_path,
                         out,
-                        f"r{int(args.release)}d{int(args.dynamic_runtime)}",
+                        args.release,
+                        (),
+                        args.dynamic_runtime,
+                        None if args.no_cache else deps_tmp,
                     )
+                    if not args.no_cache:
+                        store_build(
+                            generated,
+                            compiler[1],
+                            out,
+                            f"r{int(args.release)}d{int(args.dynamic_runtime)}",
+                            deps_tmp if deps_tmp.exists() else None,
+                        )
+                finally:
+                    deps_tmp.unlink(missing_ok=True)
                 timings.mark("build")
                 timings.report()
                 print(f"Built {out} using {compiler[0]}")

@@ -446,3 +446,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Build loop:** compiler/linker/SDK/environment identity all content-based; `--timings` shows parse+generate ~3 ms against a ~450 ms cold build.
 - **First hour:** `tests/test_first_hour.py` runs the documented scaffold → check → build → run → format → package → doctor → explain path.
 - **Open roadmap items are features, not defects:** browser target (no WASM toolchain in this environment), glTF/animation, audio, records. All audit findings C8-1..C8-12 are closed.
+
+## Batch 30 — C8-11 header half: hash the headers the build consumed
+
+- **Reproduced first:** on a synthetic SDK tree, replacing `windows.h` and `kernel32.lib` with different same-size contents and restoring their `st_mtime_ns` left `_sdk_fingerprint` at the identical `3a845389c0b0d552`. A size-changing edit did change it, which is why the committed tests missed the case.
+- **Whole-tree byte hashing rejected by measurement:** 1,167 MB under `Include\10.0.26100.0` plus `Lib\10.0.26100.0` costs 5,867 ms, more than a cold build, so it cannot sit on a cache hit.
+- **Fix:** `build_c(..., deps_path=...)` passes `cl /sourceDependencies<file>`; `store_build` copies the JSON beside the cache entry as `<base-key>.deps.json`, and `cached_build` folds a SHA-256 of those headers' **bytes** into the key. Missing or unreadable sidecars fall back to the metadata key, so old caches still work and repair on the next real build.
+- **Measured cost:** `examples/first_world.ANVL` consumes 120 distinct headers (5.45 MB); digesting them costs 9-10 ms, and `/sourceDependencies` adds no measurable compile time (315 ms with and without the flag; the dependency list was identical across runs).
+- **Tests:** same-size/same-mtime replacement changes the key; unchanged headers keep it; missing, unreadable and deleted-dependency cases. `tests/test_build_cache.py` 20 passed; with build-atomic, toolchain-env, timings and compiler suites 85 passed. End to end the second build printed `(reused build cache)` and wrote a 147-entry sidecar.
+- **Still open:** the library half. Default `.lib` files are resolved by the linker, not named on the command line, so a same-size replacement of one is still invisible to the key.
