@@ -110,5 +110,11 @@ assertions cover the program's own memory rather than screenshots.
   (`npm test`), not by inspecting a live editor window.
 - Automated window tests verify pixels and state; they are not a substitute for
   a manual look at a game running on real hardware.
+- `test_runtime.py::test_mouse_events_map_to_virtual_frame_and_preserve_update_edges`
+  drives a real window and cursor, and has failed once under full-suite load
+  while passing alone in 1.7 s. Treat a lone failure there as a flake only
+  after re-running it in isolation.
+- `test_native_window.py` covers resize, close and allocation failure;
+  minimize/restore, occlusion and DPI changes have no automated case yet.
 - The full-suite count changes as tests are added; the latest recorded run is
   in `docs/AUTONOMOUS_DEVELOPMENT_PROGRESS.md`.
