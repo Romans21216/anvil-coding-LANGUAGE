@@ -1314,8 +1314,19 @@ static double anvil_fade(double t) {
 static double anvil_lerp(double a, double b, double t) {
   return a + t * (b - a);
 }
+static int anvil_noise_lattice(double value) {
+  /* Match the native backend: every coordinate must be finite and inside
+     [-2147483648, 2147483647) so floor() and the +1 lattice corner both stay
+     representable as int.  A NaN fails every comparison and is rejected too. */
+  if (!(value >= -2147483648.0) || !(value < 2147483647.0)) {
+    fprintf(stderr, "Anvil noise coordinate range error\n");
+    exit(2);
+  }
+  return (int)floor(value);
+}
 double anvil_noise(double x, double y, double z) {
-  int xi = (int)floor(x), yi = (int)floor(y), zi = (int)floor(z);
+  int xi = anvil_noise_lattice(x), yi = anvil_noise_lattice(y),
+      zi = anvil_noise_lattice(z);
   double xf = x - xi, yf = y - yi, zf = z - zi, u = anvil_fade(xf),
          v = anvil_fade(yf), w = anvil_fade(zf);
   double c[8];
