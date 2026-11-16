@@ -328,3 +328,14 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Files:** `compiler/package.py` (new), `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_package.py`.
 - **Tests:** `tests/test_package.py` 5 passed; with the cache and compiler suites 80 passed.
 - **Commit:** `79d8af3`.
+
+## Batch 17 — lifecycle commands run/clean/doctor/new (8.14)
+
+- **`--run`:** builds, then runs the program and returns its exit code, so edit → build → run is one command. A failing program propagates its status (division by zero returns 2); combining it with `--check`, `--emit-c` or `--package` is rejected.
+- **`--clean`:** removes only what the toolchain writes beside a project — `*.generated.c`, `*_obj`, `*.partial.exe`, `*.build.cmd` and `.anvil-cache` — and keeps sources and the executable.
+- **`--doctor`:** prints Python version/path, platform, the discovered C compiler, native-backend readiness and the three runtime files, without needing a source file.
+- **`--new <dir>`:** scaffolds `main.ANVL`, `game.ANVLproj` and `README.md` in an empty folder and refuses a non-empty one.
+- **Files:** `compiler/commands.py` (new), `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_commands.py`.
+- **Tests:** 7 passed. Manual: `--new` then `--run` printed `Hello from Anvil`; `--clean` removed 3 artifacts and kept `main.exe`.
+- **Commit:** `75a4805`.
+- **Remaining from the 8.14 command list:** `test` and `format` are still unimplemented.
