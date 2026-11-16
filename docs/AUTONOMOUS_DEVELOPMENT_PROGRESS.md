@@ -550,3 +550,9 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Bug caught while building:** the index bounds check compared primitive-local corners rather than resolved indices, so a valid quad was rejected as out of range; the loader now maps corners through the index accessor first.
 - **Tests:** `tests/test_gltf_model.py` covers the loader (quad → two triangles, translation, missing/broken files), the located compile error, a rendered quad whose centre matches the computed flat-shade value (169,0,0), and depth ordering with a nearer blue quad. 6 passed; the rendered frame was also inspected as an image.
 - **Docs:** language spec row, `docs/MODELS.md`, README link, evidence ledger, testing doc.
+
+## Batch 43 — GLB container support (8.13)
+
+- **Loader:** `compiler/gltf.py` now reads `.glb` as well as `.gltf`: it validates the 12-byte header (magic, version 2, declared length), walks the chunks, decodes the JSON chunk, keeps the BIN chunk as buffer 0 for buffers without a `uri`, and skips unknown chunk types per the spec. Truncated chunks, a missing JSON chunk and a wrong version or magic are named errors.
+- **Tests:** `tests/test_gltf_model.py` builds a GLB fixture holding the same quad and asserts its triangles are identical to the `.gltf` version, rejects a header-only GLB, and renders the GLB quad with the same expected centre pixel. 9 passed.
+- **Docs:** `docs/MODELS.md` table and unsupported list, language spec row, evidence ledger, testing doc.

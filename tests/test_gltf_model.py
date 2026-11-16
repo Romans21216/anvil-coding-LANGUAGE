@@ -59,6 +59,24 @@ def write_quad(root: pathlib.Path, name: str, colour: tuple[float, float, float]
     return path
 
 
+def write_glb(root: pathlib.Path, name: str, colour: tuple[float, float, float]) -> pathlib.Path:
+    """The same quad as an embedded .glb container."""
+    positions = [(-1.0, -1.0, 0.0), (1.0, -1.0, 0.0), (1.0, 1.0, 0.0), (-1.0, 1.0, 0.0)]
+    binary = b"".join(struct.pack("<3f", *p) for p in positions) + struct.pack("<6H", 0, 1, 2, 0, 2, 3)
+    document = quad_document(colour)
+    document["buffers"] = [{"byteLength": len(binary)}]
+    payload = json.dumps(document).encode("utf-8")
+    payload += b" " * ((4 - len(payload) % 4) % 4)
+    binary += bytes((4 - len(binary) % 4) % 4)
+    total = 12 + 8 + len(payload) + 8 + len(binary)
+    header = b"glTF" + struct.pack("<II", 2, total)
+    chunks = struct.pack("<II", len(payload), 0x4E4F534A) + payload
+    chunks += struct.pack("<II", len(binary), 0x004E4942) + binary
+    path = root / name
+    path.write_bytes(header + chunks)
+    return path
+
+
 def build(root: pathlib.Path, source_text: str, name: str = "model.ANVL") -> tuple[subprocess.CompletedProcess, pathlib.Path]:
     source = root / name
     source.write_text(source_text, encoding="utf-8")
@@ -74,7 +92,7 @@ def build(root: pathlib.Path, source_text: str, name: str = "model.ANVL") -> tup
 
 class GltfLoaderTests(unittest.TestCase):
     def test_a_quad_becomes_two_coloured_triangles(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             path = write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
             triangles = gltf.load_triangles(path)
@@ -83,14 +101,31 @@ class GltfLoaderTests(unittest.TestCase):
             self.assertEqual(triangles[9:12], [255.0, 0.0, 0.0])
 
     def test_node_translation_moves_vertices(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             path = write_quad(root, "moved.gltf", (0.0, 1.0, 0.0), translation=(2.0, 3.0, 0.0))
             triangles = gltf.load_triangles(path)
             self.assertEqual(triangles[:3], [1.0, 2.0, 0.0])
 
+    def test_a_glb_container_loads_the_same_triangles(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            gltf_path = write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+            glb_path = write_glb(root, "quad.glb", (1.0, 0.0, 0.0))
+            self.assertEqual(
+                gltf.load_triangles(gltf_path), gltf.load_triangles(glb_path)
+            )
+
+    def test_a_broken_glb_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            path = root / "broken.glb"
+            path.write_bytes(b"glTF" + struct.pack("<II", 2, 12))
+            with self.assertRaises(gltf.ModelError):
+                gltf.load_triangles(path)
+
     def test_missing_and_unsupported_inputs_are_reported(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             with self.assertRaises(gltf.ModelError):
                 gltf.load_triangles(root / "nope.gltf")
@@ -102,7 +137,7 @@ class GltfLoaderTests(unittest.TestCase):
 
 class GltfCompileTests(unittest.TestCase):
     def test_missing_model_is_a_located_compile_error(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             result, _ = build(
                 root,
@@ -144,7 +179,7 @@ class GltfPixelTests(unittest.TestCase):
                 process.kill()
 
     def test_a_gltf_quad_paints_shaded_triangles(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
             result, executable = build(
@@ -173,8 +208,41 @@ class GltfPixelTests(unittest.TestCase):
                 lambda pixel: abs(pixel[0] - expected) <= 3 and pixel[1] == 0 and pixel[2] == 0,
             )
 
+    def test_a_glb_model_renders_like_a_gltf_one(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_glb(root, "quad.glb", (1.0, 0.0, 0.0))
+            source_text = '\n'.join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 5",
+                    "camera fov(60)",
+                    "clear rgba(0, 0, 0, 255)",
+                    "set var(frame) = 0",
+                    "",
+                    "fn(draw)",
+                    "  add var(frame) 1",
+                    "  if var(frame) > 900",
+                    "    stop",
+                    "  end",
+                    '  set var(ok) = model_draw("quad.glb", 0, 0, 0, 1, 0, 0, 0)',
+                    "end",
+                    "",
+                )
+            )
+            result, _ = build(root, source_text)
+            if result.returncode != 0:
+                if "No C compiler found" in result.stderr:
+                    raise unittest.SkipTest("MSVC is not available")
+                self.fail(result.stderr)
+            expected = expected_red()
+            self.run_and_sample(
+                root,
+                lambda pixel: abs(pixel[0] - expected) <= 3 and pixel[1] == 0 and pixel[2] == 0,
+            )
+
     def test_a_nearer_model_wins_the_depth_test(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             write_quad(root, "far.gltf", (1.0, 0.0, 0.0))
             write_quad(root, "near.gltf", (0.0, 0.0, 1.0), translation=(0.0, 0.0, 1.0))

@@ -256,6 +256,12 @@ class WindowReader:
             f"{client_rect.bottom - client_rect.top}"
         )
 
+    def raise_window(self) -> None:
+        """Bring the window to the top without moving or resizing it."""
+        self.user32.SetWindowPos(
+            self.hwnd, ctypes.c_void_p(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010
+        )
+
     def pixel(self, x: int, y: int) -> tuple[int, int, int]:
         dc = self.user32.GetDC(self.hwnd)
         if not dc:
@@ -350,7 +356,7 @@ class WindowReader:
 
 class SpriteDrawTests(unittest.TestCase):
     def test_tint_flip_and_rotation_paint_expected_pixels(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "quad.bmp").write_bytes(quadrant_bmp())
             source = root / "sprite.ANVL"
@@ -488,7 +494,7 @@ REGION_PROGRAM = "\n".join(
 
 class SpriteRegionTests(unittest.TestCase):
     def test_atlas_regions_draw_the_requested_cell(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "quad4.bmp").write_bytes(quadrant4_bmp())
             source = root / "region.ANVL"

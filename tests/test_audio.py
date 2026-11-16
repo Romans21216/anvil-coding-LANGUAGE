@@ -27,7 +27,7 @@ def wav_bytes(
     bits: int = 16,
 ) -> bytes:
     """A mono sine WAV in the requested shape, written through the wave module."""
-    with tempfile.TemporaryDirectory() as temp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
         path = pathlib.Path(temp) / "tone.wav"
         with wave.open(str(path), "wb") as handle:
             handle.setnchannels(channels)
@@ -53,7 +53,7 @@ def wav_bytes(
 
 
 def run_c(source: str, files: dict[str, bytes] | None = None) -> subprocess.CompletedProcess:
-    with tempfile.TemporaryDirectory() as temp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
         temp_path = pathlib.Path(temp)
         for name, payload in (files or {}).items():
             (temp_path / name).write_bytes(payload)

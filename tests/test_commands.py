@@ -34,7 +34,7 @@ class DoctorTests(unittest.TestCase):
 
 class NewProjectTests(unittest.TestCase):
     def test_new_scaffolds_a_runnable_project(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             target = pathlib.Path(temp) / "game"
             result = run_compiler("--new", str(target))
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -43,7 +43,7 @@ class NewProjectTests(unittest.TestCase):
             self.assertTrue((target / "README.md").is_file())
 
     def test_new_refuses_a_non_empty_directory(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             target = pathlib.Path(temp) / "game"
             target.mkdir()
             (target / "keep.txt").write_text("x", encoding="utf-8")
@@ -55,7 +55,7 @@ class NewProjectTests(unittest.TestCase):
 
 class RunCommandTests(unittest.TestCase):
     def test_run_builds_and_returns_the_program_exit_code(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "ok.ANVL"
             source.write_text(PROGRAM, encoding="utf-8")
             result = run_compiler(str(source), "--backend", "native", "--run")
@@ -63,7 +63,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("hi", result.stdout)
 
     def test_run_propagates_a_failing_program(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "bad.ANVL"
             source.write_text(
                 "fn(main)\n  say 1 / 0\nend\ncall fn(main)\n", encoding="utf-8"
@@ -73,7 +73,7 @@ class RunCommandTests(unittest.TestCase):
         self.assertIn("division by zero", result.stderr)
 
     def test_run_rejects_incompatible_flags(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             source = pathlib.Path(temp) / "ok.ANVL"
             source.write_text(PROGRAM, encoding="utf-8")
             result = run_compiler(str(source), "--check", "--run")
@@ -83,7 +83,7 @@ class RunCommandTests(unittest.TestCase):
 
 class CleanTests(unittest.TestCase):
     def test_clean_removes_generated_artifacts_but_keeps_sources(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             source = root / "prog.ANVL"
             source.write_text(PROGRAM, encoding="utf-8")
@@ -114,7 +114,7 @@ class ProjectTestCommandTests(unittest.TestCase):
         return manifest
 
     def test_passing_cases_report_pass_and_exit_zero(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             manifest = self._project(pathlib.Path(temp))
             result = run_compiler(str(manifest), "--backend", "native", "--test")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -122,7 +122,7 @@ class ProjectTestCommandTests(unittest.TestCase):
         self.assertIn("1 passed, 0 failed", result.stdout)
 
     def test_a_failing_case_fails_the_run(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             manifest = self._project(root)
             (root / "tests/bad.ANVL").write_text(
@@ -134,7 +134,7 @@ class ProjectTestCommandTests(unittest.TestCase):
         self.assertIn("1 passed, 1 failed", result.stdout)
 
     def test_a_project_without_tests_says_so(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "main.ANVL").write_text(PROGRAM, encoding="utf-8")
             manifest = root / "game.ANVLproj"

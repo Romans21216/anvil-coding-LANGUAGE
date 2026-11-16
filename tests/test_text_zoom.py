@@ -59,7 +59,7 @@ PROGRAM = "\n".join(
 
 class TextZoomTests(unittest.TestCase):
     def test_glyphs_grow_with_camera_zoom(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             source = root / "text_zoom.ANVL"
             source.write_text(PROGRAM, encoding="utf-8")

@@ -38,11 +38,15 @@ class ModelError(Exception):
     pass
 
 
-def _buffer_bytes(document: dict, index: int, base_dir: pathlib.Path) -> bytes:
+def _buffer_bytes(
+    document: dict, index: int, base_dir: pathlib.Path, binary: bytes | None = None
+) -> bytes:
     buffer = document["buffers"][index]
     uri = buffer.get("uri")
     if not uri:
-        raise ModelError("binary .glb containers are not supported; export .gltf with a .bin or data URI")
+        if index == 0 and binary is not None:
+            return binary
+        raise ModelError("a buffer has no uri and the file has no GLB binary chunk")
     if uri.startswith("data:"):
         header, _, payload = uri.partition(",")
         if ";base64" not in header:
@@ -58,12 +62,14 @@ def _buffer_bytes(document: dict, index: int, base_dir: pathlib.Path) -> bytes:
         raise ModelError(f"cannot read buffer {uri!r}: {error}") from error
 
 
-def _accessor(document: dict, index: int, base_dir: pathlib.Path) -> list[tuple]:
+def _accessor(
+    document: dict, index: int, base_dir: pathlib.Path, binary: bytes | None = None
+) -> list[tuple]:
     accessor = document["accessors"][index]
     if accessor.get("sparse"):
         raise ModelError("sparse accessors are not supported")
     view = document["bufferViews"][accessor["bufferView"]]
-    buffer = _buffer_bytes(document, view["buffer"], base_dir)
+    buffer = _buffer_bytes(document, view["buffer"], base_dir, binary)
     component = accessor["componentType"]
     if component not in COMPONENTS:
         raise ModelError(f"unsupported accessor component type {component}")
@@ -165,22 +171,29 @@ def _material_colour(document: dict, primitive: dict) -> tuple[int, int, int]:
 
 
 def _primitive(
-    document: dict, primitive: dict, matrix: list[float], base_dir: pathlib.Path
+    document: dict,
+    primitive: dict,
+    matrix: list[float],
+    base_dir: pathlib.Path,
+    binary: bytes | None = None,
 ) -> list[float]:
     attributes = primitive.get("attributes", {})
     if "POSITION" not in attributes:
         raise ModelError("a primitive has no POSITION attribute")
-    positions = _accessor(document, attributes["POSITION"], base_dir)
+    positions = _accessor(document, attributes["POSITION"], base_dir, binary)
     if attributes.get("POSITION") is not None and len(positions) and len(positions[0]) != 3:
         raise ModelError("POSITION must be a VEC3 accessor")
     if primitive.get("indices") is not None:
-        indices = [int(row[0]) for row in _accessor(document, primitive["indices"], base_dir)]
+        indices = [
+            int(row[0])
+            for row in _accessor(document, primitive["indices"], base_dir, binary)
+        ]
     else:
         indices = list(range(len(positions)))
 
     colours = None
     if "COLOR_0" in attributes:
-        raw = _accessor(document, attributes["COLOR_0"], base_dir)
+        raw = _accessor(document, attributes["COLOR_0"], base_dir, binary)
         colours = [tuple(max(0, min(255, int(round(v * 255.0)))) for v in row[:3]) for row in raw]
     fallback = _material_colour(document, primitive)
 
@@ -202,13 +215,52 @@ def _primitive(
     return out
 
 
-def load_triangles(path: pathlib.Path) -> list[float]:
+def _container(path: pathlib.Path) -> tuple[dict, bytes | None]:
+    """Return (document, GLB binary chunk) for a .gltf or .glb file."""
+    suffix = path.suffix.lower()
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_bytes()
     except OSError as error:
         raise ModelError(f"cannot read {path.name}: {error}") from error
-    except ValueError as error:
-        raise ModelError(f"{path.name} is not valid glTF JSON: {error}") from error
+    if suffix == ".gltf":
+        try:
+            document = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError) as error:
+            raise ModelError(f"{path.name} is not valid glTF JSON: {error}") from error
+        return document, None
+    if suffix != ".glb":
+        raise ModelError("only .gltf and .glb models are supported")
+    if len(raw) < 12 or raw[:4] != b"glTF":
+        raise ModelError(f"{path.name} is not a GLB file")
+    version, length = struct.unpack_from("<II", raw, 4)
+    if version != 2:
+        raise ModelError(f"unsupported GLB version {version}; only version 2 is supported")
+    if length > len(raw):
+        raise ModelError("the GLB header length runs past the end of the file")
+    offset = 12
+    document = None
+    binary = None
+    while offset + 8 <= length:
+        chunk_length, chunk_type = struct.unpack_from("<II", raw, offset)
+        offset += 8
+        if offset + chunk_length > len(raw):
+            raise ModelError("a GLB chunk is truncated")
+        payload = raw[offset : offset + chunk_length]
+        offset += chunk_length
+        if chunk_type == 0x4E4F534A:  # 'JSON'
+            try:
+                document = json.loads(payload.decode("utf-8"))
+            except (UnicodeDecodeError, ValueError) as error:
+                raise ModelError(f"the GLB JSON chunk is invalid: {error}") from error
+        elif chunk_type == 0x004E4942:  # 'BIN\0'
+            binary = payload
+    if document is None:
+        raise ModelError("the GLB file has no JSON chunk")
+    return document, binary
+
+
+def load_triangles(path: pathlib.Path) -> list[float]:
+    document, binary = _container(path)
     if not isinstance(document, dict) or "asset" not in document:
         raise ModelError(f"{path.name} has no glTF 'asset' block")
     base_dir = path.parent
@@ -230,7 +282,9 @@ def load_triangles(path: pathlib.Path) -> list[float]:
         if "mesh" in node:
             mesh = document["meshes"][node["mesh"]]
             for primitive in mesh.get("primitives", []):
-                triangles.extend(_primitive(document, primitive, world, base_dir))
+                triangles.extend(
+                    _primitive(document, primitive, world, base_dir, binary)
+                )
                 if len(triangles) // 12 > MAX_TRIANGLES:
                     raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
         for child in node.get("children", []):
@@ -281,8 +335,8 @@ def ensure_emitted(asset: str, source_path: pathlib.Path) -> tuple[str, int]:
         return symbol, count
     if not path.is_file():
         raise ModelError(f"cannot find model {asset!r} (resolved to {path})")
-    if not key.endswith(".gltf"):
-        raise ModelError("only .gltf models are supported (not .glb) yet")
+    if not key.endswith((".gltf", ".glb")):
+        raise ModelError("only .gltf and .glb models are supported")
     data = load_triangles(path)
     symbol = f"anvil_model_{len(_registry)}"
     count = len(data) // 12

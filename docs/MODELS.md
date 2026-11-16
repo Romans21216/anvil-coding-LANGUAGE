@@ -29,7 +29,8 @@ around X, Y and Z. The order is scale, rotate, translate.
 | Feature | Support |
 | --- | --- |
 | `.gltf` JSON | Yes |
-| Buffers | External `.bin` or `data:` base64 URI |
+| `.glb` container | Yes; JSON and BIN chunks, unknown chunks skipped |
+| Buffers | External `.bin`, `data:` base64 URI, or the GLB BIN chunk |
 | Node hierarchy | Yes; matrix or translation/rotation/scale, 64 levels deep |
 | Primitives | TRIANGLES, TRIANGLE_STRIP, TRIANGLE_FAN |
 | Positions | `POSITION` as VEC3 float |
@@ -37,9 +38,9 @@ around X, Y and Z. The order is scale, rotate, translate.
 | Colour | `COLOR_0` (averaged per triangle) or material `baseColorFactor` |
 | Budget | 200,000 triangles, checked at compile time |
 
-Not supported yet, and reported as a located compile error: `.glb`
-containers, skins, morph targets, animations, textures, sparse accessors and
-primitive modes other than triangles/strips/fans.
+Not supported yet, and reported as a located compile error: skins, morph
+targets, animations, textures, sparse accessors and primitive modes other than
+triangles/strips/fans.
 
 ## Shading
 

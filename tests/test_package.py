@@ -28,7 +28,7 @@ def sha256(path: pathlib.Path) -> str:
 
 class CollectAssetTests(unittest.TestCase):
     def test_declared_and_literal_paths_are_merged_and_deduplicated(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "assets").mkdir()
             (root / "assets/pic.bmp").write_bytes(b"bmp")
@@ -44,7 +44,7 @@ class CollectAssetTests(unittest.TestCase):
         self.assertEqual([path.name for path in found], ["pic.bmp", "snd.wav"])
 
     def test_an_asset_outside_the_project_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp) / "proj"
             root.mkdir()
             source = root / "main.ANVL"
@@ -55,7 +55,7 @@ class CollectAssetTests(unittest.TestCase):
 
 class PackageManifestTests(unittest.TestCase):
     def test_dry_run_prints_the_manifest_and_writes_nothing(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             (root / "assets").mkdir()
             (root / "assets/pic.bmp").write_bytes(b"bmp")
@@ -112,7 +112,7 @@ class PackageCommandTests(unittest.TestCase):
         )
 
     def test_package_copies_the_program_assets_and_manifest(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             manifest = self._project(root)
             dist = root / "dist"
@@ -132,7 +132,7 @@ class PackageCommandTests(unittest.TestCase):
             )
 
     def test_missing_asset_fails_the_package_step(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             manifest = self._project(root)
             (root / "assets/pic.bmp").unlink()

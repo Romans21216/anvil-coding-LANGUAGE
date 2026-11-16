@@ -60,7 +60,7 @@ PROGRAM = "\n".join(
 
 class Camera2DTests(unittest.TestCase):
     def test_pan_and_zoom_move_the_world_rect(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             source = root / "camera.ANVL"
             source.write_text(PROGRAM, encoding="utf-8")

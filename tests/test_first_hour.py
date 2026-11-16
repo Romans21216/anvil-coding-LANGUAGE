@@ -30,7 +30,7 @@ def run(*arguments: str, cwd=None) -> subprocess.CompletedProcess:
 
 class FirstHourTests(unittest.TestCase):
     def test_new_project_builds_runs_formats_and_packages(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             project = pathlib.Path(temp) / "my-game"
 
             created = run("--new", str(project))
