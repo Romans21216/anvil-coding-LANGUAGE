@@ -368,3 +368,19 @@ Measured today (28 cases):
 `tests/test_backend_matrix.py` regenerates the matrix and fails when the
 committed document drifts, so backend changes cannot silently invalidate the
 published capability table.
+
+## Part 8 GATE 0: reproducible baseline benchmarks
+
+`tools/benchmark.py` builds and runs `tools/benchmarks/console_workload.ANVL`
+(arrays, calls, recursion, loops; common operator set only) and writes
+`docs/BENCHMARKS.md` with machine and toolchain metadata. First baseline on
+this Windows 11 / MSVC 14.51 machine, 10 runs:
+
+- C backend: build median 1.320 s, EXE 288,768 bytes, run median 0.013 s.
+- Native backend: build median 0.092 s, EXE 70,144 bytes, run median 0.005 s.
+- Both backends print `36886024`, so the workload is a shared-semantics check,
+  not just a timer.
+
+`tests/test_benchmark_workload.py` builds the same workload on both backends and
+fails if the printed values diverge, extending the differential conformance
+suite beyond the small numeric cases.

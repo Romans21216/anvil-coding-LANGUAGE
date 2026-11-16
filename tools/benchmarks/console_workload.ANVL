@@ -1,0 +1,33 @@
+# Representative console workload: arithmetic, arrays, calls and recursion.
+array slots(256)
+
+fn(mix, n)
+  set local(a) = var(n)
+  set local(b) = var(n) * 3 + 7
+  set local(c) = 0
+  for local(i) = 0 to 255
+    set array(slots,local(i)) = (local(i) * local(a) + local(b)) / 16
+    add local(c) local(i)
+  end
+  output local(c) + local(a) + local(b)
+end
+
+fn(fold, n)
+  if var(n) <= 1
+    output 1
+  end
+  output call fn(fold, var(n) - 1) + var(n) * 2
+end
+
+fn(main)
+  set local(total) = 0
+  for local(round) = 0 to 999
+    add local(total) call fn(mix, local(round))
+    add local(total) call fn(fold, 12)
+  end
+  set local(sum) = 0
+  for local(i) = 0 to 255
+    add local(sum) array(slots,local(i))
+  end
+  output local(total) + local(sum)
+end
