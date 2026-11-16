@@ -78,7 +78,12 @@ def build_c(
             # wrapper whenever the capture is unavailable.
             environment = toolchain_env.ensure(devcmd)
             if environment is not None:
-                subprocess.run(args, check=True, env=environment)
+                # The capture can be hours old: keep the caller's current
+                # environment (TEMP, TMP, session PATH) and let the toolchain
+                # values win where they overlap.
+                child_env = dict(os.environ)
+                child_env.update(environment)
+                subprocess.run(args, check=True, env=child_env)
             else:
                 helper = output.parent / (output.stem + ".build.cmd")
                 helper.write_text(

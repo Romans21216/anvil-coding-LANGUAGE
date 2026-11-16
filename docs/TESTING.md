@@ -116,5 +116,7 @@ assertions cover the program's own memory rather than screenshots.
   after re-running it in isolation.
 - `test_native_window.py` covers resize, close and allocation failure;
   minimize/restore, occlusion and DPI changes have no automated case yet.
+- The full suite took 180 s with a warm toolset-environment cache (719 passed); the
+  first run after a Visual Studio update pays one ~1.2 s environment capture.
 - The full-suite count changes as tests are added; the latest recorded run is
   in `docs/AUTONOMOUS_DEVELOPMENT_PROGRESS.md`.
