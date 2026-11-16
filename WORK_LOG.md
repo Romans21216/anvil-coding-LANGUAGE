@@ -397,3 +397,19 @@ appends a newline, so a literal line prints identically on both backends:
   time with the source line and a message that says the C backend is required.
 - `tests/test_native_x64.py` covers both the literal success and the located
   rejection; `docs/BACKEND_MATRIX.md` now includes a `print-literal` row.
+
+## Native backend: `mod` and `round` parity
+
+The matrix showed `mod(...)` and `round(...)` rejected by the native backend.
+Both now lower to SSE2 in `compiler/native_math.py`:
+
+- `mod(x, y)` computes `x - y * floor(x / y)` (floored modulo, matching the C
+  runtime) and exits 2 with `path:line: modulo by zero` on a zero divisor.
+- `round(x)` computes `sign(x) * floor(abs(x) + 0.5)` (half away from zero);
+  `round(-0.4)` prints `-0` on both backends.
+- `round(value, places)` is still C-only and now fails with a located message
+  that names the limit instead of a generic parse error.
+
+Tests in `tests/test_native_x64.py` cover the matching values, the sign cases
+and both rejections; `docs/BACKEND_MATRIX.md` regenerates with these rows
+supported on both backends (20 of 29 shared cases).

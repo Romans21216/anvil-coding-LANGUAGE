@@ -10,6 +10,7 @@ from compiler.common import CompileError
 class NativeMath:
     ARITY = {"abs": 1, "sqrt": 1, "floor": 1, "ceil": 1,
              "min": 2, "max": 2, "rnd": 2, "noise": 3, "fbm": 6,
+             "mod": 2, "round": 1,
              "_anvil_native_hash": 3}
     PREFIX = "_anvil_native_"
     DEFAULT_SEED = 0x9E3779B97F4A7C15
@@ -55,6 +56,45 @@ class NativeMath:
         self.constant(1, 1)
         c.bytes(b"\xf2\x0f\x58\xc1" if ceiling else b"\xf2\x0f\x5c\xc1")
         c.label(done)
+
+    def modulo(self, load, owner, line):
+        """Floored modulo: x - y * floor(x / y), erroring on a zero divisor."""
+        c = self.code
+        load(1, 1)
+        c.bytes(b"\x66\x0f\xef\xd2")  # pxor xmm2,xmm2
+        c.bytes(b"\x66\x0f\x2e\xca")  # ucomisd xmm1,xmm2
+        ready = owner.label("mod_ready")
+        c.conditional_jump(0x85, ready)
+        owner.emit_runtime_error(f"{owner.path}:{line}: modulo by zero\n")
+        c.label(ready)
+        load(0, 0)
+        load(1, 1)
+        c.bytes(b"\xf2\x0f\x5e\xc1")  # divsd xmm0,xmm1
+        self.round(False)  # floor; clobbers xmm1 through a constant
+        load(1, 1)
+        c.bytes(b"\xf2\x0f\x59\xc1")  # mulsd xmm0,xmm1
+        load(0, 2)
+        c.bytes(b"\xf2\x0f\x5c\xd0")  # subsd xmm2,xmm0
+        c.bytes(b"\x66\x0f\x28\xc2")  # movapd xmm0,xmm2
+
+    def round_half(self, load):
+        """Round half away from zero: sign(x) * floor(abs(x) + 0.5)."""
+        c = self.code
+        load(0, 0)
+        c.bytes(b"\x66\x48\x0f\x7e\xc0")  # movq rax,xmm0
+        c.mov_imm(1, 0x7FFFFFFFFFFFFFFF)
+        c.bytes(b"\x48\x21\xc8")  # and rax,rcx  -> |x|
+        c.bytes(b"\x66\x48\x0f\x6e\xc0")  # movq xmm0,rax
+        self.constant(1, 0.5)
+        c.bytes(b"\xf2\x0f\x58\xc1")  # addsd xmm0,xmm1
+        self.round(False)  # floor(|x| + 0.5)
+        load(0, 1)  # xmm1 = original x
+        c.bytes(b"\x66\x48\x0f\x7e\xc8")  # movq rax,xmm1
+        c.mov_imm(1, 0x8000000000000000)
+        c.bytes(b"\x48\x21\xc8")  # and rax,rcx  -> sign bits
+        c.bytes(b"\x66\x48\x0f\x7e\xc2")  # movq rdx,xmm0
+        c.bytes(b"\x48\x09\xc2")  # or rdx,rax
+        c.bytes(b"\x66\x48\x0f\x6e\xc2")  # movq xmm0,rdx
 
     def seed(self, line):
         c = self.code
@@ -146,6 +186,11 @@ class NativeMath:
             slot = owner.push_temp()
             owner.store_local(slot)
             slots.append(slot)
+        if name == "round" and parser._peek(","):
+            raise CompileError(
+                f"{owner.path}:{parser.line}: native round currently accepts one argument; "
+                "round(value, places) needs the default C backend"
+            )
         parser._expect(")")
 
         def load(index, register):
@@ -175,6 +220,10 @@ class NativeMath:
             owner.emit_saved_call(helper, slots)
         elif name == "rnd":
             self.rnd(load, parser.line)
+        elif name == "mod":
+            self.modulo(load, owner, parser.line)
+        elif name == "round":
+            self.round_half(load)
         else:
             load(0, 0)
             if name in ("min", "max"):

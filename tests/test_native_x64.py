@@ -142,6 +142,33 @@ end
         self.assertIn("dynamic-print.ANVL:3", message)
         self.assertIn("one string literal", message)
 
+    def test_native_backend_matches_floored_mod_and_half_rounding(self):
+        cases = {
+            "mod(7, 3)": "1\n",
+            "mod(0 - 5, 3)": "1\n",
+            "mod(5, 0 - 3)": "-1\n",
+            "round(2.4)": "2\n",
+            "round(2.5)": "3\n",
+            "round(0 - 2.5)": "-3\n",
+            "round(0 - 0.4)": "-0\n",
+        }
+        for expression, expected in cases.items():
+            with self.subTest(expression=expression):
+                source = f"fn(main)\n  output {expression}\nend\n"
+                self.assertEqual(self._run_source(source), expected)
+
+    def test_native_backend_rejects_round_places_with_a_source_location(self):
+        source = "fn(main)\n  output round(2.456, 2)\nend\n"
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "round-places.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as raised:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        message = str(raised.exception)
+        self.assertIn("round-places.ANVL:2", message)
+        self.assertIn("accepts one argument", message)
+
     def test_native_backend_prints_fractional_numbers(self):
         cases = {
             "17.875": "17.875\n",

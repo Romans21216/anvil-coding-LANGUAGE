@@ -25,8 +25,8 @@ source with a diagnostic. Regenerate after changing either backend, and run
 | `array-runtime-index` | data | supported | supported |
 | `include-library` | modules | supported | supported |
 | `sqrt-abs-min-max` | builtins | supported | supported |
-| `mod-builtin` | builtins | supported | rejected |
-| `round-builtin` | builtins | supported | rejected |
+| `mod-builtin` | builtins | supported | supported |
+| `round-builtin` | builtins | supported | supported |
 | `text-format-number` | text | supported | wrong value |
 | `text-dynamic` | text | builds | rejected |
 | `print-statement` | text | supported | rejected |
@@ -40,14 +40,12 @@ source with a diagnostic. Regenerate after changing either backend, and run
 
 ## Summary
 
-- Cases where both backends build and print the same value: **18** of 29.
-- Cases the C backend supports but the native backend rejects: **4**.
-- Cases the native backend rejects: `mod-builtin`, `round-builtin`, `print-statement`, `text-builtins`.
+- Cases where both backends build and print the same value: **20** of 29.
+- Cases the C backend supports but the native backend rejects: **2**.
+- Cases the native backend rejects: `print-statement`, `text-builtins`.
 
 ## Rejected-case diagnostics
 
-- `mod-builtin` on `native`: error: unsupported native expression token 'mod'
-- `round-builtin` on `native`: error: unsupported native expression token 'round'
 - `text-dynamic` on `native`: error: statement 'display' is not supported by the native x64 backend yet
 - `print-statement` on `native`: error: native print currently accepts one string literal; dynamic text needs the default C backend
 - `text-builtins` on `native`: error: unsupported native expression token 'len'

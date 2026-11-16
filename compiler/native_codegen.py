@@ -257,6 +257,7 @@ class NativeCodegen:
                      "receive",
                      "mouse_x", "mouse_y", "mouse_held", "mouse_pressed", "mouse_wheel",
                      "abs", "sqrt", "floor", "ceil", "min", "max", "rnd", "noise", "fbm",
+                     "mod", "round",
                      "_anvil_native_hash"}
     MAX_DATA_BYTES = 16 * 1024 * 1024
     MAX_FRAME_BYTES = 4096
