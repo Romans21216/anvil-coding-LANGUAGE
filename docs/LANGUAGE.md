@@ -122,8 +122,9 @@ console program prints only `fn(main)`'s return value when it ends.
 draws literal text only: `display text("literal")` works, and so does
 `print "literal"`; a text expression (`"score " + var(score)`) is rejected at
 compile time with a diagnostic that says so. `round(value)` and `mod(value,
-divisor)` work on both backends, but `round(value, places)` and `clear` inside
-`fn(draw)` need the C backend. This is a known, deliberate gap — see [native
+divisor)` work on both backends, but `round(value, places)` needs the C backend.
+`clear rgba(r,g,b,255)` is accepted in top-level scene setup and inside
+`fn(draw)` on both backends. This is a known, deliberate gap — see [native
 backend availability](NATIVE_X64_COMPILER_MIGRATION.md) — so build HUDs that
 show numbers with the default C backend. The measured per-feature support table
 is [BACKEND_MATRIX.md](BACKEND_MATRIX.md).

@@ -34,7 +34,7 @@ source with a diagnostic. Regenerate after changing either backend, and run
 | `print-toplevel` | text | supported | supported |
 | `text-builtins` | text | supported | rejected |
 | `utf8-codepoints` | text | supported | rejected |
-| `clear-inside-draw` | graphics | builds | rejected |
+| `clear-inside-draw` | graphics | builds | builds |
 | `display-rect` | graphics | builds | builds |
 | `display-circle` | graphics | builds | builds |
 | `display-line` | graphics | builds | builds |
@@ -52,4 +52,3 @@ source with a diagnostic. Regenerate after changing either backend, and run
 - `print-statement` on `native`: error: native print currently accepts one string literal; dynamic text needs the default C backend
 - `text-builtins` on `native`: error: unsupported native expression token 'len'
 - `utf8-codepoints` on `native`: error: native print currently accepts one string literal; dynamic text needs the default C backend
-- `clear-inside-draw` on `native`: error: statement 'clear' is not supported by the native x64 backend yet

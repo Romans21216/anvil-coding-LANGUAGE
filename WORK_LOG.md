@@ -484,3 +484,15 @@ integer suffix was accepted. All four were false. Updated:
 - Repeated colour modifiers are specified as invalid; a stray number after a
   display call is specified as a rejected diagnostic (both already implemented).
 - Added a complete text-and-print conformance example, verified with `--check`.
+
+## Native backend: `clear` inside `fn(draw)`
+
+The matrix showed `clear` rejected inside a draw callback, so the same scene
+compiled on C and failed on native. The native draw path now accepts a literal
+`clear rgba(r,g,b,255)` and fills the client surface through the existing
+rectangle kernel (whole client, opaque), which keeps the per-frame reset the C
+backend provides. Transparent alpha is still rejected with a located diagnostic,
+matching the scene-setup rule.
+
+`tests/test_native_x64.py` covers acceptance and the alpha-255 rejection; the
+`clear-inside-draw` matrix row now reads `builds` on both backends.

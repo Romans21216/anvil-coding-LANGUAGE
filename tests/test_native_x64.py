@@ -120,6 +120,33 @@ call fn(main)
 """
         self.assertEqual(self._run_source(source), "-42\n")
 
+    def test_native_backend_accepts_literal_clear_inside_draw(self):
+        source = (
+            "scene 2d\n"
+            "fn(draw)\n"
+            "  clear rgba(0, 0, 0, 255)\n"
+            "  display rect(0, 0, 1, 1)\n"
+            "end\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "clear-draw.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            executable = NativeCodegen(path, functions, top, variables, arrays).generate()
+        self.assertTrue(executable)
+
+    def test_native_backend_rejects_transparent_clear_inside_draw(self):
+        source = "scene 2d\nfn(draw)\n clear rgba(0, 0, 0, 20)\nend\n"
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "clear-alpha.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as raised:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        message = str(raised.exception)
+        self.assertIn("clear-alpha.ANVL:3", message)
+        self.assertIn("alpha 255", message)
+
     def test_native_backend_prints_literal_text_lines(self):
         source = """\
 fn(main)

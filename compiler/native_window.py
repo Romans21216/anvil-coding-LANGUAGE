@@ -190,6 +190,36 @@ class NativeWindow:
         self.code.call("native:rectangle")
         self.code.bytes(b"\x48\x83\xc4\x60")
 
+    def emit_clear_statement(self, node: Node, scope: Node | None) -> None:
+        """Fill the whole client surface with a literal opaque colour."""
+        location = f"{self.owner.path}:{node.line}"
+        parts = split_args(node.value[1:-1]) if node.value else []
+        if (
+            len(parts) != 4
+            or any(not re.fullmatch(r"[0-9]{1,3}", part) for part in parts)
+            or any(int(part) > 255 for part in parts)
+            or parts[3] != "255"
+        ):
+            raise CompileError(
+                f"{location}: native clear requires four literal channels in 0..255 and alpha 255"
+            )
+        channels = [int(part) for part in parts]
+        c = self.code
+        c.bytes(b"\x48\x83\xec\x60")
+        c.bytes(b"\x66\x0f\xef\xc0")  # pxor xmm0,xmm0
+        c.bytes(b"\xf2\x0f\x11\x44\x24\x20")  # x = 0
+        c.bytes(b"\xf2\x0f\x11\x44\x24\x28")  # y = 0
+        for index, data in ((2, self.back_width), (3, self.back_height)):
+            c.rip_int(0, data)
+            c.bytes(b"\xf2\x48\x0f\x2a\xc0")  # cvtsi2sd xmm0,rax
+            c.bytes(b"\xf2\x0f\x11\x44\x24" + bytes((32 + index * 8,)))
+        for index, value in enumerate(channels):
+            self.owner._math.constant(0, float(value))
+            c.bytes(b"\xf2\x0f\x11\x44\x24" + bytes((32 + (4 + index) * 8,)))
+        c.bytes(b"\x48\x8d\x4c\x24\x20")  # lea rcx,[rsp+20h]
+        c.call("native:rectangle")
+        c.bytes(b"\x48\x83\xc4\x60")
+
     def _window_proc(self) -> None:
         c = self.code
         c.label("native:window_proc")

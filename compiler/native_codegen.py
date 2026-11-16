@@ -652,6 +652,8 @@ class NativeCodegen:
                 )
             elif node.kind == "display" and self._window is not None:
                 self._window.emit_display(node, scope)
+            elif node.kind == "clear" and self._window is not None:
+                self._window.emit_clear_statement(node, scope)
             elif node.kind == "print":
                 self.emit_print_statement(node)
             elif node.kind in ("add", "sub", "local_add", "local_sub",'global_add','global_sub'):
