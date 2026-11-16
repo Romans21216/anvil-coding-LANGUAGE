@@ -51,7 +51,8 @@ Supported today:
 - `say`, `write`, `output`
 - text values, `&` joining, and the builtins `len`, `mid`, `upper`, `lower`,
   `trim`, `left`, `right`, `char`, `contains`, `starts_with`, `ends_with`,
-  `number`
+  `number`, `ord`, `chr`
+- `noise` and `fbm` (same hash and gradient tables as the C runtime)
 - `floor`, `ceil`, `sqrt`, `abs`, `min`, `max`, `clamp`, `round`
 - `sin`, `cos` (range-reduced Taylor series, no libm) and `rnd` (xorshift64,
   inclusive integer range like the C runtime)
@@ -136,8 +137,10 @@ identical.
 - No Web Audio, IndexedDB or source maps yet; saves use `localStorage` for now.
   Those are the remaining 8.12 items. 3D and images also need the C backend.
 - `sin`/`cos` lose accuracy for arguments far outside the reduced range (the
-  test pins 1e6 radians, which still matches libm to six decimals); `tan`,
-  `noise` and `fbm` are not available yet.
+  test pins 1e6 radians, which still matches libm to six decimals); `tan` is not
+  available yet.
+- `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
+  same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the
   same as the C runtime; `char` returns empty text for out-of-range indexes.
 - `anvil_frame` ignores its delta argument; animations advance per host frame.

@@ -649,3 +649,9 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - **Measured here:** compile peak 111.6-113.3 MB for all five scenes; generated C 10.9 KB (idle) to 15.0 KB (3D); executables 187-206 KB; runtime peak 17.2-17.3 MB for every scene, which is dominated by fixed process overhead rather than scene content — recorded honestly instead of inferred.
 - **Tests:** `tests/test_memory_budget.py` runs one scene, asserts the metrics are present and sane, checks the budget file covers all five scenes, and enforces the gate through `--check`. 3 passed.
 - **Gap:** VRAM and input latency are still not instrumented; allocation counts per resource are not exposed.
+
+## Batch 56 — noise, fBm and characters in wasm (8.12)
+
+- **Runtime:** `noise`/`fbm` ported with the C runtime's hash table, gradient table, fade curve and 0.7 scale, including the coordinate-range check that writes `Anvil noise coordinate range error` and traps. `ord`/`chr` match the C semantics: `ord("")` is 0, `chr(0)` is empty text, and an out-of-range `chr` writes `Anvil chr out of range` and stops with a non-zero exit.
+- **Hosts:** both hosts now route `write(2, ...)` to stderr (the generated C already used fd 2), so the C and wasm failure paths report through the same channel.
+- **Tests:** `tests/test_wasm.py` compares a 13-line noise/fBm/ord/chr program across C and wasm byte for byte (including negative and fractional coordinates) and asserts the `chr(300)` failure message, empty stdout and non-zero exit. 19 passed.

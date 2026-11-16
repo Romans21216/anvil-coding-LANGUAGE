@@ -527,6 +527,120 @@ double anvil_rnd(double min_value, double max_value) {
   return (double)(low + (long long)(anvil_random_u64() % span));
 }
 
+/* ---- Noise and characters ----------------------------------------------- */
+static int anvil_noise_hash(int x, int y, int z) {
+  unsigned int h = (unsigned int)x * 374761393u +
+                   (unsigned int)y * 668265263u +
+                   (unsigned int)z * 2147483647u;
+  h = (h ^ (h >> 13)) * 1274126177u;
+  return (int)(h ^ (h >> 16));
+}
+
+static int anvil_noise_lattice(double value) {
+  if (!(value >= -2147483648.0) || !(value < 2147483647.0)) {
+    static const char message[] = "Anvil noise coordinate range error\n";
+    anvil_host_write(2, message, (int)sizeof(message) - 1);
+    exit(2);
+  }
+  return (int)floor(value);
+}
+
+static double anvil_noise_fade(double t) {
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+static double anvil_noise_grad(int hash, double x, double y, double z) {
+  switch ((unsigned int)hash & 15u) {
+  case 0:
+    return x + y;
+  case 1:
+    return -x + y;
+  case 2:
+    return x - y;
+  case 3:
+    return -x - y;
+  case 4:
+    return x + z;
+  case 5:
+    return -x + z;
+  case 6:
+    return x - z;
+  case 7:
+    return -x - z;
+  case 8:
+    return y + z;
+  case 9:
+    return -y + z;
+  case 10:
+    return y - z;
+  case 11:
+    return -y - z;
+  case 12:
+    return x + y;
+  case 13:
+    return -x + y;
+  case 14:
+    return -y + z;
+  default:
+    return -y - z;
+  }
+}
+
+static double anvil_noise_lerp(double a, double b, double t) {
+  return a + t * (b - a);
+}
+
+double anvil_noise(double x, double y, double z) {
+  int xi = anvil_noise_lattice(x), yi = anvil_noise_lattice(y),
+      zi = anvil_noise_lattice(z);
+  double xf = x - xi, yf = y - yi, zf = z - zi;
+  double u = anvil_noise_fade(xf), v = anvil_noise_fade(yf),
+         w = anvil_noise_fade(zf);
+  double corners[8];
+  for (int i = 0; i < 2; ++i)
+    for (int j = 0; j < 2; ++j)
+      for (int k = 0; k < 2; ++k)
+        corners[i * 4 + j * 2 + k] = anvil_noise_grad(
+            anvil_noise_hash(xi + i, yi + j, zi + k), xf - i, yf - j, zf - k);
+  double x00 = anvil_noise_lerp(corners[0], corners[4], u);
+  double x10 = anvil_noise_lerp(corners[2], corners[6], u);
+  double x01 = anvil_noise_lerp(corners[1], corners[5], u);
+  double x11 = anvil_noise_lerp(corners[3], corners[7], u);
+  return anvil_noise_lerp(anvil_noise_lerp(x00, x10, v),
+                          anvil_noise_lerp(x01, x11, v), w) *
+         0.7;
+}
+
+double anvil_fbm(double x, double y, double z, int octaves, double lacunarity,
+                 double gain) {
+  double sum = 0, amp = 0.5, norm = 0;
+  for (int i = 0; i < octaves && i < 16; ++i) {
+    sum += anvil_noise(x, y, z) * amp;
+    norm += amp;
+    x *= lacunarity;
+    y *= lacunarity;
+    z *= lacunarity;
+    amp *= gain;
+  }
+  return norm ? sum / norm : 0;
+}
+
+double anvil_text_ord(const char *source) {
+  return source[0] ? (double)(unsigned char)source[0] : 0.0;
+}
+
+char *anvil_text_chr(double code) {
+  char *destination = anvil_text_buffer();
+  if (!(code == code) || code < 0.0 || code > 255.0) {
+    static const char message[] = "Anvil chr out of range\n";
+    anvil_host_write(2, message, (int)sizeof(message) - 1);
+    exit(1);
+  }
+  destination[0] = (char)(int)code;
+  destination[1] = '\0';
+  return destination;
+}
+
 /* ---- Text helpers ------------------------------------------------------- */
 static size_t anvil_text_count(double value, size_t limit) {
   if (!(value == value) || value <= 0.0)

@@ -64,6 +64,10 @@ ALLOWED_BUILTINS = {
     "contains",
     "starts_with",
     "ends_with",
+    "ord",
+    "chr",
+    "noise",
+    "fbm",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
@@ -109,7 +113,9 @@ async function start() {
     const imports = { env: {
       write(fd, pointer, length) {
         const view = new Uint8Array(memory.buffer, pointer, length);
-        console.log(utf8.decode(view));
+        const text = utf8.decode(view);
+        if (fd === 2) console.error(text);
+        else console.log(text);
       },
       clear(r, g, b, a) {
         context.fillStyle = rgba(r, g, b, a);

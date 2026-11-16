@@ -133,9 +133,9 @@ class WasmRejectionTests(unittest.TestCase):
     def test_unsupported_builtins_name_the_call_site(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(root, "fn(main)\n  say noise(0, 0, 0)\nend\ncall fn(main)\n")
+            result, _ = build(root, "fn(main)\n  say image_load(\"pic.bmp\")\nend\ncall fn(main)\n")
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("'noise' is not available in the wasm backend yet", result.stderr)
+            self.assertIn("'image_load' is not available in the wasm backend yet", result.stderr)
             self.assertIn(":2:", result.stderr)
 
 
@@ -582,6 +582,97 @@ class WasmTextTests(unittest.TestCase):
                 [str(executable)], capture_output=True, text=True, timeout=60
             )
             self.assertEqual(native.stdout, run.stdout)
+
+
+
+_NOISE_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        "  say round(noise(0.5, 0.5, 0.5) * 1000000)",
+        "  say round(noise(12.25, -3.75, 8.5) * 1000000)",
+        "  say round(noise(-100.125, 200.875, 3.5) * 1000000)",
+        "  say round(fbm(1.5, 2.5, 0.5, 4, 2, 0.5) * 1000000)",
+        "  say round(fbm(-7.25, 3.5, 9.75, 6, 2.1, 0.45) * 1000000)",
+        "  say round(fbm(0, 0, 0, 1, 2, 0.5) * 1000000)",
+        '  say ord("A")',
+        '  say ord("hello")',
+        '  say ord("")',
+        "  say chr(65)",
+        "  say chr(97)",
+        "  say len(chr(0))",
+        "  say ord(chr(0))",
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+_NOISE_EXPECTED = [
+    "175000",
+    "351612",
+    "97809",
+    "-93333",
+    "96055",
+    "0",
+    "65",
+    "104",
+    "0",
+    "A",
+    "a",
+    "0",
+    "0",
+]
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmNoiseTests(unittest.TestCase):
+    def test_noise_fbm_and_characters_match_the_c_backend(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _NOISE_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines(), _NOISE_EXPECTED)
+
+            executable = root / "program.exe"
+            compiled = subprocess.run(
+                [
+                    sys.executable,
+                    str(COMPILER),
+                    str(root / "program.ANVL"),
+                    "-o",
+                    str(executable),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            native = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(native.stdout, run.stdout)
+
+    def test_out_of_range_chr_stops_with_the_same_message(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, "fn(main)\n  say chr(300)\nend\ncall fn(main)\n")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn("Anvil chr out of range", run.stderr)
+            self.assertEqual(run.stdout, "")
 
 
 if __name__ == "__main__":

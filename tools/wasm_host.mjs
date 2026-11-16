@@ -43,7 +43,9 @@ const imports = {
   env: {
     write(fd, pointer, length) {
       const view = new Uint8Array(memory.buffer, pointer, length);
-      process.stdout.write(Buffer.from(view));
+      const chunk = Buffer.from(view);
+      if (fd === 2) process.stderr.write(chunk);
+      else process.stdout.write(chunk);
     },
     clear(r, g, b, a) {
       ops.push(["clear", r, g, b, a]);

@@ -135,6 +135,13 @@ int anvil_str_contains(const char *source, const char *needle);
 int anvil_str_starts(const char *source, const char *prefix);
 int anvil_str_ends(const char *source, const char *suffix);
 
+/* Perlin-style noise and character conversion, matching the C runtime. */
+double anvil_noise(double x, double y, double z);
+double anvil_fbm(double x, double y, double z, int octaves, double lacunarity,
+                 double gain);
+double anvil_text_ord(const char *source);
+char *anvil_text_chr(double code);
+
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);
 void anvil_set_scene3d(int enabled);
