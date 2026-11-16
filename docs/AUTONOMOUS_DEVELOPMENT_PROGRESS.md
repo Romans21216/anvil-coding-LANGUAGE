@@ -642,3 +642,10 @@ This is a historical batch log. Each entry describes the state at that batch, in
 
 - **Runtime:** `lower`, `trim`, `left`, `right`, `char`, `contains`, `starts_with` and `ends_with` are implemented in the freestanding shim with the C runtime's exact clamping: counts truncate toward zero, values at or above the length clamp to the whole string, negative/NaN counts give empty text, and `char` returns empty text for an out-of-range index.
 - **Tests:** `tests/test_wasm.py` builds the same source for wasm and for the C backend and asserts both outputs are equal, with the expected 15 lines pinned (`left("abc", 99)` is `abc`, `right("abc", -1)` is empty, `left("abcdef", 1.9)` is `a`, `char("hello", 9)` is empty). 17 passed.
+
+## Batch 55 — compile and runtime memory capture (8.15)
+
+- **Tool:** `tools/bench_memory.py` samples the working set of the compiler's whole process tree (Python plus `cl.exe`) every 20 ms during a cold build, records the generated C and executable sizes, then samples each scene's working set every 50 ms while it runs. `--check` enforces `tools/mem_budgets.json`; `--write-budgets` re-baselines it with 2.5x headroom and floors (200 MB compile, 60 MB runtime).
+- **Measured here:** compile peak 111.6-113.3 MB for all five scenes; generated C 10.9 KB (idle) to 15.0 KB (3D); executables 187-206 KB; runtime peak 17.2-17.3 MB for every scene, which is dominated by fixed process overhead rather than scene content — recorded honestly instead of inferred.
+- **Tests:** `tests/test_memory_budget.py` runs one scene, asserts the metrics are present and sane, checks the budget file covers all five scenes, and enforces the gate through `--check`. 3 passed.
+- **Gap:** VRAM and input latency are still not instrumented; allocation counts per resource are not exposed.

@@ -27,6 +27,7 @@ is absent, tests that build C programs raise `SkipTest` instead of failing.
 | Backend capability drift | `python tools/capability_matrix.py --check` |
 | Compile-time and size budgets | `python tools/bench_anvil.py --check` (re-baseline with `--write-budgets`) |
 | Runtime frame-time budgets | `python tools/bench_runtime.py --check` (re-baseline with `--write-budgets`) |
+| Compile and runtime memory budgets | `python tools/bench_memory.py --check` (re-baseline with `--write-budgets`) |
 | Sprite atlas packing | `python tools/pack_atlas.py sheet.bmp --atlas sheet.json sprites/*.bmp` |
 | WebAssembly console build | `python compiler/anvil.py hello.ANVL --backend wasm -o hello.wasm` then `node tools/wasm_host.mjs hello.wasm` |
 | A project's own cases | `python compiler/anvil.py game.ANVLproj --test [--backend native]` |
@@ -93,6 +94,9 @@ remote desktop can prevent window creation:
   atlas-region draws checked by reading the pixels the program presented.
 - `test_camera2d` — C-backend `camera2d` pan, zoom, rejection of a zero zoom
   and reset, sampled from the presented window.
+- `test_memory_budget` — samples the compiler's process tree and each scene's
+  working set, checks generated C and executable sizes, and enforces
+  `tools/mem_budgets.json`.
 - `test_runtime_budget` — builds and runs the idle, 2D-overdraw, text and 3D
   benchmark scenes and enforces the frame-time budgets in
   `tools/bench_budgets.json`.
