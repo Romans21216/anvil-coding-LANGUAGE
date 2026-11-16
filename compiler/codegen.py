@@ -405,6 +405,9 @@ def emit_nodes(
                 else:
                     out.append(f'{indent}printf("%s", anvil_format_number({lower(n, part)}));')
             out.append(f'{indent}printf("\\n");')
+            # Flush each line so a piped reader (test harness, log collector)
+            # sees output while the program is still running.
+            out.append(f"{indent}fflush(stdout);")
         elif n.kind == "stop":
             out.append(f"{indent}exit(0);")
         elif n.kind == "call":

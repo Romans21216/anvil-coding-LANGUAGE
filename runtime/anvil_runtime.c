@@ -1432,6 +1432,11 @@ double anvil_net_receive(void) {
   int count = recvfrom(anvil_net_socket, (char *)&value, (int)sizeof(value), 0,
                        (SOCKADDR *)&from, &from_len);
   if (count == (int)sizeof(value)) {
+    /* A NaN or infinite payload is not a usable number and would poison every
+       later comparison, so it is ignored rather than stored. */
+    if (!isfinite(value)) {
+      return anvil_net_value;
+    }
     anvil_net_value = value;
     if (!anvil_net_has_peer) {
       anvil_net_peer = from;
