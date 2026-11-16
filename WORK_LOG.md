@@ -719,3 +719,24 @@ invalid handles play/stop/rate/length as 0, and the native backend rejects
 `sound_load` with a located error. `test_runtime_modules` gained the audio
 marker case; its unknown-marker test now uses `video`, since `audio` became a
 real module.
+
+## Physics limits: measured, not assumed
+
+Part 8's physics section asks for units, limits and tests for tunneling, stacks,
+high speed and long replays. The docs already listed the missing features; what
+was missing was evidence.
+
+- `tests/test_physics_limits.py` (6 cases) builds console programs against the
+  real runtime and pins: the capacity refusal at a configured limit (four
+  bodies fit, the fifth returns `-1`), a 120 units/s body stopping at a static
+  wall (`x ≈ -1.5`, velocity 0), a 240 units/s body tunneling through it, two
+  runs of the same 400-step simulation producing byte-identical output, a
+  two-box stack settling at `y ≈ 0.5` and `1.5` with velocities below 0.05,
+  and a 5000-step replay staying finite and bounded.
+- `docs/ENGINE.md` now states the units (world units, seconds, one fixed step
+  per `physics_step`), derives the measured tunneling boundary — the contact
+  window is 3 units, so 180 units/s at 60 Hz — and names the three honest
+  workarounds for fast projectiles: slower relative speed, thicker colliders,
+  or manual sub-stepping.
+- `docs/LANGUAGE.md` no longer lists audio as future work; only mixed/streamed
+  audio remains unimplemented.
