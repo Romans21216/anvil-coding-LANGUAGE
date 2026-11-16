@@ -70,6 +70,14 @@ double anvil_image_destroy(double handle);
 double anvil_image_draw(double handle, double x, double y);
 double anvil_image_draw_scaled(double handle, double x, double y, double width,
                                double height);
+const char *anvil_save_error(void);
+void anvil_set_project(const char *name);
+double anvil_save_number(const char *slot, double value);
+double anvil_load_number(const char *slot);
+double anvil_save_text(const char *slot, const char *text);
+const char *anvil_load_text(const char *slot);
+double anvil_save_exists(const char *slot);
+double anvil_save_delete(const char *slot);
 const char *anvil_sound_error(void);
 double anvil_sound_load(const char *path);
 double anvil_sound_play(double handle);

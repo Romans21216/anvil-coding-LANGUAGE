@@ -474,3 +474,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Backends:** C backend only; `--backend native` raises the standard located "not available in the native x64 backend yet" diagnostic.
 - **Tests:** load errors for missing/empty path, non-WAV, 24-bit, 3 channels, low rate and the per-sound budget; play/volume/pan/pitch clamps; bounded voices (8 then "all voices are busy"); looping across its source length; destroy stops voices and frees the slot. `tests/test_audio.py` 10 passed.
 - **Also:** `examples/audio_demo.ANVL` with `examples/assets/anvil_tone.wav`, spec table and grammar, evidence ledger, testing doc.
+
+## Batch 33 — saves: typed key/value storage (8.14)
+
+- **Builtins:** `save_number(slot,v)`, `load_number(slot)`, `save_text(slot,text)`, `load_text(slot)`, `save_exists(slot)`, `save_delete(slot)`, `save_error()`.
+- **Storage:** one value per slot in `%LOCALAPPDATA%\Anvil\<project>` (project name comes from the source or manifest, sanitised to `[A-Za-z0-9._-]`); `ANVIL_SAVE_DIR` overrides the root for hosts and tests.
+- **Safety:** slot names are 1–64 bytes from the same safe set, must not start with a dot and must not contain `..`, so a save cannot escape its folder. Files carry an `ANVSAVE1` magic plus a type byte; reading text as a number (or the reverse) returns 0/empty with a named error instead of reinterpreting bytes. Writes go to a temp file and `MoveFileExA(..., MOVEFILE_REPLACE_EXISTING)` swaps it in atomically.
+- **Limits:** 255-byte text values, non-finite numbers rejected on read, missing slot is a normal first run (0/empty, empty error).
+- **Tests:** round trip, cross-run persistence, missing slot, type mismatch in both directions, delete, traversal/oversized/invalid slots, 255-byte boundary and the default `%LOCALAPPDATA%` root. `tests/test_saves.py` 9 passed.
+- **Also:** `examples/save_demo.ANVL`, spec table and grammar, engine/language docs, evidence ledger, testing doc.
+- **Fixed en route:** the `number("...")` lint matched the `number(` inside `load_number(`, warning about every non-numeric save slot; the matcher now requires a name boundary, with a regression test.

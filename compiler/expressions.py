@@ -162,6 +162,13 @@ BUILTINS = {
     "sound_pitch": (2, 2),
     "sound_active": (0, 0),
     "sound_destroy": (1, 1),
+    "save_error": (0, 0),
+    "save_number": (2, 2),
+    "load_number": (1, 1),
+    "save_text": (2, 2),
+    "load_text": (1, 1),
+    "save_exists": (1, 1),
+    "save_delete": (1, 1),
     "receive": (0, 0),
     "body_create": (4, 4),
     "body_create_box": (5, 5),
@@ -218,6 +225,13 @@ BUILTIN_C_NAMES = {
     "sound_pitch": "anvil_sound_pitch",
     "sound_active": "anvil_sound_active",
     "sound_destroy": "anvil_sound_destroy",
+    "save_error": "anvil_save_error",
+    "save_number": "anvil_save_number",
+    "load_number": "anvil_load_number",
+    "save_text": "anvil_save_text",
+    "load_text": "anvil_load_text",
+    "save_exists": "anvil_save_exists",
+    "save_delete": "anvil_save_delete",
     "receive": "anvil_net_receive",
     "window_on_top": "anvil_window_on_top",
     "window_fullscreen": "anvil_window_fullscreen",
@@ -270,6 +284,8 @@ BUILTIN_TEXT_RETURNING = {
     "right",
     "image_error",
     "sound_error",
+    "load_text",
+    "save_error",
 }
 
 # Common names from other languages, mapped to the Anvil spelling. A beginner
@@ -296,6 +312,12 @@ BUILTIN_ARG_KINDS = {
     "mid": ("string", "number", "number"),
     "left": ("string", "number"),
     "right": ("string", "number"),
+    "save_number": ("string", "number"),
+    "load_number": ("string",),
+    "save_text": ("string", "string"),
+    "load_text": ("string",),
+    "save_exists": ("string",),
+    "save_delete": ("string",),
 }
 
 BUILTIN_STRING_ARGUMENTS = {
@@ -314,6 +336,12 @@ BUILTIN_STRING_ARGUMENTS = {
     "mouse_held",
     "image_load",
     "sound_load",
+    "save_number",
+    "load_number",
+    "save_text",
+    "load_text",
+    "save_exists",
+    "save_delete",
 }
 
 

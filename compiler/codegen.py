@@ -360,7 +360,7 @@ def emit_nodes(
                     or _is_text_list_read(part)
                     or _is_text_function_call(part, functions)
                     or re.fullmatch(
-                        r"(upper|lower|chr|trim|char|mid|left|right|image_error|sound_error)\s*\(.*\)", part, re.DOTALL
+                        r"(upper|lower|chr|trim|char|mid|left|right|image_error|sound_error|load_text|save_error)\s*\(.*\)", part, re.DOTALL
                     )
                 ):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
@@ -390,7 +390,7 @@ def emit_nodes(
                     or _is_text_list_read(part)
                     or _is_text_function_call(part, functions)
                     or re.fullmatch(
-                        r"(upper|lower|chr|trim|char|mid|left|right|image_error|sound_error)\s*\(.*\)", part, re.DOTALL
+                        r"(upper|lower|chr|trim|char|mid|left|right|image_error|sound_error|load_text|save_error)\s*\(.*\)", part, re.DOTALL
                     )
                 ):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
@@ -853,6 +853,9 @@ def emit_c(
     lines.append("    _setmode(_fileno(stdout), _O_BINARY);")
     lines.append("#endif")
     lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
+    lines.append(
+        f"    anvil_set_project({json.dumps(project_name, ensure_ascii=True)});"
+    )
     lines.extend(emit_nodes(path, setup, functions, "    ", arrays=arrays))
     if has_engine:
         lines.append(

@@ -272,6 +272,22 @@ call fn(main)
             ['number("abc") is not a number, so it evaluates to 0'],
         )
 
+    def test_save_builtins_are_not_mistaken_for_number(self) -> None:
+        """`load_number("slot")` must not read as the number() lint.
+
+        The literal matcher once matched the `number(` inside `load_number(`,
+        which warned about every save slot whose name was not numeric.
+        """
+        source = (
+            "fn(main)\n"
+            '  say load_number("demo.best")\n'
+            '  say save_number("demo.best", 1)\n'
+            "end\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        messages = [m for m, _ in report(functions, top, path)]
+        self.assertEqual([m for m in messages if m.startswith("number(")], [])
+
 
     def test_a_global_that_is_written_and_never_read_is_reported(self) -> None:
         source = (

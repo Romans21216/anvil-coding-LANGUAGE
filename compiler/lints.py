@@ -198,7 +198,9 @@ def empty_for_loops(functions, top):
     return warnings
 
 
-_NUMBER_LITERAL = __import__("re").compile(r'number\(\s*"([^"]*)"\s*\)')
+_NUMBER_LITERAL = __import__("re").compile(
+    r'(?<![A-Za-z0-9_])number\s*\(\s*"([^"]*)"\s*\)'
+)
 
 
 def bad_number_literals(functions, top):

@@ -52,7 +52,7 @@ Bindings written with `set var(name)` are global numeric state unless shadowed b
 
 ## Planned extensions
 
-Audio, 3D physics, polygon collision, a GPU-backed DXR renderer, persistence, controller input, platform backends, and profiling tools remain future work. The compiler rejects statements that have not been implemented instead of silently treating them as active features.
+3D physics, polygon collision, a GPU-backed DXR renderer, controller input, platform backends, and profiling tools remain future work. Bounded PCM WAV playback (`sound_*`) and a small typed key/value save store (`save_number`, `save_text`, `load_*`) are implemented and described in [the language specification](LANGUAGE_SPEC.md); the compiler rejects statements that have not been implemented instead of silently treating them as active features.
 
 
 The direct native backend also supports the five mouse query built-ins, using resizable client pixels rather than the C renderer's virtual viewport. Its button arguments are literal strings. See [native mouse behavior and limits](NATIVE_X64_COMPILER_MIGRATION.md#native-mouse-input).

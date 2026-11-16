@@ -1,0 +1,34 @@
+# Saves demo: the run counter and best score survive a restart.
+# Run from the repository root:
+#   python compiler/anvil.py examples/save_demo.ANVL --run
+scene 2d
+clear rgba(15, 21, 35, 255)
+set var(best) = load_number("demo.best")
+set var(runs) = load_number("demo.runs") + 1
+set var(saved) = save_number("demo.runs", var(runs))
+set var(score) = 0
+
+fn(update)
+  if pressed(SPACE)
+    add var(score) 10
+    if var(score) > var(best)
+      set var(best) = var(score)
+      set var(written) = save_number("demo.best", var(best))
+    end
+  end
+  if pressed(ESCAPE)
+    set var(cleared) = save_delete("demo.best")
+    set var(cleared_runs) = save_delete("demo.runs")
+    set var(best) = 0
+    set var(runs) = 0
+  end
+end
+
+fn(draw)
+  display rect(60, 60, 840, 480) -rgba(29, 41, 62, 255)
+  display text("Anvil saves") -l(90, 90) -rgb(235, 243, 255)
+  display text("SPACE: score +10   ESCAPE: clear saves") -l(90, 130) -rgb(164, 190, 224)
+  display text("Runs: " + var(runs)) -l(90, 190) -rgb(120, 220, 180)
+  display text("Score: " + var(score)) -l(90, 224) -rgb(120, 220, 180)
+  display text("Best: " + var(best)) -l(90, 258) -rgb(120, 220, 180)
+end

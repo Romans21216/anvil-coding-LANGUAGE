@@ -2019,6 +2019,273 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
   return DefWindowProcA(window, message, wparam, lparam);
 }
 
+/* ---- Saves -------------------------------------------------------------
+   A small key/value store for game state: one number or one text value per
+   named slot, written atomically into %LOCALAPPDATA%\Anvil\<project> (or
+   $ANVIL_SAVE_DIR when a host sets it). Each file carries a magic and a type
+   byte so a wrong-type read is a readable error instead of a reinterpreted
+   value, and slot names are restricted to a safe character set so a save can
+   never escape its directory. */
+enum {
+  ANVIL_SAVE_SLOT_MAX = 64,
+  ANVIL_SAVE_TEXT_MAX = 255,
+  ANVIL_SAVE_BUFFERS = 8
+};
+
+static const char ANVIL_SAVE_MAGIC[8] = {'A', 'N', 'V', 'S',
+                                         'A', 'V', 'E', '1'};
+static char anvil_project_name[64] = "Anvil Game";
+static char anvil_save_error_detail[192];
+static const char *anvil_save_error_text = "";
+static char anvil_save_buffers[ANVIL_SAVE_BUFFERS][ANVIL_SAVE_TEXT_MAX + 1];
+static int anvil_save_buffer_index;
+
+static void anvil_save_error_note(const char *format, ...) {
+  va_list arguments;
+  va_start(arguments, format);
+  _vsnprintf_s(anvil_save_error_detail, sizeof(anvil_save_error_detail),
+               _TRUNCATE, format, arguments);
+  va_end(arguments);
+  anvil_save_error_text = anvil_save_error_detail;
+}
+
+const char *anvil_save_error(void) { return anvil_save_error_text; }
+
+void anvil_set_project(const char *name) {
+  if (!name || name[0] == '\0')
+    return;
+  size_t index = 0;
+  for (; name[index] != '\0' && index < sizeof(anvil_project_name) - 1; ++index) {
+    char c = name[index];
+    int safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
+    anvil_project_name[index] = safe ? c : '_';
+  }
+  anvil_project_name[index] = '\0';
+  if (anvil_project_name[0] == '\0' ||
+      strcmp(anvil_project_name, ".") == 0 ||
+      strcmp(anvil_project_name, "..") == 0)
+    strcpy_s(anvil_project_name, sizeof(anvil_project_name), "Anvil Game");
+}
+
+static int anvil_save_slot_ok(const char *slot) {
+  if (!slot || slot[0] == '\0')
+    return 0;
+  size_t length = strlen(slot);
+  if (length > ANVIL_SAVE_SLOT_MAX)
+    return 0;
+  if (slot[0] == '.')
+    return 0;
+  for (size_t i = 0; i < length; ++i) {
+    char c = slot[i];
+    int safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
+    if (!safe)
+      return 0;
+  }
+  return strstr(slot, "..") == NULL;
+}
+
+/* Create every missing component of a path that names a directory. */
+static int anvil_save_make_dirs(const char *path) {
+  char buffer[MAX_PATH];
+  size_t length = strlen(path);
+  if (length == 0 || length >= sizeof(buffer))
+    return 0;
+  memcpy(buffer, path, length + 1);
+  for (size_t i = 1; i < length; ++i) {
+    if (buffer[i] == '\\' || buffer[i] == '/') {
+      char saved = buffer[i];
+      buffer[i] = '\0';
+      if (!CreateDirectoryA(buffer, NULL) &&
+          GetLastError() != ERROR_ALREADY_EXISTS) {
+        buffer[i] = saved;
+        return 0;
+      }
+      buffer[i] = saved;
+    }
+  }
+  if (!CreateDirectoryA(buffer, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+    return 0;
+  return 1;
+}
+
+static int anvil_save_root(char *destination, size_t capacity) {
+  const char *override = getenv("ANVIL_SAVE_DIR");
+  if (override && override[0] != '\0') {
+    if (strlen(override) >= capacity - 1)
+      return 0;
+    strcpy_s(destination, capacity, override);
+    return 1;
+  }
+  const char *base = getenv("LOCALAPPDATA");
+  if (!base || base[0] == '\0')
+    base = ".";
+  int written = _snprintf_s(destination, capacity, _TRUNCATE, "%s\\Anvil\\%s",
+                            base, anvil_project_name);
+  return written > 0;
+}
+
+static int anvil_save_path(const char *slot, const char *extension,
+                           char *destination, size_t capacity) {
+  if (!anvil_save_slot_ok(slot)) {
+    anvil_save_error_text = "the save slot is invalid";
+    return 0;
+  }
+  char root[MAX_PATH];
+  if (!anvil_save_root(root, sizeof(root))) {
+    anvil_save_error_text = "the save folder is too long";
+    return 0;
+  }
+  int written = _snprintf_s(destination, capacity, _TRUNCATE, "%s\\%s.%s", root,
+                            slot, extension);
+  if (written <= 0) {
+    anvil_save_error_text = "the save path is too long";
+    return 0;
+  }
+  if (!anvil_save_make_dirs(root)) {
+    anvil_save_error_text = "the save folder could not be created";
+    return 0;
+  }
+  return 1;
+}
+
+static int anvil_save_write(const char *slot, unsigned char type,
+                            const void *payload, size_t bytes) {
+  char path[MAX_PATH];
+  if (!anvil_save_path(slot, "sav", path, sizeof(path)))
+    return 0;
+  char temporary[MAX_PATH];
+  int written = _snprintf_s(temporary, sizeof(temporary), _TRUNCATE, "%s.tmp",
+                            path);
+  if (written <= 0) {
+    anvil_save_error_text = "the save path is too long";
+    return 0;
+  }
+  FILE *file = fopen(temporary, "wb");
+  if (!file) {
+    anvil_save_error_text = "the save could not be opened for writing";
+    return 0;
+  }
+  unsigned char header[9];
+  memcpy(header, ANVIL_SAVE_MAGIC, sizeof(ANVIL_SAVE_MAGIC));
+  header[8] = type;
+  int ok = fwrite(header, 1, sizeof(header), file) == sizeof(header) &&
+           fwrite(payload, 1, bytes, file) == bytes;
+  ok = (fclose(file) == 0) && ok;
+  if (!ok) {
+    DeleteFileA(temporary);
+    anvil_save_error_text = "the save could not be written";
+    return 0;
+  }
+  if (!MoveFileExA(temporary, path, MOVEFILE_REPLACE_EXISTING)) {
+    DeleteFileA(temporary);
+    anvil_save_error_text = "the save could not replace the previous file";
+    return 0;
+  }
+  anvil_save_error_text = "";
+  return 1;
+}
+
+static int anvil_save_read(const char *slot, unsigned char expected,
+                           void *payload, size_t bytes, int exact) {
+  char path[MAX_PATH];
+  if (!anvil_save_path(slot, "sav", path, sizeof(path)))
+    return 0;
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    /* A slot that was never written is a normal first run, not an error. */
+    anvil_save_error_text = "";
+    return 0;
+  }
+  unsigned char header[9];
+  int ok = fread(header, 1, sizeof(header), file) == sizeof(header) &&
+           memcmp(header, ANVIL_SAVE_MAGIC, sizeof(ANVIL_SAVE_MAGIC)) == 0;
+  if (!ok) {
+    fclose(file);
+    anvil_save_error_text = "the save is not a readable Anvil save";
+    return 0;
+  }
+  if (header[8] != expected) {
+    fclose(file);
+    anvil_save_error_text = expected == 1
+                                ? "the save holds text, not a number"
+                                : "the save holds a number, not text";
+    return 0;
+  }
+  size_t got = fread(payload, 1, bytes, file);
+  fclose(file);
+  if (exact) {
+    if (got != bytes) {
+      anvil_save_error_text = "the save ended before its value did";
+      return 0;
+    }
+  } else {
+    /* Text is stored with its terminator; a shorter file is still valid. */
+    if (got == bytes)
+      got = bytes - 1;
+    ((char *)payload)[got] = '\0';
+  }
+  anvil_save_error_text = "";
+  return 1;
+}
+
+double anvil_save_number(const char *slot, double value) {
+  double stored = value;
+  return anvil_save_write(slot, 1, &stored, sizeof(stored)) ? 1.0 : 0.0;
+}
+
+double anvil_load_number(const char *slot) {
+  double stored = 0.0;
+  if (!anvil_save_read(slot, 1, &stored, sizeof(stored), 1))
+    return 0.0;
+  if (!isfinite(stored)) {
+    anvil_save_error_text = "the save holds a non-finite number";
+    return 0.0;
+  }
+  return stored;
+}
+
+double anvil_save_text(const char *slot, const char *text) {
+  const char *value = text ? text : "";
+  size_t length = strlen(value);
+  if (length > ANVIL_SAVE_TEXT_MAX) {
+    anvil_save_error_note(
+        "the text is %llu bytes; the save limit is %d",
+        (unsigned long long)length, ANVIL_SAVE_TEXT_MAX);
+    return 0.0;
+  }
+  return anvil_save_write(slot, 2, value, length + 1) ? 1.0 : 0.0;
+}
+
+const char *anvil_load_text(const char *slot) {
+  char *buffer = anvil_save_buffers[anvil_save_buffer_index &
+                                    (ANVIL_SAVE_BUFFERS - 1)];
+  anvil_save_buffer_index += 1;
+  buffer[0] = '\0';
+  if (!anvil_save_read(slot, 2, buffer, ANVIL_SAVE_TEXT_MAX + 1, 0))
+    return buffer;
+  buffer[ANVIL_SAVE_TEXT_MAX] = '\0';
+  return buffer;
+}
+
+double anvil_save_exists(const char *slot) {
+  char path[MAX_PATH];
+  if (!anvil_save_path(slot, "sav", path, sizeof(path)))
+    return 0.0;
+  DWORD attributes = GetFileAttributesA(path);
+  return attributes != INVALID_FILE_ATTRIBUTES ? 1.0 : 0.0;
+}
+
+double anvil_save_delete(const char *slot) {
+  char path[MAX_PATH];
+  if (!anvil_save_path(slot, "sav", path, sizeof(path)))
+    return 0.0;
+  if (DeleteFileA(path))
+    return 1.0;
+  return 0.0;
+}
+
 /* ---- Audio -------------------------------------------------------------
    A bounded WAV player: at most 16 loaded sounds, 8 simultaneous voices and
    48 MiB of decoded audio, mixed at 48 kHz stereo into three 10 ms buffers
