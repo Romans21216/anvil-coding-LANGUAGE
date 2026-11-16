@@ -6,8 +6,7 @@ import json
 from pathlib import Path
 import re
 
-from compiler.common import CompileError, IDENTIFIER, FUNCTION_REFERENCE
-from compiler.lexer import mask_strings
+from compiler.common import ArrayDeclarations, CompileError, ParsedProgram
 
 MAX_INCLUDE_FILES = 256
 MAX_INCLUDE_DEPTH = 64
@@ -22,7 +21,7 @@ def include_name(raw, path, line):
     if not isinstance(name, str) or not name or any(ord(char) < 32 for char in name):
         raise CompileError(f'{path}:{line}: include expects a quoted relative .ANVL path')
     relative = Path(name)
-    if relative.is_absolute() or relative.drive or relative.root or relative.suffix.lower() != ".anvl":
+    if relative.is_absolute() or relative.drive or relative.suffix.lower() != ".anvl":
         raise CompileError(f'{path}:{line}: include requires a relative .ANVL file')
     return relative
 
@@ -274,9 +273,8 @@ def called_functions(nodes):
         if node.kind == "call":
             result.add(node.name)
         for text in [node.value] + node.params:
-            unquoted = mask_strings(text)
-            for match in re.finditer(rf'\bcall\s+fn\(\s*({FUNCTION_REFERENCE})(?=\s*[,\)])', unquoted):
-                result.add(match[2] + (" - " + match[3] if match[3] else ""))
+            unquoted = re.sub(r'"(?:\\.|[^"\\])*"', '""', text)
+            result.update(re.findall(r'\bcall\s+fn\(\s*([A-Za-z_][\w-]*)', unquoted))
         pending.extend(node.body)
         pending.extend(node.otherwise)
     return result
@@ -295,59 +293,3 @@ def reachable_functions(functions, top, *, graphical, extra=()):
             needed.add(dependency)
             pending.append(dependency)
     return [(name, fn) for name, fn in functions.items() if name in needed]
-
-
-_GLOBAL_VARIABLE = re.compile(rf"\b(varl|var)\(\s*({IDENTIFIER})\s*\)")
-_GLOBAL_ARRAY = re.compile(rf"\barray\(\s*({IDENTIFIER})\s*,")
-
-
-def reachable_storage(top, emitted_functions, variables, arrays):
-    """Find global storage needed by emitted code and top-level initialization.
-
-    Function bodies have already been validated. This pass only controls which
-    global scalar and array declarations are emitted; it does not remove writes
-    or expression evaluation, whose effects and runtime checks remain observable.
-    """
-    used_variables = set()
-    used_arrays = set()
-    pending = [(node, None) for node in top]
-    for _name, function in emitted_functions:
-        pending.extend((node, function) for node in function.body)
-
-    while pending:
-        node, scope = pending.pop()
-        if node.kind in ("global_set", "global_add", "global_sub"):
-            used_variables.add(node.name)
-        elif node.kind in ("set", "add", "sub") and (
-            scope is None or node.name not in scope.params
-        ):
-            # Version 1 `var(name)` may refer to a parameter. Version 2 local
-            # variables have distinct node kinds and never reach this branch.
-            used_variables.add(node.name)
-        elif node.kind in ("indirect_call", "callback_clear") and node.params:
-            storage = node.params[0]
-            if storage == "varl" or (
-                storage == "var" and (scope is None or node.name not in scope.params)
-            ):
-                used_variables.add(node.name)
-
-        if node.kind == "array_set" and (
-            scope is None or node.name not in scope.local_arrays
-        ):
-            used_arrays.add(node.name)
-
-        for text in (node.value, *node.params):
-            masked = mask_strings(text)
-            for match in _GLOBAL_VARIABLE.finditer(masked):
-                storage, name = match.groups()
-                if storage == "varl" or (scope is None or name not in scope.params):
-                    used_variables.add(name)
-            for match in _GLOBAL_ARRAY.finditer(masked):
-                name = match.group(1)
-                if scope is None or name not in scope.local_arrays:
-                    used_arrays.add(name)
-
-        pending.extend((child, scope) for child in node.body)
-        pending.extend((child, scope) for child in node.otherwise)
-
-    return used_variables & set(variables), used_arrays & set(arrays)

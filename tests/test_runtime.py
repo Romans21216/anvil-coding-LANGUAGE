@@ -38,8 +38,7 @@ class RuntimeIntegrationTests(unittest.TestCase):
             file_header = struct.pack("<2sIHHI", b"BM", 14 + len(dib) + len(pixel_data), 0, 0, 14 + len(dib))
             path.write_bytes(file_header + dib + pixel_data)
 
-        harness = r'''/* ANVIL_RUNTIME_MODULE: images */
-#include "anvil_runtime.h"
+        harness = r'''#include "anvil_runtime.h"
 #include <stdio.h>
 
 static double image;
@@ -55,7 +54,6 @@ static double replacement;
 static double stale_width;
 static double replacement_width;
 static double stale_draw;
-static double width_after_runtime_shutdown;
 static const char *image_path;
 
 static double draw(void) {
@@ -70,6 +68,7 @@ static double draw(void) {
   stale_width = anvil_image_width(image);
   replacement_width = anvil_image_width(replacement);
   stale_draw = anvil_image_draw(image, 0, 0);
+  anvil_image_destroy(replacement);
   PostQuitMessage(0);
   return 0.0;
 }
@@ -89,18 +88,16 @@ int main(int argc, char **argv) {
   double fractional = anvil_image_width(image + 0.5);
   double missing = anvil_image_height(64);
   anvil_run(NULL, draw, "Anvil Image Probe");
-  width_after_runtime_shutdown = anvil_image_width(replacement);
   printf("load=%.0f size=%.0f,%.0f second=%.0f second_size=%.0f,%.0f "
          "bad=%.0f oversized=%.0f fractional=%.0f missing=%.0f "
          "draw=%.0f top_down_draw=%.0f scaled=%.0f clipped=%.0f "
          "release=%.0f second_release=%.0f after=%.0f replacement=%.0f "
-         "stale_width=%.0f replacement_width=%.0f stale_draw=%.0f "
-         "shutdown_width=%.0f\n",
+         "stale_width=%.0f replacement_width=%.0f stale_draw=%.0f\n",
          image, width, height, top_down_image, second_width, second_height,
          bad, oversized, fractional, missing, natural_draw, top_down_draw,
          scaled_draw, clipped_draw, destroyed, top_down_destroyed,
          width_after_destroy, replacement, stale_width, replacement_width,
-         stale_draw, width_after_runtime_shutdown);
+         stale_draw);
   return 0;
 }
 '''
@@ -142,7 +139,7 @@ int main(int argc, char **argv) {
             r"load=1 size=2,2 second=2 second_size=1,2 bad=0 oversized=0 "
             r"fractional=0 missing=0 draw=1 top_down_draw=1 scaled=1 "
             r"clipped=1 release=1 second_release=1 after=0 replacement=65 "
-            r"stale_width=0 replacement_width=2 stale_draw=0 shutdown_width=0",
+            r"stale_width=0 replacement_width=2 stale_draw=0",
         )
 
     def test_mouse_events_map_to_virtual_frame_and_preserve_update_edges(self):
@@ -168,6 +165,8 @@ static double y_on_second_update;
 static double wheel_on_first_update;
 static double wheel_on_second_update;
 static int events_posted;
+static int valid_position_posted;
+static int release_posted;
 static const char *button_names[3] = {"left", "right", "middle"};
 
 static double update(void) {
@@ -177,10 +176,6 @@ static double update(void) {
     return 0.0;
   update_count++;
   if (update_count == 1) {
-    HWND window = FindWindowA("AnvilNativeGameWindow", "Anvil Mouse Probe");
-    /* Sample synthetic dispatch synchronously; real pointer integration is a
-       separate concern. Never move the user's desktop pointer from a test. */
-    SendMessageA(window, WM_MOUSEMOVE, 0, MAKELPARAM(10, 300));
     for (int i = 0; i < 3; ++i) {
       pressed_on_first_update[i] = (int)anvil_mouse_pressed(button_names[i]);
       held_on_first_update[i] = (int)anvil_mouse_held(button_names[i]);
@@ -189,8 +184,6 @@ static double update(void) {
     y_on_first_update = anvil_mouse_y();
     wheel_on_first_update = anvil_mouse_wheel();
   } else if (update_count == 2) {
-    HWND window = FindWindowA("AnvilNativeGameWindow", "Anvil Mouse Probe");
-    SendMessageA(window, WM_MOUSEMOVE, 0, MAKELPARAM(600, 300));
     for (int i = 0; i < 3; ++i) {
       pressed_on_second_update[i] = (int)anvil_mouse_pressed(button_names[i]);
       held_on_second_update[i] = (int)anvil_mouse_held(button_names[i]);
@@ -198,9 +191,6 @@ static double update(void) {
     x_on_second_update = anvil_mouse_x();
     y_on_second_update = anvil_mouse_y();
     wheel_on_second_update = anvil_mouse_wheel();
-    SendMessageA(window, WM_LBUTTONUP, 0, MAKELPARAM(600, 300));
-    SendMessageA(window, WM_RBUTTONUP, 0, MAKELPARAM(600, 300));
-    SendMessageA(window, WM_MBUTTONUP, 0, MAKELPARAM(600, 300));
   } else if (update_count == 3) {
     for (int i = 0; i < 3; ++i)
       held_on_third_update[i] = (int)anvil_mouse_held(button_names[i]);
@@ -218,6 +208,9 @@ static double draw(void) {
       AdjustWindowRect(&outer, WS_OVERLAPPEDWINDOW, FALSE);
       SetWindowPos(window, NULL, 0, 0, outer.right - outer.left,
                    outer.bottom - outer.top, SWP_NOZORDER | SWP_NOACTIVATE);
+      POINT cursor = {10, 300};
+      ClientToScreen(window, &cursor);
+      SetCursorPos(cursor.x, cursor.y);
       SendMessageA(window, WM_MOUSEMOVE, 0, MAKELPARAM(10, 300));
       SendMessageA(window, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(10, 300));
       SendMessageA(window, WM_RBUTTONDOWN, MK_RBUTTON, MAKELPARAM(10, 300));
@@ -225,6 +218,23 @@ static double draw(void) {
       SendMessageA(window, WM_MOUSEWHEEL,
                    MAKEWPARAM(0, (unsigned short)WHEEL_DELTA),
                    MAKELPARAM(10, 300));
+    }
+  } else if (update_count == 1 && !valid_position_posted) {
+    HWND window = FindWindowA("AnvilNativeGameWindow", "Anvil Mouse Probe");
+    if (window) {
+      valid_position_posted = 1;
+      POINT cursor = {600, 300};
+      ClientToScreen(window, &cursor);
+      SetCursorPos(cursor.x, cursor.y);
+      SendMessageA(window, WM_MOUSEMOVE, 0, MAKELPARAM(600, 300));
+    }
+  } else if (update_count == 2 && !release_posted) {
+    HWND window = FindWindowA("AnvilNativeGameWindow", "Anvil Mouse Probe");
+    if (window) {
+      release_posted = 1;
+      SendMessageA(window, WM_LBUTTONUP, 0, MAKELPARAM(600, 300));
+      SendMessageA(window, WM_RBUTTONUP, 0, MAKELPARAM(600, 300));
+      SendMessageA(window, WM_MBUTTONUP, 0, MAKELPARAM(600, 300));
     }
   }
   return 0.0;

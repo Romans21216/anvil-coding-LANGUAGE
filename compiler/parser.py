@@ -10,47 +10,19 @@ from compiler.common import (
     ArrayDeclarations,
     MAX_ARRAY_SIZE,
     MAX_LOCAL_ARRAY_ELEMENTS,
-    MAX_ACTIVE_LOCAL_ARRAY_BYTES,
-    MAX_ACTIVE_LOCAL_ARRAY_MIB,
     CompileError,
     Node,
     ParsedProgram,
-    function_reference,
 )
 from compiler.expressions import split_args
-from compiler.lexer import mask_strings, split_keyword, strip_comment, validate_port
+from compiler.lexer import split_keyword, strip_comment, validate_port
 from compiler.semantics import validate_program
 
 # `list <name>` reserves this many slots; `add` appends until it is full.
 LIST_CAPACITY = 256
 
 
-def parse_syntax(
-    path: pathlib.Path,
-    source: str,
-    *,
-    local_array_elements: int = MAX_LOCAL_ARRAY_ELEMENTS,
-    active_local_array_bytes: int = MAX_ACTIVE_LOCAL_ARRAY_BYTES,
-) -> ParsedProgram:
-    if (
-        isinstance(local_array_elements, bool)
-        or not isinstance(local_array_elements, int)
-        or not 1 <= local_array_elements <= MAX_ARRAY_SIZE
-    ):
-        raise CompileError(
-            f"{path}: local array element limit must be from 1 to {MAX_ARRAY_SIZE}"
-        )
-    if (
-        isinstance(active_local_array_bytes, bool)
-        or not isinstance(active_local_array_bytes, int)
-        or not 1024 * 1024 <= active_local_array_bytes
-        <= MAX_ACTIVE_LOCAL_ARRAY_MIB * 1024 * 1024
-        or active_local_array_bytes % (1024 * 1024)
-    ):
-        raise CompileError(
-            f"{path}: active-call memory limit must be an integer number of MiB "
-            f"from 1 to {MAX_ACTIVE_LOCAL_ARRAY_MIB} MiB"
-        )
+def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
     functions: dict[str, Node] = {}
     top: list[Node] = []
     variables: set[str] = set()
@@ -63,8 +35,6 @@ def parse_syntax(
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
     version_declared = False
     source_code_seen = False
-    version = "1"
-    metadata_keys = set()
     for line_no, raw in enumerate(source.splitlines(), 1):
         line = strip_comment(raw).strip()
         if not line:
@@ -90,11 +60,11 @@ def parse_syntax(
             # Compare decimal text without constructing an unbounded Python int.
             # Python limits extremely long int conversions and would leak ValueError.
             version = version_text.lstrip("0") or "0"
-            if version not in ("1","2"):
+            if version != str(LANGUAGE_VERSION):
                 shown_version = version if len(version) <= 32 else "value too large"
                 raise CompileError(
                     f"{path}:{line_no}: unsupported Anvil language version "
-                    f"{shown_version}; compiler supports versions 1 and 2"
+                    f"{shown_version}; compiler supports version {LANGUAGE_VERSION}"
                 )
             continue
         source_code_seen = True
@@ -143,11 +113,10 @@ def parse_syntax(
         if re.match(r"include\b", line):
             if len(stack) != 1:
                 raise CompileError(f"{path}:{line_no}: include must be at top level")
-            from compiler.modules import include_spec
+            from compiler.modules import include_name
             raw_name = line[len("include"):].strip()
-            selected, alias, filename = include_spec(raw_name, path, line_no)
-            top.append(Node("include", line_no, value=filename, name=selected,
-                            params=[alias] if alias else [], source=path))
+            include_name(raw_name, path, line_no)
+            top.append(Node("include", line_no, value=raw_name, source=path))
             continue
         imported = re.fullmatch(r"import\s+([A-Za-z_][\w-]*)", line)
         if imported:
@@ -166,13 +135,13 @@ def parse_syntax(
         for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", line):
             variable_references.append(
                 (
-                    reference.group(2),
+                    reference.group(1),
                     line_no,
-                    current_function.name if current_function and reference[1]=='var' else None,
+                    current_function.name if current_function else None,
                     path,
                 )
             )
-        for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", reference_text):
+        for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", line):
             local_references.append(
                 (
                     reference.group(1),
@@ -224,22 +193,14 @@ def parse_syntax(
                     )
                 if (
                     sum(current_function.local_arrays.values()) + size
-                    > local_array_elements
+                    > MAX_LOCAL_ARRAY_ELEMENTS
                 ):
                     raise CompileError(
                         f"{path}:{line_no}: local arrays in a function may "
-                        f"contain at most {local_array_elements} elements total"
+                        f"contain at most {MAX_LOCAL_ARRAY_ELEMENTS} elements total"
                     )
                 current_function.local_arrays[name] = size
                 current_function.local_array_lines[name] = line_no
-                local_bytes = sum(current_function.local_arrays.values()) * 8
-                if local_bytes > active_local_array_bytes:
-                    raise CompileError(
-                        f"{path}:{line_no}: local arrays in function "
-                        f"{current_function.name!r} need {local_bytes} bytes, "
-                        f"above the active-call memory limit of "
-                        f"{active_local_array_bytes} bytes"
-                    )
             continue
         enum_decl = re.fullmatch(
             r"enum\s+([A-Za-z_][\w-]*)\s+(.+)", line
@@ -461,8 +422,7 @@ def parse_syntax(
                 raise CompileError(
                     f"{path}:{line_no}: for loop needs start, end, and step expressions"
                 )
-            if loop_name not in current_function.params:
-                current_function.locals.add(loop_name)
+            current_function.locals.add(loop_name)
             node = Node(
                 "for", line_no, name=loop_name, params=[start_expr, end_expr, step_expr]
             )
@@ -478,19 +438,18 @@ def parse_syntax(
                 "number or text"
             )
         match = re.fullmatch(r"set\s+local\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
-        if match and node is None:
+        if match:
             if current_function is None:
                 raise CompileError(
                     f"{path}:{line_no}: local variables must be "
                     "declared inside a function"
                 )
-            if match.group(1) in current_function.params and version == "1":
+            if match.group(1) in current_function.params:
                 raise CompileError(
                     f"{path}:{line_no}: local variable {match.group(1)!r} "
                     "conflicts with a function parameter"
                 )
-            if match.group(1) not in current_function.params:
-                current_function.locals.add(match.group(1))
+            current_function.locals.add(match.group(1))
             node = Node("local_set", line_no, match.group(2), match.group(1))
         if node is None:
             match = re.fullmatch(
@@ -525,16 +484,6 @@ def parse_syntax(
             ):
                 variables.add(match.group(1))
         if node is None:
-            match=re.fullmatch(r"set\s+varl\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)",line)
-            if match:
-                node=Node('global_set',line_no,match[2],match[1])
-                variables.add(match[1])
-        if node is None:
-            match=re.fullmatch(r"(add|sub)\s+varl\(([A-Za-z_][\w-]*)\)\s+(.+)",line)
-            if match:
-                node=Node('global_'+match[1],line_no,match[3],match[2])
-                variables.add(match[2])
-        if node is None:
             match = re.fullmatch(r"(add|sub)\s+local\(([A-Za-z_][\w-]*)\)\s+(.+)", line)
             if match:
                 if current_function is None:
@@ -542,13 +491,12 @@ def parse_syntax(
                         f"{path}:{line_no}: local variables can only be "
                         "changed inside a function"
                     )
-                if match.group(2) in current_function.params and version == "1":
+                if match.group(2) in current_function.params:
                     raise CompileError(
                         f"{path}:{line_no}: local variable {match.group(2)!r} "
                         "conflicts with a function parameter"
                     )
-                if match.group(2) not in current_function.params:
-                    current_function.locals.add(match.group(2))
+                current_function.locals.add(match.group(2))
                 node = Node(
                     "local_" + match.group(1), line_no, match.group(3), match.group(2)
                 )
@@ -688,13 +636,13 @@ def parse_syntax(
             match = re.fullmatch(r"call\s+fn\((.*)\)", line)
             if match:
                 call_args = split_args(match.group(1))
-                if not call_args:
+                if not call_args or not re.fullmatch(r"[A-Za-z_][\w-]*", call_args[0]):
                     raise CompileError(
                         f"{path}:{line_no}: expected a function name in call"
                     )
-                name, module = function_reference(call_args[0], path, line_no)
-                node = Node("call", line_no, value=", ".join(call_args[1:]),
-                            name=name + (" - " + module if module else ""))
+                node = Node(
+                    "call", line_no, value=", ".join(call_args[1:]), name=call_args[0]
+                )
         if node is None:
             if re.fullmatch(r"scene\s+(?:2d|3d)", line):
                 node = Node("scene", line_no, value=line.split()[1])
@@ -710,12 +658,12 @@ def parse_syntax(
                 node = Node("clear", line_no, value=line[len("clear rgba") :])
             elif line.startswith("display "):
                 node = Node("display", line_no, value=line[len("display ") :])
-            elif m := re.fullmatch(r"(?:net\s+host|nethost|netHost)\(([0-9]+)\)(?:\s+(--local))?", line):
+            elif m := re.fullmatch(r"net\s+host\(([0-9]+)\)", line):
                 validate_port(path, line_no, m.group(1))
                 variables.add("net_ok")
                 node = Node("net_host", line_no, value=m.group(1))
             elif m := re.fullmatch(
-                r'(?:net\s+join|netjoin|netJoin)\(("(?:\\.|[^"\\])*")\s*,\s*([0-9]+)\)', line
+                r'net\s+join\(("(?:\\.|[^"\\])*")\s*,\s*([0-9]+)\)', line
             ):
                 validate_port(path, line_no, m.group(2))
                 variables.add("net_ok")
@@ -815,22 +763,10 @@ def parse_syntax(
 
 
 def parse(
-    path: pathlib.Path,
-    source: str,
-    *,
-    include_root: pathlib.Path | None = None,
-    local_array_elements: int = MAX_LOCAL_ARRAY_ELEMENTS,
-    active_local_array_bytes: int = MAX_ACTIVE_LOCAL_ARRAY_BYTES,
+    path: pathlib.Path, source: str, *, include_root: pathlib.Path | None = None
 ) -> tuple[dict[str, Node], list[Node], set[str], dict[str, int]]:
     """Parse Anvil syntax, run semantic checks, and preserve the legacy tuple API."""
     from compiler.modules import load_program
-    program = load_program(
-        path, source, include_root=include_root,
-        local_array_elements=local_array_elements,
-        active_local_array_bytes=active_local_array_bytes,
-    )
-    validate_program(program)
-    from compiler.callables import lower_callables
-    lower_callables(program)
+    program = load_program(path, source, include_root=include_root)
     validate_program(program)
     return program.functions, program.top, program.variables, program.arrays

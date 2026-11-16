@@ -416,7 +416,7 @@ def _classify_string_variables(program: ParsedProgram, strict: bool = True) -> s
     return string_vars
 
 
-def validate_program(program: ParsedProgram, *, check_symbols: bool = True) -> None:
+def validate_program(program: ParsedProgram) -> None:
     """Resolve variable references and validate generated C symbol ownership."""
     path = program.path
     functions = program.functions
@@ -500,97 +500,38 @@ def validate_program(program: ParsedProgram, *, check_symbols: bool = True) -> N
         for name in fn.local_arrays:
             if name in fn.params or name in fn.locals:
                 raise CompileError(
-                    f"{fn.source or path}:"
-                    f"{fn.local_array_lines.get(name, fn.line)}: "
-                    f"local array {name!r} conflicts with "
+                    f"{path}:{fn.line}: local array {name!r} conflicts with "
                     f"a local variable or parameter in function '{fn.name}'"
                 )
 
-    if not check_symbols:
-        return  # module source names are checked after compiler-owned binding
-
-    variable_sites = {}
-    for reference, line, owner, source in program.variable_references:
-        scope = functions.get(owner)
-        if scope is None or reference not in scope.params:
-            variable_sites.setdefault(reference, (source or path, line))
-    local_sites = {}
-    for reference, line, owner, source in program.local_references:
-        local_sites.setdefault((owner, reference), (source or path, line))
-
-    def variable_site(name):
-        return variable_sites.get(name, (path, None))
-
-    def local_site(fn, name):
-        if name in fn.local_arrays:
-            return fn.source or path, fn.local_array_lines.get(name, fn.line)
-        if name in fn.params:
-            return fn.source or path, fn.line
-        return local_sites.get((fn.name, name), (fn.source or path, fn.line))
-
-    def location(source, line):
-        return f"{source}:{line}" if line is not None else str(source)
-
-    c_symbols = {}
+    c_symbols: dict[str, tuple[str, str]] = {}
     symbols = (
-        [(name, "variable", *variable_site(name)) for name in variables]
-        + [
-            (name, "function", fn.source or path, fn.line)
-            for name, fn in functions.items()
-        ]
-        + [
-            (name, "array", *getattr(arrays, "locations", {}).get(name, (path, None)))
-            for name in arrays
-        ]
+        [(name, "variable") for name in variables]
+        + [(name, "function") for name in functions]
+        + [(name, "array") for name in arrays]
     )
     for fn in functions.values():
         symbols.extend(
-            (fn.name + "__" + name, "function-local", *local_site(fn, name))
-            for name in fn.params
-            + sorted(fn.locals)
-            + sorted(fn.local_arrays)
+            (fn.name + "__" + name, "function-local")
+            for name in fn.params + sorted(fn.locals) + sorted(fn.local_arrays)
         )
-        symbols.extend(
-            (
-                fn.name + "__" + name,
-                "function-local compiler temporary",
-                fn.source or path,
-                fn.line,
-            )
-            for name in sorted(fn.c_temporaries)
-        )
-    for node in program.top:
-        symbols.extend(
-            (name, "top-level compiler temporary", node.source or path, node.line)
-            for name in node.c_temporaries
-        )
-    for name, kind, source, line in sorted(symbols):
-        where = location(source, line)
+    for name, kind in sorted(symbols):
         generated = c_name(name)
         if generated in RUNTIME_C_NAMES:
             raise CompileError(
-                f"{where}: identifier {name!r} conflicts with a reserved runtime name"
+                f"{path}: identifier {name!r} conflicts with a reserved runtime name"
             )
         previous = c_symbols.get(generated)
         if previous is not None:
-            previous_name, previous_kind, previous_source, previous_line = previous
+            previous_name, previous_kind = previous
             if previous_name != name:
                 raise CompileError(
-                    f"{where}: identifiers {previous_name!r} and {name!r} "
-                    f"both map to C name {generated!r}; other declaration at "
-                    f"{location(previous_source, previous_line)}"
+                    f"{path}: identifiers {previous_name!r} and {name!r} "
+                    f"both map to C name {generated!r}"
                 )
             if previous_kind != kind:
-                if "compiler temporary" in kind or "compiler temporary" in previous_kind:
-                    raise CompileError(
-                        f"{where}: compiler-generated C name {generated!r} "
-                        f"for {kind} {name!r} conflicts with {previous_kind} "
-                        f"{previous_name!r} at "
-                        f"{location(previous_source, previous_line)}"
-                    )
                 raise CompileError(
-                    f"{where}: {kind} {name!r} conflicts with another "
-                    "declaration of the same name at "
-                    f"{location(previous_source, previous_line)}"
+                    f"{path}: {kind} {name!r} conflicts with another "
+                    "declaration of the same name"
                 )
-        c_symbols[generated] = (name, kind, source, line)
+        c_symbols[generated] = (name, kind)

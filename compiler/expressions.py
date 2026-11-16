@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from contextvars import ContextVar
 import math
 import pathlib
@@ -15,7 +16,6 @@ from compiler.common import (
     array_code,
     array_size,
     c_name,
-    c_string_literal,
     variable_code,
 )
 
@@ -193,9 +193,6 @@ BUILTINS = {
     "save_exists": (1, 1),
     "save_delete": (1, 1),
     "receive": (0, 0),
-    "packet_send": (2, 2),
-    "packet_receive": (0, 0),
-    "packet_id": (0, 0),
     "body_create": (4, 4),
     "body_create_box": (5, 5),
     "body_destroy": (1, 1),
@@ -451,8 +448,6 @@ class ExpressionParser:
         functions: dict[str, Node] | None,
         scope: Node | None = None,
         arrays: dict[str, int] | None = None,
-        temporary_owner: Node | None = None,
-        temporary_counter: list[int] | None = None,
     ):
         self.path, self.line, self.source, self.functions = (
             path,
@@ -556,7 +551,7 @@ class ExpressionParser:
 
     def checked_number(self, code: str) -> str:
         return (
-            f"anvil_check_number(({code}), {c_string_literal(str(self.path))}, "
+            f"anvil_check_number(({code}), {json.dumps(str(self.path))}, "
             f"{self.line})"
         )
 
@@ -609,7 +604,7 @@ class ExpressionParser:
                 left = (variable_code(name, self.scope), "number")
         elif kind == "local":
             name = value[6:-1]
-            if not self.scope or (name not in self.scope.locals and name not in self.scope.params):
+            if not self.scope or name not in self.scope.locals:
                 raise CompileError(
                     f"{self.path}:{self.line}: unknown local variable {name!r}"
                 )
@@ -635,14 +630,7 @@ class ExpressionParser:
                 )
             name = parts[0]
             index_expr = ExpressionParser(
-                self.path,
-                self.line,
-                parts[1],
-                self.functions,
-                self.scope,
-                self.arrays,
-                self.temporary_owner,
-                self.temporary_counter,
+                self.path, self.line, parts[1], self.functions, self.scope, self.arrays
             ).compile()
             if name in TEXT_LISTS:
                 left = (
@@ -877,7 +865,7 @@ class ExpressionParser:
             if operator == "/":
                 left = (
                     f"anvil_divide({left_code}, {right}, "
-                    f"{c_string_literal(str(self.path))}, {self.line})",
+                    f"{json.dumps(str(self.path))}, {self.line})",
                     "number",
                 )
             elif operator == "%":
@@ -965,19 +953,10 @@ def expr(
     expected: str = "number",
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
-    temporary_owner: Node | None = None,
-    temporary_counter: list[int] | None = None,
 ) -> str:
     source = source.strip()
     if source.startswith("compute(") and source.endswith(")"):
         source = source[8:-1]
-    return ExpressionParser(
-        path,
-        line,
-        source,
-        functions,
-        scope,
-        arrays,
-        temporary_owner,
-        temporary_counter,
-    ).compile(expected)
+    return ExpressionParser(path, line, source, functions, scope, arrays).compile(
+        expected
+    )

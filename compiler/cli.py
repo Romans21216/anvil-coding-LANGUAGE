@@ -10,7 +10,6 @@ import hashlib
 import shutil
 import subprocess
 import sys
-import tempfile
 import tomllib
 
 from compiler.build import build_c, find_compiler
@@ -400,7 +399,6 @@ def main() -> int:
         help="print the cause and fix for a diagnostic code (for example ANV102)",
     )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
-    ap.add_argument('--inspect-metadata',action='store_true',help='read embedded Anvil name/author/version from an executable')
     ap.add_argument("--generated-c", type=pathlib.Path, help="choose generated C path")
     ap.add_argument("--output", "-o", type=pathlib.Path, help="output executable")
     ap.add_argument(
@@ -591,10 +589,6 @@ def main() -> int:
     if args.format or args.format_check:
         return lifecycle.format_file(args.source, args.format_check)
     try:
-        if args.inspect_metadata:
-            from compiler.program_metadata import unpack
-            sys.stdout.buffer.write((json.dumps(unpack(args.source.read_bytes()),ensure_ascii=False,indent=2)+'\n').encode('utf-8'))
-            return 0
         source_path = args.source
         include_root = None
         fixed_hz = 60
@@ -603,6 +597,10 @@ def main() -> int:
         manifest_path = None
         manifest_entry = None
         if args.source.suffix.lower() == ".anvlproj":
+            if args.backend == "native":
+                raise CompileError(
+                    "--backend native does not support .ANVLproj manifests yet; compile the entry .ANVL file directly"
+                )
             manifest_text = args.source.read_text(encoding="utf-8")
             manifest = tomllib.loads(manifest_text)
             unknown_keys = set(manifest) - {"name", "entry", "engine", "assets"}
@@ -641,43 +639,6 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: engine.fixed_hz must be an integer from 1 to 240"
                 )
-            memory = manifest.get("memory", {})
-            if not isinstance(memory, dict):
-                raise CompileError(f"{args.source}: 'memory' must be a TOML table")
-            unknown_memory_keys = set(memory) - {
-                "local_array_elements", "active_call_memory_mib"
-            }
-            if unknown_memory_keys:
-                raise CompileError(
-                    f"{args.source}: unsupported memory setting(s): "
-                    f"{', '.join(sorted(unknown_memory_keys))}"
-                )
-            local_array_elements = memory.get(
-                "local_array_elements", MAX_LOCAL_ARRAY_ELEMENTS
-            )
-            if (
-                isinstance(local_array_elements, bool)
-                or not isinstance(local_array_elements, int)
-                or not 1 <= local_array_elements <= MAX_ARRAY_SIZE
-            ):
-                raise CompileError(
-                    f"{args.source}: memory.local_array_elements must be an "
-                    f"integer from 1 to {MAX_ARRAY_SIZE}"
-                )
-            active_call_memory_mib = memory.get(
-                "active_call_memory_mib",
-                MAX_ACTIVE_LOCAL_ARRAY_BYTES // (1024 * 1024),
-            )
-            if (
-                isinstance(active_call_memory_mib, bool)
-                or not isinstance(active_call_memory_mib, int)
-                or not 1 <= active_call_memory_mib <= MAX_ACTIVE_LOCAL_ARRAY_MIB
-            ):
-                raise CompileError(
-                    f"{args.source}: memory.active_call_memory_mib must be an "
-                    f"integer from 1 to {MAX_ACTIVE_LOCAL_ARRAY_MIB}"
-                )
-            active_local_array_bytes = active_call_memory_mib * 1024 * 1024
             entry = manifest.get("entry")
             if not isinstance(entry, str) or not entry:
                 raise CompileError(
@@ -827,9 +788,7 @@ def main() -> int:
                     "to --backend c"
                 )
             executable = NativeCodegen(
-                source_path, funcs, top, variables, arrays, fixed_hz=fixed_hz,
-                active_local_array_bytes=active_local_array_bytes,
-                title=project_name if include_root is not None else "Anvil Native 2D"
+                source_path, funcs, top, variables, arrays
             ).generate()
             out = args.output or source_path.with_suffix(".exe")
             out.parent.mkdir(parents=True, exist_ok=True)
@@ -845,8 +804,7 @@ def main() -> int:
                 )
             return 0
         generated = emit_c(
-            source_path, funcs, top, variables, arrays, fixed_hz, project_name,
-            active_local_array_bytes,
+            source_path, funcs, top, variables, arrays, fixed_hz, project_name
         )
         timings.mark("generate")
         c_path = (
@@ -855,22 +813,14 @@ def main() -> int:
         c_path.parent.mkdir(parents=True, exist_ok=True)
         c_path.write_text(generated, encoding="utf-8", newline="\n")
         if args.emit_c:
-            c_path = args.emit_c
-            c_path.parent.mkdir(parents=True, exist_ok=True)
-            c_path.write_text(generated, encoding="utf-8", newline="\n")
             print(f"Wrote {c_path}")
             return 0
         compiler = find_compiler(args.cc)
         if not compiler:
-            if args.generated_c:
-                args.generated_c.parent.mkdir(parents=True, exist_ok=True)
-                args.generated_c.write_text(generated, encoding="utf-8", newline="\n")
-                generated_note = f" Generated source: {args.generated_c}."
-            else:
-                generated_note = " Use --generated-c PATH or --emit-c PATH to preserve it."
             print(
                 "No C compiler found. Install Visual Studio 2022 Build Tools "
-                "with the C++ workload." + generated_note,
+                "with the C++ workload. Generated source: "
+                f"{c_path}",
                 file=sys.stderr,
             )
             return 2

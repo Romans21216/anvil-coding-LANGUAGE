@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 
 from compiler.suggestions import suggestion_suffix
 from compiler.common import (
     MAX_ACTIVE_LOCAL_ARRAY_BYTES,
-    MAX_ACTIVE_LOCAL_ARRAY_MIB,
     CompileError,
     Node,
     array_code,
     array_size,
     c_name,
-    c_string_literal,
-    c_bytes_literal,
     variable_code,
     decode_string,
 )
@@ -74,22 +72,19 @@ def rgb_style(
     functions: dict[str, Node],
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
-    temporary_owner: Node | None = None,
-    temporary_counter: list[int] | None = None,
 ) -> tuple[list[str], str]:
     color = ["255", "255", "255", "255"]
-    modifiers, raw = _take_display_modifiers(raw, {"rgb", "rgba"}, path, line)
-    if modifiers:
-        vals = split_args(modifiers[0][1])
+    m = re.search(r"-rgba?\(([^)]*)\)", raw)
+    if m:
+        vals = split_args(m.group(1))
         if len(vals) not in (3, 4):
             raise CompileError(f"{path}:{line}: -rgb/-rgba expects 3 or 4 values")
         color = [
-            expr(path, line, value, functions, scope=scope, arrays=arrays,
-                 temporary_owner=temporary_owner, temporary_counter=temporary_counter)
-            for value in vals
+            expr(path, line, v, functions, scope=scope, arrays=arrays) for v in vals
         ]
         if len(color) == 3:
             color.append("255")
+    raw = re.sub(r"\s+-rgba?\([^)]*\)", "", raw)
     return color, raw
 
 
@@ -115,33 +110,29 @@ def emit_display(
     functions: dict[str, Node],
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
-    temporary_owner: Node | None = None,
-    temporary_counter: list[int] | None = None,
-) -> tuple[str, str]:
+) -> str:
     raw = node.value.strip()
-    color, raw = rgb_style(raw, path, node.line, functions, scope, arrays,
-                           temporary_owner, temporary_counter)
+    color, raw = rgb_style(raw, path, node.line, functions, scope, arrays)
     rot = ["0", "0", "0"]
-    loc = None
-    modifiers, raw = _take_display_modifiers(raw, {"rotate", "l"}, path, node.line)
-    seen = set()
-    for name, arguments in modifiers:
-        if name in seen:
-            raise CompileError(f"{path}:{node.line}: malformed display command: repeated -{name} modifier")
-        seen.add(name)
-        values = [
-            expr(path, node.line, value, functions, scope=scope, arrays=arrays,
-                 temporary_owner=temporary_owner, temporary_counter=temporary_counter)
-            for value in split_args(arguments)
+    rm = re.search(r"-rotate\(((?:[^()]|\([^()]*\))*)\)", raw)
+    if rm:
+        rot = [
+            expr(path, node.line, v, functions, scope=scope, arrays=arrays)
+            for v in split_args(rm.group(1))
         ]
-        if name == "rotate":
-            if len(values) != 3:
-                raise CompileError(f"{path}:{node.line}: -rotate expects x,y,z")
-            rot = values
-        else:
-            if len(values) != 2:
-                raise CompileError(f"{path}:{node.line}: -l expects x,y")
-            loc = values
+        if len(rot) != 3:
+            raise CompileError(f"{path}:{node.line}: -rotate expects x,y,z")
+        raw = raw.replace(rm.group(0), "")
+    loc = None
+    lm = re.search(r"-l\(((?:[^()]|\([^()]*\))*)\)", raw)
+    if lm:
+        loc = [
+            expr(path, node.line, v, functions, scope=scope, arrays=arrays)
+            for v in split_args(lm.group(1))
+        ]
+        if len(loc) != 2:
+            raise CompileError(f"{path}:{node.line}: -l expects x,y")
+        raw = raw.replace(lm.group(0), "")
     call = re.fullmatch(
         r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?",
         raw.strip(),
@@ -157,45 +148,35 @@ def emit_display(
         if dynamic:
             prefix = dynamic.group(1)[:-1].replace("%", "%%")
             value = expr(
-                path, node.line, dynamic.group(2), functions, scope=scope, arrays=arrays,
-                temporary_owner=temporary_owner, temporary_counter=temporary_counter,
+                path, node.line, dynamic.group(2), functions, scope=scope, arrays=arrays
             )
             separator = "" if prefix.endswith((" ", "\t")) else " "
             fmt = prefix + separator + '%.0f"'
-            return shape, (
+            return (
                 f"{ind}anvil_text_number({', '.join(loc)}, {fmt}, {value}, "
                 f"{', '.join(color)});"
             )
     expected = "string" if shape == "text" else "number"
-    values = [
-        expr(path, node.line, item, functions, expected, scope=scope, arrays=arrays,
-             temporary_owner=temporary_owner, temporary_counter=temporary_counter)
-        for item in args
-    ]
+    values = [expr(path, node.line, item, functions, expected, scope) for item in args]
     tail = ", ".join(color)
     if shape == "cube" and len(values) == 4:
-        return shape, f"{ind}anvil_cube({', '.join(values)}, {', '.join(rot)}, {tail});"
+        return f"{ind}anvil_cube({', '.join(values)}, {', '.join(rot)}, {tail});"
     if shape == "sphere" and len(values) == 4:
-        return shape, f"{ind}anvil_sphere({', '.join(values)}, {tail});"
+        return f"{ind}anvil_sphere({', '.join(values)}, {tail});"
     if shape == "ray_sphere" and len(values) == 4:
-        return shape, f"{ind}anvil_trace_sphere({', '.join(values)}, {tail});"
+        return f"{ind}anvil_trace_sphere({', '.join(values)}, {tail});"
     if shape == "plane" and len(values) == 5:
-        return shape, f"{ind}anvil_plane({', '.join(values)}, {tail});"
+        return f"{ind}anvil_plane({', '.join(values)}, {tail});"
     if shape == "rect" and len(values) == 4:
-        return shape, f"{ind}anvil_rect({', '.join(values)}, {tail});"
+        return f"{ind}anvil_rect({', '.join(values)}, {tail});"
     if shape == "circle" and len(values) == 3:
-        return shape, f"{ind}anvil_circle({', '.join(values)}, {tail});"
+        return f"{ind}anvil_circle({', '.join(values)}, {tail});"
     if shape == "line" and len(values) in (4, 5):
         thick = values[4] if len(values) == 5 else "1.0"
-        return shape, f"{ind}anvil_line({', '.join(values[:4])}, {tail}, {thick});"
+        return f"{ind}anvil_line({', '.join(values[:4])}, {tail}, {thick});"
     if shape == "text" and loc and len(values) == 1:
-        return shape, f"{ind}anvil_text({', '.join(loc)}, {values[0]}, {tail});"
+        return f"{ind}anvil_text({', '.join(loc)}, {values[0]}, {tail});"
     raise CompileError(f"{path}:{node.line}: invalid arguments for display {shape}")
-
-def emit_display(path, node, ind, functions, scope=None, arrays=None) -> str:
-    """Compatibility API: return the generated statement only."""
-    return _lower_display(path, node, ind, functions, scope, arrays)[1]
-
 
 
 _TEXT_CALL = re.compile(r"call\s+fn\(([^,)]*)")
@@ -241,13 +222,10 @@ def emit_nodes(
             expected,
             scope,
             arrays,
-            scope or n,
-            temporary_counter,
         )
 
     original_path = path
     for n in nodes:
-        temporary_counter = [0]
         path = n.source or original_path
         source_path = json.dumps(str(path))
         if n.kind == "set":
@@ -302,9 +280,9 @@ def emit_nodes(
                     f"{indent}}}",
                 ]
             )
-        elif n.kind in ("add", "sub",'global_add','global_sub'):
-            op = "+" if n.kind in ("add",'global_add') else "-"
-            target = variable_code(n.name, None if n.kind.startswith('global_') else scope)
+        elif n.kind in ("add", "sub"):
+            op = "+" if n.kind == "add" else "-"
+            target = variable_code(n.name, scope)
             value = lower(n)
             out.append(
                 f"{indent}{target} = anvil_check_number(({target} {op} {value}), "
@@ -445,16 +423,8 @@ def emit_nodes(
                     f"{n.source or path}:{n.line}: function {n.name!r} expects "
                     f"{len(functions[n.name].params)} argument(s), got {len(args)}"
                 )
-            call_expression = "call fn(" + n.name + (", " + n.value if n.value else "") + ")"
-            if scope is None and n.name == "main":
-                out.append(
-                    f'{indent}printf("%.15g\\n", {lower(n, call_expression)});'
-                )
-            else:
-                out.append(f"{indent}(void){lower(n, call_expression)};")
-        elif n.kind=='callable_error':
-            message=c_string_literal(f'{path}:{n.line}: function reference is unset or invalid\n')
-            out.append(f'{indent}fputs({message},stderr); exit(2);')
+            values = [lower(n, arg) for arg in args]
+            out.append(f"{indent}(void){c_name(n.name)}({', '.join(values)});")
         elif n.kind == "if":
             truth = constant_truth(n.value)
             if truth is not None:
@@ -582,10 +552,8 @@ def emit_nodes(
                 raise CompileError(f"{path}:{n.line}: clear rgba expects 4 values")
             out.append(f"{indent}anvil_clear({', '.join(lower(n, x) for x in args)});")
         elif n.kind == "display":
-            shape, statement = _lower_display(
-                path, n, indent, functions, scope, arrays, scope or n, temporary_counter
-            )
-            if shape != "ray_sphere":
+            statement = emit_display(path, n, indent, functions, scope, arrays)
+            if "anvil_trace_sphere(" not in statement:
                 out.append(f"{indent}anvil_trace_finish();")
             out.append(statement)
         elif n.kind == "seed":
@@ -647,17 +615,6 @@ def emit_c(
     runtime_header: str = "anvil_runtime.h",
     minimal_includes: bool = False,
 ) -> str:
-    if (
-        isinstance(active_local_array_bytes, bool)
-        or not isinstance(active_local_array_bytes, int)
-        or not 1024 * 1024 <= active_local_array_bytes
-        <= MAX_ACTIVE_LOCAL_ARRAY_MIB * 1024 * 1024
-        or active_local_array_bytes % (1024 * 1024)
-    ):
-        raise CompileError(
-            f"{path}: active local array budget must be an integer number of MiB "
-            f"from 1 to {MAX_ACTIVE_LOCAL_ARRAY_MIB} MiB"
-        )
     arrays = arrays or {}
     from compiler import gltf as _gltf
 
@@ -851,8 +808,6 @@ def emit_c(
             "clear",
             "seed",
             "net_host",
-            "net_ip",
-            "net_leave",
             "net_join",
         )
     ]
@@ -875,8 +830,6 @@ def emit_c(
             "clear",
             "seed",
             "net_host",
-            "net_ip",
-            "net_leave",
             "net_join",
             "call",
             "import",
@@ -913,130 +866,6 @@ def emit_c(
             f"{functions['main'].source or path}:{functions['main'].line}: main cannot have parameters "
             "when used as an engine callback program"
         )
-    if not has_engine and not calls and "main" in functions and functions["main"].params:
-        raise CompileError(
-            f"{functions['main'].source or path}:{functions['main'].line}: main function parameters "
-            "require an explicit call with arguments"
-        )
-    from compiler.modules import reachable_functions, reachable_storage
-
-    emitted_functions = reachable_functions(functions, top, graphical=has_engine)
-    emitted_variables, emitted_arrays = reachable_storage(
-        top, emitted_functions, variables, arrays
-    )
-    function_bodies = {
-        name: emit_nodes(path, fn.body, functions, "    ", fn, arrays)
-        for name, fn in functions.items()
-    }
-    setup_body = emit_nodes(path, setup, functions, "    ", arrays=arrays)
-    calls_body = emit_nodes(path, calls, functions, "    ", arrays=arrays)
-    reachable_c_body = [setup_body, calls_body] + [
-        function_bodies[name] for name, _fn in emitted_functions
-    ]
-    reachable_statements = [
-        mask_strings(statement)
-        for body in reachable_c_body
-        for statement in body
-    ]
-    selected_runtime_modules = {
-        name
-        for name, module in RUNTIME_MODULES.items()
-        if any(
-            re.search(pattern, statement)
-            for pattern in module.trigger_patterns
-            for statement in reachable_statements
-        )
-    }
-    lines = [
-        "/* Generated from Anvil source. The .ANVL source remains the program. */",
-        '#include "anvil_runtime.h"',
-        "#include <math.h>",
-        "#include <stdio.h>",
-        "#include <stdlib.h>",
-        "",
-    ]
-    runtime_markers = [
-        f"/* ANVIL_RUNTIME_MODULE: {name} */"
-        for name in sorted(selected_runtime_modules)
-    ]
-    lines[1:1] = runtime_markers
-    metadata_payload=pack(metadata)
-    if metadata_payload:
-        lines.append('static const char _anvil_metadata_blob[] = '+c_bytes_literal(metadata_payload)+';')
-    lines += [f"static double {c_name(name)};" for name in sorted(emitted_variables)]
-    lines += [f'static double {c_name(name)};' for node in top for name in sorted(node.c_temporaries)]
-    lines += [
-        f"static double {c_name(name)}[{size}];"
-        for name, size in sorted(arrays.items())
-        if name in emitted_arrays
-    ]
-    if any(fn.local_arrays for _name, fn in emitted_functions):
-        lines.extend(
-            [
-                f"#define ANVIL_LOCAL_ARRAY_BUDGET_BYTES "
-                f"{active_local_array_bytes}u",
-                "static size_t anvil_active_local_array_bytes;",
-                "static double *anvil_local_array_alloc(size_t count, "
-                "const char *path, int line) {",
-                "    const size_t bytes = count * sizeof(double);",
-                "    if (bytes > ANVIL_LOCAL_ARRAY_BUDGET_BYTES - "
-                "anvil_active_local_array_bytes) {",
-                '        fprintf(stderr, "%s:%d: active local arrays exceed the '
-                '%u MiB Anvil memory limit\\n", path, line, '
-                "ANVIL_LOCAL_ARRAY_BUDGET_BYTES / (1024u * 1024u));",
-                "        exit(2);",
-                "    }",
-                "    double *values = (double *)calloc(count, sizeof(double));",
-                "    if (!values) {",
-                '        fprintf(stderr, "%s:%d: unable to allocate local array '
-                '(%zu bytes)\\n", path, line, bytes);',
-                "        exit(2);",
-                "    }",
-                "    anvil_active_local_array_bytes += bytes;",
-                "    return values;",
-                "}",
-                "static void anvil_local_array_free(double *values, size_t count) {",
-                "    if (values) {",
-                "        free(values);",
-                "        anvil_active_local_array_bytes -= count * sizeof(double);",
-                "    }",
-                "}",
-                "",
-            ]
-        )
-    for name, fn in emitted_functions:
-        if name in ("draw", "update") and fn.params:
-            raise CompileError(
-                f"{fn.source or path}:{fn.line}: engine callback '{name}' cannot have parameters"
-            )
-        params = (
-            ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
-            or "void"
-        )
-        lines.append(f"static double {c_name(name)}({params});")
-    lines.append("")
-    for name, fn in emitted_functions:
-        params = (
-            ", ".join(f"double {c_name(name + '__' + param)}" for param in fn.params)
-            or "void"
-        )
-        lines.append(f"static double {c_name(name)}({params}) {{")
-        lines.extend(
-            f"    double {c_name(name + '__' + local)} = 0.0;"
-            for local in sorted(fn.locals | fn.c_temporaries)
-        )
-        lines.extend(
-            f"    double *{c_name(name + '__' + local)} = "
-            f"anvil_local_array_alloc({size}, {c_string_literal(str(fn.source or path))}, "
-            f"{fn.local_array_lines[local]});"
-            for local, size in sorted(fn.local_arrays.items())
-        )
-        body = function_bodies[name]
-        lines.extend(body)
-        if not any(n.kind == "output" for n in fn.body):
-            lines.extend(local_array_cleanup(fn, "    "))
-            lines.append("    return 0.0;")
-        lines.extend(["}", ""])
     lines.append("int main(void) {")
     # Binary stdout keeps the bytes identical to the native backend (which writes
     # through WriteFile and never translates newlines) and to a redirected file.
@@ -1049,14 +878,10 @@ def emit_c(
     )
     lines.extend(emit_nodes(path, setup, functions, "    ", arrays=arrays))
     if has_engine:
-        lines.append(f"    anvil_set_fixed_hz({fixed_hz});")
-    lines.extend(setup_body)
-    if has_engine:
-        lines.extend(calls_body)
         lines.append(
             f"    anvil_run({c_name('update') if 'update' in functions else 'NULL'}, "
             f"{c_name('draw') if 'draw' in functions else 'NULL'}, "
-            f"{c_string_literal(project_name)});"
+            f"{json.dumps(project_name, ensure_ascii=True)});"
         )
     elif calls:
         for n in calls:
@@ -1084,7 +909,4 @@ def emit_c(
             lines.append(f'    printf("%s\\n", anvil_format_number({c_name("main")}()));')
     lines.append("    anvil_net_close();")
     lines.extend(["    return 0;", "}", ""])
-    from compiler.semantics import validate_program
-    from compiler.common import ParsedProgram
-    validate_program(ParsedProgram(path, functions, top, variables, arrays, [], []))
     return "\n".join(lines)

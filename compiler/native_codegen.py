@@ -24,14 +24,6 @@ from compiler.expressions import (
 from compiler.expressions import ExpressionParser, MAX_EXPRESSION_DEPTH, split_amp, split_args
 from compiler.lexer import strip_comment
 from compiler.native_x64 import Pe32Plus, X64Code
-from compiler.native_abi import Win64NumericABI
-
-
-@dataclass(frozen=True)
-class _TemporarySlot:
-    """Private scratch identity, distinct from every source identifier."""
-
-    index: int
 
 
 @dataclass(frozen=True)
@@ -762,7 +754,7 @@ class _Expression:
         if self.owner._window is None:
             raise CompileError(f"{self.owner.path}:{self.line}: {name}() requires native scene 2d")
         if name == "delta":
-            self.owner.emit_float(1.0 / (self.owner.fixed_hz if self.owner._window is not None else 60))
+            self.owner.emit_float(1.0 / 60.0)
         else:
             self.owner._window.clock_requested = True
             self.owner.code.rip_load_data(0, self.owner._window.simulation_time)
@@ -901,34 +893,9 @@ class NativeCodegen:
     MAX_DATA_BYTES = 16 * 1024 * 1024
     MAX_FRAME_BYTES = 4096
 
-    def __init__(self, path, functions, top, variables, arrays=None, *, fixed_hz=60, title="Anvil Native 2D", active_local_array_bytes=MAX_ACTIVE_LOCAL_ARRAY_BYTES):
+    def __init__(self, path, functions, top, variables, arrays=None):
         self.path = path
-        from compiler.program_metadata import extract,pack
-        metadata=extract(top)
-        title=metadata.get('name',title)
-        top=[node for node in top if node.kind!='metadata']
-        from compiler.native_arrays import NativeArrays
-        self._local_arrays = NativeArrays(self)
-        if isinstance(fixed_hz, bool) or not isinstance(fixed_hz, int) or not 1 <= fixed_hz <= 240:
-            raise CompileError(f"{path}: fixed_hz must be an integer from 1 to 240")
-        if (
-            isinstance(active_local_array_bytes, bool)
-            or not isinstance(active_local_array_bytes, int)
-            or not 1024 * 1024 <= active_local_array_bytes
-            <= MAX_ACTIVE_LOCAL_ARRAY_MIB * 1024 * 1024
-            or active_local_array_bytes % (1024 * 1024)
-        ):
-            raise CompileError(
-                f"{path}: active local array budget must be an integer number of MiB "
-                f"from 1 to {MAX_ACTIVE_LOCAL_ARRAY_MIB} MiB"
-            )
-        if not isinstance(title, str) or not title.strip() or any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in title):
-            raise CompileError(f"{path}: title must be a non-empty Unicode string without control characters")
-        self.fixed_hz = fixed_hz
-        self.active_local_array_bytes = active_local_array_bytes
-        self.title = title
-        if any(name.startswith("_anvil_native_") or fn.original_name.startswith("_anvil_native_")
-               for name,fn in functions.items()):
+        if any(name.startswith("_anvil_native_") for name in functions):
             raise CompileError(f"{path}: function prefix _anvil_native_ is reserved for the native runtime")
         self.functions = dict(functions)
         self.top = top
@@ -1009,16 +976,9 @@ class NativeCodegen:
             )
         self._data_size = max(8, next_offset)
         self._data = bytearray(self._data_size)
-        payload=pack(metadata)
-        if len(self._data)+len(payload)>self.MAX_DATA_BYTES:
-            raise CompileError(f'{path}: program metadata and global data exceed the native data budget')
-        if payload:
-            self.reserve_data(payload)
         self._window = None
         from compiler.native_math import NativeMath
         self._math = NativeMath(self)
-        from compiler.native_network import NativeNetwork
-        self._net=NativeNetwork(self)
 
     def reserve_data(self, payload: bytes) -> int:
         if not payload:
@@ -1047,14 +1007,29 @@ class NativeCodegen:
         self.code.bytes(b"\x48\xb8" + struct.pack("<Q", struct.unpack("<Q", struct.pack("<d", value))[0]))
         self.code.bytes(b"\x66\x48\x0f\x6e\xc0")  # movq xmm0, rax
 
-    def load_local(self, name: str | _TemporarySlot, scope: Node | None, line: int) -> None:
-        if isinstance(name, _TemporarySlot):
-            displacement = self._temporary_offset(name)
+    @staticmethod
+    def _memory_operand(register: int, base: int, displacement: int) -> bytes:
+        return NativeCodegen._xmm_rbp_operand(0x10, register, displacement)
+
+    @staticmethod
+    def _store_xmm_operand(register: int, displacement: int) -> bytes:
+        return NativeCodegen._xmm_rbp_operand(0x11, register, displacement)
+
+    @staticmethod
+    def _xmm_rbp_operand(opcode: int, register: int, displacement: int) -> bytes:
+        if -128 <= displacement <= 127:
+            return bytes((0xF2, 0x0F, opcode, 0x45 | (register << 3), displacement & 0xFF))
+        return bytes((0xF2, 0x0F, opcode, 0x85 | (register << 3))) + struct.pack("<i", displacement)
+
+    def load_local(self, name: str, scope: Node | None, line: int) -> None:
+        if name.startswith("_temporary_"):
+            index = int(name.rsplit("_", 1)[1])
+            displacement = -(self._scratch_base + index * 8)
         elif scope is None or name not in self._frame_slots:
             raise CompileError(f"{self.path}:{line}: unknown local variable {name!r}")
         else:
             displacement = -self._frame_slots[name]
-        self.code.scalar_memory(0, 5, displacement)
+        self.code.bytes(self._memory_operand(0, 5, displacement))
 
     def _text_list_block(self, name: str) -> int:
         """Reserve (once) the 256 x 256-byte block that backs a text list."""
@@ -1198,10 +1173,10 @@ class NativeCodegen:
             offset = -self._frame_slots[name]
         else:
             raise CompileError(f"native compiler internal error: local slot {name!r} missing")
-        self.code.scalar_memory(0, 5, offset, store=True)
+        self.code.bytes(self._store_xmm_operand(0, offset))
 
     def load_variable(self, name: str, scope: Node | None, line: int) -> None:
-        if scope is not None and name in scope.params:
+        if scope is not None and name in self._frame_slots:
             self.load_local(name, scope, line)
             return
         offset = self._data_offsets.get(name)
@@ -1210,7 +1185,7 @@ class NativeCodegen:
         self.code.rip_load_data(0, offset)
 
     def store_variable(self, name: str, scope: Node | None, line: int) -> None:
-        if scope is not None and name in scope.params:
+        if scope is not None and name in self._frame_slots:
             self.store_local(name)
             return
         offset = self._data_offsets.get(name)
@@ -1220,7 +1195,7 @@ class NativeCodegen:
 
     def _emit_array_index(
         self, name: str, raw_index: str, line: int, scope: Node | None
-    ) -> _TemporarySlot:
+    ) -> str:
         """Evaluate a global array index once, validate it, and save its int64 slot."""
         local = self._local_array_slots.get(name) if scope is not None else None
         if local is not None:
@@ -1243,7 +1218,7 @@ class NativeCodegen:
         self.code.bytes(b"\x48\x3d" + struct.pack("<I", size))
         self.code.conditional_jump(0x83, failure)  # jae: index >= size
         slot = self.push_temp()
-        displacement = self._temporary_offset(slot)
+        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
         self._store_rax_rbp(displacement)
         self.code.jump(done)
         self.code.label(failure)
@@ -1274,7 +1249,7 @@ class NativeCodegen:
         self, name: str, raw_index: str, line: int, scope: Node | None
     ) -> None:
         slot = self._emit_array_index(name, raw_index, line, scope)
-        displacement = self._temporary_offset(slot)
+        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
         self._load_rax_rbp(displacement)
         self._lea_array_base(2, name, scope)  # lea rdx,[array base]
         self.code.bytes(b"\xf2\x0f\x10\x04\xc2")  # movsd xmm0,[rdx+rax*8]
@@ -1290,7 +1265,7 @@ class NativeCodegen:
     ) -> None:
         slot = self._emit_array_index(name, raw_index, line, scope)
         self.emit_expression(raw_value, line, scope)
-        displacement = self._temporary_offset(slot)
+        displacement = -(self._scratch_base + int(slot.rsplit("_", 1)[1]) * 8)
         self._load_rax_rbp(displacement)
         self._lea_array_base(2, name, scope)
         self.code.bytes(b"\xf2\x0f\x11\x04\xc2")  # movsd [rdx+rax*8],xmm0
@@ -1333,14 +1308,11 @@ class NativeCodegen:
         else:
             self.code.bytes(b"\x48\x8b\x85" + struct.pack("<i", displacement))
 
-    def _temporary_offset(self, slot: _TemporarySlot) -> int:
-        return -(self._scratch_base + slot.index * 8)
-
-    def push_temp(self) -> _TemporarySlot:
+    def push_temp(self) -> str:
         self._scratch_depth += 1
         if self._scratch_depth > 16:
             raise CompileError(f"{self.path}: native expression needs more than 16 temporary slots")
-        return _TemporarySlot(self._scratch_depth)
+        return f"_temporary_{self._scratch_depth}"
 
     def pop_temp(self) -> None:
         self._scratch_depth -= 1
@@ -1349,12 +1321,13 @@ class NativeCodegen:
         if name not in self._frame_slots:
             self._frame_slots[name] = (len(self._frame_slots) + 1) * 8
 
-    def emit_binary(self, operator: str, left_slot: _TemporarySlot | None = None, line: int = 0) -> None:
+    def emit_binary(self, operator: str, left_slot: str | None = None, line: int = 0) -> None:
         if left_slot is not None:
-            displacement = self._temporary_offset(left_slot)
+            temp_index = int(left_slot.rsplit("_", 1)[1])
+            displacement = -(self._scratch_base + temp_index * 8)
             # movapd xmm1, xmm0; load the saved left operand into xmm0.
             self.code.bytes(b"\x66\x0f\x28\xc8")
-            self.code.scalar_memory(0, 5, displacement)
+            self.code.bytes(self._memory_operand(0, 5, displacement))
         opcodes = {
             "+": b"\xf2\x0f\x58\xc1",
             "-": b"\xf2\x0f\x5c\xc1",
@@ -1503,11 +1476,7 @@ class NativeCodegen:
 
     def _emit_nodes(self, nodes: list[Node], scope: Node | None) -> None:
         for node in nodes:
-            if node.kind == 'noop':
-                continue
-            elif node.kind in ('net_ip','net_host','net_join','net_send','net_leave'):
-                self._net.emit_node(node,scope)
-            elif node.kind == "seed":
+            if node.kind == "seed":
                 self.emit_expression(node.value, node.line, scope)
                 self.emit_finite_check(node.line)
                 self._math.seed(node.line)
@@ -1537,23 +1506,15 @@ class NativeCodegen:
                 )
             elif node.kind == "display" and self._window is not None:
                 self._window.emit_display(node, scope)
-            elif node.kind in ("add", "sub", "local_add", "local_sub",'global_add','global_sub'):
+            elif node.kind in ("add", "sub", "local_add", "local_sub"):
                 name = node.name
-                target_scope=None if node.kind.startswith('global_') else scope
-                is_local = node.kind in ("local_add", "local_sub")
-                if is_local:
-                    self.load_local(name, scope, node.line)
-                else:
-                    self.load_variable(name, target_scope, node.line)
+                self.load_variable(name, scope, node.line)
                 temp = self.push_temp()
                 self.store_local(temp)
                 self.emit_expression(node.value, node.line, scope)
-                self.emit_binary("+" if node.kind in ("add", "local_add",'global_add') else "-", temp, node.line)
+                self.emit_binary("+" if node.kind in ("add", "local_add") else "-", temp, node.line)
                 self.pop_temp()
-                if is_local:
-                    self.store_local(name)
-                else:
-                    self.store_variable(name, target_scope, node.line)
+                self.store_variable(name, scope, node.line)
             elif node.kind == "output":
                 if scope is not None and getattr(scope, "returns_text", False):
                     self.emit_expression(node.value, node.line, scope, expected="text")
@@ -1615,13 +1576,13 @@ class NativeCodegen:
                 self.code.conditional_jump(0x84, end)  # a zero step performs no iterations
                 self.code.conditional_jump(0x87, positive)  # step > 0
                 self.load_local(node.name, scope, node.line)
-                self.code.scalar_memory(1, 5, self._temporary_offset(end_slot))
+                self.code.bytes(self._memory_operand(1, 5, -(self._scratch_base + int(end_slot.rsplit("_", 1)[1]) * 8)))
                 self.code.bytes(b"\x66\x0f\x2e\xc1")
                 self.code.conditional_jump(0x82, end)  # current < end for negative step
                 self.code.jump(body)
                 self.code.label(positive)
                 self.load_local(node.name, scope, node.line)
-                self.code.scalar_memory(1, 5, self._temporary_offset(end_slot))
+                self.code.bytes(self._memory_operand(1, 5, -(self._scratch_base + int(end_slot.rsplit("_", 1)[1]) * 8)))
                 self.code.bytes(b"\x66\x0f\x2e\xc1")
                 self.code.conditional_jump(0x87, end)  # current > end for positive step
                 self.code.label(body)
@@ -1809,8 +1770,7 @@ class NativeCodegen:
         self._frame_slots = {}
         for local in sorted(fn.locals | set(fn.params)):
             self._alloc_slot(local)
-        private_slots = self._local_arrays.plan(fn)
-        self._scratch_base = (len(self._frame_slots) + private_slots) * 8
+        self._scratch_base = len(self._frame_slots) * 8
         self._frame_size = ((self._scratch_base + 128 + 15) // 16) * 16
         self._local_array_slots: dict[str, tuple[int, int]] = {}
         if fn.local_arrays:
@@ -1841,16 +1801,15 @@ class NativeCodegen:
         self.code.call("function:anvil_frame_enter")
         self.code.bytes(b"\x55\x48\x89\xe5")  # push rbp; mov rbp,rsp
         self.code.bytes(b"\x48\x81\xec" + struct.pack("<I", self._frame_size))
-        if len(fn.params) > Win64NumericABI.MAX_ARGUMENTS:
-            raise CompileError(f"{self.path}:{fn.line}: native backend supports at most sixteen parameters")
-        Win64NumericABI(self.code).save_parameters(
-            [-self._frame_slots[param] for param in fn.params])
-        if fn.locals:
-            # Parameters are saved before XMM0 is used to initialize local state.
-            self.code.bytes(b"\x66\x0f\xef\xc0")  # pxor xmm0,xmm0
-            for local in sorted(fn.locals):
-                self.store_local(local)
-        self._local_arrays.enter(fn)
+        for index, param in enumerate(fn.params):
+            if index < 4:
+                offset = -self._frame_slots[param]
+                self.code.bytes(self._store_xmm_operand(index, offset))
+            elif index < 16:
+                self.code.bytes(self._memory_operand(0, 5, 48 + (index - 4) * 8))
+                self.code.bytes(self._store_xmm_operand(0, -self._frame_slots[param]))
+            else:
+                raise CompileError(f"{self.path}:{fn.line}: native backend supports at most sixteen parameters")
         self.emit_nodes(fn.body, fn)
         if getattr(fn, "returns_text", False):
             empty = self.reserve_data(b"\x00")
@@ -2968,7 +2927,6 @@ class NativeCodegen:
                 body=body,
             ))
         self._math.emit_pending()
-        self._net.emit()
         self._emit_print_helper()
         if self._needs_text_helper:
             self._emit_text_helper()
@@ -3051,7 +3009,7 @@ class NativeCodegen:
                         or any(int(part) > 255 for part in parts) or parts[3] != "255"):
                     raise CompileError(f"{node.source or self.path}:{node.line}: native clear requires four literal channels in 0..255 and alpha 255")
                 clear = [int(part) for part in parts]
-            elif node.kind in ("set", "add", "sub", "call", "seed",'global_set','global_add','global_sub','net_ip','net_host','net_join','net_leave'):
+            elif node.kind in ("set", "add", "sub", "call", "seed"):
                 setup.append(node)
             else:
                 raise CompileError(f"{node.source or self.path}:{node.line}: native scene setup does not support {node.kind!r}")
@@ -3064,7 +3022,6 @@ class NativeCodegen:
         self.code.label("native:setup")
         self._emit_function("native:setup", Node("function", 1, name="native:setup", body=setup))
         self._math.emit_pending()
-        self._net.emit()
         self._window.emit()
         return self._build(
             list(self.IMPORTS) + list(self._extension_imports) + self._window.imports
@@ -3076,6 +3033,6 @@ class NativeCodegen:
         pe = Pe32Plus(bytes(self.code.code), imports)
         targets = pe.fixup_targets(len(self.code.code))
         text = self.code.finish(targets)
-        return Pe32Plus(text, imports, icon=icon_path.read_bytes()).build(
+        return Pe32Plus(text, imports).build(
             entry_offset=self.code.labels["entry"], data=bytes(self._data)
         )
