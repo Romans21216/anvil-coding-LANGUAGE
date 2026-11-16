@@ -16,6 +16,7 @@ from compiler.build import build_c, find_compiler
 from compiler.codegen import emit_c
 from compiler.common import CompileError
 from compiler.diagnostics import render, render_editor
+from compiler.timing import Timings
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
@@ -263,6 +264,11 @@ def main() -> int:
         help="diagnostic format: caret blocks or one-line path:line:column",
     )
     ap.add_argument(
+        "--timings",
+        action="store_true",
+        help="print read/parse/generate/build timings to stderr (C backend)",
+    )
+    ap.add_argument(
         "--no-cache",
         action="store_true",
         help="ignore the build cache and do not store a new entry",
@@ -475,6 +481,7 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: entry must resolve inside the project folder"
                 ) from exc
+        timings = Timings(args.timings)
         try:
             size = source_path.stat().st_size
             if size > SOURCE_LIMIT_BYTES:
@@ -494,7 +501,9 @@ def main() -> int:
             raise CompileError(
                 f"cannot read {source_path}: the file is not valid UTF-8 ({error.reason} at byte {error.start})"
             ) from error
+        timings.mark("read")
         funcs, top, variables, arrays = parse(source_path, source, include_root=include_root)
+        timings.mark("parse")
         for provided in extension_api.anvil_sources():
             provided_source = provided.read_text(encoding="utf-8")
             provided_functions, provided_top, _, _ = parse(provided, provided_source)
@@ -545,6 +554,8 @@ def main() -> int:
                 emit_c(
                     source_path, funcs, top, variables, arrays, fixed_hz, project_name
                 )
+            timings.mark("generate")
+            timings.report()
             print(f"{source_path}: ok")
             return 0
         if args.backend == "native":
@@ -572,6 +583,7 @@ def main() -> int:
         generated = emit_c(
             source_path, funcs, top, variables, arrays, fixed_hz, project_name
         )
+        timings.mark("generate")
         c_path = (
             args.emit_c or args.generated_c or source_path.with_suffix(".generated.c")
         )
@@ -607,6 +619,8 @@ def main() -> int:
                 libraries,
                 args.dynamic_runtime,
             )
+            timings.mark("build")
+            timings.report()
             print(f"Built {out} using {compiler[0]}")
         else:
             cached = False if args.no_cache else cached_build(
@@ -616,6 +630,8 @@ def main() -> int:
                 f"r{int(args.release)}d{int(args.dynamic_runtime)}",
             )
             if cached:
+                timings.mark("build")
+                timings.report()
                 print(f"Built {out} using {compiler[0]} (reused build cache)")
             else:
                 build_c(compiler[1], c_path, out, args.release, (), args.dynamic_runtime)
@@ -626,6 +642,8 @@ def main() -> int:
                         out,
                         f"r{int(args.release)}d{int(args.dynamic_runtime)}",
                     )
+                timings.mark("build")
+                timings.report()
                 print(f"Built {out} using {compiler[0]}")
         _place_extension_dlls(out)
         if args.run:

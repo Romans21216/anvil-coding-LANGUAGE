@@ -63,6 +63,8 @@ The native build has no external toolchain to start and no cache, so it is stead
 the C build's first run pays for loading the MSVC environment and later runs reuse
 the build cache.
 
+`--timings` reports each phase separately so a slow step is identifiable: a cold C build on this machine measured read 0 ms, parse 2 ms, generate 1 ms, build 1,597 ms, total 1,600 ms, while a cache hit replaced build with a 41 ms copy.
+
 The cache key covers the generated C, every runtime source and header, the compiler
 Python sources, the **contents** of `cl.exe`, the contents of the `link.exe` beside it,
 and the installed Windows SDK version directories. A compiler replaced in place with the
@@ -122,6 +124,7 @@ must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
 | `--deny-warnings` | treat warnings as build failures |
 | `--no-cache` | ignore the build cache and do not store a new entry |
 | `--diagnostics caret\|editor` | caret blocks (default) or one-line `path:line:column` messages for editors |
+| `--timings` | print `read/parse/generate/build` milliseconds to stderr (C backend; `--check` has no build phase) |
 | `--package <dir>` | copy the program and its assets into `dir` with `anvil-package.json` |
 | `--package-dry-run` | validate assets and print the package manifest without writing |
 | `--run` | build the program and run it, returning its exit code |
