@@ -505,3 +505,14 @@ A second suite hit the same `WinError 5` during `TemporaryDirectory` cleanup
 `TemporaryDirectory(ignore_cleanup_errors=True)`, matching the earlier runtime
 fix, so a briefly locked executable cannot fail a green test. Behaviour checks
 are unchanged.
+
+## GATE 2: `--run` one-command build and launch
+
+`python compiler/anvil.py game.ANVL --run` builds the executable and launches
+it, returning the program's exit code (2 for a runtime fault, 0 on success), so
+edit → build → run is a single command on both backends. `--run` refuses
+`--check`/`--emit-c`, which do not produce an executable.
+
+`tests/test_run.py` covers output capture, exit-code propagation
+(`1 / 0` → 2), and the invalid combination; `README.md` documents the flag next
+to `--format` and `--deny-warnings`.

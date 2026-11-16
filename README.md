@@ -23,6 +23,7 @@ On Windows, install Python 3.11 or newer and Visual Studio 2022 Build Tools with
 
 ```powershell
 python compiler/anvil.py examples/first_world.ANVL --release --output build/first_world.exe
+python compiler/anvil.py examples/first_world.ANVL --run
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
 python compiler/anvil.py examples/loops.ANVL --release --output build/loops.exe
 python compiler/anvil.py examples/arrays.ANVL --release --output build/arrays.exe
@@ -31,6 +32,8 @@ python compiler/anvil.py examples/physics_boxes.ANVL --release --output build/ph
 python compiler/anvil.py examples/physics_friction.ANVL --release --output build/physics_friction.exe
 python compiler/anvil.py examples/image_sprite.ANVL --release --output build/image_sprite.exe
 ```
+
+`--run` builds and immediately launches the executable, returning the program's exit code, so edit → build → run is one command. `--format` restores canonical indentation and `--format-check` fails on unformatted files; `--deny-warnings` turns lint warnings into a failing build for CI.
 
 This compiles through temporary C with MSVC in the same build command, then removes the C and object intermediates automatically. Generated C keeps functions and global scalar/array storage reachable from selected entry points and callbacks, including function-reference targets. Release builds enable MSVC function/data sections and linker elimination. A runtime-module registry compiles image loading, networking, and 2D physics in separate C translation units only when reachable Anvil code uses those features. The renderer and remaining runtime systems still share the core translation unit. Image resources are released through the core runtime shutdown-hook interface. These are internal feature boundaries, not yet a user-facing package/import system. To preserve translated C for inspection, add `--generated-c build/first_world.c`; to only translate without building, use `--emit-c build/first_world.c`. The generated C is ordinary C, while the supplied runtime currently targets Windows. Anvil owns the language front end, validation, reachability analysis, and runtime; the C toolchain performs machine-code generation and linking.
 

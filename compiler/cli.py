@@ -68,6 +68,11 @@ def main() -> int:
         help="treat lint warnings as errors and stop before building",
     )
     ap.add_argument(
+        "--run",
+        action="store_true",
+        help="build, run the executable, and return its exit code",
+    )
+    ap.add_argument(
         "--format",
         action="store_true",
         help="rewrite the .ANVL source with canonical block indentation and stop",
@@ -99,6 +104,8 @@ def main() -> int:
                 args.source.write_text(formatted, encoding="utf-8")
             print(f"{args.source}: formatted")
             return 0
+        if args.run and (args.check or args.emit_c):
+            raise CompileError("--run builds and runs the program; drop --check or --emit-c")
         if args.inspect_metadata:
             from compiler.program_metadata import unpack
             sys.stdout.buffer.write((json.dumps(unpack(args.source.read_bytes()),ensure_ascii=False,indent=2)+'\n').encode('utf-8'))
@@ -259,6 +266,8 @@ def main() -> int:
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(executable)
             print(f"Built {out} as native AMD64 PE (no C/Rust compiler)")
+            if args.run:
+                return subprocess.run([str(out)]).returncode
             return 0
         generated = emit_c(
             source_path, funcs, top, variables, arrays, fixed_hz, project_name,
@@ -296,6 +305,8 @@ def main() -> int:
                 c_path.write_text(generated, encoding="utf-8", newline="\n")
                 build_c(compiler[1], c_path, out, args.release)
         print(f"Built {out} using {compiler[0]}")
+        if args.run:
+            return subprocess.run([str(out)]).returncode
         return 0
     except tomllib.TOMLDecodeError as e:
         print(f"{args.source}: {e}", file=sys.stderr)
