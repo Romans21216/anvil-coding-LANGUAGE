@@ -56,6 +56,14 @@ ALLOWED_BUILTINS = {
     "save_exists",
     "save_delete",
     "save_error",
+    "lower",
+    "trim",
+    "left",
+    "right",
+    "char",
+    "contains",
+    "starts_with",
+    "ends_with",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)

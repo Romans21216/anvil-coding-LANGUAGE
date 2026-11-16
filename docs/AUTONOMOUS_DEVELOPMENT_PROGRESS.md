@@ -637,3 +637,8 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - **Hosts:** the page maps `save_read`/`save_write`/`save_delete` onto `localStorage` keys of the form `anvil:<project>/<slot>`; the Node host uses a Map, optionally persisted through `ANVIL_SAVE_FILE`.
 - **Tests:** `tests/test_wasm.py` covers the round trip and every error name, two separate Node runs sharing one JSON file, invalid slots and oversized text. 16 passed.
 - **Visual check:** a program that saves "seen" on its first frame was served in Chromium. With cleared storage, frame 1 drew green and `localStorage` then held `2yes`; after a reload, frame 1 drew blue, so the page really reads the persisted slot.
+
+## Batch 54 — wasm text helpers (8.12)
+
+- **Runtime:** `lower`, `trim`, `left`, `right`, `char`, `contains`, `starts_with` and `ends_with` are implemented in the freestanding shim with the C runtime's exact clamping: counts truncate toward zero, values at or above the length clamp to the whole string, negative/NaN counts give empty text, and `char` returns empty text for an out-of-range index.
+- **Tests:** `tests/test_wasm.py` builds the same source for wasm and for the C backend and asserts both outputs are equal, with the expected 15 lines pinned (`left("abc", 99)` is `abc`, `right("abc", -1)` is empty, `left("abcdef", 1.9)` is `a`, `char("hello", 9)` is empty). 17 passed.

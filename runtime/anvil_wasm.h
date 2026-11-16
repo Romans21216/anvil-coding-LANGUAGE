@@ -125,6 +125,16 @@ double anvil_save_exists(const char *slot);
 double anvil_save_delete(const char *slot);
 const char *anvil_save_error(void);
 
+/* Text helpers, matching the C runtime's clamped slice semantics. */
+char *anvil_text_lower(const char *source);
+char *anvil_text_trim(const char *source);
+char *anvil_text_left(const char *source, double count);
+char *anvil_text_right(const char *source, double count);
+char *anvil_text_char(const char *source, double index);
+int anvil_str_contains(const char *source, const char *needle);
+int anvil_str_starts(const char *source, const char *prefix);
+int anvil_str_ends(const char *source, const char *suffix);
+
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);
 void anvil_set_scene3d(int enabled);

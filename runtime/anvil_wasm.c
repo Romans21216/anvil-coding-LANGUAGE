@@ -527,6 +527,109 @@ double anvil_rnd(double min_value, double max_value) {
   return (double)(low + (long long)(anvil_random_u64() % span));
 }
 
+/* ---- Text helpers ------------------------------------------------------- */
+static size_t anvil_text_count(double value, size_t limit) {
+  if (!(value == value) || value <= 0.0)
+    return 0;
+  if (value >= (double)limit)
+    return limit;
+  return (size_t)value;
+}
+
+char *anvil_text_lower(const char *source) {
+  char *destination = anvil_text_buffer();
+  size_t index = 0;
+  for (; source[index] && index + 1 < ANVIL_STR_CAP; ++index) {
+    char c = source[index];
+    destination[index] = (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c;
+  }
+  destination[index] = '\0';
+  return destination;
+}
+
+char *anvil_text_trim(const char *source) {
+  char *destination = anvil_text_buffer();
+  size_t length = strlen(source);
+  size_t start = 0;
+  size_t end = length;
+  while (start < end && (source[start] == ' ' || source[start] == '\t'))
+    start += 1;
+  while (end > start && (source[end - 1] == ' ' || source[end - 1] == '\t'))
+    end -= 1;
+  for (size_t index = 0; index < end - start; ++index)
+    destination[index] = source[start + index];
+  destination[end - start] = '\0';
+  return destination;
+}
+
+char *anvil_text_left(const char *source, double count) {
+  char *destination = anvil_text_buffer();
+  size_t length = strlen(source);
+  size_t take = anvil_text_count(count, length);
+  for (size_t index = 0; index < take; ++index)
+    destination[index] = source[index];
+  destination[take] = '\0';
+  return destination;
+}
+
+char *anvil_text_right(const char *source, double count) {
+  char *destination = anvil_text_buffer();
+  size_t length = strlen(source);
+  size_t take = anvil_text_count(count, length);
+  for (size_t index = 0; index < take; ++index)
+    destination[index] = source[length - take + index];
+  destination[take] = '\0';
+  return destination;
+}
+
+char *anvil_text_char(const char *source, double index) {
+  char *destination = anvil_text_buffer();
+  size_t length = strlen(source);
+  if (!(index == index) || index < 0.0 || index >= (double)length) {
+    destination[0] = '\0';
+    return destination;
+  }
+  destination[0] = source[(size_t)index];
+  destination[1] = '\0';
+  return destination;
+}
+
+int anvil_str_contains(const char *source, const char *needle) {
+  size_t needle_length = strlen(needle);
+  if (needle_length == 0)
+    return 1;
+  for (size_t index = 0; source[index]; ++index) {
+    size_t scan = 0;
+    while (scan < needle_length && source[index + scan] == needle[scan])
+      scan += 1;
+    if (scan == needle_length)
+      return 1;
+  }
+  return 0;
+}
+
+int anvil_str_starts(const char *source, const char *prefix) {
+  size_t index = 0;
+  while (prefix[index]) {
+    if (source[index] != prefix[index])
+      return 0;
+    index += 1;
+  }
+  return 1;
+}
+
+int anvil_str_ends(const char *source, const char *suffix) {
+  size_t source_length = strlen(source);
+  size_t suffix_length = strlen(suffix);
+  if (suffix_length > source_length)
+    return 0;
+  for (size_t index = 0; index < suffix_length; ++index) {
+    if (source[source_length - suffix_length + index] != suffix[index])
+      return 0;
+  }
+  return 1;
+}
+
 /* ---- Saves --------------------------------------------------------------
    The host owns persistence (localStorage in the browser, a Map or JSON file
    under Node). Values are encoded as one type byte plus a payload: numbers as

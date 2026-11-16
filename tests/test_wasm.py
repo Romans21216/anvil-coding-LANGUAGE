@@ -522,5 +522,67 @@ class WasmSaveTests(unittest.TestCase):
             self.assertEqual(lines[3], "the text is 256 bytes; the save limit is 255")
 
 
+
+_PROGRAM_TEXT = "\n".join(
+    (
+        "fn(main)",
+        '  say lower("AbC")',
+        '  say trim("  hi  ")',
+        '  say left("abcdef", 3)',
+        '  say right("abcdef", 2)',
+        '  say left("abc", 99)',
+        '  say right("abc", -1)',
+        '  say left("abcdef", 1.9)',
+        '  say char("hello", 1)',
+        '  say char("hello", 9)',
+        '  say contains("abcdef", "cd")',
+        '  say contains("abcdef", "zz")',
+        '  say starts_with("abcdef", "abc")',
+        '  say ends_with("abcdef", "def")',
+        '  say starts_with("abc", "b")',
+        '  say ends_with("abc", "abcd")',
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+_EXPECTED_TEXT = [
+    "abc", "hi", "abc", "ef", "abc", "",
+    "a", "e", "", "1", "0", "1", "1", "0", "0",
+]
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmTextTests(unittest.TestCase):
+    def test_text_helpers_match_the_c_backend(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _PROGRAM_TEXT)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines(), _EXPECTED_TEXT)
+
+            source = root / "program.ANVL"
+            executable = root / "program.exe"
+            compiled = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "-o", str(executable)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            native = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(native.stdout, run.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
