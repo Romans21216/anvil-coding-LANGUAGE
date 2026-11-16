@@ -470,3 +470,17 @@ Warnings already shared the error layout but always let the build continue.
 CI can enforce a warning-free tree. `tests/test_text_and_print.py` checks the
 failing exit code and the "treated as errors" note; `docs/LANGUAGE.md` documents
 the flag next to the warning list.
+
+## Part 8 GATE 1: LANGUAGE_SPEC.md matches the implemented language
+
+The normative spec still said strings do not exist, display text took only
+`STRING + var(name)`, repeated colour modifiers were ignored, and the legacy
+integer suffix was accepted. All four were false. Updated:
+
+- Text values, `+` joining, `%.15g` number formatting, and `print`/`say` are
+  specified, with a grammar production for `print_statement` and
+  `text_expression`, and a §3.4 section covering byte vs code-point built-ins,
+  the scratch-arena lifetime, and the native literal-only limitation.
+- Repeated colour modifiers are specified as invalid; a stray number after a
+  display call is specified as a rejected diagnostic (both already implemented).
+- Added a complete text-and-print conformance example, verified with `--check`.

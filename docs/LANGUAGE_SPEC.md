@@ -29,7 +29,7 @@ blank_line  = whitespace, physical_newline | physical_newline ;
 comment_line = whitespace, "#", { any_non_newline_character }, physical_newline ;
 ```
 
-The compiler accepts a numeric literal only if it converts to a finite double. Unary `+` and `-` are operators, not part of the number token. String escapes are passed through to the generated C string literal; the stable portable subset is `\\`, `\"`, `\n`, and `\t`. General string values, concatenation, mutation, and string-returning functions are not part of version 1.
+The compiler accepts a numeric literal only if it converts to a finite double. Unary `+` and `-` are operators, not part of the number token. String escapes are passed through to the generated C string literal; the stable portable subset is `\\`, `\"`, `\n`, and `\t`. Text values exist: quoted strings join with `+`, a number on either side is formatted with the one Anvil number format (`%.15g`), and the text built-ins return text (see §3.4). There is no text variable or parameter type yet, so text is built inside the `display`/`print` expression that consumes it.
 
 ## 2. File structure and declarations
 
@@ -65,7 +65,7 @@ Every statement below occupies a single source line, except that a block stateme
 ```ebnf
 statement        = assignment | cleanup_statement | accumulation | array_write | function_call_statement | net_send_statement
                  | return_statement | if_statement | while_statement
-                 | for_statement | engine_statement | display_statement ;
+                 | for_statement | engine_statement | display_statement | print_statement ;
 assignment       = "set var(", IDENT, ") =", expression
                  | "set local(", IDENT, ") =", expression ;
 accumulation     = ("add" | "sub"), whitespace, "var(", IDENT, ")", whitespace, expression
@@ -74,12 +74,12 @@ array_write      = "set array(", IDENT, ",", expression, ") =", expression ;
 function_call_statement = "call fn(", IDENT, [ ",", argument_list ], ")" ;
 net_send_statement = "net send(", expression, ")" ;
 display_statement = "display", whitespace, display_call, display_tail ;
-display_tail     = { whitespace, display_style }, [ whitespace, INTEGER ], { whitespace, display_style } ;
+display_tail     = { whitespace, display_style } ;
 display_call     = "rect(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "circle(", expression, ",", expression, ",", expression, ")"
                  | "line(", expression, ",", expression, ",", expression, ",", expression,
                    [ ",", expression ], ")"
-                 | "text(", STRING, [ whitespace, "+", whitespace, "var(", IDENT, ")" ], ")"
+                 | "text(", text_expression, ")"
                  | "cube(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "sphere(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "ray_sphere(", expression, ",", expression, ",", expression, ",", expression, ")"
@@ -89,6 +89,10 @@ display_style    = "-rgb(", expression, ",", expression, ",", expression, ")"
                  | "-l(", expression, ",", expression, ")"
                  | "-rotate(", expression, ",", expression, ",", expression, ")" ;
 return_statement = "output", whitespace, expression ;
+print_statement  = ("print" | "say"), [ whitespace, text_expression ] ;
+text_expression  = STRING, { whitespace, "+", whitespace, (STRING | expression | text_call) }
+                 | expression | text_call ;
+text_call        = text_builtin, "(", [ argument_list ], ")" ;
 if_statement    = "if", whitespace, expression, line_end,
                   { block_item }, [ "else", line_end, { block_item } ], "end" ;
 while_statement = "while", whitespace, expression, line_end, { block_item }, "end" ;
@@ -96,8 +100,8 @@ for_statement   = "for local(", IDENT, ") =", expression, "to", expression,
                   [ "step", expression ], line_end, { block_item }, "end" ;
 ```
 
-Semantic constraint for the grammar above: when `display_call` is `text(STRING)`, `display_tail` must contain at least one `-l(x,y)` location style; without it the compiler rejects the command.
-At most one `-l(x,y)` and one `-rotate(x,y,z)` modifier may appear on a display command; a repeated location or rotation modifier is invalid. Multiple `-rgb`/`-rgba` modifiers are accepted by the current compiler, and the first color modifier supplies the color while later color modifiers are ignored. The optional legacy integer suffix may appear before or after style modifiers, but at most one suffix is accepted.
+Semantic constraint for the grammar above: when `display_call` is `text(text_expression)`, `display_tail` must contain at least one `-l(x,y)` location style; without it the compiler rejects the command.
+At most one `-l(x,y)` and one `-rotate(x,y,z)` modifier may appear on a display command; a repeated location, rotation, or colour modifier is invalid. A stray number after the draw call is rejected with a diagnostic instead of being silently ignored.
 
 The statements that may appear at file top level are limited to global `set var`, global array declarations, engine/project setup statements, `seed(expression)`, and `call fn(...)`. `add`, `sub`, `output`, local declarations, array writes, display commands, `if`, `while`, and `for` belong inside a function. Although the parser can form a top-level branch node, top-level control-flow blocks are rejected by C emission; they are not part of the accepted language.
 
@@ -124,6 +128,14 @@ An array may be global or local to a function. Arrays cannot be resized. The def
 `while expression` checks its expression before every iteration and repeats while the result is nonzero. It has no implicit termination limit. `break` and `continue` are not supported.
 
 `for local(i) = start to end [step amount]` evaluates `start`, `end`, and `step` once, then iterates inclusively in the direction of the step. The default step is `1`. Positive steps iterate while `i <= end`; negative steps iterate while `i >= end`. A zero step performs no iterations, leaving the loop variable equal to `start`. After a nonempty loop, the variable has the first value beyond the end condition. The loop variable is function-local, cannot be a parameter, and remains readable after the loop. Nested `for` loops must use different variable names.
+
+### 3.4 Text values and print
+
+`display text(...)` and `print`/`say` accept a text expression: quoted strings joined with `+`, numeric expressions (formatted with the one Anvil number format, `%.15g`), and text-returning built-ins. `print` writes one line to the console from top level or any function; `print` alone writes a blank line and `say` is an alias. `output` remains a return, not a print.
+
+Text is byte-counted UTF-8. `len`, `ord`, `find`, and `mid` operate on bytes; `utf8_len`, `utf8_char`, and `utf8_mid` operate on code points and never split a multi-byte sequence. `upper`/`lower` convert ASCII only, and `chr` accepts a code from 0 through 255. Text results live in a 256 KiB scratch arena and stay valid until the statement that built them finishes. Text cannot be stored in a variable, parameter, or array yet.
+
+The direct native backend accepts literal text only (`display text("literal")`, `print "literal"`); dynamic text and the text built-ins require the C backend.
 
 ## 4. Expressions and evaluation
 
@@ -179,7 +191,7 @@ Parentheses group expressions. `=` and `==` both mean numeric equality. Comparis
 
 The compiler also accepts the legacy compatibility form `compute(expression)` when it wraps an entire expression. It is not a callable built-in; nested or partial `compute(...)` forms are not supported.
 
-An expression must have the expected value kind. Most operators, variables, arrays, and function results are numeric. String literals are accepted only in string-taking built-ins and drawing text. The ray-backend functions require a string literal; mouse button functions require one of the string literals `"left"`, `"right"`, or `"middle"` at runtime. `image_load` accepts a path string literal. `net join` accepts a literal address. Drawing text accepts a string literal; the current dynamic form is a string literal followed by `+ var(name)`, formatted as a whole number. This limited form does not create a general string value.
+An expression must have the expected value kind. Most operators, variables, arrays, and function results are numeric. Text expressions are accepted by `display text(...)`, `print`/`say`, and the text built-ins; they join quoted strings, numeric subexpressions (formatted with `%.15g`), and text-returning calls with `+`. Text supports `=`/`==`/`!=` comparison; no other operator applies to it. The ray-backend functions require a string literal; mouse button functions require one of the string literals `"left"`, `"right"`, or `"middle"` at runtime. `image_load` accepts a path string literal. `net join` accepts a literal address.
 
 Division by zero, including negative zero, is a runtime error with source path and line and exit code 2. Every numeric operation and numeric built-in result must be finite; NaN or infinity (including overflow and invalid math results) produces a source-located runtime error. Numeric values use the C backend's `double` representation; there are no integer, decimal, or user-defined numeric types in version 1.
 
@@ -213,7 +225,7 @@ engine_statement = "scene", whitespace, ("2d" | "3d")
 camera_coordinate = ? one whitespace-free expression token sequence accepted by the expression parser ? ;
 ```
 
-`display` is a function-body statement. Supported primitives and argument counts are `rect(x,y,width,height)`, `circle(x,y,radius)`, `line(x1,y1,x2,y2[,thickness])`, `text(string)`, `cube(x,y,z,size)`, `sphere(x,y,z,radius)`, `ray_sphere(x,y,z,radius)`, and `plane(x,y,z,width,depth)`. A display command may add `-rgb(r,g,b)` or `-rgba(r,g,b,a)`; the default is opaque white. `display text(...)` requires `-l(x,y)` to provide its position. `-rotate(x,y,z)` supplies cube rotation. One optional integer suffix is accepted after the draw call, before or after style modifiers; it is retained as legacy syntax and has no documented semantic effect.
+`display` is a function-body statement. Supported primitives and argument counts are `rect(x,y,width,height)`, `circle(x,y,radius)`, `line(x1,y1,x2,y2[,thickness])`, `text(expression)`, `cube(x,y,z,size)`, `sphere(x,y,z,radius)`, `ray_sphere(x,y,z,radius)`, and `plane(x,y,z,width,depth)`. A display command may add `-rgb(r,g,b)` or `-rgba(r,g,b,a)`; the default is opaque white. `display text(...)` requires `-l(x,y)` to provide its position. `-rotate(x,y,z)` supplies cube rotation. A number after the draw call has no effect and is rejected.
 
 `ray_sphere` submits a sphere to the per-frame CPU BVH ray tracer. The current batch supports at most 32 ray-traced spheres. Hardware RTX/DXR and Embree are unavailable. Conventional 2D/3D primitives use the current fixed-size software renderer.
 
@@ -223,7 +235,7 @@ The runtime starts when the program has an `update` or `draw` callback, or top-l
 
 Before code generation, the compiler validates block structure, function/parameter uniqueness, known function names and arity, known global/local/array references, expression value kinds, array declarations and legacy C-symbol compatibility. The parser reports unsupported statements with source path and line. On the broader C backend, runtime array-index, division, non-finite-number, local-array allocation, and active-memory-budget errors include source path and line and exit with code 2. The experimental native subset's diagnostics are documented in its migration guide.
 
-The default backend emits C and links `runtime/anvil_runtime.c` using Windows/MSVC for broader engine coverage. The experimental `--backend native` instead emits x64 machine code and a PE executable directly, including a limited buffered 2D rectangle/window runtime with fixed updates and keyboard input. Its current feature availability and diagnostics are listed in [the native migration guide](NATIVE_X64_COMPILER_MIGRATION.md); the broader engine/API descriptions above do not imply native-backend parity. Both backends accept project manifests and their configurable 1–240 Hz update rate; direct source builds default to60 Hz. Generated C is not part of `.ANVL` syntax, and Rust output is not a target. Portable runtime, GPU rasterizer, DXR, Embree, 3D physics, general strings, structures, separately compiled modules, dynamic arrays, audio, general asset import (beyond bounded uncompressed BMP sprites), and reliable multiplayer remain unfinished.
+The default backend emits C and links `runtime/anvil_runtime.c` using Windows/MSVC for broader engine coverage. The experimental `--backend native` instead emits x64 machine code and a PE executable directly, including a limited buffered 2D rectangle/window runtime with fixed updates and keyboard input. Its current feature availability and diagnostics are listed in [the native migration guide](NATIVE_X64_COMPILER_MIGRATION.md); the broader engine/API descriptions above do not imply native-backend parity. Both backends accept project manifests and their configurable 1–240 Hz update rate; direct source builds default to60 Hz. Generated C is not part of `.ANVL` syntax, and Rust output is not a target. Portable runtime, GPU rasterizer, DXR, Embree, 3D physics, text variables/parameters, structures, separately compiled modules, dynamic arrays, audio, general asset import (beyond bounded uncompressed BMP sprites), and reliable multiplayer remain unfinished.
 
 ## 8. Conformance examples
 
@@ -254,6 +266,19 @@ call fn(main)
 ```
 
 For the reader-friendly guide and engine-specific examples, see [Language Guide](LANGUAGE.md), [Language Reference](Wiki/Language-Reference.md), and [Engine Guide](ENGINE.md).
+
+A complete text-and-print example (C backend; the native backend accepts the literal forms only):
+
+```anv
+language version 1
+fn(main)
+  set var(score) = 7
+  print "score = " + var(score)
+  print "name: " + upper(trim("  anvil  "))
+  output 0
+end
+call fn(main)
+```
 
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
 
