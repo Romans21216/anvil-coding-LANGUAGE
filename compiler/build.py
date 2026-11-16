@@ -36,6 +36,11 @@ def build_c(
     dynamic_runtime: bool = False,
 ):
     output.parent.mkdir(parents=True, exist_ok=True)
+    # Link into a sibling file and only replace the previous output once the
+    # toolchain succeeds, so a failed build can never leave a truncated or
+    # half-linked executable behind (Part 8 section 8.10).
+    staging = output.with_name(output.stem + ".partial" + output.suffix)
+    staging.unlink(missing_ok=True)
     if pathlib.Path(compiler).name.lower() == "cl.exe":
         obj_dir = output.parent / (output.stem + "_obj")
         obj_dir.mkdir(exist_ok=True)
@@ -46,7 +51,7 @@ def build_c(
             "/I" + str(INCLUDE),
             str(generated),
             str(RUNTIME),
-            "/Fe:" + str(output),
+            "/Fe:" + str(staging),
             "/Fo:" + str(obj_dir) + "\\",
             "/O2" if release else "/Od",
         ]
@@ -90,7 +95,7 @@ def build_c(
             "-I",
             str(INCLUDE),
             "-o",
-            str(output),
+            str(staging),
             "-lm",
             "-lgdi32",
             "-luser32",
@@ -101,3 +106,4 @@ def build_c(
         else:
             args += ["-O0", "-g"]
         subprocess.run(args, check=True)
+    os.replace(staging, output)
