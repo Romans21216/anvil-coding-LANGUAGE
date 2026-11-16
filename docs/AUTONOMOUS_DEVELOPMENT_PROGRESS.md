@@ -512,3 +512,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Tests:** `tests/test_camera2d.py` draws a world-space rect and samples the window at the identity position, after a (50,50) pan, after 2× zoom, after a rejected zero-zoom call and after reset. 1 passed.
 - **Harness fix:** two window-reading tests in the same run interfered — the second window could be occluded, and `GetPixel` on a window DC then reads the covering window. `WindowReader.force_client_size` now raises its window with `HWND_TOPMOST`, which made the three window tests pass together.
 - **Docs:** language spec row and grammar, editor grammar/validator, evidence ledger, testing doc.
+
+## Batch 38 — scalable text under the camera (8.14)
+
+- **Runtime:** `anvil_text` now sizes its font as `20 * camera2d_zoom` (clamped to 6–720 px), so world-space labels grow and shrink with the camera instead of staying a fixed pixel size. The default camera still renders the original 20 px.
+- **Harness:** `WindowReader.bounding_box` first read pixels one at a time with GetPixel, which took seconds per scan and made timing-sensitive tests read stale frames. It now grabs the rectangle in one BitBlt through a DIB section (`grab`), so a scan is milliseconds.
+- **Test:** `tests/test_text_zoom.py` holds identity, 2x zoom and reset frames for 2.5 s each and measures the bounding box of the glyphs; 2x must be at least 1.6x wider and taller and moved right, and reset must return to the original box. 1 passed; the three window suites together 4 passed in 17.1 s.
+- **Docs:** language spec camera row, evidence ledger, testing doc.

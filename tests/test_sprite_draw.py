@@ -120,6 +120,26 @@ def colourref_to_rgb(value: int) -> tuple[int, int, int]:
     return value & 255, (value >> 8) & 255, (value >> 16) & 255
 
 
+class BITMAPINFOHEADER(ctypes.Structure):
+    _fields_ = [
+        ("biSize", wintypes.DWORD),
+        ("biWidth", wintypes.LONG),
+        ("biHeight", wintypes.LONG),
+        ("biPlanes", wintypes.WORD),
+        ("biBitCount", wintypes.WORD),
+        ("biCompression", wintypes.DWORD),
+        ("biSizeImage", wintypes.DWORD),
+        ("biXPelsPerMeter", wintypes.LONG),
+        ("biYPelsPerMeter", wintypes.LONG),
+        ("biClrUsed", wintypes.DWORD),
+        ("biClrImportant", wintypes.DWORD),
+    ]
+
+
+class BITMAPINFO(ctypes.Structure):
+    _fields_ = [("bmiHeader", BITMAPINFOHEADER), ("bmiColors", wintypes.DWORD * 3)]
+
+
 class WindowReader:
     def __init__(self, pid: int):
         self.user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -150,6 +170,33 @@ class WindowReader:
         ]
         self.gdi32.GetPixel.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int]
         self.gdi32.GetPixel.restype = wintypes.DWORD
+        self.gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
+        self.gdi32.CreateCompatibleDC.restype = wintypes.HDC
+        self.gdi32.CreateDIBSection.argtypes = [
+            wintypes.HDC,
+            ctypes.POINTER(BITMAPINFO),
+            wintypes.UINT,
+            ctypes.POINTER(ctypes.c_void_p),
+            wintypes.HANDLE,
+            wintypes.DWORD,
+        ]
+        self.gdi32.CreateDIBSection.restype = wintypes.HBITMAP
+        self.gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
+        self.gdi32.SelectObject.restype = wintypes.HGDIOBJ
+        self.gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
+        self.gdi32.DeleteDC.argtypes = [wintypes.HDC]
+        self.gdi32.BitBlt.argtypes = [
+            wintypes.HDC,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            wintypes.HDC,
+            ctypes.c_int,
+            ctypes.c_int,
+            wintypes.DWORD,
+        ]
+        self.gdi32.BitBlt.restype = wintypes.BOOL
         self.pid = pid
         self.hwnd = None
 
@@ -217,6 +264,78 @@ class WindowReader:
             return colourref_to_rgb(self.gdi32.GetPixel(dc, x, y))
         finally:
             self.user32.ReleaseDC(self.hwnd, dc)
+
+    def grab(
+        self, left: int, top: int, right: int, bottom: int
+    ) -> tuple[int, int, bytes]:
+        """Capture a client rectangle as top-down BGRA bytes in one BitBlt."""
+        width = right - left
+        height = bottom - top
+        if width <= 0 or height <= 0:
+            raise AssertionError("empty capture rectangle")
+        dc = self.user32.GetDC(self.hwnd)
+        if not dc:
+            raise AssertionError("GetDC failed")
+        mem = self.gdi32.CreateCompatibleDC(dc)
+        info = BITMAPINFO()
+        info.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+        info.bmiHeader.biWidth = width
+        info.bmiHeader.biHeight = -height
+        info.bmiHeader.biPlanes = 1
+        info.bmiHeader.biBitCount = 32
+        bits = ctypes.c_void_p()
+        bitmap = self.gdi32.CreateDIBSection(
+            dc, ctypes.byref(info), 0, ctypes.byref(bits), None, 0
+        )
+        if not bitmap:
+            self.gdi32.DeleteDC(mem)
+            self.user32.ReleaseDC(self.hwnd, dc)
+            raise AssertionError("CreateDIBSection failed")
+        old = self.gdi32.SelectObject(mem, bitmap)
+        try:
+            if not self.gdi32.BitBlt(mem, 0, 0, width, height, dc, left, top, 0x00CC0020):
+                raise AssertionError("BitBlt failed")
+            raw = ctypes.string_at(bits, width * height * 4)
+        finally:
+            self.gdi32.SelectObject(mem, old)
+            self.gdi32.DeleteObject(bitmap)
+            self.gdi32.DeleteDC(mem)
+            self.user32.ReleaseDC(self.hwnd, dc)
+        return width, height, raw
+
+    def bounding_box(
+        self,
+        left: int,
+        top: int,
+        right: int,
+        bottom: int,
+        background: tuple[int, int, int] = (0, 0, 0),
+    ) -> tuple[int, int, int, int] | None:
+        """Bounding box of pixels that differ from `background` in a region."""
+        width, height, raw = self.grab(left, top, right, bottom)
+        back_b, back_g, back_r = background[2], background[1], background[0]
+        min_x = min_y = None
+        max_x = max_y = -1
+        for y in range(height):
+            row = y * width * 4
+            for x in range(width):
+                offset = row + x * 4
+                if (
+                    raw[offset] != back_b
+                    or raw[offset + 1] != back_g
+                    or raw[offset + 2] != back_r
+                ):
+                    if min_x is None or x < min_x:
+                        min_x = x
+                    if min_y is None or y < min_y:
+                        min_y = y
+                    if x > max_x:
+                        max_x = x
+                    if y > max_y:
+                        max_y = y
+        if min_x is None or min_y is None:
+            return None
+        return (left + min_x, top + min_y, left + max_x, top + max_y)
 
     def settle(self, expected: tuple[int, int, int], x: int, y: int) -> None:
         deadline = time.monotonic() + 3

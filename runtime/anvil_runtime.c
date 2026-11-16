@@ -569,13 +569,18 @@ void anvil_text(double x, double y, const char *text, int r, int g, int b,
                 int a) {
   if (!anvil_memory_dc || !text)
     return;
-  /* Text follows the 2D camera's position; glyphs keep their pixel size
-     because the runtime has no scalable font yet. */
   anvil_camera2d_point(&x, &y);
+  /* Glyphs scale with the 2D camera so world-space labels grow with zoom.
+     20 px is the original size, and the clamp keeps GDI inside sane limits. */
+  int height = (int)lrint(20.0 * anvil_camera2d_zoom);
+  if (height < 6)
+    height = 6;
+  if (height > 720)
+    height = 720;
   SetBkMode(anvil_memory_dc, TRANSPARENT);
   SetTextColor(anvil_memory_dc, RGB(r, g, b));
   HFONT font =
-      CreateFontA(20, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+      CreateFontA(height, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
                   DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                   CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
   HGDIOBJ old = SelectObject(anvil_memory_dc, font);

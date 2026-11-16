@@ -90,6 +90,8 @@ remote desktop can prevent window creation:
   atlas-region draws checked by reading the pixels the program presented.
 - `test_camera2d` — C-backend `camera2d` pan, zoom, rejection of a zero zoom
   and reset, sampled from the presented window.
+- `test_text_zoom` — text glyphs grow with the camera zoom and return to their
+  original size on reset, measured from the presented pixels.
 - `test_includes` — the subset that runs an included graphical sample.
 
 The harness (`tests/native_app.py`) builds the PE, starts it, finds the window
