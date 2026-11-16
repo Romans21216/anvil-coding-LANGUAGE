@@ -556,3 +556,11 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Loader:** `compiler/gltf.py` now reads `.glb` as well as `.gltf`: it validates the 12-byte header (magic, version 2, declared length), walks the chunks, decodes the JSON chunk, keeps the BIN chunk as buffer 0 for buffers without a `uri`, and skips unknown chunk types per the spec. Truncated chunks, a missing JSON chunk and a wrong version or magic are named errors.
 - **Tests:** `tests/test_gltf_model.py` builds a GLB fixture holding the same quad and asserts its triangles are identical to the `.gltf` version, rejects a header-only GLB, and renders the GLB quad with the same expected centre pixel. 9 passed.
 - **Docs:** `docs/MODELS.md` table and unsupported list, language spec row, evidence ledger, testing doc.
+
+## Batch 44 — streaming music (8.14)
+
+- **Runtime:** one music track is streamed from disk instead of decoded into memory. `music_load` parses RIFF chunks, records the data offset/length and validates PCM 8/16-bit mono/stereo 8k-192k. The mixer keeps an 8192-frame (~170 ms) staging buffer, refills it from the file and linearly resamples to 48 kHz; the track stops at EOF unless looping, and `music_stop` rewinds.
+- **API:** `music_load`, `music_play`, `music_play_loop`, `music_stop`, `music_playing`, `music_volume` (0-1, scaled by the master group), `music_position`, `music_length` and `music_error`.
+- **Tests:** `tests/test_music.py` covers length/volume/clamps, five named load failures (missing, non-WAV, 3 channels, 24-bit, empty data), a playing track that reports position and rewinds on stop, a short track that finishes itself, and a looping track that keeps playing with a wrapping position. 4 passed.
+- **Fix along the way:** `say` rejected `music_error()` until the text-returning builtin was added to the codegen text-expression list (it already existed in the expression layer's set).
+- **Docs:** language spec row, evidence ledger, testing doc.

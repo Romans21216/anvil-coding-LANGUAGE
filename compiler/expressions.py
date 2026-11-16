@@ -169,6 +169,15 @@ BUILTINS = {
     "sound_group_mute": (2, 2),
     "sound_group_gain": (1, 1),
     "sound_group_stop": (1, 1),
+    "music_load": (1, 1),
+    "music_play": (0, 0),
+    "music_play_loop": (0, 0),
+    "music_stop": (0, 0),
+    "music_playing": (0, 0),
+    "music_volume": (1, 1),
+    "music_position": (0, 0),
+    "music_length": (0, 0),
+    "music_error": (0, 0),
     "sound_volume": (2, 2),
     "sound_pan": (2, 2),
     "sound_pitch": (2, 2),
@@ -246,6 +255,15 @@ BUILTIN_C_NAMES = {
     "sound_group_mute": "anvil_sound_group_mute",
     "sound_group_gain": "anvil_sound_group_gain",
     "sound_group_stop": "anvil_sound_group_stop",
+    "music_load": "anvil_music_load",
+    "music_play": "anvil_music_play",
+    "music_play_loop": "anvil_music_play_loop",
+    "music_stop": "anvil_music_stop",
+    "music_playing": "anvil_music_playing",
+    "music_volume": "anvil_music_volume",
+    "music_position": "anvil_music_position",
+    "music_length": "anvil_music_length",
+    "music_error": "anvil_music_error",
     "sound_volume": "anvil_sound_volume",
     "sound_pan": "anvil_sound_pan",
     "sound_pitch": "anvil_sound_pitch",
@@ -313,6 +331,7 @@ BUILTIN_TEXT_RETURNING = {
     "sound_error",
     "load_text",
     "save_error",
+    "music_error",
 }
 
 # Common names from other languages, mapped to the Anvil spelling. A beginner
@@ -345,6 +364,7 @@ BUILTIN_ARG_KINDS = {
     "load_text": ("string",),
     "save_exists": ("string",),
     "save_delete": ("string",),
+    "music_load": ("string",),
 }
 
 BUILTIN_STRING_ARGUMENTS = {
@@ -369,6 +389,7 @@ BUILTIN_STRING_ARGUMENTS = {
     "load_text",
     "save_exists",
     "save_delete",
+    "music_load",
 }
 
 

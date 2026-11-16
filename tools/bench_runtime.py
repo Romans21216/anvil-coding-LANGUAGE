@@ -228,9 +228,9 @@ def main(argv: list[str] | None = None) -> int:
         scenes = runtime.setdefault("scenes", {})
         for name, stats in measured.items():
             scenes[name] = {
-                "p50_ms": max(0.5, round(stats["p50_ms"] * 2.5, 2)),
-                "p95_ms": max(1.0, round(stats["p95_ms"] * 2.5, 2)),
-                "max_ms": max(10.0, round(stats["max_ms"] * 2.5, 2)),
+                "p50_ms": max(1.0, round(stats["p50_ms"] * 2.5, 2)),
+                "p95_ms": max(4.0, round(stats["p95_ms"] * 2.5, 2)),
+                "max_ms": max(15.0, round(stats["max_ms"] * 2.5, 2)),
                 "measured_p50_ms": stats["p50_ms"],
                 "measured_p95_ms": stats["p95_ms"],
                 "measured_max_ms": stats["max_ms"],

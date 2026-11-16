@@ -2641,6 +2641,113 @@ static double anvil_audio_clamp(double value, double low, double high) {
   return value;
 }
 
+/* ---- Streaming music ---------------------------------------------------
+   One track at a time, decoded from disk as it plays instead of being held in
+   memory. The mixer keeps an 8192-frame (about 170 ms) staging buffer that is
+   refilled from the file; linear interpolation converts any source rate to the
+   fixed 48 kHz mix. */
+enum { ANVIL_MUSIC_BUFFER_FRAMES = 8192 };
+
+typedef struct {
+  FILE *file;
+  long data_offset;
+  long data_bytes;
+  int frame_bytes;
+  int channels;
+  int bits;
+  int rate;
+  int loop;
+  int playing;
+  int draining;
+  double volume;
+  double length;
+  double seconds;
+  double step;
+  double phase;
+  short last_l, last_r, next_l, next_r;
+  long frames_left;
+} AnvilMusic;
+
+static AnvilMusic anvil_music;
+static short anvil_music_buffer[ANVIL_MUSIC_BUFFER_FRAMES * 2];
+static size_t anvil_music_buffer_frames, anvil_music_buffer_index;
+static const char *anvil_music_error_text = "";
+static int anvil_music_volume_seeded;
+
+static int anvil_music_read_frame(short *left, short *right) {
+  unsigned char raw[6];
+  size_t bytes = (size_t)anvil_music.frame_bytes;
+  if (anvil_music.frames_left <= 0) {
+    if (!anvil_music.loop)
+      return 0;
+    fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+    anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+    if (anvil_music.frames_left <= 0)
+      return 0;
+  }
+  if (fread(raw, 1, bytes, anvil_music.file) != bytes) {
+    if (!anvil_music.loop)
+      return 0;
+    fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+    anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+    if (fread(raw, 1, bytes, anvil_music.file) != bytes)
+      return 0;
+  }
+  anvil_music.frames_left--;
+  if (anvil_music.bits == 16) {
+    *left = (short)(raw[0] | (raw[1] << 8));
+    *right = anvil_music.channels == 2 ? (short)(raw[2] | (raw[3] << 8)) : *left;
+  } else {
+    *left = (short)((raw[0] - 128) << 8);
+    *right = anvil_music.channels == 2 ? (short)((raw[1] - 128) << 8) : *left;
+  }
+  return 1;
+}
+
+static void anvil_music_prime(void) {
+  anvil_music.phase = 0.0;
+  anvil_music_buffer_frames = 0;
+  anvil_music_buffer_index = 0;
+  if (!anvil_music_read_frame(&anvil_music.last_l, &anvil_music.last_r)) {
+    anvil_music.last_l = anvil_music.last_r = 0;
+    anvil_music.next_l = anvil_music.next_r = 0;
+    return;
+  }
+  if (!anvil_music_read_frame(&anvil_music.next_l, &anvil_music.next_r)) {
+    anvil_music.next_l = anvil_music.last_l;
+    anvil_music.next_r = anvil_music.last_r;
+  }
+}
+
+static void anvil_music_fill(void) {
+  size_t produced = 0;
+  anvil_music_buffer_index = 0;
+  anvil_music_buffer_frames = 0;
+  while (produced < ANVIL_MUSIC_BUFFER_FRAMES) {
+    while (anvil_music.phase >= 1.0) {
+      anvil_music.last_l = anvil_music.next_l;
+      anvil_music.last_r = anvil_music.next_r;
+      if (!anvil_music_read_frame(&anvil_music.next_l, &anvil_music.next_r)) {
+        anvil_music.draining = 1;
+        anvil_music_buffer_frames = produced;
+        return;
+      }
+      anvil_music.phase -= 1.0;
+    }
+    double fraction = anvil_music.phase;
+    anvil_music_buffer[produced * 2] = (short)lrint(
+        anvil_music.last_l + (anvil_music.next_l - anvil_music.last_l) * fraction);
+    anvil_music_buffer[produced * 2 + 1] = (short)lrint(
+        anvil_music.last_r + (anvil_music.next_r - anvil_music.last_r) * fraction);
+    produced++;
+    anvil_music.phase += anvil_music.step;
+    anvil_music.seconds += 1.0 / 48000.0;
+    if (anvil_music.length > 0.0 && anvil_music.seconds >= anvil_music.length)
+      anvil_music.seconds -= anvil_music.length;
+  }
+  anvil_music_buffer_frames = produced;
+}
+
 static void anvil_audio_mix(short *out, int frames) {
   memset(out, 0, (size_t)frames * 2 * sizeof(short));
   if (!anvil_audio_lock_ready)
@@ -2685,6 +2792,25 @@ static void anvil_audio_mix(short *out, int frames) {
           (short)(sr < -32768 ? -32768 : sr > 32767 ? 32767 : sr);
       voice->position += voice->pitch;
     }
+  }
+  if (anvil_music.playing) {
+    if (anvil_music_buffer_index >= anvil_music_buffer_frames)
+      anvil_music_fill();
+    size_t available = anvil_music_buffer_frames - anvil_music_buffer_index;
+    size_t use = available < (size_t)frames ? available : (size_t)frames;
+    double gain = anvil_music.volume * (anvil_group_muted[0] ? 0.0 : anvil_group_gain[0]);
+    for (size_t i = 0; i < use; ++i) {
+      int sl = (int)out[i * 2] +
+               (int)(anvil_music_buffer[(anvil_music_buffer_index + i) * 2] * gain);
+      int sr = (int)out[i * 2 + 1] +
+               (int)(anvil_music_buffer[(anvil_music_buffer_index + i) * 2 + 1] * gain);
+      out[i * 2] = (short)(sl < -32768 ? -32768 : sl > 32767 ? 32767 : sl);
+      out[i * 2 + 1] =
+          (short)(sr < -32768 ? -32768 : sr > 32767 ? 32767 : sr);
+    }
+    anvil_music_buffer_index += use;
+    if (use == 0 && anvil_music.draining)
+      anvil_music.playing = 0;
   }
   LeaveCriticalSection(&anvil_audio_lock);
 }
@@ -3182,8 +3308,174 @@ double anvil_sound_destroy(double handle) {
   return 1.0;
 }
 
+/* ---- Streaming music API ----------------------------------------------- */
+
+static int anvil_music_parse_wav(FILE *file, long *data_offset, long *data_bytes,
+                                 int *channels, int *bits, int *rate) {
+  unsigned char header[12];
+  if (fread(header, 1, 12, file) != 12 || memcmp(header, "RIFF", 4) != 0 ||
+      memcmp(header + 8, "WAVE", 4) != 0)
+    return 0;
+  int have_format = 0;
+  for (;;) {
+    unsigned char chunk[8];
+    if (fread(chunk, 1, 8, file) != 8)
+      return 0;
+    unsigned long size = (unsigned long)chunk[4] |
+                         ((unsigned long)chunk[5] << 8) |
+                         ((unsigned long)chunk[6] << 16) |
+                         ((unsigned long)chunk[7] << 24);
+    if (memcmp(chunk, "fmt ", 4) == 0) {
+      unsigned char fmt[16];
+      if (size < 16 || fread(fmt, 1, 16, file) != 16)
+        return 0;
+      int format = fmt[0] | (fmt[1] << 8);
+      *channels = fmt[2] | (fmt[3] << 8);
+      *rate = fmt[4] | (fmt[5] << 8) | (fmt[6] << 16) | (fmt[7] << 24);
+      *bits = fmt[14] | (fmt[15] << 8);
+      if (format != 1)
+        return 0;
+      have_format = 1;
+      long skip = (long)size - 16;
+      if (skip > 0)
+        fseek(file, skip + (skip & 1), SEEK_CUR);
+    } else if (memcmp(chunk, "data", 4) == 0) {
+      if (!have_format)
+        return 0;
+      *data_offset = ftell(file);
+      *data_bytes = (long)size;
+      return 1;
+    } else {
+      fseek(file, (long)size + (long)(size & 1), SEEK_CUR);
+    }
+  }
+}
+
+double anvil_music_load(const char *path) {
+  anvil_music_error_text = "";
+  if (!path || path[0] == '\0') {
+    anvil_music_error_text = "the path is empty";
+    return 0.0;
+  }
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    anvil_music_error_text = "cannot open the file";
+    return 0.0;
+  }
+  long data_offset = 0, data_bytes = 0;
+  int channels = 0, bits = 0, rate = 0;
+  if (!anvil_music_parse_wav(file, &data_offset, &data_bytes, &channels, &bits,
+                             &rate)) {
+    fclose(file);
+    anvil_music_error_text = "not an uncompressed PCM WAV file";
+    return 0.0;
+  }
+  if (channels < 1 || channels > 2) {
+    fclose(file);
+    anvil_music_error_text = "only mono and stereo music is supported";
+    return 0.0;
+  }
+  if (bits != 8 && bits != 16) {
+    fclose(file);
+    anvil_music_error_text = "music must be 8-bit or 16-bit PCM";
+    return 0.0;
+  }
+  if (rate < 8000 || rate > 192000) {
+    fclose(file);
+    anvil_music_error_text = "music rate must be 8000-192000 Hz";
+    return 0.0;
+  }
+  if (data_bytes <= 0) {
+    fclose(file);
+    anvil_music_error_text = "the music has no samples";
+    return 0.0;
+  }
+  int frame_bytes = channels * (bits / 8);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  double previous_volume = anvil_music_volume_seeded ? anvil_music.volume : 1.0;
+  if (anvil_music.file)
+    fclose(anvil_music.file);
+  memset(&anvil_music, 0, sizeof(anvil_music));
+  anvil_music.file = file;
+  anvil_music.data_offset = data_offset;
+  anvil_music.data_bytes = data_bytes;
+  anvil_music.frame_bytes = frame_bytes;
+  anvil_music.channels = channels;
+  anvil_music.bits = bits;
+  anvil_music.rate = rate;
+  anvil_music.length =
+      (double)(data_bytes / frame_bytes) / (double)rate;
+  anvil_music.volume = previous_volume;
+  anvil_music_volume_seeded = 1;
+  anvil_music.frames_left = data_bytes / frame_bytes;
+  anvil_music.step = (double)rate / 48000.0;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+static double anvil_music_start(int loop) {
+  anvil_music_error_text = "";
+  if (!anvil_music.file) {
+    anvil_music_error_text = "no music is loaded";
+    return 0.0;
+  }
+  if (!anvil_audio_start())
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_music.loop = loop;
+  anvil_music.playing = 1;
+  anvil_music.draining = 0;
+  anvil_music.seconds = 0.0;
+  anvil_music.step = (double)anvil_music.rate / 48000.0;
+  fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+  anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+  anvil_music_prime();
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+double anvil_music_play(void) { return anvil_music_start(0); }
+double anvil_music_play_loop(void) { return anvil_music_start(1); }
+
+double anvil_music_stop(void) {
+  if (!anvil_music.file)
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_music.playing = 0;
+  anvil_music.draining = 0;
+  anvil_music.seconds = 0.0;
+  anvil_music_buffer_frames = 0;
+  anvil_music_buffer_index = 0;
+  fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+  anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+double anvil_music_playing(void) { return anvil_music.playing ? 1.0 : 0.0; }
+
+double anvil_music_volume(double volume) {
+  if (!anvil_music.file || !isfinite(volume))
+    return 0.0;
+  double applied = anvil_audio_clamp(volume, 0.0, 1.0);
+  anvil_music.volume = applied;
+  return applied;
+}
+
+double anvil_music_position(void) { return anvil_music.seconds; }
+double anvil_music_length(void) { return anvil_music.length; }
+const char *anvil_music_error(void) { return anvil_music_error_text; }
+
 static void anvil_release_frame_resources(void) {
   anvil_audio_shutdown();
+  if (anvil_music.file) {
+    fclose(anvil_music.file);
+    anvil_music.file = NULL;
+  }
+  anvil_music.playing = 0;
   for (int i = 0; i < ANVIL_IMAGES; ++i) {
     free(anvil_images[i].pixels);
     memset(&anvil_images[i], 0, sizeof(anvil_images[i]));
