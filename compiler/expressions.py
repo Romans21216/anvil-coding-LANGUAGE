@@ -203,6 +203,7 @@ BUILTINS = {
     "window_on_top": (1, 1),
     "window_fullscreen": (1, 1),
     "camera2d": (3, 3),
+    "model_draw": (8, 8),
 }
 
 BUILTIN_C_NAMES = {
@@ -670,6 +671,33 @@ class ExpressionParser:
             )
         elif kind == "word" and value in KEY_CODES:
             left = ("ANVIL_KEY_" + value, "number")
+        elif kind == "word" and value == "model_draw":
+            # Lowered at compile time: the glTF file becomes a static triangle
+            # array and the call becomes anvil_mesh_draw.
+            self.expect("(")
+            literal = self.require_string(self.parse())
+            try:
+                asset = json.loads(literal)
+            except ValueError:
+                raise CompileError(
+                    f"{self.path}:{self.line}: model_draw needs a string literal path"
+                ) from None
+            from compiler import gltf
+            try:
+                symbol, count = gltf.ensure_emitted(asset, pathlib.Path(self.path))
+            except gltf.ModelError as error:
+                raise CompileError(f"{self.path}:{self.line}: {error}") from None
+            mesh_args = []
+            for _ in range(7):
+                self.expect(",")
+                mesh_args.append(self.require_number(self.parse()))
+            self.expect(")")
+            call = (
+                f"anvil_mesh_draw((const double *){symbol}, {count}, "
+                + ", ".join(mesh_args)
+                + ")"
+            )
+            left = (self.checked_number(call), "number")
         elif kind == "word" and value in BUILTINS:
             self.expect("(")
             args = []

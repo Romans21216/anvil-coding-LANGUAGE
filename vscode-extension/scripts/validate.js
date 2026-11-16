@@ -106,6 +106,7 @@ async function main() {
   expect('set var(ok) = save_number("slot", 1)', 'save_number', 'support.function.anvil');
   expect('set var(ok) = camera2d(0, 0, 2)', 'camera2d', 'support.function.anvil');
   expect('set var(ms) = frame_render()', 'frame_render', 'support.function.anvil');
+  expect('set var(ok) = model_draw("m.gltf", 0, 0, 0, 1, 0, 0, 0)', 'model_draw', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
   expect('set var(size) = 3 + 4', '+', 'keyword.operator.anvil');

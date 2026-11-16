@@ -470,6 +470,66 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
   }
 }
 
+/* Draw a baked triangle mesh. Each triangle is 12 doubles: nine coordinates for
+   three vertices, then r, g, b in 0..255. Vertices are scaled and rotated about
+   the model origin, translated to (x,y,z), flat-shaded with the scene light and
+   rasterised through the same near-plane clip and depth buffer as the cube. */
+static void anvil_world_triangle(AnvilVec3 v[3], uint32_t base,
+                                 double brightness, int alpha) {
+  AnvilProjected projected[4];
+  int count;
+  if (anvil_scene_is_3d) {
+    AnvilCameraVertex camera[3] = {
+        anvil_to_camera(v[0]), anvil_to_camera(v[1]), anvil_to_camera(v[2])};
+    AnvilCameraVertex clipped[4];
+    count = anvil_clip_triangle_near(camera, ANVIL_NEAR_DEPTH, clipped);
+    for (int i = 0; i < count; ++i)
+      if (!anvil_project_camera(clipped[i], &projected[i])) {
+        count = 0;
+        break;
+      }
+  } else {
+    count = 3;
+    for (int i = 0; i < count; ++i)
+      if (!anvil_project(v[i], &projected[i])) {
+        count = 0;
+        break;
+      }
+  }
+  for (int i = 1; i + 1 < count; ++i) {
+    AnvilProjected triangle[3] = {projected[0], projected[i],
+                                  projected[i + 1]};
+    anvil_triangle_lit(triangle, base, brightness, alpha);
+  }
+}
+
+double anvil_mesh_draw(const double *data, int triangle_count, double x,
+                       double y, double z, double scale, double rx, double ry,
+                       double rz) {
+  if (!data || triangle_count <= 0 || !isfinite(x) || !isfinite(y) ||
+      !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
+      !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  AnvilVec3 light = anvil_normalize((AnvilVec3){-0.35, 0.8, 0.55});
+  for (int t = 0; t < triangle_count; ++t) {
+    const double *p = data + (size_t)t * 12;
+    AnvilVec3 v[3];
+    for (int i = 0; i < 3; ++i) {
+      AnvilVec3 q = {p[i * 3] * scale, p[i * 3 + 1] * scale,
+                     p[i * 3 + 2] * scale};
+      q = anvil_rotate(q, rx, ry, rz);
+      v[i] = (AnvilVec3){x + q.x, y + q.y, z + q.z};
+    }
+    AnvilVec3 n = anvil_normalize(
+        anvil_cross(anvil_sub(v[1], v[0]), anvil_sub(v[2], v[0])));
+    double brightness = .28 + .72 * fabs(anvil_dot(n, light));
+    uint32_t base =
+        anvil_color((int)p[9], (int)p[10], (int)p[11]);
+    anvil_world_triangle(v, base, brightness, 255);
+  }
+  return 1.0;
+}
+
 void anvil_sphere(double x, double y, double z, double radius, int r, int g,
                   int b, int a) {
   if (radius <= 0.0 || !isfinite(radius))

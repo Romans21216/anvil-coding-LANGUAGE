@@ -1,0 +1,56 @@
+# 3D models (glTF)
+
+`model_draw("model.gltf", x, y, z, scale, rx, ry, rz)` draws a glTF model with
+the scene camera, near-plane clipping, the depth buffer and the same flat light
+as `cube`.
+
+The model is not loaded at runtime. The compiler reads the file while building,
+applies node transforms, bakes one flat colour per triangle and emits a static
+`double` array into the generated C. Nothing is parsed at startup and the model
+does not have to ship beside the executable (the source `.gltf` must still exist
+to rebuild). Paths are resolved relative to the main `.ANVL` file.
+
+```anvil
+scene 3d
+camera perspective 0 2 6
+camera fov(60)
+
+fn(draw)
+  display plane(0, -1, 0, 12, 12) -rgb(33, 47, 64)
+  set var(ok) = model_draw("models/teapot.gltf", 0, 0, 0, 1, 0, 0, 0)
+end
+```
+
+Arguments after the path are position, uniform scale, then rotation in degrees
+around X, Y and Z. The order is scale, rotate, translate.
+
+## What is imported
+
+| Feature | Support |
+| --- | --- |
+| `.gltf` JSON | Yes |
+| Buffers | External `.bin` or `data:` base64 URI |
+| Node hierarchy | Yes; matrix or translation/rotation/scale, 64 levels deep |
+| Primitives | TRIANGLES, TRIANGLE_STRIP, TRIANGLE_FAN |
+| Positions | `POSITION` as VEC3 float |
+| Indices | ubyte/ushort/uint, or none (sequential) |
+| Colour | `COLOR_0` (averaged per triangle) or material `baseColorFactor` |
+| Budget | 200,000 triangles, checked at compile time |
+
+Not supported yet, and reported as a located compile error: `.glb`
+containers, skins, morph targets, animations, textures, sparse accessors and
+primitive modes other than triangles/strips/fans.
+
+## Shading
+
+Each triangle is flat-shaded with the scene light, so curved models show facets.
+Colours from glTF are linear; Anvil multiplies them by 255 without a colour
+transform, so a `baseColorFactor` of `[1, 0, 0, 1]` renders as red but is not
+gamma-managed.
+
+## Error messages
+
+A missing or malformed model stops the build at the `model_draw` line, naming
+the resolved path and the reason — for example `cannot find model
+'models/teapot.gltf'` or `binary .glb containers are not supported`. Nothing is
+silently skipped.

@@ -614,6 +614,13 @@ def emit_c(
     project_name: str = "Anvil Game",
 ) -> str:
     arrays = arrays or {}
+    from compiler import gltf as _gltf
+
+    _gltf.reset()
+    try:
+        _gltf.prescan(pathlib.Path(path).read_text(encoding="utf-8"), pathlib.Path(path))
+    except OSError:
+        pass
     # Emit only functions reachable from the real entry points (top-level calls,
     # main, and active engine callbacks), exactly like the native backend. A
     # helper that is never called should not reach the generated C at all.
@@ -672,6 +679,9 @@ def emit_c(
         f"static double {c_name(name)}[{size}];"
         for name, size in sorted(arrays.items())
     ]
+    model_lines = _gltf.definitions()
+    if model_lines:
+        lines.extend(model_lines)
     if any(fn.local_arrays for fn in functions.values()):
         lines.extend(
             [

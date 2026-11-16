@@ -99,6 +99,8 @@ remote desktop can prevent window creation:
   manifest rectangles, and requires byte-identical output across runs.
 - `test_audio_groups` — mixer-group assignment, gain clamping, master gain,
   mute and per-group stop; playback cases skip without an audio device.
+- `test_gltf_model` — glTF loader, node transforms, a located missing-model
+  error, and window pixels for flat shading and depth ordering.
 - `test_text_zoom` — text glyphs grow with the camera zoom and return to their
   original size on reset, measured from the presented pixels.
 - `test_includes` — the subset that runs an included graphical sample.

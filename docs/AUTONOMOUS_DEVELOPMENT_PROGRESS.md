@@ -541,3 +541,12 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Compatibility:** the default group is 1 and its gain is 1.0, so existing programs mix exactly as before.
 - **Tests:** `tests/test_audio_groups.py` covers assignment, invalid groups and fractional groups, gain clamping, master gain and mute, and stop isolation with two looping voices in groups 1 and 2 plus a stop-all; 3 passed. Playback cases skip when the machine has no audio device.
 - **Docs:** language spec audio row, evidence ledger, testing doc.
+
+## Batch 42 — compile-time glTF import (8.13)
+
+- **Compiler:** `compiler/gltf.py` reads `.gltf` at build time, resolves external `.bin` or base64 data-URI buffers, walks the node hierarchy (matrix or TRS, 64 levels), converts triangles/strips/fans, averages `COLOR_0` or uses the material `baseColorFactor`, and enforces a 200,000-triangle budget. `model_draw` is lowered to a static `double` array plus `anvil_mesh_draw`.
+- **Runtime:** `anvil_mesh_draw` scales/rotates/translates each triangle, flat-shades it with the scene light and rasterises through the same near-plane clip and depth buffer as `cube`.
+- **Diagnostics:** missing, malformed, oversized or unsupported models stop the build at the call site with the resolved path; a `model_draw` in an included module is rejected with a clear message instead of emitting a definition after its use.
+- **Bug caught while building:** the index bounds check compared primitive-local corners rather than resolved indices, so a valid quad was rejected as out of range; the loader now maps corners through the index accessor first.
+- **Tests:** `tests/test_gltf_model.py` covers the loader (quad → two triangles, translation, missing/broken files), the located compile error, a rendered quad whose centre matches the computed flat-shade value (169,0,0), and depth ordering with a nearer blue quad. 6 passed; the rendered frame was also inspected as an image.
+- **Docs:** language spec row, `docs/MODELS.md`, README link, evidence ledger, testing doc.
