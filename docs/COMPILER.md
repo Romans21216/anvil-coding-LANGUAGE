@@ -116,6 +116,10 @@ must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
 | `--no-cache` | ignore the build cache and do not store a new entry |
 | `--package <dir>` | copy the program and its assets into `dir` with `anvil-package.json` |
 | `--package-dry-run` | validate assets and print the package manifest without writing |
+| `--run` | build the program and run it, returning its exit code |
+| `--clean` | remove generated build artifacts beside the source |
+| `--doctor` | report the Python, C compiler, native backend and runtime state |
+| `--new <dir>` | create a starter project with a manifest, program and README |
 | `--print-imports` | print the builtins the program actually uses and stop |
 | `--extension <manifest>` | register an extension (repeatable), see `docs/EXTENSIONS.md` |
 | `--repl-backend c\|native` | backend used by the interactive shell |

@@ -1,0 +1,108 @@
+"""Part 8.14: the stable lifecycle commands new/clean/doctor/run."""
+
+from __future__ import annotations
+
+import pathlib
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+COMPILER = ROOT / "compiler" / "anvil.py"
+
+PROGRAM = 'fn(main)\n  say "hi"\nend\ncall fn(main)\n'
+
+
+def run_compiler(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(COMPILER), *args],
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+
+
+class DoctorTests(unittest.TestCase):
+    def test_doctor_reports_the_toolchain_without_a_source(self) -> None:
+        result = run_compiler("--doctor")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Anvil doctor", result.stdout)
+        self.assertIn("native backend: ready", result.stdout)
+        self.assertIn("runtime/anvil_runtime.c: ok", result.stdout)
+
+
+class NewProjectTests(unittest.TestCase):
+    def test_new_scaffolds_a_runnable_project(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = pathlib.Path(temp) / "game"
+            result = run_compiler("--new", str(target))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((target / "main.ANVL").is_file())
+            self.assertTrue((target / "game.ANVLproj").is_file())
+            self.assertTrue((target / "README.md").is_file())
+
+    def test_new_refuses_a_non_empty_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = pathlib.Path(temp) / "game"
+            target.mkdir()
+            (target / "keep.txt").write_text("x", encoding="utf-8")
+            result = run_compiler("--new", str(target))
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("not empty", result.stderr)
+            self.assertTrue((target / "keep.txt").is_file())
+
+
+class RunCommandTests(unittest.TestCase):
+    def test_run_builds_and_returns_the_program_exit_code(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "ok.ANVL"
+            source.write_text(PROGRAM, encoding="utf-8")
+            result = run_compiler(str(source), "--backend", "native", "--run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("hi", result.stdout)
+
+    def test_run_propagates_a_failing_program(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "bad.ANVL"
+            source.write_text(
+                "fn(main)\n  say 1 / 0\nend\ncall fn(main)\n", encoding="utf-8"
+            )
+            result = run_compiler(str(source), "--backend", "native", "--run")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("division by zero", result.stderr)
+
+    def test_run_rejects_incompatible_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "ok.ANVL"
+            source.write_text(PROGRAM, encoding="utf-8")
+            result = run_compiler(str(source), "--check", "--run")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--run builds and runs", result.stderr)
+
+
+class CleanTests(unittest.TestCase):
+    def test_clean_removes_generated_artifacts_but_keeps_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            source = root / "prog.ANVL"
+            source.write_text(PROGRAM, encoding="utf-8")
+            build = run_compiler(str(source), "-o", str(root / "prog.exe"))
+            if build.returncode != 0:
+                if "No C compiler found" in build.stderr:
+                    raise unittest.SkipTest("MSVC is not available")
+                self.fail(build.stderr)
+            self.assertTrue((root / "prog.generated.c").is_file())
+            self.assertTrue((root / "prog_obj").is_dir())
+
+            result = run_compiler(str(source), "--clean")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((root / "prog.generated.c").exists())
+            self.assertFalse((root / "prog_obj").exists())
+            self.assertFalse((root / ".anvil-cache").exists())
+            self.assertTrue(source.is_file())
+            self.assertTrue((root / "prog.exe").is_file())
+
+
+if __name__ == "__main__":
+    unittest.main()

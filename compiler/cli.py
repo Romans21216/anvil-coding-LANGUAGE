@@ -219,6 +219,27 @@ def main() -> int:
         help="validate assets and print the package manifest without writing",
     )
     ap.add_argument(
+        "--run",
+        action="store_true",
+        help="run the built program and return its exit code",
+    )
+    ap.add_argument(
+        "--clean",
+        action="store_true",
+        help="remove generated build artifacts next to the source",
+    )
+    ap.add_argument(
+        "--doctor",
+        action="store_true",
+        help="report the toolchain state and exit",
+    )
+    ap.add_argument(
+        "--new",
+        type=pathlib.Path,
+        metavar="DIR",
+        help="create a starter project in DIR",
+    )
+    ap.add_argument(
         "--print-imports",
         action="store_true",
         help="print the builtins this program actually uses and stop",
@@ -276,6 +297,18 @@ def main() -> int:
         from compiler.repl import repl_main
 
         return repl_main(backend=args.repl_backend)
+    from compiler import commands as lifecycle
+
+    toolchain_root = pathlib.Path(__file__).resolve().parents[1]
+    if args.doctor:
+        return lifecycle.doctor(toolchain_root)
+    if args.new is not None:
+        return lifecycle.new_project(args.new)
+    if args.clean:
+        root = args.source.parent if args.source else pathlib.Path(".")
+        return lifecycle.clean(root)
+    if args.run and (args.check or args.emit_c or args.package or args.package_dry_run):
+        ap.error("--run builds and runs; drop --check, --emit-c or --package")
     if args.source is None:
         ap.error("a source file is required unless --repl is used")
     try:
@@ -447,6 +480,8 @@ def main() -> int:
             out.write_bytes(executable)
             _place_extension_dlls(out)
             print(f"Built {out} as native AMD64 PE (no C/Rust compiler)")
+            if args.run:
+                return subprocess.run([str(out)]).returncode
             if args.package or args.package_dry_run:
                 return _package_after_build(
                     args, source_path, out, funcs, top, project_name, "native",
@@ -512,6 +547,8 @@ def main() -> int:
                     )
                 print(f"Built {out} using {compiler[0]}")
         _place_extension_dlls(out)
+        if args.run:
+            return subprocess.run([str(out)]).returncode
         if args.package or args.package_dry_run:
             return _package_after_build(
                 args, source_path, out, funcs, top, project_name, "c",
