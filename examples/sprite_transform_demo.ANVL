@@ -1,0 +1,27 @@
+# Sprite transforms: rotation, tint and flip on the bundled BMP.
+# Run from the repository root:
+#   python compiler/anvil.py examples/sprite_transform_demo.ANVL --run
+scene 2d
+clear rgba(11, 16, 27, 255)
+set var(sprite) = image_load("examples/assets/anvil_sprite.bmp")
+set var(angle) = 0.0
+set var(flip) = 0
+
+fn(update)
+  set var(angle) = compute(var(angle) + delta() * 45)
+end
+
+fn(draw)
+  display rect(60, 60, 840, 480) -rgba(29, 41, 62, 255)
+  display text("Anvil sprite transforms") -l(90, 90) -rgb(235, 243, 255)
+  display text("SPACE flips the sprite; the large copy rotates") -l(90, 126) -rgb(164, 190, 224)
+  if pressed(SPACE)
+    set var(applied) = image_flip(var(sprite), 1 - var(flip), 0)
+    set var(flip) = 1 - var(flip)
+  end
+  set var(warm) = image_tint(var(sprite), 255, 180, 140)
+  set var(big) = image_draw_rotated(var(sprite), 480, 320, var(angle), 0.5)
+  set var(plain) = image_tint(var(sprite), 255, 255, 255)
+  set var(small) = image_draw_scaled(var(sprite), 110, 400, 140, 140)
+  display text("small: scaled + flip") -l(90, 560) -rgb(120, 220, 180)
+end

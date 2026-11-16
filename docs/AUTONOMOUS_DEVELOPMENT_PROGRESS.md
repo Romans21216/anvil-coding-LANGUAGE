@@ -491,3 +491,10 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Enforcement:** `python tools/bench_anvil.py --check` exits 1 and prints every exceeded budget; `--write-budgets` re-measures the current machine and rewrites the file, so re-baselining is a command rather than an edit.
 - **Tests:** `tests/test_perf_thresholds.py` covers the budget file (every case and backend present, all ceilings positive), runs the four cases against the published budgets (fails on any regression), and feeds a deliberately impossible budget through the checker to prove it is not vacuous. 3 passed in 2.1 s.
 - **Measured baseline on this machine:** tiny C 0.397 s / 144,384 B; texty 0.411 s / 151,040 B; big 0.424 s / 154,624 B; big_trim 0.397 s / 144,384 B; native 0.001-0.005 s and 3-27 KB. Published ceilings: C 1.18-1.25 s and 180-193 KB; native 3-14 ms and 3.8-33 KB.
+
+## Batch 35 — sprite tint, flip and rotation (8.14)
+
+- **Builtins:** `image_draw_rotated(handle,cx,cy,degrees,scale)` draws centred, rotated clockwise and uniformly scaled; `image_tint(handle,r,g,b)` multiplies the sprite's colours (0-255 per channel, 255 = unchanged); `image_flip(handle,x,y)` mirrors it. Tint and flip are per-image state applied by every draw path and reset on destroy.
+- **Implementation:** the scaled path samples the source with the flip applied and shades through the tint before alpha-blending; the rotated path inverse-transforms each destination pixel around the centre and samples nearest-neighbour, matching the existing scaled draw's filtering.
+- **Tests:** `tests/test_sprite_draw.py` draws a 2x2 quadrant BMP, resizes the window until the client is exactly 960x600 (so the framebuffer maps 1:1), and reads the presented pixels with GetPixel. It asserts the four plain quadrants, the horizontal flip, a 128-grey tint, and the 90-degree clockwise arrangement (top-left blue, top-right red, bottom-left white, bottom-right green). 1 passed in 2.8 s.
+- **Also:** `examples/sprite_transform_demo.ANVL`, spec table and grammar, evidence ledger, testing doc.

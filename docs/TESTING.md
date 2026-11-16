@@ -86,6 +86,8 @@ remote desktop can prevent window creation:
   minimize/restore, close, and injected backbuffer-allocation failure.
 - `test_native_procedural` — gradient noise, FBM and procedural helpers in a
   running image.
+- `test_sprite_draw` — C-backend sprite tint, horizontal flip and 90° rotation
+  checked by reading the pixels the program presented.
 - `test_includes` — the subset that runs an included graphical sample.
 
 The harness (`tests/native_app.py`) builds the PE, starts it, finds the window

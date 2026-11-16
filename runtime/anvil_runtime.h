@@ -70,6 +70,10 @@ double anvil_image_destroy(double handle);
 double anvil_image_draw(double handle, double x, double y);
 double anvil_image_draw_scaled(double handle, double x, double y, double width,
                                double height);
+double anvil_image_draw_rotated(double handle, double cx, double cy,
+                                double degrees, double scale);
+double anvil_image_tint(double handle, double r, double g, double b);
+double anvil_image_flip(double handle, double x, double y);
 const char *anvil_save_error(void);
 void anvil_set_project(const char *name);
 double anvil_save_number(const char *slot, double value);

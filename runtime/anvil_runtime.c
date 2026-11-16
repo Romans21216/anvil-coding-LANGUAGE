@@ -84,6 +84,8 @@ typedef struct {
   uint32_t *pixels;
   int width, height;
   uint32_t generation;
+  int tint_r, tint_g, tint_b;
+  int flip_x, flip_y;
 } AnvilImage;
 
 static HWND anvil_window;
@@ -798,6 +800,11 @@ double anvil_image_load(const char *path) {
   anvil_images[slot].pixels = pixels;
   anvil_images[slot].width = width;
   anvil_images[slot].height = height;
+  anvil_images[slot].tint_r = 255;
+  anvil_images[slot].tint_g = 255;
+  anvil_images[slot].tint_b = 255;
+  anvil_images[slot].flip_x = 0;
+  anvil_images[slot].flip_y = 0;
   ++anvil_images[slot].generation;
   anvil_image_memory_used += (size_t)output_bytes;
   return (double)(anvil_images[slot].generation - 1) * ANVIL_IMAGES + slot + 1;
@@ -820,6 +827,39 @@ double anvil_image_destroy(double handle) {
   image->pixels = NULL;
   image->width = 0;
   image->height = 0;
+  image->tint_r = 255;
+  image->tint_g = 255;
+  image->tint_b = 255;
+  image->flip_x = 0;
+  image->flip_y = 0;
+  return 1.0;
+}
+
+static uint32_t anvil_image_shaded(const AnvilImage *image, uint32_t color) {
+  int alpha = (int)(color >> 24);
+  int r = (int)((color >> 16) & 255) * image->tint_r / 255;
+  int g = (int)((color >> 8) & 255) * image->tint_g / 255;
+  int b = (int)(color & 255) * image->tint_b / 255;
+  return ((uint32_t)alpha << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) |
+         (uint32_t)b;
+}
+
+double anvil_image_tint(double handle, double r, double g, double b) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !isfinite(r) || !isfinite(g) || !isfinite(b))
+    return 0.0;
+  image->tint_r = (int)(r < 0.0 ? 0.0 : r > 255.0 ? 255.0 : r);
+  image->tint_g = (int)(g < 0.0 ? 0.0 : g > 255.0 ? 255.0 : g);
+  image->tint_b = (int)(b < 0.0 ? 0.0 : b > 255.0 ? 255.0 : b);
+  return 1.0;
+}
+
+double anvil_image_flip(double handle, double x, double y) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !isfinite(x) || !isfinite(y))
+    return 0.0;
+  image->flip_x = x != 0.0;
+  image->flip_y = y != 0.0;
   return 1.0;
 }
 double anvil_image_draw_scaled(double handle, double x, double y, double width,
@@ -848,8 +888,59 @@ double anvil_image_draw_scaled(double handle, double x, double y, double width,
         source_x = 0;
       if (source_x >= image->width)
         source_x = image->width - 1;
-      uint32_t color = image->pixels[(size_t)source_y * image->width + source_x];
-      anvil_pixel(dx, dy, color & UINT32_C(0x00ffffff),
+      int sample_x = image->flip_x ? image->width - 1 - source_x : source_x;
+      int sample_y = image->flip_y ? image->height - 1 - source_y : source_y;
+      uint32_t color =
+          image->pixels[(size_t)sample_y * image->width + sample_x];
+      anvil_pixel(dx, dy, anvil_image_shaded(image, color) & UINT32_C(0x00ffffff),
+                  (int)(color >> 24));
+    }
+  }
+  return 1.0;
+}
+
+/* Draw an image centred on (cx, cy), rotated clockwise by degrees and scaled
+   uniformly. Nearest-neighbour sampling matches the scaled draw; tint and flip
+   are the image's own state, so both draw paths share them. */
+double anvil_image_draw_rotated(double handle, double cx, double cy,
+                                double degrees, double scale) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !anvil_pixels || !isfinite(cx) || !isfinite(cy) ||
+      !isfinite(degrees) || !isfinite(scale) || scale <= 0.0)
+    return 0.0;
+  const double radians = 0.017453292519943295769 * degrees;
+  double cos_angle = cos(radians);
+  double sin_angle = sin(radians);
+  double half_width = (double)image->width * scale * 0.5;
+  double half_height = (double)image->height * scale * 0.5;
+  double extent =
+      ceil(sqrt(half_width * half_width + half_height * half_height)) + 1.0;
+  int x0 = (int)fmax(0.0, floor(cx - extent));
+  int x1 = (int)fmin((double)ANVIL_WIDTH, ceil(cx + extent));
+  int y0 = (int)fmax(0.0, floor(cy - extent));
+  int y1 = (int)fmin((double)ANVIL_HEIGHT, ceil(cy + extent));
+  if (x0 >= x1 || y0 >= y1)
+    return 1.0;
+  for (int dy = y0; dy < y1; ++dy) {
+    for (int dx = x0; dx < x1; ++dx) {
+      double px = dx + 0.5 - cx;
+      double py = dy + 0.5 - cy;
+      double sx = px * cos_angle + py * sin_angle;
+      double sy = -px * sin_angle + py * cos_angle;
+      double u = sx / scale + (double)image->width * 0.5;
+      double v = sy / scale + (double)image->height * 0.5;
+      if (u < 0.0 || v < 0.0 || u >= (double)image->width ||
+          v >= (double)image->height)
+        continue;
+      int source_x = (int)u;
+      int source_y = (int)v;
+      if (image->flip_x)
+        source_x = image->width - 1 - source_x;
+      if (image->flip_y)
+        source_y = image->height - 1 - source_y;
+      uint32_t color =
+          image->pixels[(size_t)source_y * image->width + source_x];
+      anvil_pixel(dx, dy, anvil_image_shaded(image, color) & UINT32_C(0x00ffffff),
                   (int)(color >> 24));
     }
   }
