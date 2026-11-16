@@ -36,6 +36,29 @@ class TextAndPrintTests(unittest.TestCase):
             self.assertEqual(run.returncode, 0, run.stderr)
             return run.stdout.replace("\r\n", "\n").splitlines()
 
+    def test_console_and_screen_share_one_number_format(self):
+        lines = self.run_program(
+            "fn(main)\n"
+            '  print "third " + 1 / 3\n'
+            '  print "tenth " + (0.1 + 0.2)\n'
+            '  print "twelve " + 12.5663706143592\n'
+            '  print "small " + 0.000005\n'
+            '  print "big " + 1234567890123456\n'
+            "  output 0\n"
+            "end\n"
+        )
+        self.assertEqual(
+            lines,
+            [
+                "third 0.333333333333333",
+                "tenth 0.3",
+                "twelve 12.5663706143592",
+                "small 0.000005",
+                "big 1234567890123456",
+                "0",
+            ],
+        )
+
     def test_print_works_from_any_function_and_shares_one_number_format(self):
         lines = self.run_program(
             "fn(show, value)\n"

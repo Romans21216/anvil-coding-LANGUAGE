@@ -29,7 +29,7 @@ blank_line  = whitespace, physical_newline | physical_newline ;
 comment_line = whitespace, "#", { any_non_newline_character }, physical_newline ;
 ```
 
-The compiler accepts a numeric literal only if it converts to a finite double. Unary `+` and `-` are operators, not part of the number token. String escapes are passed through to the generated C string literal; the stable portable subset is `\\`, `\"`, `\n`, and `\t`. Text values exist: quoted strings join with `+`, a number on either side is formatted with the one Anvil number format (`%.15g`), and the text built-ins return text (see §3.4). There is no text variable or parameter type yet, so text is built inside the `display`/`print` expression that consumes it.
+The compiler accepts a numeric literal only if it converts to a finite double. Unary `+` and `-` are operators, not part of the number token. String escapes are passed through to the generated C string literal; the stable portable subset is `\\`, `\"`, `\n`, and `\t`. Text values exist: quoted strings join with `+`, a number on either side is formatted with the one Anvil number format (plain decimal, rounded to at most 15 significant digits, trailing zeros removed), and the text built-ins return text (see §3.4). There is no text variable or parameter type yet, so text is built inside the `display`/`print` expression that consumes it.
 
 ## 2. File structure and declarations
 
@@ -131,7 +131,7 @@ An array may be global or local to a function. Arrays cannot be resized. The def
 
 ### 3.4 Text values and print
 
-`display text(...)` and `print`/`say` accept a text expression: quoted strings joined with `+`, numeric expressions (formatted with the one Anvil number format, `%.15g`), and text-returning built-ins. `print` writes one line to the console from top level or any function; `print` alone writes a blank line and `say` is an alias. `output` remains a return, not a print.
+`display text(...)` and `print`/`say` accept a text expression: quoted strings joined with `+`, numeric expressions (formatted with the one Anvil number format: at most 15 significant digits, plain decimal), and text-returning built-ins. `print` writes one line to the console from top level or any function; `print` alone writes a blank line and `say` is an alias. `output` remains a return, not a print.
 
 Text is byte-counted UTF-8. `len`, `ord`, `find`, and `mid` operate on bytes; `utf8_len`, `utf8_char`, and `utf8_mid` operate on code points and never split a multi-byte sequence. `upper`/`lower` convert ASCII only, and `chr` accepts a code from 0 through 255. Text results live in a 256 KiB scratch arena and stay valid until the statement that built them finishes. Text cannot be stored in a variable, parameter, or array yet.
 
@@ -191,7 +191,7 @@ Parentheses group expressions. `=` and `==` both mean numeric equality. Comparis
 
 The compiler also accepts the legacy compatibility form `compute(expression)` when it wraps an entire expression. It is not a callable built-in; nested or partial `compute(...)` forms are not supported.
 
-An expression must have the expected value kind. Most operators, variables, arrays, and function results are numeric. Text expressions are accepted by `display text(...)`, `print`/`say`, and the text built-ins; they join quoted strings, numeric subexpressions (formatted with `%.15g`), and text-returning calls with `+`. Text supports `=`/`==`/`!=` comparison; no other operator applies to it. The ray-backend functions require a string literal; mouse button functions require one of the string literals `"left"`, `"right"`, or `"middle"` at runtime. `image_load` accepts a path string literal. `net join` accepts a literal address.
+An expression must have the expected value kind. Most operators, variables, arrays, and function results are numeric. Text expressions are accepted by `display text(...)`, `print`/`say`, and the text built-ins; they join quoted strings, numeric subexpressions (formatted with the one Anvil number format), and text-returning calls with `+`. Text supports `=`/`==`/`!=` comparison; no other operator applies to it. The ray-backend functions require a string literal; mouse button functions require one of the string literals `"left"`, `"right"`, or `"middle"` at runtime. `image_load` accepts a path string literal. `net join` accepts a literal address.
 
 Division by zero, including negative zero, is a runtime error with source path and line and exit code 2. Every numeric operation and numeric built-in result must be finite; NaN or infinity (including overflow and invalid math results) produces a source-located runtime error. Numeric values use the C backend's `double` representation; there are no integer, decimal, or user-defined numeric types in version 1.
 

@@ -102,7 +102,8 @@ The runnable example is `examples/local_arrays.ANVL`; it prints `27`.
 
 A quoted string is a text value. Text appears in `display text(...)`, `print`, and
 the text built-ins. `+` joins text; a number on either side of a text `+` is
-formatted with the one Anvil number format (`%.15g` — the same output the console
+formatted with the one Anvil number format (plain decimal, rounded to at most
+15 significant digits, trailing zeros removed — the same output the console
 uses), so one label can mix any number of literal pieces and numeric
 expressions. `=` and `==` compare text and `!=` negates them; no other operator
 applies to text, and using one is a compile error that says so.
@@ -156,6 +157,23 @@ is no text variable type yet: build text inside the `display`/`print` expression
 that consumes it. `examples/text_showcase.ANVL` puts all of this on one screen
 (capture: `docs/assets/text_showcase.png`), and prints the same values to the
 console.
+
+## Number format
+
+Console output and `display text(...)` use one rule, so a value never changes
+when it moves from the console to the screen:
+
+- plain decimal: no exponent form;
+- rounded to at most 15 significant digits;
+- trailing fractional zeros removed, and no fraction when every digit is zero;
+- integers with fifteen or more digits print exactly, with no fraction;
+- magnitudes at or above 2^63 are a controlled console error: `Anvil output
+  out of range`, exit status 2.
+
+`7 / 2` prints `3.5`, `0.1 + 0.2` prints `0.3`, `1 / 3` prints
+`0.333333333333333`, `1000000000000` prints `1000000000000`, and
+`12.5663706143592` stays `12.5663706143592`. Both backends implement the same
+rule; `tools/backend_matrix.py` measures it.
 
 ## Errors and diagnostics
 

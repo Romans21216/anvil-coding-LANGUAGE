@@ -102,8 +102,11 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
                   int b, int a);
 void anvil_plane(double x, double y, double z, double width, double depth,
                  int r, int g, int b, int a);
-/* One number format for every Anvil output path: console, screen text, print. */
+/* Fallback only: text values use the shared fixed-decimal formatter below and
+   fall back to this for magnitudes the formatter cannot expand. */
 #define ANVIL_NUMBER_FORMAT "%.15g"
+
+void anvil_print_number(double value);
 
 void anvil_text(double x, double y, const char *text, int r, int g, int b,
                 int a);

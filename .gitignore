@@ -3,3 +3,6 @@ __pycache__/
 *.py[cod]
 vscode-extension/node_modules/
 
+
+.scratch/
+.anvil-txt-state.json

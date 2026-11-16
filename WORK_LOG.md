@@ -533,3 +533,24 @@ have to parse the human-readable block.
 
 `tests/test_json_diagnostics.py` checks the error shape (line/column/message/
 help) and that warnings use the same shape under `--check`.
+
+## One number format for console and screen (Part 8 / B1+B15)
+
+- `anvil_format_number` rounds to at most 15 significant digits in plain
+  decimal, trims trailing zeros, and keeps no fraction once the integer part
+  has 15 or more digits. `anvil_print_number` (console) and `anvil_str_num`
+  (`display text`) share it.
+- The native `runtime:print_number` helper implements the same rule in AMD64:
+  it counts integer digits, scales the fraction by 10^(15 - digits), rounds,
+  and carries into the integer.
+- Parity spot-check, identical output on both backends: `12.5663706143592`,
+  `12.9999999`, `1 / 3`, `0.1 + 0.2`, `1234.5678`, `0.000005`,
+  `1234567890123456`, `1e-15`, `-0.75`, `17.875`,
+  `0.9999999999999999 -> 1`, `999999999999999.9 -> 1000000000000000`;
+  `1e20` and `+2^63` print `Anvil output out of range` and exit 2 on both.
+- Tests: `test_text_and_print` gains a shared-format console test;
+  `test_native_x64` fractional cases follow the new contract and add
+  `1 / 3`, `0.1 + 0.2`, `12.5663706143592`.
+- Docs: `LANGUAGE.md` gains a "Number format" section; `LANGUAGE_SPEC.md`,
+  `README.md`, `COMPILER.md`, and `NATIVE_X64_COMPILER_MIGRATION.md` describe
+  15 significant digits instead of six fractional digits.

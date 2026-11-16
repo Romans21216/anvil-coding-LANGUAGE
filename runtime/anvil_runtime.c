@@ -602,11 +602,102 @@ static char *anvil_text_alloc(size_t bytes) {
   return result;
 }
 
+/* One number format for every output path: optional '-', then the value
+   rounded to at most 15 significant digits in plain decimal, with trailing
+   zeros removed.  Integers with more than 15 digits keep no fraction, which
+   is honest because doubles at that magnitude are whole numbers.  Magnitudes
+   at or above 2^63 cannot be expanded without lying about the value, so
+   console output refuses them instead of printing a rounded approximation. */
+static int anvil_format_number(double value, char *out) {
+  unsigned long long bits, integer, fraction, limit;
+  double magnitude, scaled, scale;
+  char frac[24];
+  int negative, count, digits, end, used, i;
+
+  memcpy(&bits, &value, sizeof bits);
+  negative = (int)(bits >> 63);
+  magnitude = negative ? -value : value;
+  if (magnitude != magnitude || magnitude > 9223372036854775808.0)
+    return 0;
+  if (magnitude == 9223372036854775808.0) {
+    if (!negative)
+      return 0;
+    integer = 9223372036854775808ULL;
+  } else {
+    integer = (unsigned long long)(long long)magnitude;
+  }
+  {
+    unsigned long long probe = integer;
+    used = 0;
+    do {
+      used++;
+      probe /= 10;
+    } while (probe != 0);
+  }
+  digits = integer == 0 ? 15 : (used >= 15 ? 0 : 15 - used);
+  scale = 1.0;
+  limit = 1;
+  for (i = 0; i < digits; i++) {
+    scale *= 10.0;
+    limit *= 10;
+  }
+  scaled = (magnitude - (double)integer) * scale + 0.5;
+  fraction = (unsigned long long)scaled;
+  if (fraction >= limit) {
+    integer += 1;
+    fraction = 0;
+  }
+  for (i = 0; i < digits; i++) {
+    frac[i] = (char)('0' + (int)(fraction % 10));
+    fraction /= 10;
+  }
+  for (i = 0; i < digits / 2; i++) {
+    char swap = frac[i];
+    frac[i] = frac[digits - 1 - i];
+    frac[digits - 1 - i] = swap;
+  }
+  end = digits;
+  while (end > 0 && frac[end - 1] == '0')
+    end--;
+  count = 0;
+  if (negative)
+    out[count++] = '-';
+  {
+    char digitsbuf[24];
+    int used_integer = 0;
+    do {
+      digitsbuf[used_integer++] = (char)('0' + (int)(integer % 10));
+      integer /= 10;
+    } while (integer != 0);
+    while (used_integer > 0)
+      out[count++] = digitsbuf[--used_integer];
+  }
+  if (end > 0) {
+    out[count++] = '.';
+    for (i = 0; i < end; i++)
+      out[count++] = frac[i];
+  }
+  out[count] = '\0';
+  return 1;
+}
+
+void anvil_print_number(double value) {
+  char buffer[48];
+  if (!anvil_format_number(value, buffer)) {
+    fputs("Anvil output out of range\n", stdout);
+    fflush(stdout);
+    exit(2);
+  }
+  fputs(buffer, stdout);
+  fputc('\n', stdout);
+}
+
 const char *anvil_str_num(double value) {
   char *buffer = anvil_text_alloc(48);
   if (buffer == anvil_text_truncated)
     return anvil_text_truncated;
-  _snprintf_s(buffer, 48, _TRUNCATE, ANVIL_NUMBER_FORMAT, value);
+  if (!anvil_format_number(value, buffer))
+    _snprintf_s(buffer, 48, _TRUNCATE, ANVIL_NUMBER_FORMAT, value);
   return buffer;
 }
 

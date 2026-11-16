@@ -145,6 +145,7 @@ RUNTIME_C_NAMES = {
     "anvil_text",
     "anvil_text_number",
     "anvil_print",
+    "anvil_print_number",
     "anvil_str_num",
     "anvil_str_cat",
     "anvil_str_equal",

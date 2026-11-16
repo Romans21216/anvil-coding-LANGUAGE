@@ -249,7 +249,7 @@ def emit_nodes(
             call_expression = "call fn(" + n.name + (", " + n.value if n.value else "") + ")"
             if scope is None and n.name == "main":
                 out.append(
-                    f'{indent}printf("%.15g\\n", {lower(n, call_expression)});'
+                    f'{indent}anvil_print_number({lower(n, call_expression)});'
                 )
             else:
                 out.append(f"{indent}(void){lower(n, call_expression)};")
@@ -630,7 +630,7 @@ def emit_c(
                 f"{functions['main'].source or path}:{functions['main'].line}: main function parameters "
                 "require an explicit call with arguments"
             )
-        lines.append(f'    printf("%.15g\\n", {c_name("main")}());')
+        lines.append(f'    anvil_print_number({c_name("main")}());')
     if "networking" in selected_runtime_modules:
         lines.append("    anvil_net_close();")
     lines.extend(["    return 0;", "}", ""])
