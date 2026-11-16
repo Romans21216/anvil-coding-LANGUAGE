@@ -366,3 +366,13 @@ This log records verified implementation batches and is reconciled with Git befo
 - **Reproducibility:** temporary directories are stripped from the notes, so repeated runs produce identical bytes; `--check` exits 1 when the committed document is stale, and a test enforces it.
 - **Files:** `tools/capability_matrix.py` (new), `docs/CAPABILITY_MATRIX.md` (generated), `tests/test_capability_matrix.py`, `docs/COMPILER.md`.
 - **Commit:** `1afefc5`.
+
+## Batch 21 — testing and coverage labels (8.15)
+
+- **`docs/TESTING.md`:** records the exact environment (Windows 11 10.0.26200, Python 3.13.15, MSVC 14.51.36231, Git Bash from the repo root), the commands for the full, headless and per-area suites, and the tooling checks (`--test`, `--format-check`, `tools/capability_matrix.py --check`, `npm test`).
+- **Coverage labels:** every test module is classified as headless or interactive. Interactive means a generated PE creates a real window and is driven by bounded messages to its own process id (`test_native_keyboard`, `test_native_mouse`, `test_native_window`, `test_native_procedural`, and the graphical `test_includes` cases).
+- **Tolerances:** 960×600 fixed framebuffer with letterboxing, fixed-step updates (1–240 Hz, default 60), explicit state timeouts rather than sleeps, exact byte/value comparisons, and no performance claims from these tests.
+- **Gaps recorded:** Windows-only runs, grammar-only extension validation, no manual visual claim.
+- **Accuracy check:** all 91 test modules named in the page exist.
+- **Files:** `docs/TESTING.md` (new), `README.md`.
+- **Commit:** `8997af2`.
