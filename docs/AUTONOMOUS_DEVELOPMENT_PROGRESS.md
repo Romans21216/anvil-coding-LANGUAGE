@@ -1084,3 +1084,9 @@ Validation: `python -m pytest tests/test_compiler.py -q` — 71 passed in 59.01 
 The dynamic display form no longer requires exactly one `var(name)`. When the first text segment is a literal, top-level `+` segments are lowered through the compiler's existing `&` text-join path. This supports global and local values, multiple interpolations, and parenthesized numeric expressions such as `(1 + 2)` without splitting their arithmetic. The legacy single-global form retains its established automatic separating space; longer forms use explicit spaces in their string segments. The shared formatter keeps fractional values consistent across C and wasm. Documentation now distinguishes interpolation `+` from parenthesized arithmetic and the general `&` join.
 
 Validation: `python -m pytest tests/test_compiler.py tests/test_wasm.py tests/test_wasm_docs.py tests/test_number_format.py -q` — 133 passed in 99.77 s. The wasm host draw-stream regression verifies a label containing `var(amount)`, `local(part)`, and `(1 + 2)` as `value: 0.333333 part: 0.666667 sum: 3`; compiler coverage checks equivalent generated C. `git -c core.whitespace=cr-at-eol diff --check` passes. General string syntax, text parameters and the experimental native renderer remain separate roadmap work.
+
+8.124 REMOVE INERT DISPLAY INTEGER SUFFIX (PART 4 B10)
+
+The C emitter rejects `display ... 7` with a diagnostic explaining that the suffix has no effect and draw order follows source order. Removed the apparent layer numbers from the `first_world` and `window_controls` examples and updated the language specification. The rendered order and images are unchanged because the removed integers were ignored.
+
+Validation: `python -m pytest tests/test_compiler.py -q` — 73 passed in 72.08 s. `python tools/visual_smoke.py --check` passed all seven examples at 960x600, including the two updated sources.
