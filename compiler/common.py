@@ -272,5 +272,5 @@ LANGUAGE_VERSION = 1
 KEY_CODES = {
     **{chr(code): code for code in range(ord("A"), ord("Z") + 1)},
     "SPACE": 32, "LEFT": 37, "UP": 38, "RIGHT": 39, "DOWN": 40,
-    "ENTER": 13, "ESCAPE": 27,
+    "ENTER": 13, "ESCAPE": 27, "TAB": 9,
 }

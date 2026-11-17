@@ -147,6 +147,17 @@ ALLOWED_BUILTINS = {
     "particle_count",
     "particle_clear",
     "particle_gravity",
+    "ui_focus_add",
+    "ui_focus_clear",
+    "ui_focus_count",
+    "ui_focus_next",
+    "ui_focus_prev",
+    "ui_focus_set",
+    "ui_focus",
+    "ui_focus_at",
+    "ui_focus_activate",
+    "ui_focus_label",
+    "ui_accessible",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
@@ -166,11 +177,15 @@ HOST_PAGE = """<!doctype html>
 </style>
 <canvas id="screen" width="960" height="600"></canvas>
 <div id="out"></div>
+<!-- Screen readers read focus announcements here; visually hidden but present. -->
+<div id="announce" aria-live="polite" aria-atomic="true"
+     style="position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0"></div>
 <script>
 const canvas = document.getElementById("screen");
 const context = canvas.getContext("2d");
 context.imageSmoothingEnabled = false;
 const errors = document.getElementById("out");
+const announceRegion = document.getElementById("announce");
 const utf8 = new TextDecoder();
 const sourceMap = __SOURCE_MAP__;
 const describeError = (error) => {
@@ -377,6 +392,12 @@ async function start() {
     const imports = { env: {
       fade(alpha) {
         pendingFade = alpha;
+      },
+      /* The focused control's accessible label, for the aria-live region. */
+      announce(pointer, length) {
+        const text = utf8.decode(new Uint8Array(memory.buffer, pointer, length));
+        if (announceRegion) announceRegion.textContent = text;
+        if (window.anvilAnnouncer) window.anvilAnnouncer(text);
       },
       write(fd, pointer, length) {
         const view = new Uint8Array(memory.buffer, pointer, length);

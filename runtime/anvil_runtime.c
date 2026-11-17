@@ -1671,30 +1671,282 @@ double anvil_mouse_held(const char *button) {
   int index = anvil_mouse_button_index(button);
   return index >= 0 ? anvil_mouse_buttons[index] != 0 : 0.0;
 }
-static double anvil_mouse_coordinate(int horizontal) {
-  if (!anvil_window || !anvil_mouse_has_position)
-    return -1.0;
+/* Map a client-area point into world coordinates. Separate from the pointer
+   state because a press is hit-tested at the point it was made, even if the
+   pointer has since left the window. */
+static int anvil_client_to_world(int client_x, int client_y, double *out_x,
+                                 double *out_y) {
+  if (!anvil_window)
+    return 0;
   RECT client;
   AnvilViewport viewport;
   if (!GetClientRect(anvil_window, &client) ||
       !anvil_compute_viewport(client.right - client.left,
                              client.bottom - client.top, ANVIL_WIDTH,
                              ANVIL_HEIGHT, &viewport))
-    return -1.0;
-  int x = anvil_mouse_client_x, y = anvil_mouse_client_y;
-  if (x < viewport.x || y < viewport.y || x >= viewport.x + viewport.width ||
-      y >= viewport.y + viewport.height)
-    return -1.0;
-  double screen = horizontal
-                      ? (double)(x - viewport.x) * ANVIL_WIDTH / viewport.width
-                      : (double)(y - viewport.y) * ANVIL_HEIGHT / viewport.height;
+    return 0;
+  if (client_x < viewport.x || client_y < viewport.y ||
+      client_x >= viewport.x + viewport.width ||
+      client_y >= viewport.y + viewport.height)
+    return 0;
   /* Inverse of the 2D camera so pointer coordinates are world coordinates. */
-  return screen / anvil_camera2d_zoom +
-         (horizontal ? anvil_camera2d_x : anvil_camera2d_y);
+  *out_x = (double)(client_x - viewport.x) * ANVIL_WIDTH / viewport.width /
+               anvil_camera2d_zoom +
+           anvil_camera2d_x;
+  *out_y = (double)(client_y - viewport.y) * ANVIL_HEIGHT / viewport.height /
+               anvil_camera2d_zoom +
+           anvil_camera2d_y;
+  return 1;
+}
+static int anvil_mouse_world_point(double *out_x, double *out_y) {
+  if (!anvil_window || !anvil_mouse_has_position)
+    return 0;
+  return anvil_client_to_world(anvil_mouse_client_x, anvil_mouse_client_y,
+                               out_x, out_y);
+}
+static double anvil_mouse_coordinate(int horizontal) {
+  double x = 0.0, y = 0.0;
+  if (!anvil_mouse_world_point(&x, &y))
+    return -1.0;
+  return horizontal ? x : y;
 }
 double anvil_mouse_x(void) { return anvil_mouse_coordinate(1); }
 double anvil_mouse_y(void) { return anvil_mouse_coordinate(0); }
 double anvil_mouse_wheel(void) { return anvil_mouse_wheel_delta; }
+
+/* ---- UI focus and accessible labels -------------------------------------
+   A custom-drawn UI has no window controls for the OS to focus, so the engine
+   keeps a small registry of focusable rectangles. The program draws whatever
+   it likes and declares where a control is plus the label a screen reader
+   should read; the engine owns the part that is easy to get wrong - which
+   region is focused, what a click or Enter/Space activates, and announcing the
+   label when accessibility is switched on. */
+
+enum { ANVIL_FOCUS_REGIONS = 64, ANVIL_FOCUS_LABEL_MAX = 96 };
+
+typedef struct {
+  int used;
+  double x, y, width, height;
+  char label[ANVIL_FOCUS_LABEL_MAX];
+} AnvilFocusRegion;
+
+static AnvilFocusRegion anvil_focus_regions[ANVIL_FOCUS_REGIONS];
+static int anvil_focus_count;
+static int anvil_focus_current;   /* region index + 1, 0 = nothing focused */
+static int anvil_focus_activated; /* region index + 1 activated this frame */
+static int anvil_focus_accessible;
+static int anvil_focus_announced;
+static HWND anvil_focus_announcer;
+static int anvil_focus_full_warned;
+static int anvil_focus_label_warned;
+
+static AnvilFocusRegion *anvil_focus_region(double handle) {
+  if (!isfinite(handle) || handle < 1.0 ||
+      handle > (double)ANVIL_FOCUS_REGIONS || floor(handle) != handle)
+    return NULL;
+  AnvilFocusRegion *region = &anvil_focus_regions[(int)handle - 1];
+  return region->used ? region : NULL;
+}
+
+double anvil_ui_focus_add(double x, double y, double width, double height,
+                          const char *label) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(width) || !isfinite(height))
+    return 0.0;
+  /* A negative size is a rectangle drawn upwards or leftwards; normalise it so
+     hit testing only ever compares against a positive extent. */
+  if (width < 0.0) {
+    x += width;
+    width = -width;
+  }
+  if (height < 0.0) {
+    y += height;
+    height = -height;
+  }
+  const char *text = label ? label : "";
+  size_t length = strlen(text);
+  if (length >= ANVIL_FOCUS_LABEL_MAX) {
+    /* Truncating would announce a different control than the one drawn. */
+    if (!anvil_focus_label_warned) {
+      anvil_focus_label_warned = 1;
+      fprintf(stderr,
+              "Anvil UI focus: a label is longer than %d bytes and was not "
+              "registered.\n",
+              ANVIL_FOCUS_LABEL_MAX - 1);
+    }
+    return 0.0;
+  }
+  for (int index = 0; index < ANVIL_FOCUS_REGIONS; index++) {
+    AnvilFocusRegion *region = &anvil_focus_regions[index];
+    if (region->used)
+      continue;
+    region->used = 1;
+    region->x = x;
+    region->y = y;
+    region->width = width;
+    region->height = height;
+    memcpy(region->label, text, length + 1);
+    anvil_focus_count++;
+    return (double)(index + 1);
+  }
+  if (!anvil_focus_full_warned) {
+    anvil_focus_full_warned = 1;
+    fprintf(stderr,
+            "Anvil UI focus: %d regions are already registered; the extra "
+            "region was ignored.\n",
+            ANVIL_FOCUS_REGIONS);
+  }
+  return 0.0;
+}
+
+double anvil_ui_focus_clear(void) {
+  double removed = (double)anvil_focus_count;
+  memset(anvil_focus_regions, 0, sizeof(anvil_focus_regions));
+  anvil_focus_count = 0;
+  anvil_focus_current = 0;
+  anvil_focus_activated = 0;
+  anvil_focus_announced = 0;
+  return removed;
+}
+
+double anvil_ui_focus_count(void) { return (double)anvil_focus_count; }
+
+double anvil_ui_focus(void) {
+  return anvil_focus_region((double)anvil_focus_current) != NULL
+             ? (double)anvil_focus_current
+             : 0.0;
+}
+
+double anvil_ui_focus_next(void) {
+  if (!anvil_focus_count)
+    return 0.0;
+  int start = anvil_focus_current - 1;
+  for (int step = 1; step <= ANVIL_FOCUS_REGIONS; step++) {
+    int index = (start + step + ANVIL_FOCUS_REGIONS) % ANVIL_FOCUS_REGIONS;
+    if (anvil_focus_regions[index].used) {
+      anvil_focus_current = index + 1;
+      return (double)anvil_focus_current;
+    }
+  }
+  return 0.0;
+}
+
+double anvil_ui_focus_prev(void) {
+  if (!anvil_focus_count)
+    return 0.0;
+  int start = anvil_focus_current ? anvil_focus_current - 1
+                                  : ANVIL_FOCUS_REGIONS;
+  for (int step = 1; step <= ANVIL_FOCUS_REGIONS; step++) {
+    int index = (start - step + ANVIL_FOCUS_REGIONS) % ANVIL_FOCUS_REGIONS;
+    if (anvil_focus_regions[index].used) {
+      anvil_focus_current = index + 1;
+      return (double)anvil_focus_current;
+    }
+  }
+  return 0.0;
+}
+
+/* Returns the handle that was focused before the call. An unknown handle or 0
+   leaves the focus where it was. */
+double anvil_ui_focus_set(double handle) {
+  double previous = anvil_ui_focus();
+  if (handle == 0.0) {
+    anvil_focus_current = 0;
+    return previous;
+  }
+  if (!anvil_focus_region(handle))
+    return previous;
+  anvil_focus_current = (int)handle;
+  return previous;
+}
+
+/* Topmost region under a point: the last one registered wins, so a later
+   popup covers an earlier panel. */
+double anvil_ui_focus_at(double x, double y) {
+  if (!isfinite(x) || !isfinite(y))
+    return 0.0;
+  for (int index = ANVIL_FOCUS_REGIONS - 1; index >= 0; index--) {
+    const AnvilFocusRegion *region = &anvil_focus_regions[index];
+    if (!region->used)
+      continue;
+    if (x >= region->x && x < region->x + region->width && y >= region->y &&
+        y < region->y + region->height)
+      return (double)(index + 1);
+  }
+  return 0.0;
+}
+
+double anvil_ui_focus_activate(void) { return (double)anvil_focus_activated; }
+
+const char *anvil_ui_focus_label(void) {
+  const AnvilFocusRegion *region =
+      anvil_focus_region((double)anvil_focus_current);
+  return region ? region->label : "";
+}
+
+/* Announce the focused label through MSAA: a 1x1 static child just outside the
+   client area carries the text as its accessible name, and the focus event
+   tells a screen reader to read it. Verified by reading the child's text, not
+   against a live screen reader. */
+static void anvil_focus_announce(const char *label) {
+  if (!anvil_window || !label)
+    return;
+  if (!anvil_focus_announcer) {
+    anvil_focus_announcer =
+        CreateWindowExW(0, L"STATIC", L"", WS_CHILD, -4, -4, 1, 1, anvil_window,
+                        NULL, GetModuleHandleW(NULL), NULL);
+  }
+  if (!anvil_focus_announcer)
+    return;
+  SetWindowTextW(anvil_focus_announcer, anvil_text_utf16(label));
+  NotifyWinEvent(EVENT_OBJECT_FOCUS, anvil_focus_announcer, OBJID_CLIENT,
+                 CHILDID_SELF);
+}
+
+/* ui_accessible(1) switches announcements on and returns 1 when the channel is
+   available; 0 switches them off and returns 0. */
+double anvil_ui_accessible(double on) {
+  if (on == 0.0) {
+    anvil_focus_accessible = 0;
+    anvil_focus_announced = 0;
+    return 0.0;
+  }
+  anvil_focus_accessible = 1;
+  anvil_focus_announced = 0; /* the current region is announced again */
+  return 1.0;
+}
+
+/* Once per frame, before update(): a click focuses the topmost region under the
+   pointer and activates it, Enter/Space activates the focused region, and a
+   changed focus announces its label. */
+static void anvil_focus_frame(void) {
+  anvil_focus_activated = 0;
+  if (!anvil_focus_count) {
+    anvil_focus_current = 0;
+    return;
+  }
+  double mouse_x = 0.0, mouse_y = 0.0;
+  /* Hit-test the press point itself: a click can be delivered after the
+     pointer left the window, and the click still belongs where it landed. */
+  if (anvil_mouse_pressed_buttons[0] &&
+      anvil_client_to_world(anvil_mouse_client_x, anvil_mouse_client_y,
+                            &mouse_x, &mouse_y)) {
+    double hit = anvil_ui_focus_at(mouse_x, mouse_y);
+    if (hit != 0.0) {
+      anvil_focus_current = (int)hit;
+      anvil_focus_activated = (int)hit;
+    }
+  }
+  if (!anvil_focus_activated && anvil_focus_current &&
+      (anvil_pressed_keys[VK_RETURN] || anvil_pressed_keys[VK_SPACE]))
+    anvil_focus_activated = anvil_focus_current;
+  if (anvil_focus_accessible && anvil_focus_current != anvil_focus_announced) {
+    anvil_focus_announced = anvil_focus_current;
+    const AnvilFocusRegion *region =
+        anvil_focus_region((double)anvil_focus_current);
+    if (region)
+      anvil_focus_announce(region->label);
+  }
+}
 static uint16_t anvil_read_u16_le(const unsigned char *bytes) {
   return (uint16_t)bytes[0] | (uint16_t)((uint16_t)bytes[1] << 8);
 }
@@ -4108,6 +4360,11 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     int index = message == WM_LBUTTONDOWN ? 0
                 : message == WM_RBUTTONDOWN ? 1
                                             : 2;
+    /* Record the press position too: a posted or synthetic click can arrive
+       without a preceding WM_MOUSEMOVE. */
+    anvil_mouse_client_x = (short)LOWORD(lparam);
+    anvil_mouse_client_y = (short)HIWORD(lparam);
+    anvil_mouse_has_position = 1;
     if (!anvil_mouse_buttons[index])
       anvil_mouse_pressed_buttons[index] = 1;
     anvil_mouse_buttons[index] = 1;
@@ -5886,6 +6143,8 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
        the actual present cost rather than the wait. */
     DwmFlush();
     QueryPerformanceCounter(&phase_start);
+    /* Before update(), so the frame sees this frame's focus and activation. */
+    anvil_focus_frame();
     int update_count = 0;
     while (accumulator >= step_seconds) {
       anvil_delta_seconds = step_seconds;

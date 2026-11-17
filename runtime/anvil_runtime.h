@@ -64,6 +64,20 @@ double anvil_mouse_y(void);
 double anvil_mouse_pressed(const char *button);
 double anvil_mouse_held(const char *button);
 double anvil_mouse_wheel(void);
+/* UI focus registry: keyboard focus, activation and the label a screen reader
+   should read for a custom-drawn control. */
+double anvil_ui_focus_add(double x, double y, double width, double height,
+                          const char *label);
+double anvil_ui_focus_clear(void);
+double anvil_ui_focus_count(void);
+double anvil_ui_focus_next(void);
+double anvil_ui_focus_prev(void);
+double anvil_ui_focus_set(double handle);
+double anvil_ui_focus(void);
+double anvil_ui_focus_at(double x, double y);
+double anvil_ui_focus_activate(void);
+const char *anvil_ui_focus_label(void);
+double anvil_ui_accessible(double on);
 double anvil_image_load(const char *path);
 double anvil_image_load_site(const char *path, const char *file, int line);
 double anvil_screen_fade(double alpha);

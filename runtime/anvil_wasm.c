@@ -25,6 +25,10 @@ __attribute__((import_module("env"), import_name("present")))
 extern void anvil_host_present(void);
 __attribute__((import_module("env"), import_name("fade")))
 extern void anvil_host_fade(double alpha);
+/* The page writes the label into an aria-live region, so a screen reader reads
+   it without the canvas having to expose a widget tree. */
+__attribute__((import_module("env"), import_name("announce")))
+extern void anvil_host_announce(const char *label, int length);
 __attribute__((import_module("env"), import_name("save_read")))
 extern int anvil_host_save_read(const char *key, char *out, int capacity);
 __attribute__((import_module("env"), import_name("save_write")))
@@ -434,6 +438,7 @@ static unsigned char anvil_keys_pressed[256];
 static unsigned char anvil_mouse_buttons[3];
 static unsigned char anvil_mouse_pressed_buttons[3];
 static double anvil_mouse_x_value = -1.0, anvil_mouse_y_value = -1.0;
+static int anvil_mouse_has_position;
 static double anvil_mouse_wheel_value;
 static double anvil_time_seconds, anvil_delta_seconds = 1.0 / 60.0;
 
@@ -492,12 +497,17 @@ __attribute__((export_name("anvil_mouse"))) void anvil_host_mouse(double x,
                                                                   double y) {
   anvil_mouse_x_value = x;
   anvil_mouse_y_value = y;
+  anvil_mouse_has_position = 1;
 }
 
 __attribute__((export_name("anvil_mouse_button"))) void anvil_host_mouse_button(
     int button, int down) {
   if (button < 0 || button > 2)
     return;
+  /* A press carries its own position, so a scripted click works without a
+     preceding mousemove (the page sends one, but tests and hosts may not). */
+  if (down)
+    anvil_mouse_has_position = 1;
   if (down && !anvil_mouse_buttons[button])
     anvil_mouse_pressed_buttons[button] = 1;
   anvil_mouse_buttons[button] = down != 0;
@@ -2641,6 +2651,184 @@ static void anvil_screen_fade_advance(double seconds) {
   }
 }
 
+/* ---- UI focus and accessible labels -------------------------------------
+   Same registry as the C runtime. There is no window manager here, so the
+   announcement goes through the host's aria-live region instead of an MSAA
+   child window. */
+
+enum { ANVIL_FOCUS_REGIONS = 64, ANVIL_FOCUS_LABEL_MAX = 96 };
+
+typedef struct {
+  int used;
+  double x, y, width, height;
+  char label[ANVIL_FOCUS_LABEL_MAX];
+} AnvilFocusRegion;
+
+static AnvilFocusRegion anvil_focus_regions[ANVIL_FOCUS_REGIONS];
+static int anvil_focus_count;
+static int anvil_focus_current;
+static int anvil_focus_activated;
+static int anvil_focus_accessible;
+static int anvil_focus_announced;
+
+static AnvilFocusRegion *anvil_focus_region(double handle) {
+  if (!anvil_wasm_finite(handle) || handle < 1.0 ||
+      handle > (double)ANVIL_FOCUS_REGIONS || floor(handle) != handle)
+    return 0;
+  AnvilFocusRegion *region = &anvil_focus_regions[(int)handle - 1];
+  return region->used ? region : 0;
+}
+
+double anvil_ui_focus_add(double x, double y, double width, double height,
+                          const char *label) {
+  if (!anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
+      !anvil_wasm_finite(width) || !anvil_wasm_finite(height))
+    return 0.0;
+  if (width < 0.0) {
+    x += width;
+    width = -width;
+  }
+  if (height < 0.0) {
+    y += height;
+    height = -height;
+  }
+  const char *text = label ? label : "";
+  size_t length = strlen(text);
+  if (length >= ANVIL_FOCUS_LABEL_MAX)
+    return 0.0;
+  for (int index = 0; index < ANVIL_FOCUS_REGIONS; index++) {
+    AnvilFocusRegion *region = &anvil_focus_regions[index];
+    if (region->used)
+      continue;
+    region->used = 1;
+    region->x = x;
+    region->y = y;
+    region->width = width;
+    region->height = height;
+    memcpy(region->label, text, length + 1);
+    anvil_focus_count++;
+    return (double)(index + 1);
+  }
+  return 0.0;
+}
+
+double anvil_ui_focus_clear(void) {
+  double removed = (double)anvil_focus_count;
+  memset(anvil_focus_regions, 0, sizeof(anvil_focus_regions));
+  anvil_focus_count = 0;
+  anvil_focus_current = 0;
+  anvil_focus_activated = 0;
+  anvil_focus_announced = 0;
+  return removed;
+}
+
+double anvil_ui_focus_count(void) { return (double)anvil_focus_count; }
+
+double anvil_ui_focus(void) {
+  return anvil_focus_region((double)anvil_focus_current) != 0
+             ? (double)anvil_focus_current
+             : 0.0;
+}
+
+double anvil_ui_focus_next(void) {
+  if (!anvil_focus_count)
+    return 0.0;
+  int start = anvil_focus_current - 1;
+  for (int step = 1; step <= ANVIL_FOCUS_REGIONS; step++) {
+    int index = (start + step + ANVIL_FOCUS_REGIONS) % ANVIL_FOCUS_REGIONS;
+    if (anvil_focus_regions[index].used) {
+      anvil_focus_current = index + 1;
+      return (double)anvil_focus_current;
+    }
+  }
+  return 0.0;
+}
+
+double anvil_ui_focus_prev(void) {
+  if (!anvil_focus_count)
+    return 0.0;
+  int start = anvil_focus_current ? anvil_focus_current - 1
+                                  : ANVIL_FOCUS_REGIONS;
+  for (int step = 1; step <= ANVIL_FOCUS_REGIONS; step++) {
+    int index = (start - step + ANVIL_FOCUS_REGIONS) % ANVIL_FOCUS_REGIONS;
+    if (anvil_focus_regions[index].used) {
+      anvil_focus_current = index + 1;
+      return (double)anvil_focus_current;
+    }
+  }
+  return 0.0;
+}
+
+double anvil_ui_focus_set(double handle) {
+  double previous = anvil_ui_focus();
+  if (handle == 0.0) {
+    anvil_focus_current = 0;
+    return previous;
+  }
+  if (!anvil_focus_region(handle))
+    return previous;
+  anvil_focus_current = (int)handle;
+  return previous;
+}
+
+double anvil_ui_focus_at(double x, double y) {
+  if (!anvil_wasm_finite(x) || !anvil_wasm_finite(y))
+    return 0.0;
+  for (int index = ANVIL_FOCUS_REGIONS - 1; index >= 0; index--) {
+    const AnvilFocusRegion *region = &anvil_focus_regions[index];
+    if (!region->used)
+      continue;
+    if (x >= region->x && x < region->x + region->width && y >= region->y &&
+        y < region->y + region->height)
+      return (double)(index + 1);
+  }
+  return 0.0;
+}
+
+double anvil_ui_focus_activate(void) { return (double)anvil_focus_activated; }
+
+const char *anvil_ui_focus_label(void) {
+  const AnvilFocusRegion *region =
+      anvil_focus_region((double)anvil_focus_current);
+  return region ? region->label : "";
+}
+
+double anvil_ui_accessible(double on) {
+  if (on == 0.0) {
+    anvil_focus_accessible = 0;
+    anvil_focus_announced = 0;
+    return 0.0;
+  }
+  anvil_focus_accessible = 1;
+  anvil_focus_announced = 0;
+  return 1.0;
+}
+
+static void anvil_focus_frame(void) {
+  anvil_focus_activated = 0;
+  if (!anvil_focus_count) {
+    anvil_focus_current = 0;
+    return;
+  }
+  if (anvil_mouse_pressed_buttons[0] && anvil_mouse_has_position) {
+    double hit = anvil_ui_focus_at(anvil_mouse_x_value, anvil_mouse_y_value);
+    if (hit != 0.0) {
+      anvil_focus_current = (int)hit;
+      anvil_focus_activated = (int)hit;
+    }
+  }
+  if (!anvil_focus_activated && anvil_focus_current &&
+      (anvil_keys_pressed[13] || anvil_keys_pressed[32]))
+    anvil_focus_activated = anvil_focus_current;
+  if (anvil_focus_accessible && anvil_focus_current != anvil_focus_announced) {
+    anvil_focus_announced = anvil_focus_current;
+    const AnvilFocusRegion *region =
+        anvil_focus_region((double)anvil_focus_current);
+    if (region)
+      anvil_host_announce(region->label, (int)strlen(region->label));
+  }
+}
+
 __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   if (delta_ms < 0.0)
     delta_ms = 0.0;
@@ -2649,6 +2837,7 @@ __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   anvil_delta_seconds = delta_ms / 1000.0;
   anvil_time_seconds += anvil_delta_seconds;
   anvil_screen_fade_advance(anvil_delta_seconds);
+  anvil_focus_frame();
   if (anvil_frame_update)
     anvil_frame_update();
   anvil_particles_update(anvil_delta_seconds);

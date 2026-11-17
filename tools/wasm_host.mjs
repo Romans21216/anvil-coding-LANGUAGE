@@ -180,6 +180,10 @@ const imports = {
     fade(alpha) {
       ops.push(["fade", Math.round(alpha)]);
     },
+    announce(pointer, length) {
+      const view = new Uint8Array(memory.buffer, pointer, length);
+      ops.push(["announce", utf8.decode(view)]);
+    },
     present() {
       if (triangles.length) {
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;

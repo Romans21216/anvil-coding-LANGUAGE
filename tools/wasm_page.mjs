@@ -70,9 +70,11 @@ const screen = {
   getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 600 }),
 };
 const out = { textContent: "" };
+const announceRegion = { textContent: "" };
 const document = {
   hidden: false,
-  getElementById: (id) => (id === "screen" ? screen : out),
+  getElementById: (id) =>
+    id === "screen" ? screen : id === "announce" ? announceRegion : out,
   createElement: () => ({
     width: 0,
     height: 0,
