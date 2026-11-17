@@ -4,8 +4,8 @@
     "non_background": 0.0944
   },
   "particles": {
-    "distinct_colours": 109,
-    "non_background": 0.2287
+    "distinct_colours": 113,
+    "non_background": 0.2284
   },
   "physics_boxes": {
     "distinct_colours": 83,
@@ -14,5 +14,9 @@
   "sprite_transform": {
     "distinct_colours": 84,
     "non_background": 0.371
+  },
+  "textured_cube": {
+    "distinct_colours": 31,
+    "non_background": 0.1131
   }
 }
