@@ -190,7 +190,7 @@ page opened with `?painter=1`. `?nosort=1` additionally skips the far-to-near
 sort, which is how the depth test is demonstrated — an unsorted painter shows
 the farther cube, WebGL shows the nearer one. 3D is still painted after any 2D
 drawing in the frame, and 2D primitives in a 3D scene are covered by the blit.
-Skinned `ray_mesh` models and textured geometry remain C-backend only. Unskinned animated
+Skinned `ray_mesh` is unsupported; textured geometry remains C-backend only. Unskinned animated
 `model_draw` and `ray_mesh` models support the first glTF clip with translation,
 rotation and scale tracks using LINEAR or STEP interpolation. `model_animate`
 sets a per-model clock; `model_animation_length` is baked as a compile-time

@@ -21,6 +21,8 @@ class WasmDocsTests(unittest.TestCase):
         self.assertIn("share a 16,384-triangle frame budget across\nstatic and animated submissions", document)
         self.assertIn("`model_morph(path,index,weight)` overrides that target", document)
         self.assertIn("static\nand animated unskinned models", document)
+        self.assertIn("supports one skin with up to 64 joints", document)
+        self.assertIn("skinned `ray_mesh` receives a located diagnostic", document)
         self.assertIn("unskinned model clips\n  are sampled", document)
         self.assertIn("`light(x,y,z)` vector points toward the light", document)
         self.assertIn("`light_ambient(level)`\nsets the 0–1 floor", document)

@@ -143,8 +143,8 @@ quietly drop the targets.
 
 A skinned model shares the animation clock: `model_animate(path, seconds)`
 drives its joint channels, and C and wasm `model_draw` pose it. Wasm samples the
-first clip and draws the bind pose when no clip exists; C `ray_mesh` supports
-skinning while wasm `ray_mesh` reports a source-located diagnostic. A vertex whose
+first clip and draws the bind pose when no clip exists; Neither C nor wasm `ray_mesh` supports
+skinning; wasm `ray_mesh` reports a source-located diagnostic. A vertex whose
 four weights are all zero keeps its mesh-space position rather than collapsing
 to the origin.
 
