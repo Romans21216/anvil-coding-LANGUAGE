@@ -2187,8 +2187,20 @@ double anvil_image_load_site(const char *path, const char *file, int line) {
 
 double anvil_memory_images(void) { return (double)anvil_image_memory_used; }
 double anvil_memory_audio(void) { return (double)anvil_sound_bytes; }
+/* Every pixel surface the renderer holds: two 32-bit backbuffers and the
+   double-precision depth buffer. The old counter reported one backbuffer, so
+   memory_total() under-reported the true footprint by three quarters. */
 double anvil_memory_video(void) {
-  return (double)ANVIL_WIDTH * (double)ANVIL_HEIGHT * 4.0;
+  const double pixels = (double)ANVIL_WIDTH * (double)ANVIL_HEIGHT;
+  return pixels * 4.0 * 2.0 + pixels * 8.0;
+}
+
+/* The subset a compositor can see: the two DIB sections. The depth buffer is a
+   private CPU allocation, and there is no other GPU-visible surface because
+   rendering is CPU-side, which is the honest answer to "VRAM beyond the
+   backbuffer" for this renderer. */
+double anvil_memory_gpu(void) {
+  return (double)ANVIL_WIDTH * (double)ANVIL_HEIGHT * 4.0 * 2.0;
 }
 double anvil_memory_total(void) {
   return anvil_memory_images() + anvil_memory_audio() + anvil_memory_video();

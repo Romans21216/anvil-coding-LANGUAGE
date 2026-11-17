@@ -61,7 +61,7 @@ class MemoryBudgetTests(unittest.TestCase):
             result = json.loads(report.read_text(encoding="utf-8"))["results"][0]
             self.assertEqual(result["scene"], "assets")
             self.assertEqual(result["image_bytes"], 8 * 64 * 64 * 4)
-            self.assertEqual(result["video_bytes"], 960 * 600 * 4)
+            self.assertEqual(result["video_bytes"], 960 * 600 * 16)  # 2 buffers + depth
             self.assertGreater(result["audio_bytes"], 0)
             self.assertEqual(result["image_bytes_after_destroy"], 7 * 64 * 64 * 4)
             self.assertGreater(result["audio_bytes"], result["audio_bytes_after_destroy"])

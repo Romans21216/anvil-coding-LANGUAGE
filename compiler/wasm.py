@@ -138,6 +138,7 @@ ALLOWED_BUILTINS = {
     "memory_images",
     "memory_audio",
     "memory_video",
+    "memory_gpu",
     "memory_total",
     "buffer",
     "sprite_batch",

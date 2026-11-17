@@ -1548,7 +1548,10 @@ const char *anvil_image_error(void) { return anvil_image_error_text; }
 
 double anvil_memory_images(void) { return anvil_wasm_image_bytes; }
 double anvil_memory_audio(void) { return anvil_wasm_audio_bytes; }
-double anvil_memory_video(void) { return 960.0 * 600.0 * 4.0; }
+/* The page owns the canvas; the module holds no pixel memory, so both
+   video counters are zero here and memory_total() covers images and audio. */
+double anvil_memory_video(void) { return 0.0; }
+double anvil_memory_gpu(void) { return 0.0; }
 double anvil_memory_total(void) {
   return anvil_memory_images() + anvil_memory_audio() + anvil_memory_video();
 }

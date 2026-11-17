@@ -12,6 +12,6 @@
   "assets": {
     "image_bytes": 131072,
     "audio_bytes": 576000,
-    "video_bytes": 2304000
+    "video_bytes": 9216000
   }
 }

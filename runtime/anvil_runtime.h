@@ -323,6 +323,7 @@ int anvil_str_ends(const char *source, const char *suffix);
 double anvil_memory_images(void);
 double anvil_memory_audio(void);
 double anvil_memory_video(void);
+double anvil_memory_gpu(void);
 double anvil_memory_total(void);
 
 #endif

@@ -48,6 +48,7 @@ PROGRAM = "\n".join(
         "  say image_destroy(var(b))",
         "  say memory_images()",
         "  say memory_video()",
+        "  say memory_gpu()",
         "  say memory_total()",
         "  say memory_audio()",
         '  set var(s) = sound_load("tone.wav")',
@@ -92,8 +93,12 @@ class MemoryBuiltinTests(unittest.TestCase):
                     "64",
                     "1",
                     "0",
-                    "2304000",
-                    "2304000",
+                    # Two 32-bit backbuffers plus the double-precision depth
+                    # buffer: 960*600*4*2 + 960*600*8.
+                    "9216000",
+                    # The compositor-visible subset: the two DIB sections.
+                    "4608000",
+                    "9216000",
                     "0",
                     "2400",
                     "1",
