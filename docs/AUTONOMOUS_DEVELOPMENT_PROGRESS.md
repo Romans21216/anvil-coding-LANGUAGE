@@ -920,3 +920,10 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Pre-scan:** a model problem found during the pre-scan used to escape as a traceback; the pre-scan now defers to the `model_draw`/`model_animate` lowering, which knows the line, and `emit_c` reports a prescan failure against the source path if one ever escapes.
 - **Tests:** `tests/test_gltf_skins.py` measures ink bounds for a fully weighted joint (moves as far as the joint), a 50/50 blend (half way), the bind pose with no clip, the missing-weights refusal and the wasm refusal.
 
+## Batch 94 — glTF morph targets (8.13)
+
+- **Import:** a static model with `targets` bakes one POSITION delta per vertex per target (transformed by the node matrix's linear part, since a delta is a displacement) plus the mesh's default weights. Up to eight targets; every primitive must declare the same count; a target without POSITION is refused.
+- **Runtime:** `anvil_mesh_draw_morphed` adds the weighted deltas to each vertex before the usual scale/rotate/translate and shading. `model_morph(path, index, weight)` clamps to 0-1 and returns the previous weight; weights initialise from the mesh defaults on the first draw and live per model id.
+- **Limits:** static models only — `model_morph` on an animated or skinned model is a located compile error, and wasm refuses a morphing model.
+- **Tests:** `tests/test_gltf_morph.py` measures ink (full delta at 1, half at 0.5, default weight applied, clamp/previous sequence, no-target refusal at the line, wasm refusal).
+

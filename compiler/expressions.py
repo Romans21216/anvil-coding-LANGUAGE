@@ -253,6 +253,7 @@ BUILTINS = {
     "model_draw": (8, 8),
     "model_animate": (2, 2),
     "model_animation_length": (1, 1),
+    "model_morph": (3, 3),
     "particle_emit": (9, 9),
     "particle_count": (0, 0),
     "particle_clear": (0, 0),
@@ -839,6 +840,14 @@ class ExpressionParser:
                     f"{model['length']:.6g}, anvil_model_clock({model['id']}), "
                     f"{placement})"
                 )
+            elif model.get("morph_count"):
+                call = (
+                    f"anvil_mesh_draw_morphed((const double *){symbol}, {count}, "
+                    f"(const double *){symbol}_morph, {model['morph_count']}, "
+                    f"anvil_model_morph_weights({model['id']}, "
+                    f"(const double *){symbol}_morph_default, {model['morph_count']}), "
+                    f"{placement})"
+                )
             elif model.get("animated"):
                 # The clip is evaluated per draw: node-local triangles plus the
                 # hierarchy and keyframes, sampled at the model's clock.
@@ -909,6 +918,37 @@ class ExpressionParser:
                 )
             self.expect(")")
             left = (f"{model['length']:.6g}", "number")
+        elif kind == "word" and value == "model_morph":
+            # Literal-path lowering: the model index and target count are
+            # compile-time facts.
+            self.expect("(")
+            literal = self.require_string(self.parse())
+            try:
+                asset = json.loads(literal)
+            except ValueError:
+                raise CompileError(
+                    f"{self.path}:{self.line}: model_morph needs a string literal path"
+                ) from None
+            from compiler import gltf
+            try:
+                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+            except gltf.ModelError as error:
+                raise CompileError(f"{self.path}:{self.line}: {error}") from None
+            if not model.get("morph_count"):
+                raise CompileError(
+                    f"{self.path}:{self.line}: the model has no morph targets"
+                )
+            self.expect(",")
+            index = self.require_number(self.parse())
+            self.expect(",")
+            weight = self.require_number(self.parse())
+            self.expect(")")
+            left = (
+                self.checked_number(
+                    f"anvil_model_morph({model['id']}, {index}, {weight})"
+                ),
+                "number",
+            )
         elif kind == "word" and value in BUILTINS:
             self.expect("(")
             args = []

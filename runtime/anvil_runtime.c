@@ -1175,6 +1175,79 @@ double anvil_mesh_draw_skinned(
   return 1.0;
 }
 
+/* ---- Morph targets ------------------------------------------------------ */
+
+#define ANVIL_MORPH_TARGETS 8
+static double anvil_morph_values[ANVIL_MODEL_STATES][ANVIL_MORPH_TARGETS];
+static int anvil_morph_ready[ANVIL_MODEL_STATES];
+
+/* Weights start at the mesh's default blend; the first draw initialises them
+   and model_morph() edits them in place. */
+const double *anvil_model_morph_weights(int id, const double *defaults,
+                                        int count) {
+  if (id < 0 || id >= ANVIL_MODEL_STATES)
+    return defaults;
+  if (!anvil_morph_ready[id]) {
+    for (int i = 0; i < ANVIL_MORPH_TARGETS; ++i)
+      anvil_morph_values[id][i] =
+          (defaults && i < count) ? defaults[i] : 0.0;
+    anvil_morph_ready[id] = 1;
+  }
+  return anvil_morph_values[id];
+}
+
+double anvil_model_morph(int id, int index, double weight) {
+  if (id < 0 || id >= ANVIL_MODEL_STATES || index < 0 ||
+      index >= ANVIL_MORPH_TARGETS || !isfinite(weight))
+    return 0.0;
+  anvil_model_morph_weights(id, NULL, 0);
+  double previous = anvil_morph_values[id][index];
+  anvil_morph_values[id][index] =
+      weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
+  return previous;
+}
+
+double anvil_mesh_draw_morphed(const double *data, int triangle_count,
+                               const double *deltas, int targets,
+                               const double *weights, double x, double y,
+                               double z, double scale, double rx, double ry,
+                               double rz) {
+  if (!data || !deltas || !weights || triangle_count <= 0 || targets <= 0 ||
+      targets > ANVIL_MORPH_TARGETS || !isfinite(x) || !isfinite(y) ||
+      !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
+      !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  anvil_mesh_drawn_frame++;
+  for (int triangle = 0; triangle < triangle_count; ++triangle) {
+    const double *p = data + (size_t)triangle * 12;
+    AnvilVec3 v[3];
+    for (int corner = 0; corner < 3; ++corner) {
+      int vertex = triangle * 3 + corner;
+      const double *base = p + corner * 3;
+      const double *delta = deltas + (size_t)vertex * (size_t)targets * 3;
+      double px = base[0], py = base[1], pz = base[2];
+      for (int target = 0; target < targets; ++target) {
+        double weight = weights[target];
+        if (weight == 0.0)
+          continue;
+        const double *offset = delta + target * 3;
+        px += offset[0] * weight;
+        py += offset[1] * weight;
+        pz += offset[2] * weight;
+      }
+      AnvilVec3 q = {px * scale, py * scale, pz * scale};
+      q = anvil_rotate(q, rx, ry, rz);
+      v[corner] = (AnvilVec3){x + q.x, y + q.y, z + q.z};
+    }
+    AnvilVec3 n = anvil_normalize(
+        anvil_cross(anvil_sub(v[1], v[0]), anvil_sub(v[2], v[0])));
+    double brightness = anvil_light_level(n, 1);
+    uint32_t base = anvil_color((int)p[9], (int)p[10], (int)p[11]);
+    anvil_world_triangle(v, base, brightness, 255);
+  }
+  return 1.0;
+}
+
 void anvil_sphere(double x, double y, double z, double radius, int r, int g,
                   int b, int a) {
   if (radius <= 0.0 || !isfinite(radius))

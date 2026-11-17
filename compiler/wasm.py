@@ -761,6 +761,12 @@ def validate(
                 f"{source_path}:{line}: animated models are not available in the "
                 "wasm backend yet (the browser draws a baked static pose)"
             )
+        if model.get("morph_count"):
+            line = text.count("\n", 0, match.start()) + 1
+            raise CompileError(
+                f"{source_path}:{line}: morph targets are not available in the "
+                "wasm backend yet (the browser bakes a single pose)"
+            )
         if model.get("skinned"):
             line = text.count("\n", 0, match.start()) + 1
             raise CompileError(

@@ -123,6 +123,10 @@ remote desktop can prevent window creation:
 - `test_parallax` — clamps the factor and returns the previous value, then pans
   the camera 100 px and proves with captured pixels that a factor-1 layer
   lands at x=0 and a 0.5 layer at x=50.
+- `test_gltf_morph` — a weight of 1 moves the triangle the whole delta and 0.5
+  half way, a mesh default weight applies on the first draw, weights clamp while
+  returning the previous value, a model without targets refuses `model_morph`
+  at its line, and the wasm case is refused.
 - `test_gltf_skins` — a one-joint skin follows its animated joint, a 50/50
   blend between a moving and a static joint lands half way, a clip-less rig
   draws at its bind pose, and a primitive without weights plus the wasm case

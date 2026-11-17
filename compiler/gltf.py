@@ -182,6 +182,7 @@ def _primitive(
     matrix: list[float],
     base_dir: pathlib.Path,
     binary: bytes | None = None,
+    morph_out: list[float] | None = None,
 ) -> list[float]:
     attributes = primitive.get("attributes", {})
     if "POSITION" not in attributes:
@@ -203,6 +204,25 @@ def _primitive(
         colours = [tuple(max(0, min(255, int(round(v * 255.0)))) for v in row[:3]) for row in raw]
     fallback = _material_colour(document, primitive)
 
+    targets = primitive.get("targets", [])
+    deltas: list[list[tuple[float, float, float]]] = []
+    for target in targets:
+        if "POSITION" not in target:
+            raise ModelError("a morph target needs a POSITION delta")
+        raw = _accessor(document, target["POSITION"], base_dir, binary)
+        # Only the linear part of the world matrix applies to a delta; the
+        # translation would move a delta that is a displacement, not a point.
+        deltas.append(
+            [
+                (
+                    matrix[0] * row[0] + matrix[4] * row[1] + matrix[8] * row[2],
+                    matrix[1] * row[0] + matrix[5] * row[1] + matrix[9] * row[2],
+                    matrix[2] * row[0] + matrix[6] * row[1] + matrix[10] * row[2],
+                )
+                for row in raw
+            ]
+        )
+
     triangles = _triangle_indices(primitive.get("mode", 4), len(indices))
     out: list[float] = []
     for a, b, c in triangles:
@@ -218,6 +238,10 @@ def _primitive(
         for point in points:
             out.extend(point)
         out.extend((float(colour[0]), float(colour[1]), float(colour[2])))
+        if morph_out is not None:
+            for corner in corners:
+                for target in deltas:
+                    morph_out.extend(target[corner])
     return out
 
 
@@ -265,11 +289,16 @@ def _container(path: pathlib.Path) -> tuple[dict, bytes | None]:
     return document, binary
 
 
-def load_triangles(path: pathlib.Path) -> list[float]:
-    document, binary = _container(path)
-    if not isinstance(document, dict) or "asset" not in document:
-        raise ModelError(f"{path.name} has no glTF 'asset' block")
-    base_dir = path.parent
+MAX_MORPH_TARGETS = 8
+
+
+def _static_walk(
+    document: dict,
+    binary: bytes | None,
+    base_dir: pathlib.Path,
+    morph_out: list[float] | None = None,
+) -> tuple[list[float], list[int]]:
+    """Bake every mesh in world space; optionally collect morph deltas."""
     nodes = document.get("nodes", [])
     scenes = document.get("scenes")
     if scenes:
@@ -277,6 +306,7 @@ def load_triangles(path: pathlib.Path) -> list[float]:
     else:
         roots = list(range(len(nodes)))
     triangles: list[float] = []
+    target_counts: list[int] = []
 
     def visit(index: int, parent: list[float], depth: int) -> None:
         if depth > 64:
@@ -289,8 +319,9 @@ def load_triangles(path: pathlib.Path) -> list[float]:
             mesh = document["meshes"][node["mesh"]]
             for primitive in mesh.get("primitives", []):
                 triangles.extend(
-                    _primitive(document, primitive, world, base_dir, binary)
+                    _primitive(document, primitive, world, base_dir, binary, morph_out)
                 )
+                target_counts.append(len(primitive.get("targets", [])))
                 if len(triangles) // 12 > MAX_TRIANGLES:
                     raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
         for child in node.get("children", []):
@@ -298,9 +329,57 @@ def load_triangles(path: pathlib.Path) -> list[float]:
 
     for root in roots:
         visit(root, _identity(), 0)
+    return triangles, target_counts
+
+
+def _static_document(path: pathlib.Path) -> tuple[dict, bytes | None]:
+    document, binary = _container(path)
+    if not isinstance(document, dict) or "asset" not in document:
+        raise ModelError(f"{path.name} has no glTF 'asset' block")
+    return document, binary
+
+
+def load_triangles(path: pathlib.Path) -> list[float]:
+    document, binary = _static_document(path)
+    triangles, _ = _static_walk(document, binary, path.parent)
     if not triangles:
         raise ModelError("the model has no triangle geometry")
     return triangles
+
+
+def load_morphed(path: pathlib.Path) -> dict:
+    """Bake a static model with morph target deltas.
+
+    Every primitive must declare the same positive number of targets, so the
+    per-vertex delta stride is uniform; the deltas are stored per vertex, per
+    target.
+    """
+    document, binary = _static_document(path)
+    morph: list[float] = []
+    triangles, counts = _static_walk(document, binary, path.parent, morph)
+    if not triangles:
+        raise ModelError("the model has no triangle geometry")
+    if not counts or max(counts) == 0:
+        raise ModelError("the model has no morph targets")
+    targets = counts[0]
+    if any(count != targets for count in counts):
+        raise ModelError("every primitive must use the same morph target count")
+    if targets > MAX_MORPH_TARGETS:
+        raise ModelError(f"a model may use at most {MAX_MORPH_TARGETS} morph targets")
+    defaults = [0.0] * targets
+    for mesh in document.get("meshes", []):
+        weights = mesh.get("weights")
+        if weights:
+            if len(weights) != targets:
+                raise ModelError("a mesh's default morph weights do not match its targets")
+            defaults = [float(value) for value in weights]
+            break
+    return {
+        "vertices": triangles,
+        "morph": morph,
+        "morph_count": targets,
+        "morph_defaults": defaults,
+    }
 
 
 # ---- Animation -------------------------------------------------------------
@@ -705,7 +784,13 @@ def _kind(path: pathlib.Path) -> str:
     nodes = document.get("nodes", [])
     if document.get("skins") and any("skin" in node for node in nodes):
         return "skinned"
-    return "animated" if document.get("animations") else "static"
+    if document.get("animations"):
+        return "animated"
+    for mesh in document.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            if primitive.get("targets"):
+                return "morphed"
+    return "static"
 
 
 def _skinned_bounds(vertices: list[float]) -> tuple[float, float, float, float]:
@@ -751,6 +836,13 @@ def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
         entry["count"] = len(clip["vertices"]) // 14 // 3
         entry["data"] = clip["vertices"]
         entry["bounds"] = _skinned_bounds(clip["vertices"])
+    elif kind == "morphed":
+        morph = load_morphed(path)
+        entry.update(morph)
+        entry["animated"] = False
+        entry["count"] = len(morph["vertices"]) // 12
+        entry["data"] = morph["vertices"]
+        entry["bounds"] = bounds_of(morph["vertices"])
     elif kind == "animated":
         clip = load_animated(path)
         entry.update(clip)
@@ -813,6 +905,14 @@ def definitions() -> list[str]:
             _double_array(lines, symbol + "_times", entry["times"], 8)
             _double_array(lines, symbol + "_values", entry["values"], 8)
             _int_array(lines, symbol + "_tracks", entry["tracks"], 6)
+        elif entry.get("morph_count"):
+            lines.append(
+                f"/* model: {pathlib.Path(key).name}, {count} morphing triangles, "
+                f"{entry['morph_count']} targets */"
+            )
+            _double_array(lines, symbol, entry["data"], 12)
+            _double_array(lines, symbol + "_morph", entry["morph"], 12)
+            _double_array(lines, symbol + "_morph_default", entry["morph_defaults"], 8)
         elif entry.get("animated"):
             lines.append(
                 f"/* model: {pathlib.Path(key).name}, {count} animated triangles, "

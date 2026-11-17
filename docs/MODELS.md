@@ -131,3 +131,34 @@ by the joint's animated translation, a 50/50 blend between a moving joint and a
 static one lands half way, a clip-less rig draws at rest, and the malformed and
 wasm cases are refused with the source line.
 
+## Morph targets
+
+A static model may declare up to eight morph targets. The importer keeps one
+`POSITION` delta per vertex per target (transformed into model space by the
+node's matrix) and the mesh's default `weights`.
+
+```
+set var(previous) = model_morph("face.gltf", 0, 0.75)
+set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
+```
+
+- Every primitive in the model must declare the same number of targets, so the
+  per-vertex delta stride is uniform; a mismatch, a target without a `POSITION`
+  delta, or more than eight targets is refused at compile time.
+- `model_morph(path, index, weight)` clamps the weight to 0-1, stores it and
+  returns the previous value, so a caller can restore it. A non-finite weight
+  leaves the stored value alone.
+- The weights start at the mesh's `weights` array and stay per model for the
+  life of the process.
+- Blending is additive on the vertex position before scale/rotate/translate;
+  vertex colour does not animate, and culling still uses the rest-pose bounding
+  sphere.
+- Only static models morph: a model with an animation clip or a skin is refused
+  at the `model_morph` line, and the browser backend refuses a morphing model
+  outright.
+
+`tests/test_gltf_morph.py` measures ink: weight 1 moves the triangle the whole
+delta, 0.5 moves it half way, a mesh default of 1.0 is applied on the first
+draw, weights clamp while returning the previous value, a model without targets
+refuses `model_morph` at its source line, and wasm refuses a morphing model.
+
