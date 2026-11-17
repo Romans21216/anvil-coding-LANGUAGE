@@ -1672,6 +1672,255 @@ double anvil_image_draw_rotated(double handle, double cx, double cy, double angl
   return anvil_image_draw_rotated_now(handle, cx, cy, angle, scale);
 }
 
+
+/* ---- Tilemaps ------------------------------------------------------------
+   A tilemap is a grid of cells, each naming a tile in an image sheet. Tile t
+   sits at (t % tiles_per_row, t / tiles_per_row) in the sheet, so a 4x4
+   tileset is addressed left to right, top to bottom. Tile -1 is empty, which
+   lets a cell be cleared without borrowing a real tile. Cells are allocated
+   per map, so an unused slot costs nothing. */
+enum {
+  ANVIL_TILEMAPS = 16,
+  ANVIL_TILEMAP_MAX = 128,
+  ANVIL_TILEMAP_EMPTY = -1
+};
+
+typedef struct {
+  int used;
+  uint32_t generation;
+  double image_handle;
+  int tile_w, tile_h;
+  int columns, rows;
+  int tiles;
+  int tiles_per_row;
+  int *cells;
+} AnvilTilemap;
+
+static AnvilTilemap anvil_tilemaps[ANVIL_TILEMAPS];
+static const char *anvil_tilemap_error_text = "";
+
+const char *anvil_tilemap_error(void) { return anvil_tilemap_error_text; }
+
+static AnvilTilemap *anvil_tilemap_from_handle(double handle) {
+  const uint64_t max_handle = (uint64_t)UINT32_MAX * ANVIL_TILEMAPS;
+  if (!isfinite(handle) || handle < 1.0 || handle > (double)max_handle ||
+      floor(handle) != handle)
+    return NULL;
+  uint64_t encoded = (uint64_t)handle - 1;
+  int slot = (int)(encoded % ANVIL_TILEMAPS);
+  uint32_t generation = (uint32_t)(encoded / ANVIL_TILEMAPS) + 1;
+  AnvilTilemap *map = &anvil_tilemaps[slot];
+  return map->used && map->generation == generation ? map : NULL;
+}
+
+static int anvil_tilemap_cell_ok(const AnvilTilemap *map, double column,
+                                 double row) {
+  if (!isfinite(column) || !isfinite(row) || floor(column) != column ||
+      floor(row) != row || column < 0.0 || row < 0.0 ||
+      column >= (double)map->columns || row >= (double)map->rows)
+    return 0;
+  return 1;
+}
+
+static int anvil_tilemap_tile_ok(const AnvilTilemap *map, double tile) {
+  if (!isfinite(tile) || floor(tile) != tile)
+    return 0;
+  if (tile == (double)ANVIL_TILEMAP_EMPTY)
+    return 1;
+  return tile >= 0.0 && tile < (double)map->tiles;
+}
+
+double anvil_tilemap_new(double image_handle, double tile_w, double tile_h,
+                         double columns, double rows) {
+  anvil_tilemap_error_text = "";
+  AnvilImage *image = anvil_image_from_handle(image_handle);
+  if (!image) {
+    anvil_tilemap_error_text = "the tileset is not a loaded image";
+    return 0.0;
+  }
+  if (!isfinite(tile_w) || !isfinite(tile_h) || floor(tile_w) != tile_w ||
+      floor(tile_h) != tile_h || tile_w < 1.0 || tile_h < 1.0) {
+    anvil_tilemap_error_text = "the tile size must be whole pixels of at least 1";
+    return 0.0;
+  }
+  if (tile_w > (double)image->width || tile_h > (double)image->height) {
+    anvil_tilemap_error_text = "the tile is larger than the tileset image";
+    return 0.0;
+  }
+  if (!isfinite(columns) || !isfinite(rows) || floor(columns) != columns ||
+      floor(rows) != rows || columns < 1.0 || rows < 1.0 ||
+      columns > (double)ANVIL_TILEMAP_MAX || rows > (double)ANVIL_TILEMAP_MAX) {
+    anvil_tilemap_error_text = "the map must be 1..128 cells on each side";
+    return 0.0;
+  }
+  int slot = -1;
+  for (int i = 0; i < ANVIL_TILEMAPS; ++i) {
+    if (!anvil_tilemaps[i].used && anvil_tilemaps[i].generation < UINT32_MAX) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    anvil_tilemap_error_text = "the tilemap slots are full";
+    return 0.0;
+  }
+  int columns_i = (int)columns;
+  int rows_i = (int)rows;
+  int *cells = (int *)malloc((size_t)columns_i * (size_t)rows_i * sizeof(int));
+  if (!cells) {
+    anvil_tilemap_error_text = "there is not enough memory for the map";
+    return 0.0;
+  }
+  for (int i = 0; i < columns_i * rows_i; ++i)
+    cells[i] = ANVIL_TILEMAP_EMPTY;
+  AnvilTilemap *map = &anvil_tilemaps[slot];
+  uint32_t generation = map->generation + 1;
+  memset(map, 0, sizeof(*map));
+  map->generation = generation;
+  map->used = 1;
+  map->image_handle = image_handle;
+  map->tile_w = (int)tile_w;
+  map->tile_h = (int)tile_h;
+  map->columns = columns_i;
+  map->rows = rows_i;
+  map->tiles_per_row = image->width / (int)tile_w;
+  map->tiles = map->tiles_per_row * (image->height / (int)tile_h);
+  map->cells = cells;
+  return (double)(generation - 1) * ANVIL_TILEMAPS + slot + 1;
+}
+
+double anvil_tilemap_free(double handle) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map)
+    return 0.0;
+  free(map->cells);
+  uint32_t generation = map->generation;
+  memset(map, 0, sizeof(*map));
+  map->generation = generation;
+  return 1.0;
+}
+
+double anvil_tilemap_columns(double handle) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  return map ? (double)map->columns : 0.0;
+}
+
+double anvil_tilemap_rows(double handle) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  return map ? (double)map->rows : 0.0;
+}
+
+double anvil_tilemap_tiles(double handle) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  return map ? (double)map->tiles : 0.0;
+}
+
+double anvil_tilemap_set(double handle, double column, double row, double tile) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !anvil_tilemap_cell_ok(map, column, row))
+    return 0.0;
+  if (!anvil_tilemap_tile_ok(map, tile))
+    return 0.0;
+  map->cells[(size_t)(int)row * (size_t)map->columns + (size_t)(int)column] =
+      (int)tile;
+  return 1.0;
+}
+
+double anvil_tilemap_get(double handle, double column, double row) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !anvil_tilemap_cell_ok(map, column, row))
+    return -1.0;
+  return (double)map->cells[(size_t)(int)row * (size_t)map->columns +
+                            (size_t)(int)column];
+}
+
+double anvil_tilemap_fill(double handle, double tile) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !anvil_tilemap_tile_ok(map, tile))
+    return 0.0;
+  int count = map->columns * map->rows;
+  for (int i = 0; i < count; ++i)
+    map->cells[i] = (int)tile;
+  return 1.0;
+}
+
+double anvil_tilemap_area(double handle, double tile, double column, double row,
+                          double columns, double rows) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !anvil_tilemap_tile_ok(map, tile))
+    return 0.0;
+  if (!isfinite(column) || !isfinite(row) || !isfinite(columns) ||
+      !isfinite(rows) || floor(column) != column || floor(row) != row ||
+      floor(columns) != columns || floor(rows) != rows)
+    return 0.0;
+  int x0 = (int)column, y0 = (int)row;
+  int x1 = x0 + (int)columns, y1 = y0 + (int)rows;
+  if (x0 < 0)
+    x0 = 0;
+  if (y0 < 0)
+    y0 = 0;
+  if (x1 > map->columns)
+    x1 = map->columns;
+  if (y1 > map->rows)
+    y1 = map->rows;
+  if (x0 >= x1 || y0 >= y1)
+    return 0.0;
+  for (int y = y0; y < y1; ++y)
+    for (int x = x0; x < x1; ++x)
+      map->cells[(size_t)y * (size_t)map->columns + (size_t)x] = (int)tile;
+  return 1.0;
+}
+
+double anvil_tilemap_draw(double handle, double x, double y, double scale) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map) {
+    anvil_tilemap_error_text = "the tilemap handle is not live";
+    return 0.0;
+  }
+  if (!anvil_image_from_handle(map->image_handle)) {
+    anvil_tilemap_error_text = "the tileset image was destroyed";
+    return 0.0;
+  }
+  if (!anvil_pixels) {
+    anvil_tilemap_error_text = "there is no window to draw into";
+    return 0.0;
+  }
+  if (!isfinite(x) || !isfinite(y) || !isfinite(scale) || scale <= 0.0)
+    return 0.0;
+  double step_x = (double)map->tile_w * scale;
+  double step_y = (double)map->tile_h * scale;
+  for (int row = 0; row < map->rows; ++row) {
+    for (int column = 0; column < map->columns; ++column) {
+      int tile = map->cells[(size_t)row * (size_t)map->columns + (size_t)column];
+      if (tile < 0 || tile >= map->tiles)
+        continue;
+      double dx = x + (double)column * step_x;
+      double dy = y + (double)row * step_y;
+      /* Cull cells that cannot touch the framebuffer after the camera. */
+      double sx = dx, sy = dy;
+      anvil_camera2d_point(&sx, &sy);
+      double cw = step_x * anvil_camera2d_zoom;
+      double ch = step_y * anvil_camera2d_zoom;
+      if (sx + cw <= 0.0 || sy + ch <= 0.0 || sx >= (double)ANVIL_WIDTH ||
+          sy >= (double)ANVIL_HEIGHT)
+        continue;
+      double source_x = (double)((tile % map->tiles_per_row) * map->tile_w);
+      double source_y = (double)((tile / map->tiles_per_row) * map->tile_h);
+      if (anvil_sprite_batch_on) {
+        const double args[9] = {map->image_handle, source_x, source_y,
+                                (double)map->tile_w, (double)map->tile_h,
+                                dx, dy, step_x, step_y};
+        if (anvil_sprite_push(2, args))
+          continue;
+      }
+      anvil_image_draw_region_now(map->image_handle, source_x, source_y,
+                                  (double)map->tile_w, (double)map->tile_h,
+                                  dx, dy, step_x, step_y);
+    }
+  }
+  return 1.0;
+}
+
 double anvil_image_draw_region(double handle, double sx, double sy, double sw,
                                double sh, double dx, double dy, double dw,
                                double dh) {

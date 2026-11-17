@@ -90,7 +90,10 @@ Refused with a source-located error:
 - `scene 3d`, `camera` and `engine` statements
 - `display` shapes other than `rect`, `circle`, `line` and `text` (cubes,
   spheres, planes, sprites, ray-sphere)
-- any other builtin (`time`, `rnd`, `image_load`, `sound_*`, `save_*`, ...)
+- any other builtin; the current refusals are `memory_report`,
+  `frame_capture`, `text_width` and the `tilemap_*` family (the console, canvas, baked-asset,
+  audio, save, physics, particle and accounting builtins listed above
+  are supported)
 
 For example:
 

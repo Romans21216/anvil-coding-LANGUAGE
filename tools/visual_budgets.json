@@ -18,5 +18,9 @@
   "textured_cube": {
     "distinct_colours": 29,
     "non_background": 0.0858
+  },
+  "tilemap": {
+    "distinct_colours": 45,
+    "non_background": 0.521
   }
 }

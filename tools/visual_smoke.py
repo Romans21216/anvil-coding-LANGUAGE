@@ -34,6 +34,7 @@ CASES = {
     "physics_boxes": ("examples/physics_boxes.ANVL", 1.0, 4, 0.01),
     "first_world": ("examples/first_world.ANVL", 1.0, 6, 0.02),
     "textured_cube": ("examples/textured_cube.ANVL", 1.0, 6, 0.02),
+    "tilemap": ("examples/tilemap_demo.ANVL", 1.0, 6, 0.02),
 }
 
 

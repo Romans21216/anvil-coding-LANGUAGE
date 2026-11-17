@@ -157,6 +157,8 @@ async function main() {
   expect('say memory_images() + memory_audio()', 'memory_images', 'support.function.anvil');
   expect('say memory_total()', 'memory_total', 'support.function.anvil');
   expect('say memory_report()', 'memory_report', 'support.function.anvil');
+  expect('set ok = tilemap_draw(map, 0, 0, 1)', 'tilemap_draw', 'support.function.anvil');
+  expect('set map = tilemap_new(sheet, 16, 16, 20, 12)', 'tilemap_new', 'support.function.anvil');
   expect('set var(ok) = shadow(1)', 'shadow', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');

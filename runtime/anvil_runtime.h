@@ -82,6 +82,20 @@ double anvil_image_draw_scaled(double handle, double x, double y, double width,
                                double height);
 double anvil_image_draw_rotated(double handle, double cx, double cy,
                                 double degrees, double scale);
+double anvil_tilemap_new(double image_handle, double tile_w, double tile_h,
+                         double columns, double rows);
+double anvil_tilemap_free(double handle);
+double anvil_tilemap_columns(double handle);
+double anvil_tilemap_rows(double handle);
+double anvil_tilemap_tiles(double handle);
+double anvil_tilemap_set(double handle, double column, double row, double tile);
+double anvil_tilemap_get(double handle, double column, double row);
+double anvil_tilemap_fill(double handle, double tile);
+double anvil_tilemap_area(double handle, double tile, double column, double row,
+                          double columns, double rows);
+double anvil_tilemap_draw(double handle, double x, double y, double scale);
+const char *anvil_tilemap_error(void);
+
 double anvil_image_draw_region(double handle, double sx, double sy, double sw,
                                double sh, double dx, double dy, double dw,
                                double dh);

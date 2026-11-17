@@ -1,0 +1,32 @@
+# Tilemap demo: a 20x12 island drawn from the 4x4 tileset in examples/assets/tiles.bmp.
+# Each cell is 16x16 pixels in the sheet and drawn at 3x, so the map fills 960x576.
+scene 2d
+clear rgba(9, 12, 20, 255)
+set var(sheet) = image_load("examples/assets/tiles.bmp")
+set var(map) = tilemap_new(var(sheet), 16, 16, 20, 12)
+
+# Water everywhere, then paint the island as clipped rectangles. Tile 2 is
+# water, 4 sand, 0 grass, 3 stone, 1 dirt, 5 brick, 6 wood.
+set var(ok) = tilemap_fill(var(map), 2)
+set var(ok) = tilemap_area(var(map), 4, 3, 2, 14, 8)
+set var(ok) = tilemap_area(var(map), 0, 4, 3, 12, 6)
+set var(ok) = tilemap_area(var(map), 3, 9, 3, 2, 5)
+set var(ok) = tilemap_area(var(map), 1, 10, 2, 3, 2)
+set var(ok) = tilemap_set(var(map), 6, 4, 6)
+set var(ok) = tilemap_set(var(map), 12, 7, 5)
+set var(ok) = tilemap_set(var(map), 13, 7, 5)
+# Chamfer both layers at the corners so the island reads as an island.
+set var(ok) = tilemap_set(var(map), 3, 2, 2)
+set var(ok) = tilemap_set(var(map), 16, 2, 2)
+set var(ok) = tilemap_set(var(map), 3, 9, 2)
+set var(ok) = tilemap_set(var(map), 16, 9, 2)
+set var(ok) = tilemap_set(var(map), 4, 3, 4)
+set var(ok) = tilemap_set(var(map), 15, 3, 4)
+set var(ok) = tilemap_set(var(map), 4, 8, 4)
+set var(ok) = tilemap_set(var(map), 15, 8, 4)
+
+fn(draw)
+  display rect(0, 0, 960, 600) -rgba(9, 12, 20, 255)
+  set var(drawn) = tilemap_draw(var(map), 0, 24, 3)
+  display text("Anvil tilemap  20 x 12 cells  3x") -l(12, 4) -rgb(196, 210, 236)
+end
