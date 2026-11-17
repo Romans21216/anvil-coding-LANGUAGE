@@ -2,7 +2,7 @@
 # follows the camera at 1x, so the two visibly separate as the view drifts.
 scene 2d
 clear rgba(8, 14, 26, 255)
-set var(tiles) = image_load("examples/assets/tiles.bmp")
+set var(tiles) = image_load("assets/tiles.bmp")
 set var(sea) = tilemap_new(var(tiles), 16, 16, 64, 12)
 set var(isle) = tilemap_new(var(tiles), 16, 16, 16, 10)
 

@@ -60,6 +60,8 @@ def write_skinned_model(
     blob = b""
     views = []
     for _, payload in parts:
+        if len(blob) % 4 and payload in (joint_bytes, weight_bytes, bind, times, values):
+            blob += b"\0" * (-len(blob) % 4)
         views.append({"buffer": 0, "byteOffset": len(blob), "byteLength": len(payload)})
         blob += payload
     (root / "skin.bin").write_bytes(blob)

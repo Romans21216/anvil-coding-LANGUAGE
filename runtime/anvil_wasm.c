@@ -67,11 +67,22 @@ static int anvil_wasm_ray_mesh_triangles_frame;
 #define ANVIL_WASM_MODEL_TRIANGLE_BUDGET 16384
 #define ANVIL_WASM_MODEL_STATES 32
 #define ANVIL_WASM_MORPH_TARGETS 8
+#define ANVIL_WASM_MODEL_INSTANCES 64
+#define ANVIL_WASM_INSTANCE_GENERATION_MAX 33554431
 static double anvil_wasm_morph_values[ANVIL_WASM_MODEL_STATES]
                                           [ANVIL_WASM_MORPH_TARGETS];
 static unsigned char anvil_wasm_morph_ready[ANVIL_WASM_MODEL_STATES];
 static unsigned char anvil_wasm_morph_overridden[ANVIL_WASM_MODEL_STATES]
                                                     [ANVIL_WASM_MORPH_TARGETS];
+typedef struct {
+  int model_id;
+  unsigned generation;
+  int active, retired;
+  double values[ANVIL_WASM_MORPH_TARGETS];
+  unsigned char overridden[ANVIL_WASM_MORPH_TARGETS];
+} AnvilWasmModelInstance;
+static AnvilWasmModelInstance
+    anvil_wasm_model_instances[ANVIL_WASM_MODEL_INSTANCES];
 #define ANVIL_WASM_MODEL_NODES 128
 static double anvil_wasm_model_times[ANVIL_WASM_MODEL_STATES];
 
@@ -1779,7 +1790,7 @@ static int anvil_wasm_sphere_visible(double cx, double cy, double cz,
   centre = anvil_wasm_rotate(centre, rx, ry, rz);
   centre = (AnvilWasmVec3){centre.x + x, centre.y + y, centre.z + z};
   AnvilWasmVec3 camera = anvil_wasm_to_camera(centre);
-  double scaled = radius * scale;
+  double scaled = radius * fabs(scale);
   if (camera.z + scaled <= 0.05)
     return 0;
   if (camera.z - scaled < 0.05)
@@ -1905,17 +1916,133 @@ double anvil_model_morph(int id, int index, double weight,
   return previous;
 }
 
+static AnvilWasmModelInstance *anvil_wasm_instance_lookup(double handle,
+                                                           int model_id) {
+  if (!anvil_wasm_finite(handle) || handle < 1.0 || handle > 2147483647.0 ||
+      (double)(int)handle != handle)
+    return NULL;
+  unsigned token = (unsigned)handle - 1u;
+  unsigned slot = token % ANVIL_WASM_MODEL_INSTANCES;
+  unsigned generation = token / ANVIL_WASM_MODEL_INSTANCES;
+  AnvilWasmModelInstance *instance = &anvil_wasm_model_instances[slot];
+  return instance->active && instance->generation == generation &&
+                 instance->model_id == model_id
+             ? instance
+             : NULL;
+}
+
+double anvil_model_instance_create(int model_id, int morph_count) {
+  if (model_id < 0 || model_id >= ANVIL_WASM_MODEL_STATES || morph_count <= 0 ||
+      morph_count > ANVIL_WASM_MORPH_TARGETS)
+    return 0.0;
+  for (unsigned slot = 0; slot < ANVIL_WASM_MODEL_INSTANCES; ++slot) {
+    AnvilWasmModelInstance *instance = &anvil_wasm_model_instances[slot];
+    if (instance->active || instance->retired)
+      continue;
+    instance->active = 1;
+    instance->model_id = model_id;
+    for (int i = 0; i < ANVIL_WASM_MORPH_TARGETS; ++i) {
+      instance->values[i] = 0.0;
+      instance->overridden[i] = 0;
+    }
+    return (double)instance->generation * ANVIL_WASM_MODEL_INSTANCES + slot + 1.0;
+  }
+  return 0.0;
+}
+
+double anvil_model_instance_destroy(double handle, int model_id) {
+  AnvilWasmModelInstance *instance = anvil_wasm_instance_lookup(handle, model_id);
+  if (!instance)
+    return 0.0;
+  instance->active = 0;
+  instance->model_id = -1;
+  if (instance->generation >= ANVIL_WASM_INSTANCE_GENERATION_MAX)
+    instance->retired = 1;
+  else
+    instance->generation++;
+  return 1.0;
+}
+
+int anvil_model_instance_valid(double handle, int model_id) {
+  return anvil_wasm_instance_lookup(handle, model_id) != NULL;
+}
+
+const double *anvil_model_instance_morph_weights(double handle, int model_id,
+                                                  const double *defaults,
+                                                  int morph_count) {
+  AnvilWasmModelInstance *instance = anvil_wasm_instance_lookup(handle, model_id);
+  return instance && defaults && morph_count > 0 &&
+                 morph_count <= ANVIL_WASM_MORPH_TARGETS
+             ? instance->values
+             : defaults;
+}
+
+double anvil_model_instance_morph(double handle, int model_id, int index,
+                                  double weight, const double *defaults,
+                                  int morph_count) {
+  AnvilWasmModelInstance *instance = anvil_wasm_instance_lookup(handle, model_id);
+  if (!instance || !defaults || index < 0 || index >= morph_count ||
+      morph_count <= 0 || morph_count > ANVIL_WASM_MORPH_TARGETS ||
+      !anvil_wasm_finite(weight))
+    return 0.0;
+  double previous = instance->overridden[index]
+                        ? instance->values[index]
+                        : defaults[index];
+  instance->values[index] = weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
+  instance->overridden[index] = 1;
+  return previous;
+}
+
+static AnvilWasmModelInstance *anvil_wasm_instance_from_state_id(int id) {
+  if (id >= 0)
+    return NULL;
+  unsigned token = (unsigned)(-id) - 1u;
+  unsigned slot = token % ANVIL_WASM_MODEL_INSTANCES;
+  unsigned generation = token / ANVIL_WASM_MODEL_INSTANCES;
+  AnvilWasmModelInstance *instance = &anvil_wasm_model_instances[slot];
+  return instance->active && instance->generation == generation ? instance
+                                                                 : NULL;
+}
+
+static void anvil_wasm_morph_group_weights(
+    int model_id, const double *defaults, const double *current_weights,
+    int morph_count, double *weights) {
+  AnvilWasmModelInstance *instance =
+      anvil_wasm_instance_from_state_id(model_id);
+  for (int target = 0; target < morph_count; ++target)
+    weights[target] = instance
+                          ? (instance->overridden[target]
+                                 ? current_weights[target]
+                                 : defaults[target])
+                          : (model_id >= 0 &&
+                                     model_id < ANVIL_WASM_MODEL_STATES &&
+                                     anvil_wasm_morph_overridden[model_id][target]
+                                 ? current_weights[target]
+                                 : defaults[target]);
+}
+
+static int anvil_wasm_morph_group_visible(const double *envelope_bounds,
+                                          double x, double y, double z,
+                                          double scale, double rx, double ry,
+                                          double rz) {
+  if (!anvil_mesh_culling_enabled || anvil_shadows_enabled)
+    return 1;
+  return anvil_wasm_sphere_visible(envelope_bounds[0], envelope_bounds[1],
+                                   envelope_bounds[2], envelope_bounds[3], x,
+                                   y, z, scale, rx, ry, rz);
+}
+
 double anvil_trace_mesh_morphed_groups(
     const double *data, int triangle_count, const double *morph_deltas,
-    const int *groups, int group_count, const double *group_defaults,
+    const int *groups, int group_count, const double *group_bounds,
+    const double *group_defaults,
     const double *current_weights, int model_id, int morph_count, double cx,
     double cy, double cz, double radius, double x, double y, double z,
     double scale, double rx, double ry, double rz) {
   if (!anvil_scene_is_3d || !data || !morph_deltas || !groups ||
-      !group_defaults || !current_weights || triangle_count <= 0 ||
+      !group_bounds || !group_defaults || !current_weights || triangle_count <= 0 ||
       group_count <= 0 || morph_count <= 0 ||
       morph_count > ANVIL_WASM_MORPH_TARGETS ||
-      triangle_count > ANVIL_WASM_MODEL_TRIANGLE_BUDGET ||
       !anvil_wasm_finite(cx) || !anvil_wasm_finite(cy) ||
       !anvil_wasm_finite(cz) || !anvil_wasm_finite(radius) || radius < 0.0 ||
       !anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
@@ -1924,11 +2051,18 @@ double anvil_trace_mesh_morphed_groups(
       !anvil_wasm_finite(rz))
     return 0.0;
   int active_triangles = 0;
+  int visible_triangles = 0;
   for (int group = 0; group < group_count; ++group) {
     int first = groups[group * 2];
     int count = groups[group * 2 + 1];
     if (first < 0 || count < 0 || first > triangle_count ||
         count > triangle_count - first)
+      return 0.0;
+    const double *bounds = group_bounds + (size_t)group * 4;
+    for (int field = 0; field < 4; ++field)
+      if (!anvil_wasm_finite(bounds[field]))
+        return 0.0;
+    if (bounds[3] < 0.0)
       return 0.0;
     const double *defaults =
         group_defaults + (size_t)group * (size_t)morph_count;
@@ -1948,17 +2082,23 @@ double anvil_trace_mesh_morphed_groups(
       active_triangles += count;
     }
   }
+  for (int group = 0; group < group_count; ++group) {
+    int count = groups[group * 2 + 1];
+    if (count <= 0)
+      continue;
+    const double *bounds = group_bounds + (size_t)group * 4;
+    if (anvil_wasm_morph_group_visible(bounds, x, y, z, scale, rx, ry, rz))
+      visible_triangles += count;
+  }
   if (active_triangles <= 0)
     return 0.0;
-  if (morph_count == 0 &&
-      !anvil_wasm_sphere_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry,
-                                 rz)) {
+  if (visible_triangles <= 0) {
     anvil_mesh_culled_frame = 1;
     return 1.0;
   }
   anvil_mesh_culled_frame = 0;
-  if (active_triangles > ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
-                             anvil_wasm_ray_mesh_triangles_frame)
+  if (visible_triangles > ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
+                              anvil_wasm_ray_mesh_triangles_frame)
     return 0.0;
 
   anvil_mesh_drawn_frame = 0;
@@ -1970,12 +2110,11 @@ double anvil_trace_mesh_morphed_groups(
       continue;
     const double *defaults =
         group_defaults + (size_t)group * (size_t)morph_count;
-    for (int target = 0; target < morph_count; ++target)
-      weights[target] =
-          model_id >= 0 && model_id < ANVIL_WASM_MODEL_STATES &&
-                  anvil_wasm_morph_overridden[model_id][target]
-              ? current_weights[target]
-              : defaults[target];
+    const double *bounds = group_bounds + (size_t)group * 4;
+    anvil_wasm_morph_group_weights(model_id, defaults, current_weights,
+                                   morph_count, weights);
+    if (!anvil_wasm_morph_group_visible(bounds, x, y, z, scale, rx, ry, rz))
+      continue;
     for (int triangle = first; triangle < first + count; ++triangle) {
       const double *source = data + (size_t)triangle * 12;
       AnvilWasmVec3 points[3];
@@ -2006,16 +2145,17 @@ double anvil_trace_mesh_morphed_groups(
       anvil_mesh_drawn_frame += 1;
     }
   }
-  anvil_wasm_ray_mesh_triangles_frame += active_triangles;
+  anvil_wasm_ray_mesh_triangles_frame += visible_triangles;
   return 1.0;
 }
 
 double anvil_mesh_draw_morphed_groups(
     const double *data, int triangle_count, const double *morph_deltas,
-    const int *groups, int group_count, const double *group_defaults,
+    const int *groups, int group_count, const double *group_bounds,
+    const double *group_defaults,
     const double *current_weights, int model_id, int morph_count, double x,
     double y, double z, double scale, double rx, double ry, double rz) {
-  if (!data || !morph_deltas || !groups || !group_defaults ||
+  if (!data || !morph_deltas || !groups || !group_bounds || !group_defaults ||
       !current_weights || triangle_count <= 0 || group_count <= 0 ||
       morph_count <= 0 || morph_count > ANVIL_WASM_MORPH_TARGETS ||
       !anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
@@ -2024,11 +2164,18 @@ double anvil_mesh_draw_morphed_groups(
       !anvil_wasm_finite(rz))
     return 0.0;
   size_t active_triangles = 0;
+  size_t visible_triangles = 0;
   for (int group = 0; group < group_count; ++group) {
     int first = groups[group * 2];
     int count = groups[group * 2 + 1];
     if (first < 0 || count < 0 || first > triangle_count ||
         count > triangle_count - first)
+      return 0.0;
+    const double *bounds = group_bounds + (size_t)group * 4;
+    for (int field = 0; field < 4; ++field)
+      if (!anvil_wasm_finite(bounds[field]))
+        return 0.0;
+    if (bounds[3] < 0.0)
       return 0.0;
     active_triangles += (size_t)count;
     const double *defaults =
@@ -2048,12 +2195,28 @@ double anvil_mesh_draw_morphed_groups(
       }
     }
   }
-  if (active_triangles == 0 ||
-      active_triangles > (size_t)(ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
-                                  anvil_wasm_ray_mesh_triangles_frame))
+  if (active_triangles == 0)
     return 0.0;
 
+  for (int group = 0; group < group_count; ++group) {
+    int count = groups[group * 2 + 1];
+    if (count <= 0)
+      continue;
+    const double *bounds = group_bounds + (size_t)group * 4;
+    if (anvil_wasm_morph_group_visible(bounds, x, y, z, scale, rx, ry, rz))
+      visible_triangles += (size_t)count;
+  }
+
+  if (visible_triangles == 0) {
+    anvil_mesh_culled_frame = 1;
+    anvil_mesh_drawn_frame = 0;
+    return 0.0;
+  }
   anvil_mesh_culled_frame = 0;
+  if (visible_triangles > (size_t)(ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
+                                   anvil_wasm_ray_mesh_triangles_frame))
+    return 0.0;
+
   anvil_mesh_drawn_frame = 0;
   double weights[ANVIL_WASM_MORPH_TARGETS];
   for (int group = 0; group < group_count; ++group) {
@@ -2063,12 +2226,11 @@ double anvil_mesh_draw_morphed_groups(
       continue;
     const double *defaults =
         group_defaults + (size_t)group * (size_t)morph_count;
-    for (int target = 0; target < morph_count; ++target)
-      weights[target] =
-          model_id >= 0 && model_id < ANVIL_WASM_MODEL_STATES &&
-                  anvil_wasm_morph_overridden[model_id][target]
-              ? current_weights[target]
-              : defaults[target];
+    const double *bounds = group_bounds + (size_t)group * 4;
+    anvil_wasm_morph_group_weights(model_id, defaults, current_weights,
+                                   morph_count, weights);
+    if (!anvil_wasm_morph_group_visible(bounds, x, y, z, scale, rx, ry, rz))
+      continue;
     for (int triangle = first; triangle < first + count; ++triangle) {
       const double *source = data + (size_t)triangle * 12;
       AnvilWasmVec3 points[3];
@@ -2099,7 +2261,7 @@ double anvil_mesh_draw_morphed_groups(
       anvil_mesh_drawn_frame += 1;
     }
   }
-  anvil_wasm_ray_mesh_triangles_frame += (int)active_triangles;
+  anvil_wasm_ray_mesh_triangles_frame += (int)visible_triangles;
   return 1.0;
 }
 

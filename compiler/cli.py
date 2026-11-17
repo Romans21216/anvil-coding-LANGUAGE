@@ -332,6 +332,13 @@ def _place_extension_dlls(output: pathlib.Path) -> None:
             shutil.copyfile(dll, target)
 
 
+def _run_program(command: list[str], source_path: pathlib.Path,
+                 manifest_path: pathlib.Path | None) -> int:
+    """Run relative assets from the project root or standalone source folder."""
+    root = (manifest_path.parent if manifest_path else source_path.parent).resolve()
+    return subprocess.run(command, cwd=root).returncode
+
+
 def _package_after_build(
     args,
     source_path: pathlib.Path,
@@ -779,7 +786,10 @@ def main() -> int:
             print(f"Built {out} as WebAssembly; host page {out.with_suffix('.html')}")
             if args.run:
                 host = pathlib.Path(__file__).resolve().parents[1] / "tools" / "wasm_host.mjs"
-                return subprocess.run(["node", str(host), str(out)]).returncode
+                return _run_program(
+                    ["node", str(host.resolve()), str(out.resolve())],
+                    source_path, manifest_path,
+                )
             return 0
         if args.backend == "native":
             if args.emit_c or args.generated_c or args.cc or args.debug or args.dynamic_runtime:
@@ -796,7 +806,7 @@ def main() -> int:
             _place_extension_dlls(out)
             print(f"Built {out} as native AMD64 PE (no C/Rust compiler)")
             if args.run:
-                return subprocess.run([str(out)]).returncode
+                return _run_program([str(out.resolve())], source_path, manifest_path)
             if args.package or args.package_dry_run:
                 return _package_after_build(
                     args, source_path, out, funcs, top, project_name, "native",
@@ -892,7 +902,7 @@ def main() -> int:
                 print(f"Built {out} using {compiler[0]}")
         _place_extension_dlls(out)
         if args.run:
-            return subprocess.run([str(out)]).returncode
+            return _run_program([str(out.resolve())], source_path, manifest_path)
         if args.package or args.package_dry_run:
             return _package_after_build(
                 args, source_path, out, funcs, top, project_name, "c",

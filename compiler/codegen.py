@@ -791,13 +791,6 @@ def emit_c(
     from compiler import gltf as _gltf
 
     _gltf.reset()
-    try:
-        _gltf.prescan(pathlib.Path(path).read_text(encoding="utf-8"), pathlib.Path(path))
-    except OSError:
-        pass
-    except _gltf.ModelError as error:
-        # A model the prescan cannot read must name the source file, not trace.
-        raise CompileError(f"{path}: {error}") from None
     # Emit only functions reachable from the real entry points (top-level calls,
     # main, and active engine callbacks), exactly like the native backend. A
     # helper that is never called should not reach the generated C at all.
@@ -864,9 +857,7 @@ def emit_c(
         f"static double {c_name(name)}[{size}];"
         for name, size in sorted(arrays.items())
     ]
-    model_lines = _gltf.definitions()
-    if model_lines:
-        lines.extend(model_lines)
+    model_declaration_index = len(lines)
     if any(fn.local_arrays for fn in functions.values()):
         lines.extend(
             [
@@ -1096,4 +1087,10 @@ def emit_c(
             lines.append(f'    printf("%s\\n", anvil_format_number({c_name("main")}()));')
     lines.append("    anvil_net_close();")
     lines.extend(["    return 0;", "}", ""])
+    # Model imports are discovered while lowering reachable expressions.
+    # Insert their definitions before function declarations after all emitted
+    # bodies and setup expressions have registered their referenced assets.
+    model_lines = _gltf.definitions()
+    if model_lines:
+        lines[model_declaration_index:model_declaration_index] = model_lines
     return "\n".join(lines)

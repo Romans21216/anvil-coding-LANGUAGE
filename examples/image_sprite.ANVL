@@ -1,7 +1,7 @@
 # Load the bundled 32-bit BMP from the repository root and draw it as a 2D sprite.
 scene 2d
 clear rgba(15, 21, 35, 255)
-set var(sprite) = image_load("examples/assets/anvil_sprite.bmp")
+set var(sprite) = image_load("assets/anvil_sprite.bmp")
 set var(sprite_width) = image_width(var(sprite))
 
 fn(update)

@@ -3,7 +3,7 @@
 #   python compiler/anvil.py examples/sprite_transform_demo.ANVL --run
 scene 2d
 clear rgba(11, 16, 27, 255)
-set var(sprite) = image_load("examples/assets/anvil_sprite.bmp")
+set var(sprite) = image_load("assets/anvil_sprite.bmp")
 set var(angle) = 0.0
 set var(flip) = 0
 

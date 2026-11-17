@@ -3,7 +3,7 @@
 #   python compiler/anvil.py examples/audio_demo.ANVL --run
 scene 2d
 clear rgba(15, 21, 35, 255)
-set var(tone) = sound_load("examples/assets/anvil_tone.wav")
+set var(tone) = sound_load("assets/anvil_tone.wav")
 set var(voice) = 0
 set var(pitch) = 1.0
 set var(pan) = 0.0

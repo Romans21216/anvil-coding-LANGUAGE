@@ -193,6 +193,95 @@ class GltfImportBoundsTests(unittest.TestCase):
         self.assertIn("runtime state slot 32", combined)
         self.assertIn("bounds.ANVL:", combined)
 
+    def test_accessor_ranges_stay_inside_declared_parent_views_and_buffers(self) -> None:
+        cases = (
+            ("adjacent_view", lambda doc: doc["bufferViews"][0].update(byteLength=32), "declared bufferView"),
+            ("short_declared_buffer", lambda doc: doc["buffers"][0].update(byteLength=41), "declared buffer"),
+            ("misaligned_offset", lambda doc: doc["accessors"][0].update(byteOffset=2), "aligned"),
+            ("short_stride", lambda doc: doc["bufferViews"][0].update(byteStride=8), "byteStride"),
+            ("empty_count", lambda doc: doc["accessors"][0].update(count=0), "count"),
+            ("stride_not_multiple_of_four", lambda doc: doc["bufferViews"][0].update(byteStride=6), "byteStride"),
+            ("stride_larger_than_view", lambda doc: doc["bufferViews"][0].update(byteStride=40), "byteStride"),
+            ("stride_on_indices", lambda doc: doc["bufferViews"][1].update(byteStride=4), "only valid for vertex attribute"),
+            ("normalized_not_boolean", lambda doc: doc["accessors"][0].update(normalized="false"), "normalized value must be a boolean"),
+            ("normalized_float", lambda doc: doc["accessors"][0].update(normalized=True), "only valid for BYTE"),
+            ("normalized_unsigned_int", lambda doc: doc["accessors"][1].update(componentType=5125, count=1, normalized=True), "only valid for BYTE"),
+        )
+        for name, mutate, diagnostic in cases:
+            with self.subTest(name=name), tempfile_dir() as root:
+                write_static_model(root, "mesh.gltf")
+                model_path = root / "mesh.gltf"
+                document = json.loads(model_path.read_text(encoding="utf-8"))
+                mutate(document)
+                model_path.write_text(json.dumps(document), encoding="utf-8")
+                result = build(root, draw_program(["mesh.gltf"]))
+                combined = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0, name)
+                self.assertIn(diagnostic, combined, name)
+                self.assertIn("bounds.ANVL:5:", combined, name)
+                self.assertFalse((root / "bounds.exe").exists(), name)
+
+    def test_malformed_nested_documents_are_located_compile_errors(self) -> None:
+        cases = (
+            ("wrong_scenes_type", lambda doc: doc.update(scenes={}), "glTF scenes must be an array"),
+            ("scene_out_of_range", lambda doc: doc.update(scene=9), "scene index is out of range"),
+            ("mesh_out_of_range", lambda doc: doc["nodes"][0].update(mesh=9), "mesh index is out of range"),
+            ("primitive_wrong_type", lambda doc: doc["meshes"][0].update(primitives="bad"), "primitives must be an array"),
+            ("accessor_view_out_of_range", lambda doc: doc["accessors"][0].update(bufferView=9), "invalid bufferView"),
+            ("node_transform_wrong_type", lambda doc: doc["nodes"][0].update(translation=[{}, 0, 0]), "malformed glTF structure"),
+            ("root_wrong_type", lambda doc: None, "root must be a JSON object"),
+        )
+        for name, mutate, diagnostic in cases:
+            with self.subTest(name=name), tempfile_dir() as root:
+                write_static_model(root, "mesh.gltf")
+                model_path = root / "mesh.gltf"
+                if name == "root_wrong_type":
+                    model_path.write_text("[]", encoding="utf-8")
+                else:
+                    document = json.loads(model_path.read_text(encoding="utf-8"))
+                    mutate(document)
+                    model_path.write_text(json.dumps(document), encoding="utf-8")
+                result = build(root, draw_program(["mesh.gltf"]))
+                combined = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0, name)
+                self.assertIn(diagnostic, combined, name)
+                self.assertIn("bounds.ANVL:5:", combined, name)
+                self.assertNotIn("Traceback", combined, name)
+                self.assertFalse((root / "bounds.exe").exists(), name)
+
+    def test_normalized_joint_indices_are_rejected_at_the_model_call(self) -> None:
+        with tempfile_dir() as root:
+            write_skinned_model(root, "skin.gltf")
+            model_path = root / "skin.gltf"
+            document = json.loads(model_path.read_text(encoding="utf-8"))
+            document["accessors"][2]["normalized"] = True
+            model_path.write_text(json.dumps(document), encoding="utf-8")
+            result = build(root, draw_program(["skin.gltf"]))
+            combined = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("JOINTS_0 accessors cannot be normalized", combined)
+            self.assertIn("bounds.ANVL:5:", combined)
+            self.assertFalse((root / "bounds.exe").exists())
+
+    def test_malformed_animation_and_skin_structures_raise_model_errors(self) -> None:
+        from compiler import gltf
+        from test_gltf_animation import write_model
+
+        with tempfile_dir() as root:
+            write_model(root, "animation.gltf")
+            document = json.loads((root / "animation.gltf").read_text(encoding="utf-8"))
+            document["animations"][0]["samplers"] = [None]
+            (root / "animation.gltf").write_text(json.dumps(document), encoding="utf-8")
+            with self.assertRaisesRegex(gltf.ModelError, "sampler must be an object"):
+                gltf.load_animated(root / "animation.gltf")
+
+            write_skinned_model(root, "skin.gltf")
+            document = json.loads((root / "skin.gltf").read_text(encoding="utf-8"))
+            document["skins"][0]["joints"] = [99]
+            (root / "skin.gltf").write_text(json.dumps(document), encoding="utf-8")
+            with self.assertRaisesRegex(gltf.ModelError, "skin joint is not a node"):
+                gltf.load_skinned(root / "skin.gltf")
+
 
 if __name__ == "__main__":
     unittest.main()

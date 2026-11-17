@@ -157,7 +157,7 @@ must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
 | `--timings` | print `read/parse/generate/build` milliseconds to stderr (C backend; `--check` has no build phase) |
 | `--package <dir>` | copy the program and its assets into `dir` with `anvil-package.json` |
 | `--package-dry-run` | validate assets and print the package manifest without writing |
-| `--run` | build the program and run it, returning its exit code |
+| `--run` | build and run from the project directory (manifest directory, or source directory for standalone files), returning its exit code |
 | `--clean` | remove generated build artifacts beside the source |
 | `--doctor` | report the Python, C compiler, native backend and runtime state |
 | `--new <dir>` | create a starter project with a manifest, program and README |

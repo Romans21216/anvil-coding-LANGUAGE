@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+import struct
 import subprocess
 import sys
 import tempfile
@@ -79,6 +80,69 @@ class RunCommandTests(unittest.TestCase):
             result = run_compiler(str(source), "--check", "--run")
         self.assertEqual(result.returncode, 2)
         self.assertIn("--run builds and runs", result.stderr)
+
+    def test_run_resolves_relative_assets_from_source_folder(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            project = root / "project"
+            caller = root / "caller"
+            project.mkdir()
+            caller.mkdir()
+            header = bytearray(54)
+            header[:2] = b"BM"
+            struct.pack_into("<I", header, 2, 58)
+            struct.pack_into("<I", header, 10, 54)
+            struct.pack_into("<I", header, 14, 40)
+            struct.pack_into("<iiHHI", header, 18, 1, 1, 1, 24, 0)
+            struct.pack_into("<I", header, 34, 4)
+            (project / "pixel.bmp").write_bytes(bytes(header) + b"\0\0\xff\0")
+            source = project / "main.ANVL"
+            source.write_text(PROGRAM, encoding="utf-8")
+            command = [
+                sys.executable, str(COMPILER), str(source), "--backend", "native",
+                "--run", "-o", "build/native.exe",
+            ]
+            native = subprocess.run(command, cwd=caller, capture_output=True, text=True, timeout=180)
+            self.assertEqual(native.returncode, 0, native.stdout + native.stderr)
+            self.assertIn("hi", native.stdout)
+
+            source.write_text(
+                "fn(main)\n"
+                '  set var(image) = image_load("pixel.bmp")\n'
+                "  say image_width(var(image))\n"
+                "  say image_error()\n"
+                "end\ncall fn(main)\n",
+                encoding="utf-8",
+            )
+            command = [
+                sys.executable, str(COMPILER), str(source), "--backend", "c",
+                "--run", "-o", "build/c.exe",
+            ]
+            c_backend = subprocess.run(command, cwd=caller, capture_output=True, text=True, timeout=300)
+            if c_backend.returncode != 0 and "No C compiler found" in c_backend.stderr:
+                raise unittest.SkipTest("MSVC is not available")
+            self.assertEqual(c_backend.returncode, 0, c_backend.stdout + c_backend.stderr)
+            c_output = c_backend.stdout.replace("\r\n", "\n")
+            self.assertIn("1\n\nBuilt ", c_output)
+            self.assertNotIn("cannot open the file", c_output)
+
+            source_dir = project / "src"
+            source_dir.mkdir()
+            project_entry = source_dir / "main.ANVL"
+            project_entry.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            manifest = project / "game.ANVLproj"
+            manifest.write_text('name = "Asset test"\nentry = "src/main.ANVL"\n', encoding="utf-8")
+            project_command = [
+                sys.executable, str(COMPILER), str(manifest), "--backend", "c",
+                "--run", "-o", "build/project.exe",
+            ]
+            project_run = subprocess.run(
+                project_command, cwd=caller, capture_output=True, text=True, timeout=300
+            )
+            self.assertEqual(project_run.returncode, 0, project_run.stdout + project_run.stderr)
+            project_output = project_run.stdout.replace("\r\n", "\n")
+            self.assertIn("1\n\nBuilt ", project_output)
+            self.assertNotIn("cannot open the file", project_output)
 
 
 class CleanTests(unittest.TestCase):

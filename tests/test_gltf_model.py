@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import pathlib
 import queue
+import re
 import struct
 import subprocess
 import sys
@@ -100,6 +101,47 @@ class GltfLoaderTests(unittest.TestCase):
             self.assertEqual(triangles[:9], [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0])
             self.assertEqual(triangles[9:12], [255.0, 0.0, 0.0])
 
+    def test_generated_model_arrays_round_trip_imported_float_values(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            path = write_quad(root, "precision.gltf", (1.0, 0.0, 0.0))
+            positions = [
+                (1.23456789, 1.0e-12, -1.23456789),
+                (100000000.0, 1.0000001e-7, 0.0),
+                (1.23456789, 1.23456789, 1.0e-12),
+                (-100000000.0, 0.0, -1.23456789),
+            ]
+            payload = b"".join(struct.pack("<3f", *point) for point in positions)
+            payload += struct.pack("<6H", 0, 1, 2, 0, 2, 3)
+            (root / "quad.bin").write_bytes(payload)
+            imported = gltf.load_triangles(path)
+            source = root / "precision.ANVL"
+            source.write_text(
+                'fn(draw)\n  set var(ok) = model_draw("precision.gltf", 0, 0, 0, 1, 0, 0, 0)\nend\n',
+                encoding="utf-8",
+            )
+            gltf.reset()
+            try:
+                gltf.ensure_model("precision.gltf", source)
+                generated = "\n".join(gltf.definitions())
+            finally:
+                gltf.reset()
+
+        match = re.search(
+            r"static const double anvil_model_0\[\d+\] = \{(.*?)\n\};",
+            generated,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(match)
+        emitted = [
+            float(value)
+            for value in re.findall(
+                r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?",
+                match.group(1),
+            )
+        ]
+        self.assertEqual(emitted[: len(imported)], imported)
+
     def test_node_translation_moves_vertices(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
@@ -148,6 +190,20 @@ class GltfCompileTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("cannot find model", result.stderr)
             self.assertIn('absent.gltf', result.stderr)
+
+    def test_comments_strings_and_unreachable_functions_do_not_load_models(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, executable = build(
+                root,
+                '# model_draw("absent_comment.gltf", 0, 0, 0, 1, 0, 0, 0)\n'
+                'set var(note) = "model_draw(\\\"absent_string.gltf\\\", 0, 0, 0, 1, 0, 0, 0)"\n'
+                "scene 3d\n"
+                "fn(draw)\n  clear rgba(0, 0, 0, 255)\nend\n"
+                'fn(dead)\n  set var(x) = model_draw("absent_dead.gltf", 0, 0, 0, 1, 0, 0, 0)\nend\n',
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(executable.is_file())
 
 
 class GltfPixelTests(unittest.TestCase):

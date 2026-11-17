@@ -7,6 +7,9 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const root = path.resolve(process.argv[2] || ".");
 const page = process.argv[3] || "program.html";
+const captureFrames = Number.parseInt(process.env.ANVIL_WASM_CAPTURE_FRAMES || "1", 10);
+if (!Number.isInteger(captureFrames) || captureFrames < 1 || captureFrames > 60)
+  throw new Error("ANVIL_WASM_CAPTURE_FRAMES must be between 1 and 60");
 const chromePath = process.env.CHROME_PATH || "C:/Program Files/Google/Chrome/Application/chrome.exe";
 if (!fs.existsSync(path.join(root, page))) throw new Error(`page not found: ${page}`);
 
@@ -85,9 +88,15 @@ async function connect(target) {
 
 try {
   const portFile = path.join(temp, "profile", "DevToolsActivePort");
-  for (let attempt = 0; attempt < 100 && !fs.existsSync(portFile); attempt++) await delay(100);
-  if (!fs.existsSync(portFile)) throw new Error("Chrome did not create its DevTools port file");
-  const devtoolsPort = Number(fs.readFileSync(portFile, "utf8").split(/\r?\n/, 1)[0]);
+  let devtoolsPort = 0;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try {
+      devtoolsPort = Number(fs.readFileSync(portFile, "utf8").split(/\r?\n/, 1)[0]);
+      if (Number.isInteger(devtoolsPort) && devtoolsPort > 0) break;
+    } catch {}
+    await delay(100);
+  }
+  if (!devtoolsPort) throw new Error("Chrome did not create a readable DevTools port file");
   await pollJson(`http://127.0.0.1:${devtoolsPort}/json/version`);
   const url = `http://127.0.0.1:${server.address().port}/${encodeURIComponent(page)}`;
   const response = await fetch(`http://127.0.0.1:${devtoolsPort}/json/new?${url}`, { method: "PUT" });
@@ -110,21 +119,26 @@ try {
       const context = canvas.getContext('2d');
       const gl = document.createElement('canvas').getContext('webgl');
       if (!gl) throw new Error('WebGL unavailable');
-      window.anvil.exports.anvil_frame(16.6667);
-      const pixels = context.getImageData(0, 0, 960, 600).data;
+      const frames = [];
+      for (let frame = 0; frame < ${captureFrames}; frame++) {
+        window.anvil.exports.anvil_frame(16.6667);
+        const pixels = context.getImageData(0, 0, 960, 600).data;
+        let rgbaBinary = '';
+        for (let start = 0; start < pixels.length; start += 8192)
+          rgbaBinary += String.fromCharCode(...pixels.subarray(start, start + 8192));
+        frames.push(btoa(rgbaBinary));
+      }
+      const last = Uint8Array.from(atob(frames[frames.length - 1]), (char) => char.charCodeAt(0));
       const packed = new Uint8Array(Math.ceil(960 * 600 / 8));
       for (let pixel = 0; pixel < 960 * 600; pixel++) {
         const offset = pixel * 4;
-        if (pixels[offset] > 2 || pixels[offset + 1] > 2 || pixels[offset + 2] > 2)
+        if (last[offset] > 2 || last[offset + 1] > 2 || last[offset + 2] > 2)
           packed[pixel >> 3] |= 1 << (pixel & 7);
       }
       let binary = '';
       for (let start = 0; start < packed.length; start += 8192)
         binary += String.fromCharCode(...packed.subarray(start, start + 8192));
-      let rgbaBinary = '';
-      for (let start = 0; start < pixels.length; start += 8192)
-        rgbaBinary += String.fromCharCode(...pixels.subarray(start, start + 8192));
-      return { width: 960, height: 600, mask: btoa(binary), rgba: btoa(rgbaBinary) };
+      return { width: 960, height: 600, mask: btoa(binary), rgba: frames[frames.length - 1], frames };
     })()` ,
     returnByValue: true,
   });

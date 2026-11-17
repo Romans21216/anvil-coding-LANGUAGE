@@ -189,7 +189,8 @@ double anvil_trace_mesh_morphed(
     double rz);
 double anvil_trace_mesh_morphed_groups(
     const double *data, int triangle_count, const double *morph_deltas,
-    const int *groups, int group_count, const double *group_defaults,
+    const int *groups, int group_count, const double *group_bounds,
+    const double *group_defaults,
     const double *current_weights, int model_id, int morph_count, double cx,
     double cy, double cz, double radius, double x, double y, double z,
     double scale, double rx, double ry, double rz);
@@ -246,6 +247,15 @@ const double *anvil_model_morph_weights(int id, const double *defaults,
                                         int count);
 double anvil_model_morph(int id, int index, double weight,
                          const double *defaults, int count);
+double anvil_model_instance_create(int model_id, int morph_count);
+double anvil_model_instance_destroy(double handle, int model_id);
+int anvil_model_instance_valid(double handle, int model_id);
+const double *anvil_model_instance_morph_weights(double handle, int model_id,
+                                                  const double *defaults,
+                                                  int morph_count);
+double anvil_model_instance_morph(double handle, int model_id, int index,
+                                  double weight, const double *defaults,
+                                  int morph_count);
 double anvil_mesh_draw_morphed(const double *data, int triangle_count,
                                const double *deltas, int targets,
                                const double *weights, double x, double y,
@@ -253,7 +263,8 @@ double anvil_mesh_draw_morphed(const double *data, int triangle_count,
                                double rz);
 double anvil_mesh_draw_morphed_groups(
     const double *data, int triangle_count, const double *deltas,
-    const int *groups, int group_count, const double *group_defaults,
+    const int *groups, int group_count, const double *group_bounds,
+    const double *group_defaults,
     const double *current_weights, int model_id, int targets, double x,
     double y, double z, double scale, double rx, double ry, double rz);
 double anvil_mesh_drawn(void);

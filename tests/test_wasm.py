@@ -1249,13 +1249,125 @@ class WasmScene3DTests(unittest.TestCase):
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from test_gltf_model import write_quad  # noqa: E402
-from test_gltf_morph import write_morph_glb, write_morph_model  # noqa: E402
+from test_gltf_morph import (  # noqa: E402
+    write_morph_glb,
+    write_morph_model,
+    write_two_target_morph_model,
+)
 from test_gltf_ray_mesh import write_animated_morph_glb  # noqa: E402
 from test_gltf_skins import write_skinned_model  # noqa: E402
 
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmModelTests(unittest.TestCase):
+    def test_instance_morph_draws_use_independent_generation_checked_handles(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_morph_model(root, "instance.gltf")
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 8",
+                    "fn(draw)",
+                    '  set var(old) = model_instance("instance.gltf")',
+                    '  set var(destroyed) = model_instance_destroy("instance.gltf", var(old))',
+                    "  for local(i) = 0 to 69",
+                    '    set var(reused) = model_instance("instance.gltf")',
+                    '    set var(destroyed) = model_instance_destroy("instance.gltf", var(reused))',
+                    "  end",
+                    '  set var(a) = model_instance("instance.gltf")',
+                    '  set var(b) = model_instance("instance.gltf")',
+                    '  set var(stale) = model_instance_morph("instance.gltf", var(old), 0, 1)',
+                    '  set var(stale_draw) = model_draw_instance("instance.gltf", var(old), 0, 0, 0, 1, 0, 0, 0)',
+                    '  set var(pa) = model_instance_morph("instance.gltf", var(a), 0, 1)',
+                    '  set var(pb) = model_instance_morph("instance.gltf", var(b), 0, 0)',
+                    '  set var(da) = model_draw_instance("instance.gltf", var(a), -2, 0, 0, 1, 0, 0, 0)',
+                    '  set var(db) = model_draw_instance("instance.gltf", var(b), 2, 0, 0, 1, 0, 0, 0)',
+                    '  say "weights " & var(pb) & "," & model_instance_morph("instance.gltf", var(a), 0, 0) & "," & var(stale) & "," & var(stale_draw)',
+                    "end",
+                    "",
+                )
+            )
+            result, output = build(root, program, "instance_morph")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            dumped_triangles = root / "triangles.json"
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(output)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={
+                    **os.environ,
+                    "ANVIL_WASM_FRAMES": "1",
+                    "ANVIL_WASM_DUMP_TRIANGLES": str(dumped_triangles),
+                },
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertIn("weights 0,1,0,0", lines)
+            records = json.loads(lines[-1])
+            triangles = [record for record in records if record[0] == "triangles"]
+            self.assertEqual(len(triangles), 1)
+            self.assertEqual(triangles[0][1], 2)
+            vertices = json.loads(dumped_triangles.read_text(encoding="utf-8"))
+            self.assertEqual(len(vertices), 2)
+            centers = [
+                sum((triangle[0], triangle[3], triangle[6])) / 3
+                for triangle in vertices
+            ]
+            self.assertAlmostEqual(centers[1] - centers[0], 130, delta=3, msg=str(centers))
+
+    def test_morphed_model_culls_only_groups_outside_all_supported_poses(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_two_target_morph_model(
+                root,
+                "groups.gltf",
+                group_translations=((0.0, 0.0, 0.0), (200.0, 0.0, 0.0)),
+                target_deltas=((-4.0, 0.0, 0.0), (0.0, -4.0, 0.0)),
+            )
+
+            def capture(name: str, placement_x: float) -> tuple[list[str], list]:
+                program = "\n".join(
+                    (
+                        "scene 3d",
+                        "camera perspective 0 0 12",
+                        "fn(draw)",
+                        "  set var(culling) = mesh_culling(1)",
+                        f'  set var(ok) = model_draw("groups.gltf", {placement_x}, 0, 0, 1, 0, 0, 0)',
+                        "  say mesh_drawn()",
+                        "  say mesh_culled()",
+                        "end",
+                        "",
+                    )
+                )
+                result, out = build(root, program, name)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                run = subprocess.run(
+                    ["node", str(HOST), "--record", str(out)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                lines = run.stdout.strip().splitlines()
+                return lines, json.loads(lines[-1])
+
+            partial_lines, partial_records = capture("morph_partial_cull", 0)
+            whole_lines, whole_records = capture("morph_whole_cull", 300)
+
+        self.assertEqual(partial_lines[:2], ["1", "0"])
+        self.assertEqual(
+            [record[1] for record in partial_records if record[0] == "triangles"],
+            [1],
+        )
+        self.assertEqual(whole_lines[:2], ["0", "1"])
+        self.assertEqual(
+            [record[1] for record in whole_records if record[0] == "triangles"],
+            [],
+        )
+
     def test_skinned_model_draw_obeys_the_shared_triangle_budget(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
@@ -2084,6 +2196,9 @@ _MAGNITUDE_PROGRAM = "\n".join(
         '  set var(x) = number("1e300")',
         "  say sin(var(x)) * 1000000",
         "  say cos(var(x)) * 1000000",
+        '  set var(x) = number("-1e21")',
+        "  say sin(var(x)) * 1000000",
+        "  say cos(var(x)) * 1000000",
         "end",
         "call fn(main)",
         "",
@@ -2138,7 +2253,7 @@ class WasmAngleMagnitudeTests(unittest.TestCase):
                 )
             # Past the documented limit the phase is not recoverable, so the
             # reduction returns 0: sin reads 0 and cos reads 1.
-            self.assertEqual(values[12:], ["0", "1000000"])
+            self.assertEqual(values[12:], ["0", "1000000", "0", "1000000"])
 
 
 PAGE_HOST = ROOT / "tools" / "wasm_page.mjs"

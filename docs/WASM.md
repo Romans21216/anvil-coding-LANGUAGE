@@ -232,6 +232,9 @@ An intersecting, rotated-cube fixture compares C and Chrome in both submission
 orders; each renderer's pixels remain order-independent and the C/Chrome color
 comparison passes. A second crossing-depth fixture draws two tilted GLTF quads
 through `model_draw` in both orders and also passes the C/Chrome RGBA thresholds.
+An animated half-weight skinned model crossing a rotated GLTF mesh is also
+compared in both submission orders; C and Chrome output is order-independent and
+meets the visible-pixel parity thresholds.
 The animated+morphed ray-mesh comparison uses an offset, oblique camera. These
 fixtures do not establish parity across every camera, lighting setting,
 primitive combination, or crossing-depth scene.
@@ -387,7 +390,9 @@ identical.
   targets through the depth-tested triangle path, plus overhead shadows and tessellated
   `ray_sphere`; both model APIs share the 16,384-triangle frame budget.
   Skinned `ray_mesh` and textured geometry remain unsupported in wasm; skinned
-  `model_draw` supports one skin with up to 64 joints.
+  `model_draw` supports one skin with up to 64 joints. Static morph groups use
+  conservative per-group bounds spanning default weights and all 0–1 target
+  overrides, and skip fully offscreen groups when mesh culling is enabled.
 - `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
   same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the

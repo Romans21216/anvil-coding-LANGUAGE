@@ -24,7 +24,10 @@ CHROME = pathlib.Path(
 NEEDS_BROWSER = sys.platform == "win32" and CHROME.is_file() and shutil.which("node")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from test_gltf_morph import write_morph_model  # noqa: E402
+from test_gltf_morph import (  # noqa: E402
+    write_morph_model,
+    write_two_target_morph_model,
+)
 from test_gltf_ray_mesh import write_animated_morph_glb  # noqa: E402
 from test_gltf_model import write_quad  # noqa: E402
 from test_gltf_skins import write_skinned_model  # noqa: E402
@@ -416,6 +419,175 @@ class WasmBrowserParityTests(unittest.TestCase):
         metrics = self._color_metrics(c_rgba, wasm_rgba)
         self.assertLess(metrics["mae_visible_pixels"], 20.0, metrics)
         self.assertGreater(metrics["within_32_visible"], 0.88, metrics)
+
+    def test_animated_skinned_mesh_crossing_depth_is_order_independent(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            captures: dict[tuple[str, str], bytes] = {}
+            draws = (
+                'model_draw("skin.gltf", -1, 0, 0, 2, 0, 0, 0)',
+                'model_draw("blue.gltf", 0, 0, 0, 2, 0, 35, 0)',
+            )
+            for order in ((0, 1), (1, 0)):
+                for backend in ("c", "wasm"):
+                    directory = root / f"{backend}_{order[0]}_{order[1]}"
+                    directory.mkdir()
+                    write_skinned_model(
+                        directory,
+                        "skin.gltf",
+                        weights=(0.5, 0.5),
+                        joints=2,
+                    )
+                    write_quad(directory, "blue.gltf", (0.0, 0.0, 1.0))
+                    program = "\n".join(
+                        (
+                            "scene 3d",
+                            "camera perspective 0 0 12",
+                            "camera fov(70)",
+                            "clear rgba(0, 0, 0, 255)",
+                            "fn(draw)",
+                            "  set var(flat) = light_ambient(1)",
+                            '  set var(t) = model_animate("skin.gltf", 0.5)',
+                            f"  set var(first) = {draws[order[0]]}",
+                            f"  set var(second) = {draws[order[1]]}",
+                            "end",
+                            "",
+                        )
+                    )
+                    source = directory / "program.ANVL"
+                    source.write_text(program, encoding="utf-8")
+                    output = directory / ("program.exe" if backend == "c" else "program.wasm")
+                    _compile(source, output, "wasm" if backend == "wasm" else "c")
+                    if backend == "c":
+                        rgba = _native_rgba(output)
+                    else:
+                        browser = subprocess.run(
+                            ["node", str(CAPTURE), str(directory), "program.html"],
+                            capture_output=True,
+                            text=True,
+                            timeout=90,
+                            env={**os.environ, "CHROME_PATH": str(CHROME)},
+                        )
+                        self.assertEqual(browser.returncode, 0, browser.stderr)
+                        page = json.loads(browser.stdout.strip().splitlines()[-1])
+                        rgba = base64.b64decode(page["rgba"], validate=True)
+                    captures[(backend, str(order))] = rgba
+
+        c_skin_first = captures[("c", str((0, 1)))]
+        c_blue_first = captures[("c", str((1, 0)))]
+        wasm_skin_first = captures[("wasm", str((0, 1)))]
+        wasm_blue_first = captures[("wasm", str((1, 0)))]
+        for c_image, wasm_image in (
+            (c_skin_first, wasm_skin_first),
+            (c_blue_first, wasm_blue_first),
+        ):
+            self.assertGreater(self._silhouette_iou(c_image, wasm_image), 0.88)
+            metrics = self._color_metrics(c_image, wasm_image)
+            self.assertLess(metrics["mae_visible_pixels"], 20.0, metrics)
+            self.assertGreater(metrics["within_32_visible"], 0.88, metrics)
+        self.assertLess(
+            self._color_metrics(c_skin_first, c_blue_first)["mae_all_pixels"], 0.5
+        )
+        self.assertLess(
+            self._color_metrics(wasm_skin_first, wasm_blue_first)["mae_all_pixels"], 0.5
+        )
+
+    def test_morph_culling_matches_unculled_pixels_for_all_weight_combinations(self) -> None:
+        poses = tuple(
+            (weight0, weight1)
+            for weight0 in (0.0, 0.5, 1.0)
+            for weight1 in (0.0, 0.5, 1.0)
+        )
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            captures: dict[bool, list[bytes]] = {}
+            for culling in (True, False):
+                directory = root / ("culled" if culling else "unculled")
+                directory.mkdir()
+                write_two_target_morph_model(
+                    directory,
+                    "groups.gltf",
+                    group_translations=((0.0, 0.0, 0.0),),
+                    target_deltas=((-4.0, 0.0, 0.0), (0.0, -4.0, 0.0)),
+                )
+                program = [
+                    "scene 3d",
+                    "camera perspective 0 0 12",
+                    "camera fov(70)",
+                    "set var(frame) = 0",
+                    "fn(update)",
+                    "  add var(frame) 1",
+                    "end",
+                    "fn(draw)",
+                    "  clear rgba(0, 0, 0, 255)",
+                    f"  set var(culling) = mesh_culling({1 if culling else 0})",
+                ]
+                for frame, (weight0, weight1) in enumerate(poses, 1):
+                    program.extend(
+                        (
+                            f"  if var(frame) = {frame}",
+                            f'    set var(w0) = model_morph("groups.gltf", 0, {weight0})',
+                            f'    set var(w1) = model_morph("groups.gltf", 1, {weight1})',
+                            "  end",
+                        )
+                    )
+                program.extend(
+                    (
+                        '  set var(ok) = model_draw("groups.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                        "end",
+                        "",
+                    )
+                )
+                source = directory / "program.ANVL"
+                source.write_text("\n".join(program), encoding="utf-8")
+                output = directory / "program.wasm"
+                _compile(source, output, "wasm")
+                page_path = output.with_suffix(".html")
+                page_html = page_path.read_text(encoding="utf-8")
+                disabled_ticks = page_html.count("requestAnimationFrame(tick);")
+                self.assertEqual(disabled_ticks, 2)
+                page_path.write_text(
+                    page_html.replace(
+                        "requestAnimationFrame(tick);",
+                        "// deterministic manual frame capture",
+                    ),
+                    encoding="utf-8",
+                )
+                browser = subprocess.run(
+                    ["node", str(CAPTURE), str(directory), "program.html"],
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    env={
+                        **os.environ,
+                        "CHROME_PATH": str(CHROME),
+                        "ANVIL_WASM_CAPTURE_FRAMES": str(len(poses)),
+                    },
+                )
+                self.assertEqual(browser.returncode, 0, browser.stderr)
+                page = json.loads(browser.stdout.strip().splitlines()[-1])
+                self.assertEqual(len(page["frames"]), len(poses))
+                captures[culling] = [
+                    base64.b64decode(frame, validate=True) for frame in page["frames"]
+                ]
+
+        for index, (culled, unculled) in enumerate(zip(captures[True], captures[False])):
+            if culled != unculled:
+                offset = next(
+                    offset
+                    for offset, (left, right) in enumerate(zip(culled, unculled))
+                    if left != right
+                )
+                pixel = offset // 4
+                self.fail(
+                    f"morph frame {index + 1} differs at ({pixel % 960}, {pixel // 960}): "
+                    f"culled={culled[offset:offset + 4]} unculled={unculled[offset:offset + 4]}"
+                )
+        self.assertTrue(
+            all(any(max(frame[offset : offset + 3]) > 2 for offset in range(0, len(frame), 4))
+                for frame in captures[True]),
+            "each morph pose should leave visible pixels in the frame",
+        )
 
     def test_animated_morphed_ray_mesh_matches_c_silhouette(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:

@@ -42,7 +42,9 @@ def write_model(
         values = struct.pack("<8f", 0, 0, 0, 1, 0, 0, 0.7071068, 0.7071068)
     else:
         values = struct.pack("<6f", *start, *end)
-    blob = positions + indices + times + values
+    rotation_padding = b"\0" * 8 if path == "rotation" else b""
+    values_offset = 52 + len(rotation_padding)
+    blob = positions + indices + b"\0\0" + times + rotation_padding + values
     (root / "tri.bin").write_bytes(blob)
     document = {
         "asset": {"version": "2.0"},
@@ -57,8 +59,8 @@ def write_model(
         "bufferViews": [
             {"buffer": 0, "byteOffset": 0, "byteLength": 36},
             {"buffer": 0, "byteOffset": 36, "byteLength": 6},
-            {"buffer": 0, "byteOffset": 42, "byteLength": 8},
-            {"buffer": 0, "byteOffset": 50, "byteLength": 24},
+            {"buffer": 0, "byteOffset": 44, "byteLength": 8},
+            {"buffer": 0, "byteOffset": values_offset, "byteLength": len(values)},
         ],
         "accessors": [
             {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
@@ -265,7 +267,7 @@ class GltfAnimationTests(unittest.TestCase):
             self.assertIn("the model has no animation clip to play", combined)
             self.assertIn(":3:", combined)
 
-    def test_the_wasm_backend_refuses_an_animated_model(self) -> None:
+    def test_the_wasm_backend_accepts_an_animated_model(self) -> None:
         with tempfile_dir() as root:
             write_model(root, "tri.gltf")
             source = root / "wasm.ANVL"
@@ -290,10 +292,8 @@ class GltfAnimationTests(unittest.TestCase):
                 text=True,
                 timeout=300,
             )
-        self.assertNotEqual(build.returncode, 0)
-        combined = build.stdout + build.stderr
-        self.assertIn("animated models are not available in the wasm backend yet", combined)
-        self.assertIn(":3:", combined)
+            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+            self.assertTrue((root / "anim.wasm").is_file())
 
 
 class tempfile_dir:

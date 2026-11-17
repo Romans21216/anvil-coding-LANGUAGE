@@ -6,9 +6,11 @@ as `cube`.
 
 The model is not loaded at runtime. The compiler reads the file while building,
 applies node transforms, bakes one flat colour per triangle and emits a static
-`double` array into the generated C. Nothing is parsed at startup and the model
-does not have to ship beside the executable (the source `.gltf` must still exist
-to rebuild). Paths are resolved relative to the main `.ANVL` file.
+`double` array into the generated C. Baked values use 17 significant decimal
+digits so geometry and bounds round-trip the imported binary64 values. Nothing
+is parsed at startup and the model does not have to ship beside the executable
+(the source `.gltf` must still exist to rebuild). Paths are resolved relative to
+the main `.ANVL` file.
 
 ```anvil
 scene 3d
@@ -143,8 +145,8 @@ quietly drop the targets.
 
 A skinned model shares the animation clock: `model_animate(path, seconds)`
 drives its joint channels, and C and wasm `model_draw` pose it. Wasm samples the
-first clip and draws the bind pose when no clip exists; Neither C nor wasm `ray_mesh` supports
-skinning; wasm `ray_mesh` reports a source-located diagnostic. A vertex whose
+first clip and draws the bind pose when no clip exists. Neither C nor wasm
+`ray_mesh` supports skinning; wasm `ray_mesh` reports a source-located diagnostic. A vertex whose
 four weights are all zero keeps its mesh-space position rather than collapsing
 to the origin.
 
@@ -178,8 +180,11 @@ set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
   table; registering a stateful asset beyond that limit is refused at compile
   time.
 - Blending is additive on the vertex position before scale/rotate/translate;
-  vertex colour does not animate. Morphing draws skip culling because the
-  rest-pose bounding sphere may not contain every weighted pose.
+  vertex colour does not animate. Static morph draws use per-geometry
+  conservative bounds that cover default weights and every supported 0–1
+  override, so fully offscreen groups can be culled without clipping a deformed
+  pose. Animated and skinned draws bypass culling; wasm also bypasses this cull
+  when shadows are enabled.
 - C supports morph targets on static models and on animated, unskinned models;
   morph targets combined with skinning remain unsupported. Wasm
   `model_draw` and `ray_mesh` support static and animated unskinned morphs
