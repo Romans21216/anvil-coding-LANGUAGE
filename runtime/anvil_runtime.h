@@ -181,6 +181,12 @@ double anvil_trace_mesh(const double *data, int triangle_count, double cx,
                         double cy, double cz, double radius, double x,
                         double y, double z, double scale, double rx,
                         double ry, double rz);
+double anvil_trace_mesh_morphed(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const double *morph_defaults, const double *morph_weights,
+    int morph_count, double cx, double cy, double cz, double radius,
+    double x, double y, double z, double scale, double rx, double ry,
+    double rz);
 void anvil_trace_finish(void);
 int anvil_ray_backend(const char *name);
 int anvil_ray_backend_available(const char *name);

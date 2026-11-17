@@ -879,11 +879,11 @@ class ExpressionParser:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             symbol, count, bounds = model["symbol"], model["count"], model["bounds"]
             if value == "ray_mesh" and (
-                model.get("animated") or model.get("skinned") or model.get("morph_count")
+                model.get("animated") or model.get("skinned")
             ):
                 raise CompileError(
                     f"{self.path}:{self.line}: ray_mesh currently requires a static, "
-                    "unskinned mesh without morph targets"
+                    "unskinned mesh"
                 )
             mesh_args = []
             for _ in range(7):
@@ -892,11 +892,24 @@ class ExpressionParser:
             self.expect(")")
             placement = ", ".join(mesh_args)
             if value == "ray_mesh":
-                call = (
-                    f"anvil_trace_mesh((const double *){symbol}, {count}, "
-                    + ", ".join(f"{item:.6g}" for item in bounds)
-                    + f", {placement})"
-                )
+                if model.get("morph_count"):
+                    morph_count = model["morph_count"]
+                    call = (
+                        f"anvil_trace_mesh_morphed((const double *){symbol}, "
+                        f"{count}, (const double *){symbol}_morph, "
+                        f"(const double *){symbol}_morph_default, "
+                        f"anvil_model_morph_weights({model['id']}, "
+                        f"(const double *){symbol}_morph_default, {morph_count}), "
+                        f"{morph_count}, "
+                        + ", ".join(f"{item:.6g}" for item in bounds)
+                        + f", {placement})"
+                    )
+                else:
+                    call = (
+                        f"anvil_trace_mesh((const double *){symbol}, {count}, "
+                        + ", ".join(f"{item:.6g}" for item in bounds)
+                        + f", {placement})"
+                    )
             elif model.get("skinned"):
                 call = (
                     f"anvil_mesh_draw_skinned((const double *){symbol}, {count}, "

@@ -219,6 +219,16 @@
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.12,
         "measured_max_ms": 8.49
+      },
+      "ray_mesh_morph": {
+        "work_p50_ms": 23.45,
+        "work_p95_ms": 24.05,
+        "present_p95_ms": 3.0,
+        "measured_work_p50_ms": 9.38,
+        "measured_work_p95_ms": 9.62,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 0.12,
+        "measured_max_ms": 9.76
       }
     }
   }

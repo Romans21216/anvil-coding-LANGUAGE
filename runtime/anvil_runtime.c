@@ -82,15 +82,20 @@ typedef struct {
 } AnvilBvhNode;
 typedef struct {
   const double *data;
+  const double *morph_deltas;
+  const double *morph_defaults;
+  int morph_count;
   int triangle_count;
   AnvilBvhNode *nodes;
   int *indices;
   int node_count;
+  double morph_radius_expansion;
 } AnvilMeshBvh;
 typedef struct {
   const AnvilMeshBvh *bvh;
   double cx, cy, cz, radius;
   double x, y, z, scale, rx, ry, rz;
+  const double *morph_weights;
 } AnvilTraceMesh;
 typedef struct {
   double x, y, depth;
@@ -246,8 +251,9 @@ static int anvil_trace_mesh_count;
 static AnvilMeshBvh anvil_mesh_bvh_cache[ANVIL_MESH_BVH_CACHE];
 static int anvil_mesh_bvh_cache_count;
 static size_t anvil_mesh_bvh_memory_bytes;
-static const AnvilMeshBvh *anvil_mesh_bvh_get(const double *data,
-                                              int triangle_count);
+static const AnvilMeshBvh *anvil_mesh_bvh_get(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const double *morph_defaults, int morph_count);
 static AnvilBvhNode anvil_trace_bvh[ANVIL_TRACE_SPHERES * 2];
 static int anvil_trace_bvh_count;
 static int anvil_active_ray_backend = ANVIL_RAY_BACKEND_BVH;
@@ -3437,16 +3443,21 @@ void anvil_trace_triangle(double x1, double y1, double z1, double x2,
   triangle->a = a;
 }
 
-double anvil_trace_mesh(const double *data, int triangle_count, double cx,
-                        double cy, double cz, double radius, double x,
-                        double y, double z, double scale, double rx,
-                        double ry, double rz) {
+static double anvil_trace_mesh_register(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const double *morph_defaults, const double *morph_weights,
+    int morph_count, double cx, double cy, double cz, double radius,
+    double x, double y, double z, double scale, double rx, double ry,
+    double rz) {
   if (!data || triangle_count <= 0 || triangle_count > ANVIL_MESH_MAX_TRIANGLES ||
       anvil_trace_mesh_count >= ANVIL_TRACE_MESHES || !isfinite(x) ||
       !isfinite(y) || !isfinite(z) || !isfinite(scale) || scale == 0.0 ||
-      !isfinite(rx) || !isfinite(ry) || !isfinite(rz))
+      !isfinite(rx) || !isfinite(ry) || !isfinite(rz) || morph_count < 0 ||
+      morph_count > 8 || (morph_count > 0 &&
+                          (!morph_deltas || !morph_defaults || !morph_weights)))
     return 0.0;
-  const AnvilMeshBvh *bvh = anvil_mesh_bvh_get(data, triangle_count);
+  const AnvilMeshBvh *bvh = anvil_mesh_bvh_get(
+      data, triangle_count, morph_deltas, morph_defaults, morph_count);
   if (!bvh)
     return 0.0;
   AnvilTraceMesh *mesh = &anvil_trace_meshes[anvil_trace_mesh_count++];
@@ -3454,7 +3465,7 @@ double anvil_trace_mesh(const double *data, int triangle_count, double cx,
   mesh->cx = cx;
   mesh->cy = cy;
   mesh->cz = cz;
-  mesh->radius = radius;
+  mesh->radius = radius + bvh->morph_radius_expansion;
   mesh->x = x;
   mesh->y = y;
   mesh->z = z;
@@ -3462,7 +3473,29 @@ double anvil_trace_mesh(const double *data, int triangle_count, double cx,
   mesh->rx = rx;
   mesh->ry = ry;
   mesh->rz = rz;
+  mesh->morph_weights = morph_weights;
   return 1.0;
+}
+
+double anvil_trace_mesh(const double *data, int triangle_count, double cx,
+                        double cy, double cz, double radius, double x,
+                        double y, double z, double scale, double rx,
+                        double ry, double rz) {
+  return anvil_trace_mesh_register(data, triangle_count, NULL, NULL, NULL, 0,
+                                   cx, cy, cz, radius, x, y, z, scale, rx, ry,
+                                   rz);
+}
+
+double anvil_trace_mesh_morphed(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const double *morph_defaults, const double *morph_weights,
+    int morph_count, double cx, double cy, double cz, double radius,
+    double x, double y, double z, double scale, double rx, double ry,
+    double rz) {
+  return anvil_trace_mesh_register(data, triangle_count, morph_deltas,
+                                   morph_defaults, morph_weights, morph_count,
+                                   cx, cy, cz, radius, x, y, z, scale, rx, ry,
+                                   rz);
 }
 
 static int anvil_ray_backend_id(const char *name) {
@@ -3679,11 +3712,30 @@ static int anvil_mesh_bvh_build(AnvilMeshBvh *bvh, int start, int count) {
   node->left = node->right = -1;
   node->sphere = -1;
   for (int i = start; i < start + count; ++i) {
-    const double *p = bvh->data + (size_t)bvh->indices[i] * 12;
-    for (int vertex = 0; vertex < 3; ++vertex)
-      anvil_bvh_include(&node->minimum, &node->maximum,
-                        (AnvilVec3){p[vertex * 3], p[vertex * 3 + 1],
-                                    p[vertex * 3 + 2]});
+    int triangle = bvh->indices[i];
+    const double *p = bvh->data + (size_t)triangle * 12;
+    for (int vertex = 0; vertex < 3; ++vertex) {
+      AnvilVec3 minimum = {p[vertex * 3], p[vertex * 3 + 1], p[vertex * 3 + 2]};
+      AnvilVec3 maximum = minimum;
+      if (bvh->morph_count > 0) {
+        double extent[3] = {0.0, 0.0, 0.0};
+        size_t vertex_index = (size_t)triangle * 3 + (size_t)vertex;
+        for (int target = 0; target < bvh->morph_count; ++target) {
+          double weight = fmax(1.0, fabs(bvh->morph_defaults[target]));
+          const double *delta = bvh->morph_deltas +
+              (vertex_index * (size_t)bvh->morph_count + (size_t)target) * 3;
+          extent[0] += fabs(delta[0]) * weight;
+          extent[1] += fabs(delta[1]) * weight;
+          extent[2] += fabs(delta[2]) * weight;
+        }
+        minimum = (AnvilVec3){minimum.x - extent[0], minimum.y - extent[1],
+                              minimum.z - extent[2]};
+        maximum = (AnvilVec3){maximum.x + extent[0], maximum.y + extent[1],
+                              maximum.z + extent[2]};
+      }
+      anvil_bvh_include(&node->minimum, &node->maximum, minimum);
+      anvil_bvh_include(&node->minimum, &node->maximum, maximum);
+    }
   }
   if (count == 1) {
     node->sphere = bvh->indices[start];
@@ -3712,11 +3764,15 @@ static void anvil_mesh_bvh_cleanup(void) {
   anvil_mesh_bvh_memory_bytes = 0;
 }
 
-static const AnvilMeshBvh *anvil_mesh_bvh_get(const double *data,
-                                               int triangle_count) {
+static const AnvilMeshBvh *anvil_mesh_bvh_get(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const double *morph_defaults, int morph_count) {
   for (int i = 0; i < anvil_mesh_bvh_cache_count; ++i)
     if (anvil_mesh_bvh_cache[i].data == data)
-      return anvil_mesh_bvh_cache[i].triangle_count == triangle_count
+      return anvil_mesh_bvh_cache[i].triangle_count == triangle_count &&
+                     anvil_mesh_bvh_cache[i].morph_deltas == morph_deltas &&
+                     anvil_mesh_bvh_cache[i].morph_defaults == morph_defaults &&
+                     anvil_mesh_bvh_cache[i].morph_count == morph_count
                  ? &anvil_mesh_bvh_cache[i]
                  : NULL;
   if (anvil_mesh_bvh_cache_count >= ANVIL_MESH_BVH_CACHE)
@@ -3731,6 +3787,9 @@ static const AnvilMeshBvh *anvil_mesh_bvh_get(const double *data,
   AnvilMeshBvh *bvh = &anvil_mesh_bvh_cache[anvil_mesh_bvh_cache_count];
   memset(bvh, 0, sizeof(*bvh));
   bvh->data = data;
+  bvh->morph_deltas = morph_deltas;
+  bvh->morph_defaults = morph_defaults;
+  bvh->morph_count = morph_count;
   bvh->triangle_count = triangle_count;
   bvh->nodes = (AnvilBvhNode *)calloc((size_t)triangle_count * 2,
                                       sizeof(*bvh->nodes));
@@ -3742,6 +3801,20 @@ static const AnvilMeshBvh *anvil_mesh_bvh_get(const double *data,
     return NULL;
   }
   for (int i = 0; i < triangle_count; ++i) bvh->indices[i] = i;
+  if (morph_count > 0) {
+    for (int vertex = 0; vertex < triangle_count * 3; ++vertex) {
+      double displacement = 0.0;
+      for (int target = 0; target < morph_count; ++target) {
+        double weight = fmax(1.0, fabs(morph_defaults[target]));
+        const double *delta = morph_deltas +
+            ((size_t)vertex * (size_t)morph_count + (size_t)target) * 3;
+        displacement += sqrt(delta[0] * delta[0] + delta[1] * delta[1] +
+                             delta[2] * delta[2]) * weight;
+      }
+      if (displacement > bvh->morph_radius_expansion)
+        bvh->morph_radius_expansion = displacement;
+    }
+  }
   anvil_mesh_bvh_cache_count++;
   anvil_mesh_bvh_memory_bytes += node_bytes + index_bytes;
   (void)anvil_mesh_bvh_build(bvh, 0, triangle_count);
@@ -3753,15 +3826,33 @@ static int anvil_mesh_bvh_trace_node(const AnvilMeshBvh *bvh, int node_index,
                                      AnvilVec3 origin, AnvilVec3 direction,
                                      double max_t, double near_t,
                                      double *hit_t, int *hit_triangle,
-                                     AnvilVec3 *hit_normal) {
+                                     AnvilVec3 *hit_normal,
+                                     const double *morph_weights) {
   if (near_t >= max_t) return 0;
   const AnvilBvhNode *node = &bvh->nodes[node_index];
   if (node->sphere >= 0) {
     int triangle_index = node->sphere;
     const double *p = bvh->data + (size_t)triangle_index * 12;
-    AnvilTraceTriangle triangle = {
-        {{p[0], p[1], p[2]}, {p[3], p[4], p[5]}, {p[6], p[7], p[8]}},
-        (int)p[9], (int)p[10], (int)p[11], 255};
+    AnvilTraceTriangle triangle = {0};
+    for (int vertex = 0; vertex < 3; ++vertex) {
+      double position[3] = {p[vertex * 3], p[vertex * 3 + 1],
+                            p[vertex * 3 + 2]};
+      if (bvh->morph_count > 0) {
+        size_t vertex_index = (size_t)triangle_index * 3 + (size_t)vertex;
+        for (int target = 0; target < bvh->morph_count; ++target) {
+          const double *delta = bvh->morph_deltas +
+              (vertex_index * (size_t)bvh->morph_count + (size_t)target) * 3;
+          for (int axis = 0; axis < 3; ++axis)
+            position[axis] += delta[axis] * morph_weights[target];
+        }
+      }
+      triangle.vertex[vertex] =
+          (AnvilVec3){position[0], position[1], position[2]};
+    }
+    triangle.r = (int)p[9];
+    triangle.g = (int)p[10];
+    triangle.b = (int)p[11];
+    triangle.a = 255;
     double t;
     AnvilVec3 normal;
     if (anvil_ray_triangle_hit(origin, direction, &triangle, &t, &normal) &&
@@ -3793,12 +3884,12 @@ static int anvil_mesh_bvh_trace_node(const AnvilMeshBvh *bvh, int node_index,
   if (first_hit)
     found = anvil_mesh_bvh_trace_node(bvh, first, origin, direction, max_t,
                                       first_near, hit_t, hit_triangle,
-                                      hit_normal);
+                                      hit_normal, morph_weights);
   if (found) max_t = *hit_t;
   if (second_hit && second_near < max_t) {
     int second_found = anvil_mesh_bvh_trace_node(
         bvh, second, origin, direction, max_t, second_near, hit_t,
-        hit_triangle, hit_normal);
+        hit_triangle, hit_normal, morph_weights);
     found = found || second_found;
   }
   return found;
@@ -3807,13 +3898,15 @@ static int anvil_mesh_bvh_trace_node(const AnvilMeshBvh *bvh, int node_index,
 static int anvil_mesh_bvh_trace(const AnvilMeshBvh *bvh, AnvilVec3 origin,
                                 AnvilVec3 direction, double max_t,
                                 double *hit_t, int *hit_triangle,
-                                AnvilVec3 *hit_normal) {
+                                AnvilVec3 *hit_normal,
+                                const double *morph_weights) {
   double near_t;
   if (!bvh || bvh->node_count == 0 ||
       !anvil_ray_box_hit(origin, direction, &bvh->nodes[0], max_t, &near_t))
     return 0;
   return anvil_mesh_bvh_trace_node(bvh, 0, origin, direction, max_t, near_t,
-                                   hit_t, hit_triangle, hit_normal);
+                                   hit_t, hit_triangle, hit_normal,
+                                   morph_weights);
 }
 
 /* `near_t` is the box distance already computed by the parent while ordering
@@ -3908,7 +4001,8 @@ static int anvil_trace_meshes_shadow(AnvilVec3 origin,
     double hit_t = 1.0e30;
     int triangle;
     if (anvil_mesh_bvh_trace(mesh->bvh, local_origin, local_direction,
-                             hit_t, &hit_t, &triangle, &normal))
+                             hit_t, &hit_t, &triangle, &normal,
+                             mesh->morph_weights))
       return 1;
   }
   return 0;
@@ -4193,7 +4287,7 @@ void anvil_trace_finish(void) {
           int triangle_index = -1;
           if (!anvil_mesh_bvh_trace(mesh->bvh, local_origin, local_direction,
                                     closest, &closest, &triangle_index,
-                                    &local_normal))
+                                    &local_normal, mesh->morph_weights))
             continue;
           const double *triangle =
               mesh->bvh->data + (size_t)triangle_index * 12;

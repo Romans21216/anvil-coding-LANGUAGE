@@ -188,6 +188,7 @@ The numeric sample builds and prints `17`. The starter world builds into a nativ
 - [Starter world](examples/first_world.ANVL)
 - [Ray-traced triangles sample](examples/ray_triangles.ANVL)
 - [Ray-traced GLB mesh sample](examples/ray_mesh.ANVL)
+- [Ray-traced morph mesh sample](examples/ray_mesh_morph.ANVL)
 - [LAN counter sample](examples/network_counter.ANVL)
 - [LAN client sample](examples/network_client.ANVL)
 - [Numeric compiler sample](examples/numeric_demo.ANVL)
