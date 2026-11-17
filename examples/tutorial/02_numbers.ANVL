@@ -1,0 +1,10 @@
+# Lesson 2: numbers, variables and arithmetic.
+fn(main)
+  set var(score) = 10
+  add var(score) 5
+  say "Score: " & var(score)
+  say 3 + 4 * 2
+  say (3 + 4) * 2
+  say 7 % 3
+end
+call fn(main)

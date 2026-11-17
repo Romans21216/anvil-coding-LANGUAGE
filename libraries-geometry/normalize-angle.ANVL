@@ -1,0 +1,10 @@
+fn(normalize-angle, degrees)
+  set local(a) = var(degrees)
+  while local(a) < 0
+    set local(a) = local(a) + 360
+  end
+  while local(a) >= 360
+    set local(a) = local(a) - 360
+  end
+  output local(a)
+end

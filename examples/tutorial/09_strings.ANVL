@@ -1,0 +1,11 @@
+# Lesson 9: the text toolkit.
+fn(main)
+  set var(word) = "  Beginner  "
+  say "[" & trim(var(word)) & "]"
+  say left("Anvil", 3)
+  say right("Anvil", 3)
+  say mid("Anvil", 2, 2)
+  say char("Anvil", 0)
+  say number("42") + 8
+end
+call fn(main)

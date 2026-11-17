@@ -294,3 +294,351 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - Native runtime regression covers 24-bit and top-down 32-bit files, malformed/oversized inputs, dimension queries, clipped/scaled/native drawing, destruction, reload and stale-handle rejection. `python -m unittest discover -s tests -q` passed 79 tests; MSVC release build of the example, npm extension validation, compileall, QA arithmetic and diff check pass.
 - Canonical issue #23 status: #201 PARTIALLY IMPLEMENTED (BMP only), #202 IN PROGRESS pending independent review, #209 IN PROGRESS pending independent review, #212 PARTIALLY IMPLEMENTED (scaling present, rotation missing).
 - Latest independent score remains **92/100 — FAIL against 98** on `c102604`; review of the sprite source candidate is pending.
+
+## Batch 14 — cross-backend number and text-slice parity (C8 findings)
+
+- Closed the eight open C8 findings from the strict Part 8 review with executed C/native comparisons rather than source inspection alone.
+- C8-1: the native `mid` helper clamps `start` and `count` in the double domain before converting to int64, and `right` clamps then truncates the count, so huge and fractional arguments match the C runtime (`mid("abcdef",1e300,2)` is empty, `right("abcdef",1.9)` is `f` on both).
+- C8-2: both parsers keep nine significant fraction digits and skip the rest; a six-value cross-backend probe is identical.
+- C8-3: the two test oracles that still encoded prefix parsing were corrected, a cross-backend parity test was added, and `LANGUAGE_SPEC.md` now states the whole-text rule explicitly.
+- C8-4/C8-8: the native parser accumulates the integer mantissa in double like C, stops consuming exponent digits at C's 1000 boundary, and both backends read a magnitude outside the finite binary64 range as 0.
+- C8-5: `chr(0)` is documented as empty text because Anvil text is zero-terminated, with matching tests on both backends.
+- C8-6: the build-cache key now hashes every top-level runtime `.c`/`.h` file and the compiler's size/mtime, with a key-version tag retiring old entries.
+- C8-7: `anvil_noise` rejects non-finite and out-of-range coordinates before any float-to-int conversion, using the native `[-2147483648, 2147483647)` interval; `fbm` inherits the per-octave check.
+- Files: `compiler/native_codegen.py`, `compiler/cli.py`, `runtime/anvil_runtime.c`, `docs/LANGUAGE_SPEC.md`, `README.md`, and the number/mid/chr/noise/cache test files.
+- Tests: `tests/test_number.py` 19 passed; the targeted cross-backend batch `test_number`, `test_number_format`, `test_text_functions`, `test_chrorrd`, `test_mid`, `test_noise_bounds`, `test_build_cache`, `test_native_x64` 97 passed.
+- Commits: `fdb6344` (C8-1/C8-3/C8-5), `214e200` (C8-7), `40bf89d` (C8-6), `e6513b4` (C8-2/C8-4/C8-8), `7545c4c` (README).
+
+## Batch 15 — build safety and bounded inputs (8.10, 8.15)
+
+- **Atomic output:** `build_c` links to `<name>.partial.exe` and only replaces the requested output after the toolchain succeeds, so a failing `cl`/`cc` cannot leave a truncated program behind. A failing-toolchain test keeps the previous bytes.
+- **Cache bypass:** `--no-cache` skips the cached lookup, forces a real build and stores nothing, leaving existing entries usable. Documented in the CLI table.
+- **Bounded entry source:** the entry file is stat'ed and refused above the 4 MiB include budget before it is read, so a mistaken huge path cannot be loaded into memory.
+- **Bounded call depth (C backend):** generated functions call `anvil_frame_enter`/`anvil_frame_leave`; a chain that grows the C stack past 512 KiB stops with `Anvil call depth exceeded the 512 KiB stack budget` and exit 2. 200000-deep non-tail recursion previously died with no output and now reports the diagnostic; 100-deep recursion still returns 5050.
+- **Files:** `compiler/build.py`, `compiler/cli.py`, `compiler/codegen.py`, `compiler/common.py`, `runtime/anvil_runtime.c`, `runtime/anvil_runtime.h`, `docs/COMPILER.md`, `docs/INCLUDES.md`, `docs/LANGUAGE_SPEC.md`, and four new test files.
+- **Tests:** full suite on `0b0130d` 646 passed, 1 skipped, 1 xfailed; targeted batch after the recursion change 128 passed.
+- **Commits:** `dd40769`, `0b0130d`, `a24a071`, `6f0f3e8`.
+- **Native guard:** the same 512 KiB budget now applies to the native backend through an inline `anvil_frame_enter` helper with a writable .data base slot; 20000-deep recursion reports the diagnostic instead of dying silently. Tests cover both backends.
+
+## Batch 16 — packaging with dry run and manifest (8.14)
+
+- **Command:** `--package <dir>` copies the built program and every asset into the target folder and writes `anvil-package.json`; `--package-dry-run` prints the same manifest and validates inputs without touching the filesystem.
+- **Assets:** the project manifest gained an optional `[assets] files = [...]` list, merged with literal `image_load("...")`/`sound_load("...")` paths found in the program's sources. Paths outside the project folder are rejected; every missing asset is listed and fails the package step with exit 1.
+- **Manifest:** format, name, target, backend, compiler identity (SHA-256 of `cl`, language version for native), used builtins, program size/hash, per-asset path/size/hash and a checksums map. No timestamps, so identical inputs produce identical bytes.
+- **Files:** `compiler/package.py` (new), `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_package.py`.
+- **Tests:** `tests/test_package.py` 5 passed; with the cache and compiler suites 80 passed.
+- **Commit:** `79d8af3`.
+
+## Batch 17 — lifecycle commands run/clean/doctor/new (8.14)
+
+- **`--run`:** builds, then runs the program and returns its exit code, so edit → build → run is one command. A failing program propagates its status (division by zero returns 2); combining it with `--check`, `--emit-c` or `--package` is rejected.
+- **`--clean`:** removes only what the toolchain writes beside a project — `*.generated.c`, `*_obj`, `*.partial.exe`, `*.build.cmd` and `.anvil-cache` — and keeps sources and the executable.
+- **`--doctor`:** prints Python version/path, platform, the discovered C compiler, native-backend readiness and the three runtime files, without needing a source file.
+- **`--new <dir>`:** scaffolds `main.ANVL`, `game.ANVLproj` and `README.md` in an empty folder and refuses a non-empty one.
+- **Files:** `compiler/commands.py` (new), `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_commands.py`.
+- **Tests:** 7 passed. Manual: `--new` then `--run` printed `Hello from Anvil`; `--clean` removed 3 artifacts and kept `main.exe`.
+- **Commit:** `75a4805`.
+- **Remaining from the 8.14 command list:** `test` and `format` are still unimplemented.
+
+## Batch 18 — format command (8.14)
+
+- **`--format`:** normalises line endings, trailing whitespace, runs of blank lines, the final newline and block indentation. Because Anvil ignores indentation, the formatter only touches whitespace and never rewrites a token; `else` dedents then re-indents, and repeated runs are idempotent.
+- **`--format-check`:** exits 1 when a file would change, so CI can require formatted sources.
+- **Safety evidence:** every file under `examples/` was copied, formatted and re-checked; all still compiled (`fail=0`). A unit test formats a copy of `first_world.ANVL` and asserts `--check` still reports ok.
+- **Files:** `compiler/formatting.py` (new), `compiler/commands.py`, `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_format.py`.
+- **Tests:** 6 passed.
+- **Commit:** `5967fdb`.
+- **Remaining from the 8.14 command list:** `test` only.
+
+## Batch 19 — project test runner (8.14)
+
+- **`--test`:** compiles and runs every `tests/**/*.ANVL` case with the selected backend into a temporary output directory, running each case from its own folder so relative includes and assets resolve. A case passes when the built program exits 0.
+- **Reporting:** `PASS name` per case, `FAIL name (exit N)` plus the captured build/run output, then a `N passed, M failed` summary; exit 1 if any case fails or the project has no `tests/` folder or no cases.
+- **Files:** `compiler/commands.py`, `compiler/cli.py`, `docs/COMPILER.md`, `tests/test_commands.py`.
+- **Tests:** 10 passed. Manual: one passing plus one failing case reported `1 passed, 1 failed` and exit 1; removing the failing case gave exit 0.
+- **Commit:** `44dcd1b`.
+- **Command surface:** `new`, `run`, `build`, `test`, `format`, `clean`, `doctor` and `package` now all exist, completing the 8.14 command list for this checkout.
+
+## Batch 20 — measured backend capability matrix (8.16)
+
+- **Tool:** `tools/capability_matrix.py` compiles and runs fourteen feature cases on the C and native backends. A case counts as `runs` only when the build succeeds and the program's output matches the expected text exactly; other statuses are `rejected`, `runtime-error`, `wrong-output`, `build-error`, `timeout` or `skipped`.
+- **Result:** 12 of 14 cases run identically. `image-load` and `physics-body` are C-only and both report their existing located diagnostics (`... is not available in the native x64 backend yet; build with --backend c`).
+- **Reproducibility:** temporary directories are stripped from the notes, so repeated runs produce identical bytes; `--check` exits 1 when the committed document is stale, and a test enforces it.
+- **Files:** `tools/capability_matrix.py` (new), `docs/CAPABILITY_MATRIX.md` (generated), `tests/test_capability_matrix.py`, `docs/COMPILER.md`.
+- **Commit:** `1afefc5`.
+
+## Batch 21 — testing and coverage labels (8.15)
+
+- **`docs/TESTING.md`:** records the exact environment (Windows 11 10.0.26200, Python 3.13.15, MSVC 14.51.36231, Git Bash from the repo root), the commands for the full, headless and per-area suites, and the tooling checks (`--test`, `--format-check`, `tools/capability_matrix.py --check`, `npm test`).
+- **Coverage labels:** every test module is classified as headless or interactive. Interactive means a generated PE creates a real window and is driven by bounded messages to its own process id (`test_native_keyboard`, `test_native_mouse`, `test_native_window`, `test_native_procedural`, and the graphical `test_includes` cases).
+- **Tolerances:** 960×600 fixed framebuffer with letterboxing, fixed-step updates (1–240 Hz, default 60), explicit state timeouts rather than sleeps, exact byte/value comparisons, and no performance claims from these tests.
+- **Gaps recorded:** Windows-only runs, grammar-only extension validation, no manual visual claim.
+- **Accuracy check:** all 91 test modules named in the page exist.
+- **Files:** `docs/TESTING.md` (new), `README.md`.
+- **Commit:** `8997af2`.
+
+## Batch 22 — network fuzzing and prompt output (8.14/8.15)
+
+- **Runtime hardening:** `anvil_net_receive` ignores datagrams whose length is not one double and 8-byte payloads that are NaN or infinite, keeping the previous value. A malformed packet can no longer poison comparisons or stop the program.
+- **Fuzz test:** `tests/test_net_fuzz.py` hosts a real program, sends empty/1/4/7/9/16-byte datagrams and NaN/+inf/-inf bit patterns, then one valid 2.5, and asserts the program exits 0 with only 2.5 accepted and no `nan`/`inf` output.
+- **Found while testing:** `say` output was block-buffered when stdout was a pipe, so a running program looked silent until exit. Generated C now calls `fflush(stdout)` after each `say` line; `tests/test_output_flush.py` reads the first line while the program is still sleeping.
+- **Contract update:** the old UDP NaN test expected exit 2 with a located non-finite error; it now floods NaN and asserts survival plus acceptance of a later finite value. `docs/LANGUAGE_SPEC.md` and `docs/MULTIPLAYER.md` record the payload rules.
+- **Tests:** 70 passed across `test_compiler`, `test_net_fuzz` and `test_output_flush`.
+- **Commits:** `031bfb0`, plus the test-contract commit.
+
+## Batch 23 — Part 8 evidence ledger (8.16)
+
+- **`docs/PART8_EVIDENCE.md`:** maps sections 8.8–8.17 to verified behaviour, the exact commits and test files, and the remaining gap for each. Status is honest: 8.8/8.10 verified, 8.9 verified for existing resources, 8.11/8.13/8.14/8.15 partial, 8.12 browser not implemented, 8.17 new-user trial not performed.
+- **Checked before claiming:** local-array and recursion budgets are covered by `tests/test_compiler.py` and `tests/test_recursion_budget.py`; image caps are documented and enforced but only missing-file diagnostics are tested (recorded as a gap); the 3D sample is marked interactive rather than automated.
+- **Index:** 17 commits from the C8 parity work through the network fuzz and per-line flush.
+- **Files:** `docs/PART8_EVIDENCE.md` (new), `README.md`.
+- **Commit:** `27be76d`.
+
+## Batch 24 — image limit diagnostics (8.9/8.10)
+
+- **Specific rejections:** `image_load` used one generic message for every failure. Each check now returns early with the reason: width or height over 8,192 (naming the value), pixel count over 16,777,216, the remaining 128 MiB budget in MiB, a file shorter than its declared rows, or an allocation failure.
+- **Tests:** `tests/test_image_limits.py` covers the width, height, pixel-count and short-file messages plus an 8,192-pixel-wide image that still loads; `tests/test_image_error.py` still passes unchanged. 8 passed.
+- **Docs:** `ENGINE.md` and `LANGUAGE_SPEC.md` describe the named reasons; `TESTING.md` lists the new module.
+- **Commit:** `e4de27d`.
+
+## Batch 25 — build-cache completeness (C8-9, C8-10)
+
+- **Reproduced both findings** with `.scratch/repro_c89_c810.py` before changing code: a 4096-byte compiler replaced by different 4096-byte code with the original `st_mtime_ns` restored produced the identical cache key, and rewriting the `link.exe` beside the compiler also left the key unchanged.
+- **C8-9 fix:** `_compiler_identity` hashes the compiler's bytes instead of path/size/mtime.
+- **C8-10 fix:** the key now includes `link.exe` bytes from the compiler's own toolset folder, the installed Windows SDK `Include`/`Lib` version directories, and `WindowsSDKVersion` when present. `CACHE_KEY_VERSION` is `anvil-cache-v3`, so pre-fix entries are never reused.
+- **Tests:** `test_same_size_same_time_compiler_replacement_changes_the_key`, `test_a_changed_linker_beside_the_compiler_changes_the_key`, `test_an_unchanged_linker_keeps_the_key` — red before the fix, green after; 12 passed with `test_build_atomic`.
+- **Measured cost:** cold C build 1.67 s, cached hit 0.22 s (was 0.13 s) with the real MSVC toolset, so hashing ~4.6 MB of tools costs about 0.09 s.
+- **Known gap recorded in `docs/COMPILER.md`:** libraries passed through `build_c(libraries=...)` are still not part of the key.
+- **Commit:** `d1e56b9`.
+
+## Batch 26 — typo inside an unused function (8.10/8.8)
+
+- **Gap found by probing include diagnostics:** an unknown call inside a function that is never called compiled clean (`main.ANVL: ok`), because uncalled functions are pruned before lowering and the project's documented boundary only checks emitted code. Include spans themselves are correct: the same error in a *called* helper reports `lib/util.ANVL:5` with a caret.
+- **Fix:** `compiler/lints.py::unknown_calls_in_unused_functions` warns `unused function 'helper' calls unknown function 'helo'; did you mean 'hello'?`, reusing the suggestion helper. It joins the existing warning list, so `--deny-warnings` exits 1. Entry file only, matching the unused-function warning's shared-include policy.
+- **Pre-flight:** all 36 examples parsed; zero would warn.
+- **Tests:** `test_a_typo_in_an_uncalled_function_is_reported` was red first, then green; 50 passed across `test_lints`, `test_suggestions`, `test_dead_branches`, `test_refusals`, `test_unused_imports`. CLI verified: warning with caret, `--deny-warnings` rc 1.
+- **Commit:** `a896281`.
+
+## Batch 27 — always-on-top and fullscreen (8.11/8.14)
+
+- **`window_on_top(on)`**: sets or clears `WS_EX_TOPMOST` so the game floats over other programs, or goes behind them again when clicked away.
+- **`window_fullscreen(on)`**: saves the window style and rectangle, switches to borderless `WS_POPUP` on the current monitor, and restores the exact previous style and rectangle on `0`. Both return 1 on success and 0 without a window, usable as statements or expressions.
+- **Native backend:** reports a source-located "not available in the native x64 backend yet" diagnostic instead of ignoring the call.
+- **Tests:** `tests/test_window_flags.py` drives a real window and inspects live Win32 state after each phase — `WS_EX_TOPMOST` present/absent, `WS_POPUP` plus rectangle equal to the monitor, then the original rectangle restored. 110 passed with includes, compiler, capability matrix and native x64.
+- **Also:** `examples/window_controls.ANVL` (F/T toggles), spec and engine docs, native migration note, VS Code grammar and `npm test`.
+- **Commit:** `25ac3ab`.
+
+## Batch 28 — SDK contents and environment script identity (C8-11, C8-12)
+
+- **C8-12 reproduced first:** a same-size `VsDevCmd.bat` replacement with the original `st_mtime_ns` restored produced the identical environment cache path.
+- **C8-12 fix:** the cache file name is now a SHA-256 of `VsDevCmd.bat` and `vcvarsall.bat` contents plus the arch, so stale environments cannot be revived.
+- **C8-11 fix:** `_sdk_fingerprint` hashes every file under the newest SDK version's `Include` and `Lib` trees by path, size and mtime. Measured 40 ms cold and 10 ms warm, against 531 ms for a stat-per-file walk, because `os.scandir` supplies the metadata.
+- **Residual window:** a build still trusts the newest version directory by name; if two SDKs were installed out of order the newest name wins, which matches VsDevCmd's usual selection.
+- **Tests:** header edit, library edit, unchanged control, newer version directory and missing SDK; same-size script replacement, changed nested script, unchanged script. 27 passed.
+- **Cost after the change:** cold build 451 ms (was 413 ms), cache hit 53 ms (was 41 ms).
+- **Commit:** `a4eafbc`.
+
+## Batch 29 — window flags, first-hour workflow and a green checkpoint
+
+- **Suite:** 742 passed, 1 skipped, 1 xfailed in 190 s on `fab2030` (was 646 passed in 618 s before this work stream; the 3.3x speedup comes from the cached toolset environment).
+- **Window controls:** `window_on_top` / `window_fullscreen` with live Win32 state assertions, including repeated toggles that must not re-save the fullscreen geometry.
+- **Diagnostics:** closest-name suggestions, stable codes for ten errors, `--explain CODE`, `--diagnostics editor` with `file:line:column`.
+- **Build loop:** compiler/linker/SDK/environment identity all content-based; `--timings` shows parse+generate ~3 ms against a ~450 ms cold build.
+- **First hour:** `tests/test_first_hour.py` runs the documented scaffold → check → build → run → format → package → doctor → explain path.
+- **Open roadmap items are features, not defects:** browser target (no WASM toolchain in this environment), glTF/animation, audio, records. All audit findings C8-1..C8-12 are closed.
+
+## Batch 30 — C8-11 header half: hash the headers the build consumed
+
+- **Reproduced first:** on a synthetic SDK tree, replacing `windows.h` and `kernel32.lib` with different same-size contents and restoring their `st_mtime_ns` left `_sdk_fingerprint` at the identical `3a845389c0b0d552`. A size-changing edit did change it, which is why the committed tests missed the case.
+- **Whole-tree byte hashing rejected by measurement:** 1,167 MB under `Include\10.0.26100.0` plus `Lib\10.0.26100.0` costs 5,867 ms, more than a cold build, so it cannot sit on a cache hit.
+- **Fix:** `build_c(..., deps_path=...)` passes `cl /sourceDependencies<file>`; `store_build` copies the JSON beside the cache entry as `<base-key>.deps.json`, and `cached_build` folds a SHA-256 of those headers' **bytes** into the key. Missing or unreadable sidecars fall back to the metadata key, so old caches still work and repair on the next real build.
+- **Measured cost:** `examples/first_world.ANVL` consumes 120 distinct headers (5.45 MB); digesting them costs 9-10 ms, and `/sourceDependencies` adds no measurable compile time (315 ms with and without the flag; the dependency list was identical across runs).
+- **Tests:** same-size/same-mtime replacement changes the key; unchanged headers keep it; missing, unreadable and deleted-dependency cases. `tests/test_build_cache.py` 20 passed; with build-atomic, toolchain-env, timings and compiler suites 85 passed. End to end the second build printed `(reused build cache)` and wrote a 147-entry sidecar.
+- **Still open:** the library half. Default `.lib` files are resolved by the linker, not named on the command line, so a same-size replacement of one is still invisible to the key.
+
+## Batch 31 — C8-11 library half: hash the libraries the linker resolved
+
+- **Problem:** default `.lib` files are chosen by `#pragma comment(lib, …)` inside SDK headers, so they appear on neither the command line nor the header dependency list. A same-size, same-mtime replacement of a static library could still return a stale executable.
+- **Capture:** `build_c(..., libs_path=...)` adds `/link /VERBOSE` and parses the `Searching <path>.lib:` lines the linker prints, writing `<base-key>.libs.json` beside the cache entry. On failure the captured output is echoed to stderr before the build error propagates.
+- **Keying:** `_library_digest` folds a SHA-256 over each resolved library's path and bytes into the cache key, independent of the header sidecar; either list may be missing and its half falls back to the metadata key.
+- **Measured:** a real build resolves nine libraries totalling 62 MB; digesting them costs about 36 ms, taking a `first_world` cache hit from ~145 ms to 169-177 ms against a 315 ms cold build. sha256 was the fastest option here (blake2b was 1.6x slower).
+- **Verified end to end:** second build printed `(reused build cache)`; folded key `3b0ba6cd…` equals the cached executable's name; `.libs.json` lists 9 libraries.
+- **Tests:** same-size/same-mtime library replacement changes the key, missing library list falls back, `/VERBOSE` parsing keeps only files that exist. `tests/test_build_cache.py` 24 passed.
+- **Closes:** C8-11 entirely — headers (Batch 30) and libraries (this batch).
+
+## Batch 32 — audio: bounded WAV playback (8.14)
+
+- **Builtins:** `sound_load(path)`, `sound_error()`, `sound_play(handle)`, `sound_play_loop(handle)`, `sound_stop(voice)`, `sound_stop_all()`, `sound_volume(voice,v)`, `sound_pan(voice,p)`, `sound_pitch(voice,r)`, `sound_active()`, `sound_destroy(handle)`.
+- **Format and limits:** uncompressed PCM WAV, mono or stereo, 8- or 16-bit, 8,000–192,000 Hz; converted once at load to 48 kHz stereo 16-bit. 16 sound slots, 8 voices, 8 MiB decoded per sound, 48 MiB total. Every rejection sets a readable `sound_error()` (open failure, bad RIFF, non-PCM, channel/bit-depth/rate limits, per-sound or total budget, truncated data).
+- **Device and threading:** `waveOut` opened lazily on first play, mixed on one worker thread into three 10 ms buffers (~30 ms latency). A missing or lost device falls back to silence with an error instead of crashing; audio is released on window teardown and through `atexit` for console-only programs.
+- **Backends:** C backend only; `--backend native` raises the standard located "not available in the native x64 backend yet" diagnostic.
+- **Tests:** load errors for missing/empty path, non-WAV, 24-bit, 3 channels, low rate and the per-sound budget; play/volume/pan/pitch clamps; bounded voices (8 then "all voices are busy"); looping across its source length; destroy stops voices and frees the slot. `tests/test_audio.py` 10 passed.
+- **Also:** `examples/audio_demo.ANVL` with `examples/assets/anvil_tone.wav`, spec table and grammar, evidence ledger, testing doc.
+
+## Batch 33 — saves: typed key/value storage (8.14)
+
+- **Builtins:** `save_number(slot,v)`, `load_number(slot)`, `save_text(slot,text)`, `load_text(slot)`, `save_exists(slot)`, `save_delete(slot)`, `save_error()`.
+- **Storage:** one value per slot in `%LOCALAPPDATA%\Anvil\<project>` (project name comes from the source or manifest, sanitised to `[A-Za-z0-9._-]`); `ANVIL_SAVE_DIR` overrides the root for hosts and tests.
+- **Safety:** slot names are 1–64 bytes from the same safe set, must not start with a dot and must not contain `..`, so a save cannot escape its folder. Files carry an `ANVSAVE1` magic plus a type byte; reading text as a number (or the reverse) returns 0/empty with a named error instead of reinterpreting bytes. Writes go to a temp file and `MoveFileExA(..., MOVEFILE_REPLACE_EXISTING)` swaps it in atomically.
+- **Limits:** 255-byte text values, non-finite numbers rejected on read, missing slot is a normal first run (0/empty, empty error).
+- **Tests:** round trip, cross-run persistence, missing slot, type mismatch in both directions, delete, traversal/oversized/invalid slots, 255-byte boundary and the default `%LOCALAPPDATA%` root. `tests/test_saves.py` 9 passed.
+- **Also:** `examples/save_demo.ANVL`, spec table and grammar, engine/language docs, evidence ledger, testing doc.
+- **Fixed en route:** the `number("...")` lint matched the `number(` inside `load_number(`, warning about every non-numeric save slot; the matcher now requires a name boundary, with a regression test.
+
+## Batch 34 — compile-time and size budgets are enforced (8.15)
+
+- **Published budgets:** `tools/bench_budgets.json` now records, per benchmark case and backend, a time ceiling and an executable-size ceiling plus the measured median they came from. Budgets are 3x the measured time and 1.25x the measured size, which absorbs scheduler noise without hiding a real regression.
+- **Enforcement:** `python tools/bench_anvil.py --check` exits 1 and prints every exceeded budget; `--write-budgets` re-measures the current machine and rewrites the file, so re-baselining is a command rather than an edit.
+- **Tests:** `tests/test_perf_thresholds.py` covers the budget file (every case and backend present, all ceilings positive), runs the four cases against the published budgets (fails on any regression), and feeds a deliberately impossible budget through the checker to prove it is not vacuous. 3 passed in 2.1 s.
+- **Measured baseline on this machine:** tiny C 0.397 s / 144,384 B; texty 0.411 s / 151,040 B; big 0.424 s / 154,624 B; big_trim 0.397 s / 144,384 B; native 0.001-0.005 s and 3-27 KB. Published ceilings: C 1.18-1.25 s and 180-193 KB; native 3-14 ms and 3.8-33 KB.
+
+## Batch 35 — sprite tint, flip and rotation (8.14)
+
+- **Builtins:** `image_draw_rotated(handle,cx,cy,degrees,scale)` draws centred, rotated clockwise and uniformly scaled; `image_tint(handle,r,g,b)` multiplies the sprite's colours (0-255 per channel, 255 = unchanged); `image_flip(handle,x,y)` mirrors it. Tint and flip are per-image state applied by every draw path and reset on destroy.
+- **Implementation:** the scaled path samples the source with the flip applied and shades through the tint before alpha-blending; the rotated path inverse-transforms each destination pixel around the centre and samples nearest-neighbour, matching the existing scaled draw's filtering.
+- **Tests:** `tests/test_sprite_draw.py` draws a 2x2 quadrant BMP, resizes the window until the client is exactly 960x600 (so the framebuffer maps 1:1), and reads the presented pixels with GetPixel. It asserts the four plain quadrants, the horizontal flip, a 128-grey tint, and the 90-degree clockwise arrangement (top-left blue, top-right red, bottom-left white, bottom-right green). 1 passed in 2.8 s.
+- **Also:** `examples/sprite_transform_demo.ANVL`, spec table and grammar, evidence ledger, testing doc.
+
+## Batch 36 — atlas-region drawing (8.14)
+
+- **Builtin:** `image_draw_region(handle,sx,sy,sw,sh,dx,dy,dw,dh)` copies a source rectangle (a sprite-sheet cell) into a destination rectangle with the existing nearest-neighbour scaling, tint and flip; flip mirrors inside the cell. A source rect outside the image returns 0 and draws nothing, so a wrong atlas layout is visible instead of silently clamped.
+- **Tests:** the second case in `tests/test_sprite_draw.py` loads a 4x4 four-quadrant BMP, draws each 2x2 cell into a 4x4 destination and checks the centre pixel, mirrors the top half (red|green becomes green|red) and asserts an out-of-range region returns 0 and leaves the frame untouched. 2 passed in 6.1 s.
+- **Editor:** the TextMate grammar and `validate.js` now list the sprite, sound and save builtins (they had lagged behind the runtime); `npm test` passes.
+- **Docs:** language spec row and grammar, evidence ledger, testing doc.
+
+## Batch 37 — 2D camera (8.14)
+
+- **API:** `camera2d(pan_x,pan_y,zoom)` sets a world→screen transform `screen = (world - pan) * zoom` used by rect, circle, line, text position and every sprite draw path. The identity default keeps existing programs unchanged; zoom is clamped to 0.05–20, and a non-finite or non-positive zoom returns 0 and leaves the camera alone. `mouse_x`/`mouse_y` invert the transform, so pointer coordinates are world coordinates. Text moves with the camera but keeps its pixel size because there is no scalable font yet; 3D drawing is untouched.
+- **Tests:** `tests/test_camera2d.py` draws a world-space rect and samples the window at the identity position, after a (50,50) pan, after 2× zoom, after a rejected zero-zoom call and after reset. 1 passed.
+- **Harness fix:** two window-reading tests in the same run interfered — the second window could be occluded, and `GetPixel` on a window DC then reads the covering window. `WindowReader.force_client_size` now raises its window with `HWND_TOPMOST`, which made the three window tests pass together.
+- **Docs:** language spec row and grammar, editor grammar/validator, evidence ledger, testing doc.
+
+## Batch 38 — scalable text under the camera (8.14)
+
+- **Runtime:** `anvil_text` now sizes its font as `20 * camera2d_zoom` (clamped to 6–720 px), so world-space labels grow and shrink with the camera instead of staying a fixed pixel size. The default camera still renders the original 20 px.
+- **Harness:** `WindowReader.bounding_box` first read pixels one at a time with GetPixel, which took seconds per scan and made timing-sensitive tests read stale frames. It now grabs the rectangle in one BitBlt through a DIB section (`grab`), so a scan is milliseconds.
+- **Test:** `tests/test_text_zoom.py` holds identity, 2x zoom and reset frames for 2.5 s each and measures the bounding box of the glyphs; 2x must be at least 1.6x wider and taller and moved right, and reset must return to the original box. 1 passed; the three window suites together 4 passed in 17.1 s.
+- **Docs:** language spec camera row, evidence ledger, testing doc.
+
+## Batch 39 — runtime frame benchmarks with enforced budgets (8.15)
+
+- **Builtins:** `frame_tick()`, `frame_render()` and `frame_present()` return the last frame's update, draw and presentation times in seconds; the main loop records them with QueryPerformanceCounter around each phase. This is the first way for a program to see real per-frame work instead of the fixed 60 Hz `delta()`.
+- **Harness:** `tools/bench_runtime.py` builds four ordinary Anvil scenes (idle 2D, 2D overdraw with 1,200 rects and 120 circles, 40 text lines, 20 cubes plus a plane), skips 30 warm-up frames, buckets 120 frame totals at 0.25 ms resolution (no runtime sort), prints p50/p95/worst and compares against `runtime` budgets in `tools/bench_budgets.json`. `--write-budgets` re-measures (2.5x headroom); `--check` exits 1 on a miss.
+- **Measured here:** idle 0.38 ms, overdraw 3.88 ms, text 1.12 ms, cubes 2.88 ms p50.
+- **Test:** `tests/test_runtime_budget.py` runs `--check` and asserts the scene list matches the budgets file; 2 passed in 13 s.
+- **Docs:** language spec clock row, evidence ledger, testing doc.
+
+## Batch 40 — atlas packing tool (8.14)
+
+- **Tool:** `tools/pack_atlas.py` reads uncompressed 24/32-bit BMPs, orders them by height/width/name, packs them on shelves with an optional gutter, writes a 32-bit BGRA sheet and a sorted, timestamp-free `anvil-atlas-1` JSON manifest. Sprite names come from file stems and duplicates are refused; an image wider than the sheet is refused with its width in the message.
+- **Bug caught by the test:** the width guard unpacked the sprite tuple with the fields in the wrong position, so it compared heights and allowed a 5 px image into a 4 px sheet. `pack()` now indexes the width field directly.
+- **Tests:** `tests/test_atlas_pack.py` packs three solid sprites, reads the sheet back and checks every cell pixel against the manifest rectangle, verifies rectangles do not overlap with padding, requires byte-identical sheet and JSON across runs, and covers the duplicate-name and oversized-image errors; 4 passed.
+- **Docs:** `docs/ATLAS.md` documents the workflow, options, manifest and `image_draw_region` usage.
+
+## Batch 41 — audio mixer groups (8.14)
+
+- **Runtime:** every loaded sound carries a group (1..3, default 1). Three group gains plus a master gain (group 0) multiply into the mixer, with mute tracked separately so a muted group keeps its volume. `sound_group(handle,group)`, `sound_group_volume(group,v)` (0..1), `sound_group_mute(group,on)`, `sound_group_gain(group)` (effective, 0 while muted) and `sound_group_stop(group)` (0 stops all) are exposed.
+- **Compatibility:** the default group is 1 and its gain is 1.0, so existing programs mix exactly as before.
+- **Tests:** `tests/test_audio_groups.py` covers assignment, invalid groups and fractional groups, gain clamping, master gain and mute, and stop isolation with two looping voices in groups 1 and 2 plus a stop-all; 3 passed. Playback cases skip when the machine has no audio device.
+- **Docs:** language spec audio row, evidence ledger, testing doc.
+
+## Batch 42 — compile-time glTF import (8.13)
+
+- **Compiler:** `compiler/gltf.py` reads `.gltf` at build time, resolves external `.bin` or base64 data-URI buffers, walks the node hierarchy (matrix or TRS, 64 levels), converts triangles/strips/fans, averages `COLOR_0` or uses the material `baseColorFactor`, and enforces a 200,000-triangle budget. `model_draw` is lowered to a static `double` array plus `anvil_mesh_draw`.
+- **Runtime:** `anvil_mesh_draw` scales/rotates/translates each triangle, flat-shades it with the scene light and rasterises through the same near-plane clip and depth buffer as `cube`.
+- **Diagnostics:** missing, malformed, oversized or unsupported models stop the build at the call site with the resolved path; a `model_draw` in an included module is rejected with a clear message instead of emitting a definition after its use.
+- **Bug caught while building:** the index bounds check compared primitive-local corners rather than resolved indices, so a valid quad was rejected as out of range; the loader now maps corners through the index accessor first.
+- **Tests:** `tests/test_gltf_model.py` covers the loader (quad → two triangles, translation, missing/broken files), the located compile error, a rendered quad whose centre matches the computed flat-shade value (169,0,0), and depth ordering with a nearer blue quad. 6 passed; the rendered frame was also inspected as an image.
+- **Docs:** language spec row, `docs/MODELS.md`, README link, evidence ledger, testing doc.
+
+## Batch 43 — GLB container support (8.13)
+
+- **Loader:** `compiler/gltf.py` now reads `.glb` as well as `.gltf`: it validates the 12-byte header (magic, version 2, declared length), walks the chunks, decodes the JSON chunk, keeps the BIN chunk as buffer 0 for buffers without a `uri`, and skips unknown chunk types per the spec. Truncated chunks, a missing JSON chunk and a wrong version or magic are named errors.
+- **Tests:** `tests/test_gltf_model.py` builds a GLB fixture holding the same quad and asserts its triangles are identical to the `.gltf` version, rejects a header-only GLB, and renders the GLB quad with the same expected centre pixel. 9 passed.
+- **Docs:** `docs/MODELS.md` table and unsupported list, language spec row, evidence ledger, testing doc.
+
+## Batch 44 — streaming music (8.14)
+
+- **Runtime:** one music track is streamed from disk instead of decoded into memory. `music_load` parses RIFF chunks, records the data offset/length and validates PCM 8/16-bit mono/stereo 8k-192k. The mixer keeps an 8192-frame (~170 ms) staging buffer, refills it from the file and linearly resamples to 48 kHz; the track stops at EOF unless looping, and `music_stop` rewinds.
+- **API:** `music_load`, `music_play`, `music_play_loop`, `music_stop`, `music_playing`, `music_volume` (0-1, scaled by the master group), `music_position`, `music_length` and `music_error`.
+- **Tests:** `tests/test_music.py` covers length/volume/clamps, five named load failures (missing, non-WAV, 3 channels, 24-bit, empty data), a playing track that reports position and rewinds on stop, a short track that finishes itself, and a looping track that keeps playing with a wrapping position. 4 passed.
+- **Fix along the way:** `say` rejected `music_error()` until the text-returning builtin was added to the codegen text-expression list (it already existed in the expression layer's set).
+- **Docs:** language spec row, evidence ledger, testing doc.
+
+## Batch 45 — particle system (8.14/8.15)
+
+- **Runtime:** a fixed 4,096-particle pool with `particle_emit(x,y,vx,vy,life,size,r,g,b)`, `particle_count`, `particle_clear` and `particle_gravity`. Particles advance every fixed update by velocity plus constant gravity, expire on their lifetime, and are drawn after the program's draw pass as squares fading from alpha 255 to 0. World-space, so the 2D camera applies.
+- **Bounds:** emit returns 0 when the pool is full or an argument is non-finite/`life <= 0`/`size <= 0`; window teardown empties the pool.
+- **Tests:** `tests/test_particles.py` covers argument rejection, filling all 4,096 slots and the next emit failing, clear returning the live count, a fresh particle reading nearly solid red, a mid-life faded value and a black frame after expiry. 3 passed.
+- **Benchmark:** `particles_2d` joins `tools/bench_runtime.py` (about 2,400 live particles at p50 0.88 ms), and its budget is enforced with the others.
+- **Bug caught:** the runtime header lacked the new prototypes, so generated C used implicit declarations and `particle_clear` returned garbage; the prototypes were added after the `anvil_rect` block.
+- **Docs:** language spec row, evidence ledger, testing doc, `examples/particles_demo.ANVL` (screenshot inspected: orange fountain over the floor band).
+
+## Batch 46 — bounding-sphere culling for models (8.13)
+
+- **Compiler:** `bounds_of` computes a centre and radius from the baked triangles and emits them as part of the `anvil_mesh_draw` call, so culling costs no runtime bounds pass.
+- **Runtime:** each model's sphere is scaled, rotated and translated, then tested against the near plane and the projected viewport. Entirely-behind or entirely-outside models are skipped before any triangle work, returning 0. `mesh_culled()`/`mesh_drawn()` expose per-frame counts and `mesh_culling(on)` toggles the test.
+- **Measured:** 20 off-screen models of 2,048 triangles each (40,960 triangles) cost 3.83 ms/frame with culling off and 0.20 ms with it on — 18.9x less render time for that scene. A single 2-triangle quad only gained 1.11x, so the win scales with triangle count, as expected.
+- **Tests:** `tests/test_gltf_model.py` now asserts a behind-camera model reports 1 culled / 0 drawn, a visible one 0 / 1, and that `mesh_culling(0)` forces the behind-camera model to draw. 10 passed.
+- **Docs:** language spec model row, `docs/MODELS.md` culling section, evidence ledger, testing doc.
+
+## Batch 47 — overhead shadows (8.13)
+
+- **Runtime:** `shadow(on)` makes `cube` and `model_draw` draw a copy of their geometry flattened onto a horizontal plane at `shadow_height(y)`, in black at `shadow_alpha(a)` (default 150), before the object. Drawn through the same depth buffer, so objects occlude their own shadows correctly.
+- **Camera:** added `camera_angle(yaw,pitch)` so a program can look down programmatically (pitch clamped to ±89). Until now only the arrow keys could pitch the camera, which made ground-plane behaviour untestable.
+- **Tests:** `tests/test_shadows.py` sets a tilted camera and samples a pixel where the shadow must land: a horizontal quad at y=2 casting onto y=0 (darkens, then returns to background when `shadow_height(1)` moves it), and a cube at y=1 casting below itself. 2 passed. The demo frame was inspected as an image: two cubes on a grid plane with dark shadows beneath.
+- **Docs:** language spec rows for the 3D camera and shadows, evidence ledger, testing doc, `examples/shadows_demo.ANVL`.
+
+## Batch 48 — IMA ADPCM WAV support (8.14)
+
+- **Decoder:** a shared IMA ADPCM block decoder (89-entry step table, 16-entry index table) for WAV format tag 0x0011, mono or stereo, blocks up to 4,096 bytes.
+- **Sounds:** `sound_load` decodes every block to 16-bit, then reuses the existing 48 kHz resampler; a decode larger than 64 MiB is refused. Validation now allows PCM 8/16-bit and ADPCM 4-bit with distinct messages.
+- **Music:** `music_load` accepts ADPCM and the streaming reader decodes one block at a time into a small buffer, so memory stays flat; length and looping use block counts.
+- **Queries:** added `sound_duration(handle)` and `sound_rms(handle)` so imported audio can be checked without playing it.
+- **Bugs fixed:** the music parser still rejected every non-PCM format (`if (format != 1) return 0`), and `frame_bytes` became 0 for 4-bit audio, dividing by zero (0xC0000094) when the stream started.
+- **Tests:** `tests/test_wav_adpcm.py` covers decoding and playing a compressed sound, streaming ADPCM music with the right length and position, decoded RMS within 600 of the PCM reference, and the 4-bit rejection messages for both loaders. 4 passed.
+
+## Batch 49 — WebAssembly console target (8.12 first slice)
+
+- **Backend:** `--backend wasm` reuses the C code generation with a freestanding runtime (`runtime/anvil_wasm.c` + `anvil_wasm.h`), links with clang 23.1.4 and wasm-ld, and writes both the `.wasm` and a host `.html` page that wires `env.write` to a `<pre>`.
+- **Runtime:** implemented `printf`/`putchar`/`strlen`/`memcpy`/`memset`/`strcmp`, a 1 MiB bump allocator, number formatting, string helpers (`str_set`, `str_cat`, `text_mid`, `text_upper`, `text_to_number`), array bounds checks and frame-depth checks; math builtins lower to wasm instructions via `__builtin_*`.
+- **Subset enforcement:** `scene`/`display`/`engine` statements and builtins outside the allowed list are refused with a source-located error before linking, instead of failing at link time with an undefined symbol.
+- **Host:** `tools/wasm_host.mjs` runs a module under Node and is used by `--run`.
+- **Tests:** `tests/test_wasm.py` covers hello output, strings/arrays/loops/function calls, `--check`, the generated host page, and both refusals (graphics at line 1, `time()` at line 2). 5 passed.
+- **Docs:** `docs/WASM.md`, backend list, README link, evidence ledger, testing doc.
+
+## Batch 50 — canvas 2D in the wasm target (8.12)
+
+- **Runtime:** the wasm runtime now forwards `clear`, `rect`, `circle`, `line` and `text` to host imports and stores the `update`/`draw` callbacks; `anvil_run` returns immediately and the exported `anvil_frame(delta)` runs one update, clear, draw and `present`. Strings cross the boundary as `(ptr, len)` and the host decodes UTF-8 from memory.
+- **Host page:** generated `.html` now contains a 960×600 canvas with a 2D context, real drawing for each primitive, and a `requestAnimationFrame` loop calling `anvil_frame`.
+- **Node host:** `--record` captures the draw-command stream as JSON so tests can assert order and arguments without a browser.
+- **Validation:** `scene 2d` and `display rect/circle/line/text` are allowed; `scene 3d`, `camera`, `engine` and other shapes are refused with their line number.
+- **Tests:** `tests/test_wasm.py` adds the canvas command stream (clear, rect, circle, line, text, present with exact arguments), the host page contents, and the new refusals. 8 passed.
+- **Visual check:** the generated page was served over HTTP and opened in Chromium; the canvas showed the red rectangle and yellow "hi" text, and sampled pixels matched the scene colours.
+
+## Batch 51 — wasm input and time (8.12)
+
+- **Runtime:** keyboard/mouse state with one-frame pressed edges, `time()`/`delta()` driven by the host's frame delta (clamped 0-250 ms), and exported setters `anvil_key`, `anvil_mouse`, `anvil_mouse_button` and `anvil_wheel`. Key codes match the C runtime (A-Z 65-90, Space 32, Enter 13, Escape 27, arrows 37-40); mouse buttons are left/right/middle.
+- **Host page:** window keydown/keyup listeners (with `KeyA` mapping and arrow/space scroll suppression), canvas-relative mousemove, mouse buttons and wheel; `window.anvil` exposes the instance so frames can be stepped deterministically.
+- **Node host:** `--input JSON` drives a script of `key`/`mouse`/`button`/`wheel`/`frame` steps for tests.
+- **Tests:** `tests/test_wasm.py` adds exact output for pressed/held edges, mouse coordinates and per-frame delta, time accumulation across frames, and the host page's input listeners. 11 passed.
+- **Visual check:** a colour-flag program was served and opened in Chromium; stepping frames showed blue when idle, red while `A` was held, and blue again on release, both through the exported API and through real DOM `KeyboardEvent`s.
+
+## Batch 52 — wasm math and random (8.12)
+
+- **Runtime:** `sin`/`cos` implemented without libm by reducing the angle to [-pi, pi] (nearest-turn) and summing the Taylor series to n=9; `rnd(low, high)` uses the same xorshift64 multiplier/algorithm as the C runtime and keeps its inclusive integer range and swap-if-reversed behavior, seeded with a fixed constant so runs are reproducible.
+- **Why:** clang lowers `sin`/`cos` to libcalls in wasm (there is no trig instruction), so the freestanding shim has to provide them under the libm names the C generator already emits.
+- **Tests:** `tests/test_wasm.py` runs a ten-value trig program and pins results that match `cl.exe`'s libm byte-for-byte, including `sin(1e6)`; a 500-draw loop asserts `rnd(0,9)` never leaves its range and `rnd(4,4)` is the fixed point. 13 passed.
+- **Cross-check:** the same source compiled with the C backend and with the wasm backend produced identical ten-line output (`diff` empty).
+
+## Batch 53 — wasm saves over localStorage (8.12)
+
+- **Runtime:** the six save builtins plus `save_error` now work in wasm. Values are a type byte plus payload: numbers as 16 hex digits of the IEEE-754 bit pattern (exact round trip), text as UTF-8 (255-byte limit). Slot validation, project-name sanitizing, "not a readable Anvil save", type-mismatch and non-finite messages all match the C runtime word for word.
+- **Hosts:** the page maps `save_read`/`save_write`/`save_delete` onto `localStorage` keys of the form `anvil:<project>/<slot>`; the Node host uses a Map, optionally persisted through `ANVIL_SAVE_FILE`.
+- **Tests:** `tests/test_wasm.py` covers the round trip and every error name, two separate Node runs sharing one JSON file, invalid slots and oversized text. 16 passed.
+- **Visual check:** a program that saves "seen" on its first frame was served in Chromium. With cleared storage, frame 1 drew green and `localStorage` then held `2yes`; after a reload, frame 1 drew blue, so the page really reads the persisted slot.
+
+## Batch 54 — wasm text helpers (8.12)
+
+- **Runtime:** `lower`, `trim`, `left`, `right`, `char`, `contains`, `starts_with` and `ends_with` are implemented in the freestanding shim with the C runtime's exact clamping: counts truncate toward zero, values at or above the length clamp to the whole string, negative/NaN counts give empty text, and `char` returns empty text for an out-of-range index.
+- **Tests:** `tests/test_wasm.py` builds the same source for wasm and for the C backend and asserts both outputs are equal, with the expected 15 lines pinned (`left("abc", 99)` is `abc`, `right("abc", -1)` is empty, `left("abcdef", 1.9)` is `a`, `char("hello", 9)` is empty). 17 passed.

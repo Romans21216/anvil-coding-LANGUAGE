@@ -1,0 +1,6 @@
+library import arith
+
+fn(main)
+  say call fn(gcd, 48, 18)
+end
+call fn(main)

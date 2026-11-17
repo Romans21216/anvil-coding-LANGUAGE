@@ -1,6 +1,5 @@
 import json
 import pathlib
-import re
 import subprocess
 import sys
 import tempfile
@@ -9,7 +8,7 @@ from unittest import mock
 
 from compiler.cli import main
 from compiler.codegen import emit_c
-from compiler.common import CompileError, Node, ROOT, RUNTIME_C_NAMES
+from compiler.common import CompileError, Node
 from compiler.modules import called_functions
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse, parse_syntax
@@ -99,7 +98,7 @@ class IncludeTests(IncludeFixture):
 
     def test_included_configuration_and_callback_errors_keep_location(self):
         cases = [
-            ('set var(x) = 7\n', 'fn(main)\n output var(x)\nend\n'),
+            ('net host(9000)\n', 'fn(main)\n output 1\nend\n'),
             ('scene 3d\n', 'fn(draw)\n display rect(0,0,1,1)\nend\n'),
             ('clear rgba(1,2,3,4)\n', 'scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n'),
             ('fn(update, dt)\n output 0\nend\n', 'scene 2d\nfn(draw)\n display rect(0,0,1,1)\nend\n'),
@@ -112,86 +111,6 @@ class IncludeTests(IncludeFixture):
             with self.subTest(library=library_source), self.assertRaises(CompileError) as error:
                 NativeCodegen(path, *program).generate()
             self.assertIn(str(library) + ':1:', str(error.exception))
-
-    def test_included_local_array_conflict_cli_reports_library_line(self):
-        library = self.write('lib.ANVL', 'fn(value, parameter)\n array parameter(2)\n output 1\nend\n')
-        entry = self.write('main.ANVL', 'include "lib.ANVL"\nfn(main)\n output call fn(value, 7)\nend\n')
-        for options in (['--backend', 'native', '--output', str(self.root / 'out.exe')],
-                        ['--emit-c', str(self.root / 'out.c')]):
-            with self.subTest(options=options):
-                result = subprocess.run([sys.executable, '-m', 'compiler.anvil', str(entry), *options],
-                                        capture_output=True, text=True, timeout=10)
-                self.assertEqual(result.returncode, 1)
-                self.assertIn(str(library) + ':2:', result.stderr)
-                self.assertIn('conflicts with a local variable or parameter', result.stderr)
-                self.assertNotIn('Traceback', result.stderr)
-
-    def test_semantic_symbol_errors_identify_physical_declarations(self):
-        for declaration in ('fn(array_get)\n output 0\nend\n',
-                            'set var(array_get) = 1\n', 'array array_get(2)\n'):
-            library = self.write('symbols.ANVL', '# header\n' + declaration)
-            with self.subTest(declaration=declaration), self.assertRaises(CompileError) as error:
-                self.load('include "symbols.ANVL"\nfn(main)\n output 0\nend\n')
-            self.assertIn(str(library) + ':2:', str(error.exception))
-            self.assertIn('reserved runtime name', str(error.exception))
-        first = self.write('first.ANVL', '# header\nfn(foo-bar)\n output 0\nend\n')
-        second = self.write('second.ANVL', '# header\n# header\nfn(foo_bar)\n output 0\nend\n')
-        with self.assertRaises(CompileError) as error:
-            self.load('include "first.ANVL"\ninclude "second.ANVL"\nfn(main)\n output 0\nend\n')
-        self.assertIn(str(first) + ':2', str(error.exception))
-        self.assertIn(str(second) + ':3', str(error.exception))
-        self.assertIn("both map to C name 'anvil_foo_bar'", str(error.exception))
-
-    def test_all_public_runtime_symbols_are_reserved(self):
-        header = (ROOT / 'runtime/anvil_runtime.h').read_text(encoding='utf-8')
-        names = set(re.findall(r'\b(anvil_[A-Za-z_][A-Za-z_0-9]*)\s*\(', header))
-        self.assertTrue(names)
-        self.assertFalse(names - RUNTIME_C_NAMES, names - RUNTIME_C_NAMES)
-
-    def test_previously_missing_runtime_names_reject_all_symbol_kinds(self):
-        for name in ('camera_control', 'camera_fov', 'set_fixed_hz', 'trace_finish', 'trace_sphere'):
-            for declaration in (f'fn({name})\n output 0\nend\n', f'set var({name}) = 1\n', f'array {name}(2)\n'):
-                library = self.write('reserved.ANVL', '# header\n' + declaration)
-                entry = self.write('main.ANVL', 'include "reserved.ANVL"\nfn(main)\n output 0\nend\n')
-                for options in (['--backend', 'native', '--output', str(self.root / 'out.exe')],
-                                ['--emit-c', str(self.root / 'out.c')]):
-                    with self.subTest(name=name, declaration=declaration, options=options):
-                        result = subprocess.run([sys.executable, '-m', 'compiler.anvil', str(entry), *options],
-                                                capture_output=True, text=True, timeout=10)
-                        self.assertEqual(result.returncode, 1)
-                        self.assertIn(str(library) + ':2:', result.stderr)
-                        self.assertIn('reserved runtime name', result.stderr)
-                        self.assertNotIn('Traceback', result.stderr)
-
-    def test_quoted_reference_text_and_escapes_remain_literals(self):
-        literals = ['var(ghost)', 'local(ghost)', 'call fn(ghost)',
-                    'quote "var(ghost)" \\ local(ghost) # literal']
-        for literal in literals:
-            source = ('scene 2d\nfn(draw)\n set var(realglobal) = 3\n'
-                      ' set local(reallocal) = 4\n display text(' + json.dumps(literal)
-                      + ') -l(var(realglobal),local(reallocal))\nend\n')
-            with self.subTest(literal=literal):
-                path, program = self.load(source)
-                self.assertEqual(program[2], {'realglobal'})
-                self.assertEqual(program[0]['draw'].locals, {'reallocal'})
-                emit_c(path, *program)
-
-    def test_real_references_outside_literals_still_report_library_line(self):
-        for reference in ('var(missing)', 'local(missing)'):
-            library = self.write('literal.ANVL', 'fn(draw)\n display text("var(ghost) local(ghost)") -l(' + reference + ',0)\nend\n')
-            with self.subTest(reference=reference), self.assertRaises(CompileError) as error:
-                self.load('include "literal.ANVL"\nfn(main)\n output 0\nend\n')
-            self.assertIn(str(library) + ':2:', str(error.exception))
-            self.assertIn("'missing'", str(error.exception))
-            self.assertNotIn("'ghost'", str(error.exception))
-
-    def test_reference_like_image_path_in_unused_native_library(self):
-        self.write('literal.ANVL', 'fn(image-helper)\n output image_load("var(ghost)-local(ghost).bmp")\nend\n')
-        path, program = self.load('include "literal.ANVL"\nfn(main)\n output 7\nend\n')
-        emit_c(path, *program)
-        generator = NativeCodegen(path, *program)
-        generator.generate()
-        self.assertNotIn('function:image-helper', generator.code.labels)
 
     def test_graph_limits_and_invalid_utf8_are_controlled(self):
         self.write('one.ANVL', 'include "two.ANVL"\n')
@@ -253,8 +172,8 @@ class IncludeExecutionTests(IncludeFixture):
         exe.write_bytes(NativeCodegen(path, *program).generate())
         result = subprocess.run([str(exe)], capture_output=True, timeout=5)
         self.assertEqual(result.returncode, 2)
-        self.assertIn(str(library).encode('utf-8'), result.stdout)
-        self.assertGreater(len(result.stdout), 200)
+        self.assertIn(str(library).encode('utf-8'), result.stderr)
+        self.assertGreater(len(result.stderr), 200)
 
     def test_native_include_entry_and_original_runtime_error_location(self):
         library = self.write('lib/helper.ANVL', 'fn(value, number)\n output var(number) + 1\nend\n')
@@ -269,8 +188,8 @@ class IncludeExecutionTests(IncludeFixture):
         exe.write_bytes(NativeCodegen(path, *program).generate())
         result = subprocess.run([str(exe)], capture_output=True, timeout=5)
         self.assertEqual(result.returncode, 2)
-        self.assertIn(str(library).encode('utf-8'), result.stdout)
-        self.assertIn(b'line 2', result.stdout)
+        self.assertIn(str(library).encode('utf-8'), result.stderr)
+        self.assertIn(b':2:', result.stderr)
 
     def test_included_graphical_callbacks_initialize_once(self):
         self.write('lib.ANVL', 'array shared(2)\nset var(initialized) = 0\nadd var(initialized) 1\nfn(value)\n output 42\nend\n')

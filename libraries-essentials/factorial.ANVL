@@ -1,0 +1,13 @@
+fn(factorial, n)
+  set local(k) = floor(var(n))
+  if local(k) < 0
+    output 0
+  end
+  set local(result) = 1
+  set local(i) = 2
+  while local(i) <= local(k)
+    set local(result) = local(result) * local(i)
+    set local(i) = local(i) + 1
+  end
+  output local(result)
+end

@@ -1,0 +1,3 @@
+fn(area-triangle, base, height)
+  output var(base) * var(height) / 2
+end

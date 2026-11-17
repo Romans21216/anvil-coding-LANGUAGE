@@ -1,0 +1,12 @@
+fn(reverse-number, n)
+  set local(k) = floor(abs(var(n)))
+  set local(result) = 0
+  while local(k) > 0
+    set local(result) = local(result) * 10 + local(k) % 10
+    set local(k) = floor(local(k) / 10)
+  end
+  if var(n) < 0
+    output -local(result)
+  end
+  output local(result)
+end

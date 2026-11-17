@@ -1,0 +1,26 @@
+fn(is-upper-text, text)
+  set local(has_letter) = 0
+  set local(lower_found) = 0
+  set local(i) = 0
+  while local(i) < len(var(text))
+    set local(code) = ord(mid(var(text), local(i), 1))
+    if local(code) >= 65
+      if local(code) <= 90
+        set local(has_letter) = 1
+      end
+    end
+    if local(code) >= 97
+      if local(code) <= 122
+        set local(lower_found) = 1
+      end
+    end
+    set local(i) = local(i) + 1
+  end
+  if local(has_letter) = 0
+    output 0
+  end
+  if local(lower_found) = 1
+    output 0
+  end
+  output 1
+end

@@ -1,0 +1,17 @@
+fn(index-of, text, needle)
+  set local(found) = -1
+  set local(i) = 0
+  set local(last) = len(var(text)) - len(var(needle))
+  if len(var(needle)) = 0
+    output 0
+  end
+  while local(i) <= local(last)
+    if local(found) = -1
+      if mid(var(text), local(i), len(var(needle))) = var(needle)
+        set local(found) = local(i)
+      end
+    end
+    set local(i) = local(i) + 1
+  end
+  output local(found)
+end

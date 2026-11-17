@@ -1,0 +1,10 @@
+fn(text-repeat, text, times)
+  # Recursive rather than a global accumulator, so it is reentrant.
+  if floor(var(times)) <= 0
+    output ""
+  end
+  if floor(var(times)) = 1
+    output var(text)
+  end
+  output var(text) & call fn(text-repeat, var(text), floor(var(times)) - 1)
+end

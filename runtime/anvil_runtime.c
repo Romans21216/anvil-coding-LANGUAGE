@@ -3,6 +3,8 @@
 #include "anvil_projection.h"
 
 #include <math.h>
+#include <mmsystem.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,13 +13,40 @@
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "winmm.lib")
 
 enum {
-  ANVIL_WIDTH = ANVIL_FRAME_WIDTH,
-  ANVIL_HEIGHT = ANVIL_FRAME_HEIGHT,
+  ANVIL_WIDTH = 960,
+  ANVIL_HEIGHT = 600,
   ANVIL_KEYS = 256,
-  ANVIL_MOUSE_BUTTONS = 3
+  ANVIL_MOUSE_BUTTONS = 3,
+  ANVIL_IMAGES = 64,
+  ANVIL_IMAGE_MAX_DIMENSION = 8192
 };
+/* Bounded recursion: generated functions enter and leave a frame, and a call
+   that grows the C stack past this budget stops with a diagnostic instead of
+   an OS stack overflow. The base is captured on the first entry. */
+enum { ANVIL_STACK_BUDGET_BYTES = 512 * 1024 };
+static uintptr_t anvil_stack_base;
+void anvil_frame_enter(void) {
+  char marker;
+  uintptr_t here = (uintptr_t)&marker;
+  if (anvil_stack_base == 0) {
+    anvil_stack_base = here;
+    return;
+  }
+  if (here < anvil_stack_base &&
+      anvil_stack_base - here > (uintptr_t)ANVIL_STACK_BUDGET_BYTES) {
+    fprintf(stderr,
+            "Anvil call depth exceeded the %d KiB stack budget; check for "
+            "unbounded recursion\n",
+            (int)(ANVIL_STACK_BUDGET_BYTES / 1024));
+    exit(2);
+  }
+}
+void anvil_frame_leave(void) {}
+#define ANVIL_IMAGE_MEMORY_LIMIT ((size_t)128 * 1024 * 1024)
 enum { ANVIL_TRACE_SPHERES = 32 };
 static const double ANVIL_NEAR_DEPTH = 0.08;
 enum {
@@ -25,6 +54,11 @@ enum {
   ANVIL_RAY_BACKEND_DXR,
   ANVIL_RAY_BACKEND_EMBREE
 };
+enum { ANVIL_PHYSICS_BODIES = 128, ANVIL_PHYSICS_SOLVER_ITERATIONS = 4 };
+enum { ANVIL_PHYSICS_CIRCLE, ANVIL_PHYSICS_BOX };
+#define ANVIL_PHYSICS_MAX_COORDINATE 1000000000.0
+#define ANVIL_PHYSICS_MAX_RADIUS 1000000.0
+#define ANVIL_PHYSICS_MAX_SPEED 1000000.0
 typedef struct {
   double x, y, z;
 } AnvilVec3;
@@ -40,7 +74,24 @@ typedef struct {
 typedef struct {
   double x, y, depth;
 } AnvilProjected;
+typedef struct {
+  double x, y, vx, vy, force_x, force_y;
+  double radius, half_width, half_height, mass, restitution, friction;
+  uint32_t generation;
+  int active, shape;
+} AnvilPhysicsBody;
+typedef struct {
+  uint32_t *pixels;
+  int width, height;
+  uint32_t generation;
+  int tint_r, tint_g, tint_b;
+  int flip_x, flip_y;
+} AnvilImage;
+
 static HWND anvil_window;
+static LONG anvil_window_saved_style;
+static RECT anvil_window_saved_rect;
+static int anvil_window_is_fullscreen;
 static HDC anvil_memory_dc;
 static HBITMAP anvil_bitmap;
 static HGDIOBJ anvil_old_bitmap;
@@ -57,14 +108,33 @@ static int anvil_mouse_client_y = -1;
 static int anvil_mouse_has_position;
 static double anvil_mouse_wheel_delta;
 static int anvil_mouse_invalid_button_warned;
-static AnvilRuntimeShutdownHook anvil_shutdown_hooks[16];
-static size_t anvil_shutdown_hook_count;
+static AnvilImage anvil_images[ANVIL_IMAGES];
+static size_t anvil_image_memory_used;
 static int anvil_clear_color[4] = {12, 17, 29, 255};
 static int anvil_scene_is_3d = 1;
 static double anvil_camera_x = 0.0, anvil_camera_y = 3.0, anvil_camera_z = 8.0;
 static double anvil_camera_yaw, anvil_camera_pitch;
 static double anvil_camera_focal = 520.0;
 static double anvil_camera_move_speed, anvil_camera_turn_speed;
+/* 2D camera: screen = (world - pan) * zoom. Defaults are the identity, so
+   existing programs draw exactly where they did before. */
+static double anvil_camera2d_x, anvil_camera2d_y;
+static double anvil_camera2d_zoom = 1.0;
+
+static void anvil_camera2d_point(double *x, double *y) {
+  *x = (*x - anvil_camera2d_x) * anvil_camera2d_zoom;
+  *y = (*y - anvil_camera2d_y) * anvil_camera2d_zoom;
+}
+
+double anvil_camera2d(double x, double y, double zoom) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(zoom) || zoom <= 0.0)
+    return 0.0;
+  anvil_camera2d_x = x;
+  anvil_camera2d_y = y;
+  anvil_camera2d_zoom =
+      zoom < 0.05 ? 0.05 : zoom > 20.0 ? 20.0 : zoom;
+  return 1.0;
+}
 static AnvilTraceSphere anvil_trace_spheres[ANVIL_TRACE_SPHERES];
 static int anvil_trace_sphere_count;
 static AnvilBvhNode anvil_trace_bvh[ANVIL_TRACE_SPHERES * 2];
@@ -72,11 +142,30 @@ static int anvil_trace_bvh_count;
 static int anvil_active_ray_backend = ANVIL_RAY_BACKEND_BVH;
 static unsigned int anvil_ray_backend_warnings;
 static double anvil_delta_seconds = 1.0 / 60.0;
+static double anvil_frame_tick_seconds, anvil_frame_render_seconds,
+    anvil_frame_present_seconds;
+static int anvil_mesh_culling_enabled = 1;
+static int anvil_mesh_culled_frame, anvil_mesh_drawn_frame;
+/* Overhead shadow: the same geometry flattened onto a ground plane. */
+static int anvil_shadows_enabled;
+static double anvil_shadow_ground_y;
+static int anvil_shadow_alpha_value = 150;
+static void anvil_world_triangle(AnvilVec3 v[3], uint32_t base,
+                                 double brightness, int alpha);
 static int anvil_fixed_hz = 60;
 static double anvil_elapsed_seconds;
 static LARGE_INTEGER anvil_clock_frequency;
 static LARGE_INTEGER anvil_clock_start;
 static unsigned long long anvil_rng_state = 0x9e3779b97f4a7c15ULL;
+static SOCKET anvil_net_socket = INVALID_SOCKET;
+static SOCKADDR_IN anvil_net_peer;
+static int anvil_net_has_peer;
+static int anvil_winsock_started;
+static double anvil_net_value;
+static AnvilPhysicsBody anvil_physics_bodies[ANVIL_PHYSICS_BODIES];
+static int anvil_physics_active_capacity = ANVIL_PHYSICS_BODIES;
+static double anvil_physics_gravity_x;
+static double anvil_physics_gravity_y = -9.81;
 
 static uint32_t anvil_color(int r, int g, int b) {
   if (r < 0)
@@ -111,23 +200,10 @@ static void anvil_pixel(int x, int y, uint32_t color, int alpha) {
   anvil_pixels[index] = anvil_color(r, g, b);
 }
 
-uint32_t *anvil_runtime_framebuffer(void) { return anvil_pixels; }
-
-int anvil_runtime_register_shutdown_hook(AnvilRuntimeShutdownHook hook) {
-  if (!hook)
-    return 0;
-  for (size_t i = 0; i < anvil_shutdown_hook_count; ++i)
-    if (anvil_shutdown_hooks[i] == hook)
-      return 1;
-  if (anvil_shutdown_hook_count >=
-      sizeof(anvil_shutdown_hooks) / sizeof(anvil_shutdown_hooks[0]))
-    return 0;
-  anvil_shutdown_hooks[anvil_shutdown_hook_count++] = hook;
-  return 1;
-}
-
 static void anvil_clear_frame(void) {
   anvil_trace_sphere_count = 0;
+  anvil_mesh_culled_frame = 0;
+  anvil_mesh_drawn_frame = 0;
   uint32_t c = anvil_color(anvil_clear_color[0], anvil_clear_color[1],
                            anvil_clear_color[2]);
   size_t count = (size_t)ANVIL_WIDTH * ANVIL_HEIGHT;
@@ -261,6 +337,18 @@ void anvil_camera_perspective(double x, double y, double z) {
   anvil_camera_y = y;
   anvil_camera_z = z;
 }
+double anvil_camera_angle(double yaw, double pitch) {
+  if (!isfinite(yaw) || !isfinite(pitch))
+    return 0.0;
+  if (pitch > 89.0)
+    pitch = 89.0;
+  if (pitch < -89.0)
+    pitch = -89.0;
+  anvil_camera_yaw = yaw;
+  anvil_camera_pitch = pitch;
+  return 1.0;
+}
+
 void anvil_camera_fov(double degrees) {
   if (degrees < 20.0)
     degrees = 20.0;
@@ -281,6 +369,9 @@ void anvil_clear(int r, int g, int b, int a) {
 
 void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
                 int a) {
+  anvil_camera2d_point(&x, &y);
+  w *= anvil_camera2d_zoom;
+  h *= anvil_camera2d_zoom;
   int x0 = (int)floor(x), y0 = (int)floor(y), x1 = (int)ceil(x + w),
       y1 = (int)ceil(y + h);
   if (x0 < 0)
@@ -299,47 +390,24 @@ void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
 
 void anvil_circle(double x, double y, double radius, int r, int g, int b,
                   int a) {
-  if (!anvil_pixels || a <= 0 || !isfinite(x) || !isfinite(y) ||
-      !isfinite(radius))
-    return;
-  radius = fabs(radius);
-  double magnitude = fmax(radius, fmax(fabs(x), fabs(y)));
-  int minx = 0, maxx = ANVIL_WIDTH - 1;
-  int miny = 0, maxy = ANVIL_HEIGHT - 1;
-  /* Clip floating-point bounds before any integer conversion. In particular,
-     enormous off-screen circles must not scan radius-sized bounding squares.
-     At extreme magnitudes a pixel-sized change can disappear in the selected
-     binary64 distance predicate. Geometric bounds are then not conservative.
-     Use the full (still bounded) viewport from 2^50, before unit-sized ULPs;
-     below it, one extra pixel covers subpixel rounding/tiny tangencies. */
-  if (magnitude < 1125899906842624.0) {
-    double left = floor(x - radius) - 1.0;
-    double right = ceil(x + radius) + 1.0;
-    double top = floor(y - radius) - 1.0;
-    double bottom = ceil(y + radius) + 1.0;
-    if (right < 0.0 || bottom < 0.0 || left >= ANVIL_WIDTH ||
-        top >= ANVIL_HEIGHT)
-      return;
-    minx = (int)fmax(0.0, left);
-    maxx = (int)fmin(ANVIL_WIDTH - 1.0, right);
-    miny = (int)fmax(0.0, top);
-    maxy = (int)fmin(ANVIL_HEIGHT - 1.0, bottom);
-  }
+  anvil_camera2d_point(&x, &y);
+  radius *= anvil_camera2d_zoom;
+  int rr = (int)ceil(fabs(radius)), cx = (int)lrint(x), cy = (int)lrint(y);
   uint32_t c = anvil_color(r, g, b);
-  /* Preserve the existing squared-distance predicate in its safe domain.
-     Hypot avoids overflowing squares for extreme finite C-API arguments. */
-  int squared = magnitude <= 1.0e150;
-  double r2 = squared ? radius * radius : 0.0;
-  for (int py = miny; py <= maxy; ++py)
-    for (int px = minx; px <= maxx; ++px) {
+  double r2 = radius * radius;
+  for (int py = cy - rr; py <= cy + rr; ++py)
+    for (int px = cx - rr; px <= cx + rr; ++px) {
       double dx = px - x, dy = py - y;
-      if (squared ? dx * dx + dy * dy <= r2 : hypot(dx, dy) <= radius)
+      if (dx * dx + dy * dy <= r2)
         anvil_pixel(px, py, c, a);
     }
 }
 
 void anvil_line(double x1, double y1, double x2, double y2, int r, int g, int b,
                 int a, double thickness) {
+  anvil_camera2d_point(&x1, &y1);
+  anvil_camera2d_point(&x2, &y2);
+  thickness *= anvil_camera2d_zoom;
   AnvilScreenPoint start = {x1, y1}, end = {x2, y2};
   if (!isfinite(thickness) ||
       !anvil_clip_screen_line(&start, &end, ANVIL_WIDTH, ANVIL_HEIGHT))
@@ -385,6 +453,23 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
                                   {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}};
   AnvilVec3 light = anvil_normalize((AnvilVec3){-0.35, 0.8, 0.55});
   uint32_t base = anvil_color(r, g, b);
+  if (anvil_shadows_enabled && a > 0) {
+    AnvilVec3 shadow[8];
+    for (int i = 0; i < 8; ++i) {
+      shadow[i] = v[i];
+      shadow[i].y = anvil_shadow_ground_y + 0.002;
+    }
+    for (int f = 0; f < 6; ++f) {
+      const int triangles[2][3] = {{faces[f][0], faces[f][1], faces[f][2]},
+                                   {faces[f][0], faces[f][2], faces[f][3]}};
+      for (int t = 0; t < 2; ++t) {
+        AnvilVec3 corners[3] = {shadow[triangles[t][0]],
+                                shadow[triangles[t][1]],
+                                shadow[triangles[t][2]]};
+        anvil_world_triangle(corners, 0, 1.0, anvil_shadow_alpha_value);
+      }
+    }
+  }
   for (int f = 0; f < 6; ++f) {
     AnvilVec3 n =
         anvil_normalize(anvil_cross(anvil_sub(v[faces[f][1]], v[faces[f][0]]),
@@ -422,6 +507,140 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
       }
     }
   }
+}
+
+/* Draw a baked triangle mesh. Each triangle is 12 doubles: nine coordinates for
+   three vertices, then r, g, b in 0..255. Vertices are scaled and rotated about
+   the model origin, translated to (x,y,z), flat-shaded with the scene light and
+   rasterised through the same near-plane clip and depth buffer as the cube. */
+double anvil_mesh_culled(void) { return (double)anvil_mesh_culled_frame; }
+double anvil_mesh_drawn(void) { return (double)anvil_mesh_drawn_frame; }
+double anvil_mesh_culling(double on) {
+  anvil_mesh_culling_enabled = on != 0.0;
+  return anvil_mesh_culling_enabled ? 1.0 : 0.0;
+}
+
+double anvil_shadow(double on) {
+  anvil_shadows_enabled = on != 0.0;
+  return anvil_shadows_enabled ? 1.0 : 0.0;
+}
+
+double anvil_shadow_height(double y) {
+  if (!isfinite(y))
+    return 0.0;
+  anvil_shadow_ground_y = y;
+  return y;
+}
+
+double anvil_shadow_alpha(double alpha) {
+  if (!isfinite(alpha))
+    return 0.0;
+  int applied = (int)(alpha < 0.0 ? 0.0 : alpha > 255.0 ? 255.0 : alpha);
+  anvil_shadow_alpha_value = applied;
+  return (double)applied;
+}
+
+static void anvil_world_triangle(AnvilVec3 v[3], uint32_t base,
+                                 double brightness, int alpha) {
+  AnvilProjected projected[4];
+  int count;
+  if (anvil_scene_is_3d) {
+    AnvilCameraVertex camera[3] = {
+        anvil_to_camera(v[0]), anvil_to_camera(v[1]), anvil_to_camera(v[2])};
+    AnvilCameraVertex clipped[4];
+    count = anvil_clip_triangle_near(camera, ANVIL_NEAR_DEPTH, clipped);
+    for (int i = 0; i < count; ++i)
+      if (!anvil_project_camera(clipped[i], &projected[i])) {
+        count = 0;
+        break;
+      }
+  } else {
+    count = 3;
+    for (int i = 0; i < count; ++i)
+      if (!anvil_project(v[i], &projected[i])) {
+        count = 0;
+        break;
+      }
+  }
+  for (int i = 1; i + 1 < count; ++i) {
+    AnvilProjected triangle[3] = {projected[0], projected[i],
+                                  projected[i + 1]};
+    anvil_triangle_lit(triangle, base, brightness, alpha);
+  }
+}
+
+/* Bounding-sphere frustum test. The sphere is transformed to world space,
+   then projected; if it lies entirely behind the near plane or completely
+   outside the viewport it cannot contribute a pixel. */
+static int anvil_mesh_visible(double cx, double cy, double cz, double radius,
+                              double x, double y, double z, double scale,
+                              double rx, double ry, double rz) {
+  if (!anvil_scene_is_3d)
+    return 1;
+  AnvilVec3 center = {cx * scale, cy * scale, cz * scale};
+  center = anvil_rotate(center, rx, ry, rz);
+  center.x += x;
+  center.y += y;
+  center.z += z;
+  double r = fabs(radius * scale);
+  AnvilCameraVertex camera = anvil_to_camera(center);
+  if (camera.depth + r < ANVIL_NEAR_DEPTH)
+    return 0;
+  if (camera.depth > ANVIL_NEAR_DEPTH) {
+    double screen_radius = r * anvil_camera_focal / camera.depth;
+    double sx = ANVIL_WIDTH * 0.5 + camera.x * anvil_camera_focal / camera.depth;
+    double sy = ANVIL_HEIGHT * 0.54 - camera.y * anvil_camera_focal / camera.depth;
+    if (sx + screen_radius < 0.0 || sx - screen_radius > ANVIL_WIDTH ||
+        sy + screen_radius < 0.0 || sy - screen_radius > ANVIL_HEIGHT)
+      return 0;
+  }
+  return 1;
+}
+
+double anvil_mesh_draw(const double *data, int triangle_count, double cx,
+                       double cy, double cz, double radius, double x, double y,
+                       double z, double scale, double rx, double ry, double rz) {
+  if (!data || triangle_count <= 0 || !isfinite(x) || !isfinite(y) ||
+      !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
+      !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  if (anvil_mesh_culling_enabled &&
+      !anvil_mesh_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry, rz)) {
+    anvil_mesh_culled_frame++;
+    return 0.0;
+  }
+  anvil_mesh_drawn_frame++;
+  AnvilVec3 light = anvil_normalize((AnvilVec3){-0.35, 0.8, 0.55});
+  if (anvil_shadows_enabled) {
+    for (int t = 0; t < triangle_count; ++t) {
+      const double *p = data + (size_t)t * 12;
+      AnvilVec3 v[3];
+      for (int i = 0; i < 3; ++i) {
+        AnvilVec3 q = {p[i * 3] * scale, p[i * 3 + 1] * scale,
+                       p[i * 3 + 2] * scale};
+        q = anvil_rotate(q, rx, ry, rz);
+        v[i] = (AnvilVec3){x + q.x, anvil_shadow_ground_y + 0.002, z + q.z};
+      }
+      anvil_world_triangle(v, 0, 1.0, anvil_shadow_alpha_value);
+    }
+  }
+  for (int t = 0; t < triangle_count; ++t) {
+    const double *p = data + (size_t)t * 12;
+    AnvilVec3 v[3];
+    for (int i = 0; i < 3; ++i) {
+      AnvilVec3 q = {p[i * 3] * scale, p[i * 3 + 1] * scale,
+                     p[i * 3 + 2] * scale};
+      q = anvil_rotate(q, rx, ry, rz);
+      v[i] = (AnvilVec3){x + q.x, y + q.y, z + q.z};
+    }
+    AnvilVec3 n = anvil_normalize(
+        anvil_cross(anvil_sub(v[1], v[0]), anvil_sub(v[2], v[0])));
+    double brightness = .28 + .72 * fabs(anvil_dot(n, light));
+    uint32_t base =
+        anvil_color((int)p[9], (int)p[10], (int)p[11]);
+    anvil_world_triangle(v, base, brightness, 255);
+  }
+  return 1.0;
 }
 
 void anvil_sphere(double x, double y, double z, double radius, int r, int g,
@@ -490,12 +709,12 @@ void anvil_plane(double x, double y, double z, double width, double depth,
   uint32_t base = anvil_color(r, g, b);
   for (int i = 0; i <= 10; ++i) {
     double t = (double)i / 10.0;
-    AnvilProjected p0, p1, p2, p3;
+    AnvilProjected p0 = {0}, p1 = {0}, p2 = {0}, p3 = {0};
     AnvilVec3 a0 = {x - width * .5, y, z - depth * .5 + depth * t},
               a1 = {x + width * .5, y, z - depth * .5 + depth * t},
               a2 = {x - width * .5 + width * t, y, z - depth * .5},
               a3 = {x - width * .5 + width * t, y, z + depth * .5};
-    int line0_visible;
+    int line0_visible = 0;
     if (anvil_scene_is_3d) {
       AnvilCameraVertex c0 = anvil_to_camera(a0), c1 = anvil_to_camera(a1);
       line0_visible = anvil_clip_segment_near(&c0, &c1, ANVIL_NEAR_DEPTH) &&
@@ -506,7 +725,7 @@ void anvil_plane(double x, double y, double z, double width, double depth,
     }
     if (line0_visible)
       anvil_line(p0.x, p0.y, p1.x, p1.y, r, g, b, a, 1);
-    int line1_visible;
+    int line1_visible = 0;
     if (anvil_scene_is_3d) {
       AnvilCameraVertex c2 = anvil_to_camera(a2), c3 = anvil_to_camera(a3);
       line1_visible = anvil_clip_segment_near(&c2, &c3, ANVIL_NEAR_DEPTH) &&
@@ -525,10 +744,18 @@ void anvil_text(double x, double y, const char *text, int r, int g, int b,
                 int a) {
   if (!anvil_memory_dc || !text)
     return;
+  anvil_camera2d_point(&x, &y);
+  /* Glyphs scale with the 2D camera so world-space labels grow with zoom.
+     20 px is the original size, and the clamp keeps GDI inside sane limits. */
+  int height = (int)lrint(20.0 * anvil_camera2d_zoom);
+  if (height < 6)
+    height = 6;
+  if (height > 720)
+    height = 720;
   SetBkMode(anvil_memory_dc, TRANSPARENT);
   SetTextColor(anvil_memory_dc, RGB(r, g, b));
   HFONT font =
-      CreateFontA(20, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+      CreateFontA(height, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
                   DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                   CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
   HGDIOBJ old = SelectObject(anvil_memory_dc, font);
@@ -545,7 +772,15 @@ void anvil_text_number(double x, double y, const char *format, double value,
 }
 
 double anvil_time(void) { return anvil_elapsed_seconds; }
+double anvil_clock(void) { return (double)GetTickCount64(); }
 double anvil_delta(void) { return anvil_delta_seconds; }
+
+/* Phase timings for the last frame, in seconds. The main loop records how long
+   the fixed-step update, the draw pass and the presentation each took, so a
+   benchmark can report real per-frame work instead of the 60 Hz pacing. */
+double anvil_frame_tick(void) { return anvil_frame_tick_seconds; }
+double anvil_frame_render(void) { return anvil_frame_render_seconds; }
+double anvil_frame_present(void) { return anvil_frame_present_seconds; }
 double anvil_check_number(double value, const char *path, int line) {
   if (!isfinite(value)) {
     fprintf(stderr, "%s:%d: numeric overflow or non-finite result\n",
@@ -611,13 +846,481 @@ static double anvil_mouse_coordinate(int horizontal) {
   if (x < viewport.x || y < viewport.y || x >= viewport.x + viewport.width ||
       y >= viewport.y + viewport.height)
     return -1.0;
-  if (horizontal)
-    return (double)(x - viewport.x) * ANVIL_WIDTH / viewport.width;
-  return (double)(y - viewport.y) * ANVIL_HEIGHT / viewport.height;
+  double screen = horizontal
+                      ? (double)(x - viewport.x) * ANVIL_WIDTH / viewport.width
+                      : (double)(y - viewport.y) * ANVIL_HEIGHT / viewport.height;
+  /* Inverse of the 2D camera so pointer coordinates are world coordinates. */
+  return screen / anvil_camera2d_zoom +
+         (horizontal ? anvil_camera2d_x : anvil_camera2d_y);
 }
 double anvil_mouse_x(void) { return anvil_mouse_coordinate(1); }
 double anvil_mouse_y(void) { return anvil_mouse_coordinate(0); }
 double anvil_mouse_wheel(void) { return anvil_mouse_wheel_delta; }
+static uint16_t anvil_read_u16_le(const unsigned char *bytes) {
+  return (uint16_t)bytes[0] | (uint16_t)((uint16_t)bytes[1] << 8);
+}
+static uint32_t anvil_read_u32_le(const unsigned char *bytes) {
+  return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) |
+         ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
+}
+static AnvilImage *anvil_image_from_handle(double handle) {
+  const uint64_t max_handle = (uint64_t)UINT32_MAX * ANVIL_IMAGES;
+  if (!isfinite(handle) || handle < 1.0 || handle > (double)max_handle ||
+      floor(handle) != handle)
+    return NULL;
+  uint64_t encoded = (uint64_t)handle - 1;
+  int slot = (int)(encoded % ANVIL_IMAGES);
+  uint32_t generation = (uint32_t)(encoded / ANVIL_IMAGES) + 1;
+  AnvilImage *image = &anvil_images[slot];
+  return image->pixels && image->generation == generation ? image : NULL;
+}
+static const char *anvil_image_error_text = "";
+static char anvil_image_error_detail[192];
+
+static void anvil_image_error_note(const char *format, ...) {
+  va_list arguments;
+  va_start(arguments, format);
+  _vsnprintf_s(anvil_image_error_detail, sizeof(anvil_image_error_detail),
+               _TRUNCATE, format, arguments);
+  va_end(arguments);
+  anvil_image_error_text = anvil_image_error_detail;
+}
+
+const char *anvil_image_error(void) { return anvil_image_error_text; }
+
+double anvil_image_load(const char *path) {
+  anvil_image_error_text = "";
+  if (!path || !*path) {
+    anvil_image_error_text = "the path is empty";
+    return 0.0;
+  }
+  int slot = -1;
+  for (int i = 0; i < ANVIL_IMAGES; ++i) {
+    if (!anvil_images[i].pixels &&
+        anvil_images[i].generation < UINT32_MAX) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    anvil_image_error_text = "no free image slot";
+    return 0.0;
+  }
+
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    anvil_image_error_text = "cannot open the file";
+    return 0.0;
+  }
+  unsigned char header[54] = {0};
+  if (fread(header, 1, sizeof(header), file) != sizeof(header) ||
+      header[0] != 'B' || header[1] != 'M') {
+    fclose(file);
+    anvil_image_error_text = "the file is not a readable 24- or 32-bit BMP";
+    return 0.0;
+  }
+  int64_t file_size = -1;
+  if (_fseeki64(file, 0, SEEK_END) == 0)
+    file_size = _ftelli64(file);
+  int64_t pixel_offset = (int64_t)anvil_read_u32_le(header + 10);
+  uint32_t dib_size = anvil_read_u32_le(header + 14);
+  int32_t width = (int32_t)anvil_read_u32_le(header + 18);
+  int32_t signed_height = (int32_t)anvil_read_u32_le(header + 22);
+  uint16_t planes = anvil_read_u16_le(header + 26);
+  uint16_t bits_per_pixel = anvil_read_u16_le(header + 28);
+  uint32_t compression = anvil_read_u32_le(header + 30);
+  if (dib_size < 40 || pixel_offset < 14 + (int64_t)dib_size || width <= 0 ||
+      signed_height == 0 || signed_height == INT32_MIN || planes != 1 ||
+      (bits_per_pixel != 24 && bits_per_pixel != 32) || compression != BI_RGB) {
+    fclose(file);
+    anvil_image_error_text = "the file is not a readable 24- or 32-bit BMP";
+    return 0.0;
+  }
+  int height = signed_height < 0 ? -signed_height : signed_height;
+  if (width > ANVIL_IMAGE_MAX_DIMENSION) {
+    fclose(file);
+    anvil_image_error_note("the image is %d pixels wide; the limit is %d",
+                           (int)width, (int)ANVIL_IMAGE_MAX_DIMENSION);
+    return 0.0;
+  }
+  if (height > ANVIL_IMAGE_MAX_DIMENSION) {
+    fclose(file);
+    anvil_image_error_note("the image is %d pixels tall; the limit is %d",
+                           height, (int)ANVIL_IMAGE_MAX_DIMENSION);
+    return 0.0;
+  }
+  uint64_t pixel_count =
+      (uint64_t)(unsigned int)width * (uint64_t)(unsigned int)height;
+  uint64_t output_bytes = pixel_count * sizeof(uint32_t);
+  if (pixel_count == 0 || pixel_count > 16u * 1024u * 1024u) {
+    fclose(file);
+    anvil_image_error_note("the image has %llu pixels; the limit is %d",
+                           (unsigned long long)pixel_count, 16 * 1024 * 1024);
+    return 0.0;
+  }
+  if (output_bytes > ANVIL_IMAGE_MEMORY_LIMIT - anvil_image_memory_used) {
+    fclose(file);
+    anvil_image_error_note(
+        "the image needs %llu MiB; only %llu MiB of the 128 MiB image budget "
+        "remain",
+        (unsigned long long)((output_bytes + 1048575u) / 1048576u),
+        (unsigned long long)((ANVIL_IMAGE_MEMORY_LIMIT -
+                              anvil_image_memory_used) /
+                             1048576u));
+    return 0.0;
+  }
+  uint64_t row_bytes = (uint64_t)(unsigned int)width * (bits_per_pixel / 8);
+  uint64_t row_stride = (row_bytes + 3u) & ~UINT64_C(3);
+  if (pixel_offset + (int64_t)(row_stride * (uint64_t)(unsigned int)height) >
+      file_size) {
+    fclose(file);
+    anvil_image_error_text = "the file is too short for the declared image size";
+    return 0.0;
+  }
+
+  uint32_t *pixels = (uint32_t *)malloc((size_t)output_bytes);
+  unsigned char *row = (unsigned char *)malloc((size_t)row_stride);
+  if (!pixels || !row) {
+    free(pixels);
+    free(row);
+    fclose(file);
+    anvil_image_error_text = "the image could not be allocated";
+    return 0.0;
+  }
+  int ok = 1;
+  int any_alpha = 0;
+  for (int source_y = 0; ok && source_y < height; ++source_y) {
+    int64_t row_offset = pixel_offset + (int64_t)row_stride * source_y;
+    if (_fseeki64(file, row_offset, SEEK_SET) != 0 ||
+        fread(row, 1, (size_t)row_stride, file) != (size_t)row_stride) {
+      ok = 0;
+      break;
+    }
+    int target_y = signed_height > 0 ? height - source_y - 1 : source_y;
+    for (int x = 0; x < width; ++x) {
+      const unsigned char *source = row + (size_t)x * (bits_per_pixel / 8);
+      unsigned int alpha = bits_per_pixel == 32 ? source[3] : 255u;
+      any_alpha |= alpha != 0;
+      pixels[(size_t)target_y * (size_t)width + (size_t)x] =
+          ((uint32_t)alpha << 24) | ((uint32_t)source[2] << 16) |
+          ((uint32_t)source[1] << 8) | (uint32_t)source[0];
+    }
+  }
+  free(row);
+  fclose(file);
+  if (!ok) {
+    free(pixels);
+    anvil_image_error_text = "the file ended before the image data did";
+    return 0.0;
+  }
+  if (bits_per_pixel == 32 && !any_alpha) {
+    for (uint64_t i = 0; i < pixel_count; ++i)
+      pixels[i] |= UINT32_C(0xff000000);
+  }
+  anvil_images[slot].pixels = pixels;
+  anvil_images[slot].width = width;
+  anvil_images[slot].height = height;
+  anvil_images[slot].tint_r = 255;
+  anvil_images[slot].tint_g = 255;
+  anvil_images[slot].tint_b = 255;
+  anvil_images[slot].flip_x = 0;
+  anvil_images[slot].flip_y = 0;
+  ++anvil_images[slot].generation;
+  anvil_image_memory_used += (size_t)output_bytes;
+  return (double)(anvil_images[slot].generation - 1) * ANVIL_IMAGES + slot + 1;
+}
+double anvil_image_width(double handle) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  return image ? (double)image->width : 0.0;
+}
+double anvil_image_height(double handle) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  return image ? (double)image->height : 0.0;
+}
+double anvil_image_destroy(double handle) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image)
+    return 0.0;
+  anvil_image_memory_used -=
+      (size_t)image->width * (size_t)image->height * sizeof(uint32_t);
+  free(image->pixels);
+  image->pixels = NULL;
+  image->width = 0;
+  image->height = 0;
+  image->tint_r = 255;
+  image->tint_g = 255;
+  image->tint_b = 255;
+  image->flip_x = 0;
+  image->flip_y = 0;
+  return 1.0;
+}
+
+static uint32_t anvil_image_shaded(const AnvilImage *image, uint32_t color) {
+  int alpha = (int)(color >> 24);
+  int r = (int)((color >> 16) & 255) * image->tint_r / 255;
+  int g = (int)((color >> 8) & 255) * image->tint_g / 255;
+  int b = (int)(color & 255) * image->tint_b / 255;
+  return ((uint32_t)alpha << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) |
+         (uint32_t)b;
+}
+
+double anvil_image_tint(double handle, double r, double g, double b) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !isfinite(r) || !isfinite(g) || !isfinite(b))
+    return 0.0;
+  image->tint_r = (int)(r < 0.0 ? 0.0 : r > 255.0 ? 255.0 : r);
+  image->tint_g = (int)(g < 0.0 ? 0.0 : g > 255.0 ? 255.0 : g);
+  image->tint_b = (int)(b < 0.0 ? 0.0 : b > 255.0 ? 255.0 : b);
+  return 1.0;
+}
+
+double anvil_image_flip(double handle, double x, double y) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !isfinite(x) || !isfinite(y))
+    return 0.0;
+  image->flip_x = x != 0.0;
+  image->flip_y = y != 0.0;
+  return 1.0;
+}
+double anvil_image_draw_scaled(double handle, double x, double y, double width,
+                               double height) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !anvil_pixels || !isfinite(x) || !isfinite(y) ||
+      !isfinite(width) || !isfinite(height) || width <= 0.0 || height <= 0.0 ||
+      !isfinite(x + width) || !isfinite(y + height))
+    return 0.0;
+  anvil_camera2d_point(&x, &y);
+  width *= anvil_camera2d_zoom;
+  height *= anvil_camera2d_zoom;
+  double left = fmax(0.0, floor(x));
+  double top = fmax(0.0, floor(y));
+  double right = fmin((double)ANVIL_WIDTH, ceil(x + width));
+  double bottom = fmin((double)ANVIL_HEIGHT, ceil(y + height));
+  if (left >= right || top >= bottom)
+    return 1.0;
+  int x0 = (int)left, y0 = (int)top, x1 = (int)right, y1 = (int)bottom;
+  for (int dy = y0; dy < y1; ++dy) {
+    int source_y = (int)(((dy + 0.5 - y) / height) * image->height);
+    if (source_y < 0)
+      source_y = 0;
+    if (source_y >= image->height)
+      source_y = image->height - 1;
+    for (int dx = x0; dx < x1; ++dx) {
+      int source_x = (int)(((dx + 0.5 - x) / width) * image->width);
+      if (source_x < 0)
+        source_x = 0;
+      if (source_x >= image->width)
+        source_x = image->width - 1;
+      int sample_x = image->flip_x ? image->width - 1 - source_x : source_x;
+      int sample_y = image->flip_y ? image->height - 1 - source_y : source_y;
+      uint32_t color =
+          image->pixels[(size_t)sample_y * image->width + sample_x];
+      anvil_pixel(dx, dy, anvil_image_shaded(image, color) & UINT32_C(0x00ffffff),
+                  (int)(color >> 24));
+    }
+  }
+  return 1.0;
+}
+
+/* Draw an image centred on (cx, cy), rotated clockwise by degrees and scaled
+   uniformly. Nearest-neighbour sampling matches the scaled draw; tint and flip
+   are the image's own state, so both draw paths share them. */
+double anvil_image_draw_rotated(double handle, double cx, double cy,
+                                double degrees, double scale) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !anvil_pixels || !isfinite(cx) || !isfinite(cy) ||
+      !isfinite(degrees) || !isfinite(scale) || scale <= 0.0)
+    return 0.0;
+  anvil_camera2d_point(&cx, &cy);
+  scale *= anvil_camera2d_zoom;
+  const double radians = 0.017453292519943295769 * degrees;
+  double cos_angle = cos(radians);
+  double sin_angle = sin(radians);
+  double half_width = (double)image->width * scale * 0.5;
+  double half_height = (double)image->height * scale * 0.5;
+  double extent =
+      ceil(sqrt(half_width * half_width + half_height * half_height)) + 1.0;
+  int x0 = (int)fmax(0.0, floor(cx - extent));
+  int x1 = (int)fmin((double)ANVIL_WIDTH, ceil(cx + extent));
+  int y0 = (int)fmax(0.0, floor(cy - extent));
+  int y1 = (int)fmin((double)ANVIL_HEIGHT, ceil(cy + extent));
+  if (x0 >= x1 || y0 >= y1)
+    return 1.0;
+  for (int dy = y0; dy < y1; ++dy) {
+    for (int dx = x0; dx < x1; ++dx) {
+      double px = dx + 0.5 - cx;
+      double py = dy + 0.5 - cy;
+      double sx = px * cos_angle + py * sin_angle;
+      double sy = -px * sin_angle + py * cos_angle;
+      double u = sx / scale + (double)image->width * 0.5;
+      double v = sy / scale + (double)image->height * 0.5;
+      if (u < 0.0 || v < 0.0 || u >= (double)image->width ||
+          v >= (double)image->height)
+        continue;
+      int source_x = (int)u;
+      int source_y = (int)v;
+      if (image->flip_x)
+        source_x = image->width - 1 - source_x;
+      if (image->flip_y)
+        source_y = image->height - 1 - source_y;
+      uint32_t color =
+          image->pixels[(size_t)source_y * image->width + source_x];
+      anvil_pixel(dx, dy, anvil_image_shaded(image, color) & UINT32_C(0x00ffffff),
+                  (int)(color >> 24));
+    }
+  }
+  return 1.0;
+}
+/* Draw a sub-rectangle of an image (an atlas cell) into a destination
+   rectangle. The source rect must lie fully inside the image; a rect that does
+   not is a layout bug, so it returns 0 instead of silently clamping. Flip and
+   tint are the image's state, with flip mirrored inside the source rect. */
+double anvil_image_draw_region(double handle, double sx, double sy, double sw,
+                               double sh, double dx, double dy, double dw,
+                               double dh) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !anvil_pixels || !isfinite(sx) || !isfinite(sy) ||
+      !isfinite(sw) || !isfinite(sh) || !isfinite(dx) || !isfinite(dy) ||
+      !isfinite(dw) || !isfinite(dh) || sw <= 0.0 || sh <= 0.0 || dw <= 0.0 ||
+      dh <= 0.0)
+    return 0.0;
+  if (sx < 0.0 || sy < 0.0 || sx + sw > (double)image->width ||
+      sy + sh > (double)image->height || !isfinite(sx + sw) ||
+      !isfinite(sy + sh))
+    return 0.0;
+  int isx = (int)sx, isy = (int)sy, isw = (int)sw, ish = (int)sh;
+  anvil_camera2d_point(&dx, &dy);
+  dw *= anvil_camera2d_zoom;
+  dh *= anvil_camera2d_zoom;
+  double left = fmax(0.0, floor(dx));
+  double top = fmax(0.0, floor(dy));
+  double right = fmin((double)ANVIL_WIDTH, ceil(dx + dw));
+  double bottom = fmin((double)ANVIL_HEIGHT, ceil(dy + dh));
+  if (left >= right || top >= bottom)
+    return 1.0;
+  int x0 = (int)left, y0 = (int)top, x1 = (int)right, y1 = (int)bottom;
+  for (int py = y0; py < y1; ++py) {
+    int v = isy + (int)(((py + 0.5 - dy) / dh) * sh);
+    if (v < isy)
+      v = isy;
+    if (v >= isy + ish)
+      v = isy + ish - 1;
+    for (int px = x0; px < x1; ++px) {
+      int u = isx + (int)(((px + 0.5 - dx) / dw) * sw);
+      if (u < isx)
+        u = isx;
+      if (u >= isx + isw)
+        u = isx + isw - 1;
+      int sample_x = image->flip_x ? isx + (isw - 1 - (u - isx)) : u;
+      int sample_y = image->flip_y ? isy + (ish - 1 - (v - isy)) : v;
+      uint32_t color =
+          image->pixels[(size_t)sample_y * image->width + sample_x];
+      anvil_pixel(px, py, anvil_image_shaded(image, color) & UINT32_C(0x00ffffff),
+                  (int)(color >> 24));
+    }
+  }
+  return 1.0;
+}
+
+double anvil_image_draw(double handle, double x, double y) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image)
+    return 0.0;
+  return anvil_image_draw_scaled(handle, x, y, image->width, image->height);
+}
+/* ---- Particles ---------------------------------------------------------- */
+enum { ANVIL_PARTICLE_MAX = 4096 };
+
+typedef struct {
+  double x, y, vx, vy;
+  double age, life, size;
+  int r, g, b;
+  int alive;
+} AnvilParticle;
+
+static AnvilParticle anvil_particles[ANVIL_PARTICLE_MAX];
+static int anvil_particle_live;
+static double anvil_particle_gravity_y;
+
+double anvil_particle_emit(double x, double y, double vx, double vy,
+                           double life, double size, double r, double g,
+                           double b) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(vx) || !isfinite(vy) ||
+      !isfinite(life) || !isfinite(size) || !isfinite(r) || !isfinite(g) ||
+      !isfinite(b) || life <= 0.0 || size <= 0.0)
+    return 0.0;
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; ++i) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (particle->alive)
+      continue;
+    particle->x = x;
+    particle->y = y;
+    particle->vx = vx;
+    particle->vy = vy;
+    particle->age = 0.0;
+    particle->life = life;
+    particle->size = size;
+    particle->r = (int)(r < 0 ? 0 : r > 255 ? 255 : r);
+    particle->g = (int)(g < 0 ? 0 : g > 255 ? 255 : g);
+    particle->b = (int)(b < 0 ? 0 : b > 255 ? 255 : b);
+    particle->alive = 1;
+    anvil_particle_live++;
+    return 1.0;
+  }
+  return 0.0;
+}
+
+double anvil_particle_count(void) { return (double)anvil_particle_live; }
+
+double anvil_particle_clear(void) {
+  int cleared = anvil_particle_live;
+  memset(anvil_particles, 0, sizeof(anvil_particles));
+  anvil_particle_live = 0;
+  return (double)cleared;
+}
+
+double anvil_particle_gravity(double gravity) {
+  if (!isfinite(gravity))
+    return 0.0;
+  anvil_particle_gravity_y = gravity;
+  return gravity;
+}
+
+static void anvil_particles_update(double dt) {
+  if (anvil_particle_live == 0)
+    return;
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; ++i) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (!particle->alive)
+      continue;
+    particle->age += dt;
+    if (particle->age >= particle->life) {
+      particle->alive = 0;
+      anvil_particle_live--;
+      continue;
+    }
+    particle->vy += anvil_particle_gravity_y * dt;
+    particle->x += particle->vx * dt;
+    particle->y += particle->vy * dt;
+  }
+}
+
+/* Drawn after the program's own draw pass, so particles sit above the scene. */
+static void anvil_particles_draw(void) {
+  if (anvil_particle_live == 0)
+    return;
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; ++i) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (!particle->alive)
+      continue;
+    double fade = 1.0 - particle->age / particle->life;
+    int alpha = (int)(255.0 * fade);
+    anvil_rect(particle->x - particle->size * 0.5,
+               particle->y - particle->size * 0.5, particle->size,
+               particle->size, particle->r, particle->g, particle->b, alpha);
+  }
+}
+
 static void anvil_camera_update(void) {
   if (anvil_camera_move_speed <= 0.0 && anvil_camera_turn_speed <= 0.0)
     return;
@@ -641,6 +1344,140 @@ static void anvil_camera_update(void) {
   anvil_camera_z += (anvil_keys['D'] - anvil_keys['A']) * right_z * distance;
   anvil_camera_y += (anvil_keys['E'] - anvil_keys['Q']) * distance;
 }
+#define ANVIL_STR_CAP 256
+#define ANVIL_STR_SLOTS 256
+char anvil_str_scratch[ANVIL_STR_SLOTS][ANVIL_STR_CAP];
+
+void anvil_print_bool(double value) {
+  fputs(value != 0.0 ? "true" : "false", stdout);
+}
+
+void anvil_text_list_remove(char block[][256], int index, double count) {
+  int total = (int)count;
+  if (index < 0 || index >= total) {
+    return;
+  }
+  for (int slot = index; slot + 1 < total; slot++) {
+    memcpy(block[slot], block[slot + 1], 256);
+  }
+  block[total - 1][0] = '\0';
+}
+
+const char *anvil_text_list_get(const char block[][256], int index, double count,
+                                const char *path, int line) {
+  if (index < 0 || index >= (int)count) {
+    fprintf(stderr, "%s:%d: list index %d is outside 0..%d\n", path,
+            line, index, (int)count - 1);
+    exit(2);
+  }
+  return block[index];
+}
+
+void anvil_text_list_set(char block[][256], int index, double count,
+                         const char *value, const char *path, int line) {
+  (void)count;
+  if (index < 0 || index >= 256) {
+    fprintf(stderr, "%s:%d: text list is full (256 values)\n", path, line);
+    exit(2);
+  }
+  anvil_str_set(block[index], value, path, line);
+}
+
+
+__declspec(noreturn) static void anvil_str_overflow(const char *path, int line) {
+  fprintf(stderr, "%s:%d: text is limited to %d characters\n", path ? path : "<Anvil>",
+          line, ANVIL_STR_CAP - 1);
+  exit(2);
+}
+
+void anvil_str_set(char *dest, const char *value, const char *path, int line) {
+  size_t len = strlen(value);
+  if (len >= ANVIL_STR_CAP) {
+    anvil_str_overflow(path, line);
+  }
+  memcpy(dest, value, len + 1);
+}
+
+char *anvil_str_cat(char *dest, const char *a, const char *b,
+                    const char *path, int line) {
+  size_t la = strlen(a), lb = strlen(b);
+  char tail[ANVIL_STR_CAP];
+  int a_inside = a >= dest && a < dest + ANVIL_STR_CAP;
+  int b_inside = b >= dest && b < dest + ANVIL_STR_CAP;
+  if (la + lb >= ANVIL_STR_CAP) {
+    anvil_str_overflow(path, line);
+  }
+  /* A text-returning function joins into its own return buffer, and a recursive
+     call hands back that same buffer, so `a` or `b` can alias `dest`. Copy the
+     aliased tail aside before dest is rewritten, or the join reads text it just
+     overwrote (a recursive reverse produced "ccb" instead of "cba"). */
+  if (b_inside) {
+    memcpy(tail, b, lb + 1);
+    b = tail;
+  }
+  if (!a_inside) {
+    memcpy(dest, a, la);
+  }
+  memcpy(dest + la, b, lb + 1);
+  return dest;
+}
+
+char *anvil_str_from_number(int slot, double value) {
+  if (slot < 0 || slot >= ANVIL_STR_SLOTS) {
+    anvil_str_overflow(NULL, 0);
+  }
+  _snprintf_s(anvil_str_scratch[slot], ANVIL_STR_CAP, _TRUNCATE, "%s",
+              anvil_format_number(value));
+  return anvil_str_scratch[slot];
+}
+
+void anvil_ask(const char *prompt, char *dest) {
+  if (prompt && *prompt) {
+    printf("%s", prompt);
+    fflush(stdout);
+  }
+  if (fgets(dest, 256, stdin)) {
+    size_t len = strlen(dest);
+    while (len && (dest[len - 1] == '\n' || dest[len - 1] == '\r')) {
+      dest[--len] = 0;
+    }
+  } else {
+    dest[0] = 0;
+  }
+}
+
+double anvil_ask_number(const char *prompt) {
+  char buffer[256];
+  if (prompt && *prompt) {
+    printf("%s", prompt);
+    fflush(stdout);
+  }
+  if (!fgets(buffer, sizeof(buffer), stdin)) {
+    return 0.0;
+  }
+  /* strtod reads the leading number; anything unread stays in the buffer. */
+  return strtod(buffer, NULL);
+}
+
+void anvil_press_enter(void) {
+  printf("Press Enter to continue...\n");
+  fflush(stdout);
+  int ch;
+  while ((ch = getchar()) != '\n' && ch != EOF) {
+  }
+}
+
+void anvil_wait(double seconds) {
+  /* Pause the console program; negative and non-finite values do not sleep. */
+  if (!(seconds > 0.0)) {
+    return;
+  }
+  if (seconds > 86400.0) {
+    seconds = 86400.0;
+  }
+  Sleep((DWORD)(seconds * 1000.0));
+}
+
 void anvil_seed(unsigned long long seed) {
   anvil_rng_state = seed ? seed : 0x9e3779b97f4a7c15ULL;
 }
@@ -987,10 +1824,10 @@ void anvil_trace_finish(void) {
         int green = (int)(hit->g * brightness + 255.0 * specular);
         int blue = (int)(hit->b * brightness + 255.0 * specular);
         uint32_t color = anvil_color(red, green, blue);
-        double camera_depth = anvil_dot(anvil_sub(point, origin), forward);
+        double pixel_depth = anvil_dot(anvil_sub(point, origin), forward);
         size_t pixel = (size_t)py * ANVIL_WIDTH + (size_t)px;
-        if (camera_depth < anvil_depth_buffer[pixel]) {
-          anvil_depth_buffer[pixel] = camera_depth;
+        if (pixel_depth < anvil_depth_buffer[pixel]) {
+          anvil_depth_buffer[pixel] = pixel_depth;
           anvil_pixel(px, py, color, hit->a);
         }
       }
@@ -1004,8 +1841,19 @@ static double anvil_fade(double t) {
 static double anvil_lerp(double a, double b, double t) {
   return a + t * (b - a);
 }
+static int anvil_noise_lattice(double value) {
+  /* Match the native backend: every coordinate must be finite and inside
+     [-2147483648, 2147483647) so floor() and the +1 lattice corner both stay
+     representable as int.  A NaN fails every comparison and is rejected too. */
+  if (!(value >= -2147483648.0) || !(value < 2147483647.0)) {
+    fprintf(stderr, "Anvil noise coordinate range error\n");
+    exit(2);
+  }
+  return (int)floor(value);
+}
 double anvil_noise(double x, double y, double z) {
-  int xi = (int)floor(x), yi = (int)floor(y), zi = (int)floor(z);
+  int xi = anvil_noise_lattice(x), yi = anvil_noise_lattice(y),
+      zi = anvil_noise_lattice(z);
   double xf = x - xi, yf = y - yi, zf = z - zi, u = anvil_fade(xf),
          v = anvil_fade(yf), w = anvil_fade(zf);
   double c[8];
@@ -1030,6 +1878,504 @@ double anvil_fbm(double x, double y, double z, int octaves, double lacunarity,
     amp *= gain;
   }
   return norm ? sum / norm : 0;
+}
+
+static int anvil_net_ready(void) {
+  if (anvil_winsock_started)
+    return 1;
+  WSADATA data;
+  if (WSAStartup(MAKEWORD(2, 2), &data) != 0)
+    return 0;
+  anvil_winsock_started = 1;
+  return 1;
+}
+int anvil_net_host(int port) {
+  if (!anvil_net_ready())
+    return 0;
+  if (anvil_net_socket != INVALID_SOCKET)
+    closesocket(anvil_net_socket);
+  anvil_net_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (anvil_net_socket == INVALID_SOCKET)
+    return 0;
+  SOCKADDR_IN local;
+  memset(&local, 0, sizeof(local));
+  local.sin_family = AF_INET;
+  local.sin_addr.s_addr = htonl(INADDR_ANY);
+  local.sin_port = htons((u_short)port);
+  u_long nonblocking = 1;
+  ioctlsocket(anvil_net_socket, FIONBIO, &nonblocking);
+  anvil_net_has_peer = 0;
+  return bind(anvil_net_socket, (SOCKADDR *)&local, sizeof(local)) == 0;
+}
+int anvil_net_join(const char *address, int port) {
+  if (!anvil_net_ready())
+    return 0;
+  if (anvil_net_socket != INVALID_SOCKET)
+    closesocket(anvil_net_socket);
+  anvil_net_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (anvil_net_socket == INVALID_SOCKET)
+    return 0;
+  memset(&anvil_net_peer, 0, sizeof(anvil_net_peer));
+  anvil_net_peer.sin_family = AF_INET;
+  anvil_net_peer.sin_port = htons((u_short)port);
+  if (inet_pton(AF_INET, address, &anvil_net_peer.sin_addr) != 1) {
+    closesocket(anvil_net_socket);
+    anvil_net_socket = INVALID_SOCKET;
+    return 0;
+  }
+  u_long nonblocking = 1;
+  ioctlsocket(anvil_net_socket, FIONBIO, &nonblocking);
+  anvil_net_has_peer = 1;
+  return 1;
+}
+double anvil_net_receive(void) {
+  if (anvil_net_socket == INVALID_SOCKET)
+    return anvil_net_value;
+  double value;
+  SOCKADDR_IN from;
+  int from_len = sizeof(from);
+  int count = recvfrom(anvil_net_socket, (char *)&value, (int)sizeof(value), 0,
+                       (SOCKADDR *)&from, &from_len);
+  if (count == (int)sizeof(value)) {
+    /* A NaN or infinite payload is not a usable number and would poison every
+       later comparison, so it is ignored rather than stored. */
+    if (!isfinite(value)) {
+      return anvil_net_value;
+    }
+    anvil_net_value = value;
+    if (!anvil_net_has_peer) {
+      anvil_net_peer = from;
+      anvil_net_has_peer = 1;
+    }
+  }
+  return anvil_net_value;
+}
+int anvil_net_send(double value) {
+  if (anvil_net_socket == INVALID_SOCKET || !anvil_net_has_peer)
+    return 0;
+  int sent = (int)sendto(anvil_net_socket, (const char *)&value,
+                         (int)sizeof(value), 0, (SOCKADDR *)&anvil_net_peer,
+                         sizeof(anvil_net_peer));
+  return sent == (int)sizeof(value);
+}
+void anvil_net_close(void) {
+  if (anvil_net_socket != INVALID_SOCKET) {
+    closesocket(anvil_net_socket);
+    anvil_net_socket = INVALID_SOCKET;
+  }
+  if (anvil_winsock_started) {
+    WSACleanup();
+    anvil_winsock_started = 0;
+  }
+  anvil_net_has_peer = 0;
+}
+
+static AnvilPhysicsBody *anvil_physics_body(double handle, int *slot_out) {
+  const double max_handle = (double)UINT32_MAX * ANVIL_PHYSICS_BODIES +
+                            (ANVIL_PHYSICS_BODIES - 1);
+  if (!isfinite(handle) || handle < 0.0 || handle > max_handle ||
+      floor(handle) != handle)
+    return NULL;
+  uint64_t encoded = (uint64_t)handle;
+  int slot = (int)(encoded % ANVIL_PHYSICS_BODIES);
+  uint32_t generation = (uint32_t)(encoded / ANVIL_PHYSICS_BODIES);
+  AnvilPhysicsBody *body = &anvil_physics_bodies[slot];
+  if (!generation || !body->active || body->generation != generation)
+    return NULL;
+  if (slot_out)
+    *slot_out = slot;
+  return body;
+}
+
+static double anvil_physics_allocate_body(double x, double y, double radius,
+                                          double half_width,
+                                          double half_height, double mass,
+                                          int shape) {
+  for (int slot = 0; slot < anvil_physics_active_capacity; ++slot) {
+    AnvilPhysicsBody *body = &anvil_physics_bodies[slot];
+    if (body->active)
+      continue;
+    uint32_t generation = body->generation + 1;
+    if (!generation)
+      generation = 1;
+    memset(body, 0, sizeof(*body));
+    body->generation = generation;
+    body->active = 1;
+    body->shape = shape;
+    body->x = x;
+    body->y = y;
+    body->radius = radius;
+    body->half_width = half_width;
+    body->half_height = half_height;
+    body->mass = mass;
+    body->friction = 0.5;
+    return (double)generation * ANVIL_PHYSICS_BODIES + slot;
+  }
+  return -1.0;
+}
+
+double anvil_body_create(double x, double y, double radius, double mass) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(radius) || !isfinite(mass) ||
+      fabs(x) > ANVIL_PHYSICS_MAX_COORDINATE ||
+      fabs(y) > ANVIL_PHYSICS_MAX_COORDINATE || radius < 1.0e-6 ||
+      radius > ANVIL_PHYSICS_MAX_RADIUS || mass < 0.0 || mass > 1.0e12 ||
+      (mass > 0.0 && mass < 1.0e-6))
+    return -1.0;
+  return anvil_physics_allocate_body(x, y, radius, 0.0, 0.0, mass,
+                                     ANVIL_PHYSICS_CIRCLE);
+}
+
+double anvil_body_create_box(double x, double y, double width, double height,
+                             double mass) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(width) || !isfinite(height) ||
+      !isfinite(mass) || fabs(x) > ANVIL_PHYSICS_MAX_COORDINATE ||
+      fabs(y) > ANVIL_PHYSICS_MAX_COORDINATE || width < 2.0e-6 ||
+      width > 2.0 * ANVIL_PHYSICS_MAX_RADIUS || height < 2.0e-6 ||
+      height > 2.0 * ANVIL_PHYSICS_MAX_RADIUS || mass < 0.0 || mass > 1.0e12 ||
+      (mass > 0.0 && mass < 1.0e-6))
+    return -1.0;
+  return anvil_physics_allocate_body(x, y, 0.0, width * 0.5, height * 0.5,
+                                     mass, ANVIL_PHYSICS_BOX);
+}
+
+double anvil_physics_capacity(double requested_capacity) {
+  if (!isfinite(requested_capacity) || floor(requested_capacity) != requested_capacity ||
+      requested_capacity < 1.0 || requested_capacity > ANVIL_PHYSICS_BODIES)
+    return -1.0;
+  int capacity = (int)requested_capacity;
+  for (int slot = capacity; slot < anvil_physics_active_capacity; ++slot) {
+    if (anvil_physics_bodies[slot].active)
+      return -1.0;
+  }
+  anvil_physics_active_capacity = capacity;
+  return (double)anvil_physics_active_capacity;
+}
+
+double anvil_body_destroy(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body)
+    return 0.0;
+  body->active = 0;
+  body->force_x = 0.0;
+  body->force_y = 0.0;
+  return 1.0;
+}
+
+double anvil_body_active(double handle) {
+  return anvil_physics_body(handle, NULL) ? 1.0 : 0.0;
+}
+
+double anvil_body_x(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  return body ? body->x : -1.0;
+}
+
+double anvil_body_y(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  return body ? body->y : -1.0;
+}
+
+double anvil_body_vx(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  return body ? body->vx : -1.0;
+}
+
+double anvil_body_vy(double handle) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  return body ? body->vy : -1.0;
+}
+
+double anvil_body_set_velocity(double handle, double vx, double vy) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body || body->mass <= 0.0 || !isfinite(vx) || !isfinite(vy) ||
+      fabs(vx) > ANVIL_PHYSICS_MAX_SPEED || fabs(vy) > ANVIL_PHYSICS_MAX_SPEED)
+    return 0.0;
+  body->vx = vx;
+  body->vy = vy;
+  return 1.0;
+}
+
+double anvil_body_force(double handle, double force_x, double force_y) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body || body->mass <= 0.0 || !isfinite(force_x) || !isfinite(force_y) ||
+      fabs(force_x) > 1.0e12 || fabs(force_y) > 1.0e12)
+    return 0.0;
+  double next_force_x = body->force_x + force_x;
+  double next_force_y = body->force_y + force_y;
+  if (!isfinite(next_force_x) || !isfinite(next_force_y) ||
+      fabs(next_force_x) > 1.0e12 || fabs(next_force_y) > 1.0e12)
+    return 0.0;
+  body->force_x = next_force_x;
+  body->force_y = next_force_y;
+  return 1.0;
+}
+
+double anvil_body_restitution(double handle, double restitution) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body || !isfinite(restitution) || restitution < 0.0 || restitution > 1.0)
+    return 0.0;
+  body->restitution = restitution;
+  return 1.0;
+}
+
+double anvil_body_friction(double handle, double friction) {
+  AnvilPhysicsBody *body = anvil_physics_body(handle, NULL);
+  if (!body || !isfinite(friction) || friction < 0.0 || friction > 1.0)
+    return 0.0;
+  body->friction = friction;
+  return 1.0;
+}
+
+static int anvil_physics_contact(const AnvilPhysicsBody *a,
+                                 const AnvilPhysicsBody *b, double *normal_x,
+                                 double *normal_y, double *penetration) {
+  if (a->shape == ANVIL_PHYSICS_CIRCLE &&
+      b->shape == ANVIL_PHYSICS_CIRCLE) {
+    double dx = b->x - a->x, dy = b->y - a->y;
+    double radius = a->radius + b->radius;
+    double distance_sq = dx * dx + dy * dy;
+    if (distance_sq >= radius * radius)
+      return 0;
+    double distance = sqrt(distance_sq);
+    *normal_x = distance > 1.0e-12 ? dx / distance : 1.0;
+    *normal_y = distance > 1.0e-12 ? dy / distance : 0.0;
+    *penetration = radius - distance;
+    return 1;
+  }
+
+  if (a->shape == ANVIL_PHYSICS_BOX && b->shape == ANVIL_PHYSICS_BOX) {
+    double dx = b->x - a->x, dy = b->y - a->y;
+    double overlap_x = a->half_width + b->half_width - fabs(dx);
+    double overlap_y = a->half_height + b->half_height - fabs(dy);
+    if (overlap_x <= 0.0 || overlap_y <= 0.0)
+      return 0;
+    if (overlap_x < overlap_y) {
+      *normal_x = dx >= 0.0 ? 1.0 : -1.0;
+      *normal_y = 0.0;
+      *penetration = overlap_x;
+    } else {
+      *normal_x = 0.0;
+      *normal_y = dy >= 0.0 ? 1.0 : -1.0;
+      *penetration = overlap_y;
+    }
+    return 1;
+  }
+
+  const AnvilPhysicsBody *circle = a->shape == ANVIL_PHYSICS_CIRCLE ? a : b;
+  const AnvilPhysicsBody *box = a->shape == ANVIL_PHYSICS_BOX ? a : b;
+  double closest_x = fmax(box->x - box->half_width,
+                          fmin(circle->x, box->x + box->half_width));
+  double closest_y = fmax(box->y - box->half_height,
+                          fmin(circle->y, box->y + box->half_height));
+  double dx = closest_x - circle->x, dy = closest_y - circle->y;
+  double distance_sq = dx * dx + dy * dy;
+  if (distance_sq >= circle->radius * circle->radius)
+    return 0;
+  if (distance_sq > 1.0e-24) {
+    double distance = sqrt(distance_sq);
+    *normal_x = dx / distance;
+    *normal_y = dy / distance;
+    *penetration = circle->radius - distance;
+  } else {
+    double left = circle->x - (box->x - box->half_width);
+    double right = box->x + box->half_width - circle->x;
+    double bottom = circle->y - (box->y - box->half_height);
+    double top = box->y + box->half_height - circle->y;
+    double nearest = left;
+    *normal_x = 1.0;
+    *normal_y = 0.0;
+    if (right < nearest) {
+      nearest = right;
+      *normal_x = -1.0;
+      *normal_y = 0.0;
+    }
+    if (bottom < nearest) {
+      nearest = bottom;
+      *normal_x = 0.0;
+      *normal_y = 1.0;
+    }
+    if (top < nearest) {
+      nearest = top;
+      *normal_x = 0.0;
+      *normal_y = -1.0;
+    }
+    *penetration = circle->radius + nearest;
+  }
+  if (a->shape == ANVIL_PHYSICS_BOX) {
+    *normal_x = -*normal_x;
+    *normal_y = -*normal_y;
+  }
+  return 1;
+}
+
+double anvil_body_collision(double first, double second) {
+  int first_slot, second_slot;
+  AnvilPhysicsBody *a = anvil_physics_body(first, &first_slot);
+  AnvilPhysicsBody *b = anvil_physics_body(second, &second_slot);
+  if (!a || !b || first_slot == second_slot)
+    return 0.0;
+  double normal_x, normal_y, penetration;
+  return anvil_physics_contact(a, b, &normal_x, &normal_y, &penetration)
+             ? 1.0
+             : 0.0;
+}
+
+double anvil_physics_gravity(double x, double y) {
+  if (!isfinite(x) || !isfinite(y) || fabs(x) > 1.0e6 || fabs(y) > 1.0e6)
+    return 0.0;
+  anvil_physics_gravity_x = x;
+  anvil_physics_gravity_y = y;
+  return 1.0;
+}
+
+double anvil_physics_step(void) {
+  double dt = anvil_delta_seconds;
+  if (!isfinite(dt) || dt <= 0.0 || dt > 0.25)
+    dt = 1.0 / (double)anvil_fixed_hz;
+
+  int contact_count = 0;
+  for (int i = 0; i < anvil_physics_active_capacity; ++i) {
+    AnvilPhysicsBody *a = &anvil_physics_bodies[i];
+    if (!a->active)
+      continue;
+    for (int j = i + 1; j < anvil_physics_active_capacity; ++j) {
+      AnvilPhysicsBody *b = &anvil_physics_bodies[j];
+      if (!b->active)
+        continue;
+      double normal_x, normal_y, penetration;
+      if (anvil_physics_contact(a, b, &normal_x, &normal_y, &penetration))
+        ++contact_count;
+    }
+  }
+
+  for (int i = 0; i < anvil_physics_active_capacity; ++i) {
+    AnvilPhysicsBody *body = &anvil_physics_bodies[i];
+    if (!body->active)
+      continue;
+    if (body->mass > 0.0) {
+      body->vx += (anvil_physics_gravity_x + body->force_x / body->mass) * dt;
+      body->vy += (anvil_physics_gravity_y + body->force_y / body->mass) * dt;
+      body->vx = fmax(-ANVIL_PHYSICS_MAX_SPEED,
+                      fmin(ANVIL_PHYSICS_MAX_SPEED, body->vx));
+      body->vy = fmax(-ANVIL_PHYSICS_MAX_SPEED,
+                      fmin(ANVIL_PHYSICS_MAX_SPEED, body->vy));
+      body->x += body->vx * dt;
+      body->y += body->vy * dt;
+      if (body->x > ANVIL_PHYSICS_MAX_COORDINATE) {
+        body->x = ANVIL_PHYSICS_MAX_COORDINATE;
+        body->vx = 0.0;
+      } else if (body->x < -ANVIL_PHYSICS_MAX_COORDINATE) {
+        body->x = -ANVIL_PHYSICS_MAX_COORDINATE;
+        body->vx = 0.0;
+      }
+      if (body->y > ANVIL_PHYSICS_MAX_COORDINATE) {
+        body->y = ANVIL_PHYSICS_MAX_COORDINATE;
+        body->vy = 0.0;
+      } else if (body->y < -ANVIL_PHYSICS_MAX_COORDINATE) {
+        body->y = -ANVIL_PHYSICS_MAX_COORDINATE;
+        body->vy = 0.0;
+      }
+      if (!isfinite(body->x) || !isfinite(body->y) || !isfinite(body->vx) ||
+          !isfinite(body->vy)) {
+        body->x = body->y = body->vx = body->vy = 0.0;
+      }
+    }
+    body->force_x = 0.0;
+    body->force_y = 0.0;
+  }
+
+  for (int iteration = 0; iteration < ANVIL_PHYSICS_SOLVER_ITERATIONS;
+       ++iteration) {
+    for (int i = 0; i < anvil_physics_active_capacity; ++i) {
+      AnvilPhysicsBody *a = &anvil_physics_bodies[i];
+      if (!a->active)
+        continue;
+      for (int j = i + 1; j < anvil_physics_active_capacity; ++j) {
+        AnvilPhysicsBody *b = &anvil_physics_bodies[j];
+        if (!b->active)
+          continue;
+        double nx, ny, penetration;
+        if (!anvil_physics_contact(a, b, &nx, &ny, &penetration))
+          continue;
+        double inverse_a = a->mass > 0.0 ? 1.0 / a->mass : 0.0;
+        double inverse_b = b->mass > 0.0 ? 1.0 / b->mass : 0.0;
+        double inverse_sum = inverse_a + inverse_b;
+        if (inverse_sum <= 0.0)
+          continue;
+
+        double correction = fmax(penetration - 0.0001, 0.0) * 0.8 / inverse_sum;
+        a->x -= nx * correction * inverse_a;
+        a->y -= ny * correction * inverse_a;
+        b->x += nx * correction * inverse_b;
+        b->y += ny * correction * inverse_b;
+
+        double relative_x = b->vx - a->vx;
+        double relative_y = b->vy - a->vy;
+        double along_normal = relative_x * nx + relative_y * ny;
+        double normal_impulse = 0.0;
+        if (along_normal < 0.0) {
+          double restitution = fmin(a->restitution, b->restitution);
+          normal_impulse = -(1.0 + restitution) * along_normal / inverse_sum;
+          a->vx -= normal_impulse * nx * inverse_a;
+          a->vy -= normal_impulse * ny * inverse_a;
+          b->vx += normal_impulse * nx * inverse_b;
+          b->vy += normal_impulse * ny * inverse_b;
+        }
+
+        if (normal_impulse > 0.0) {
+          relative_x = b->vx - a->vx;
+          relative_y = b->vy - a->vy;
+          double tangent_x = relative_x - (relative_x * nx + relative_y * ny) * nx;
+          double tangent_y = relative_y - (relative_x * nx + relative_y * ny) * ny;
+          double tangent_length = hypot(tangent_x, tangent_y);
+          if (tangent_length > 1.0e-12) {
+            tangent_x /= tangent_length;
+            tangent_y /= tangent_length;
+            double tangent_impulse = -(relative_x * tangent_x +
+                                       relative_y * tangent_y) / inverse_sum;
+            double coefficient = sqrt(a->friction * b->friction);
+            double maximum = coefficient * normal_impulse;
+            tangent_impulse = fmax(-maximum, fmin(tangent_impulse, maximum));
+            a->vx -= tangent_impulse * tangent_x * inverse_a;
+            a->vy -= tangent_impulse * tangent_y * inverse_a;
+            b->vx += tangent_impulse * tangent_x * inverse_b;
+            b->vy += tangent_impulse * tangent_y * inverse_b;
+          }
+        }
+      }
+    }
+  }
+
+  /* Collision impulses and positional corrections can exceed the integration
+   * limits above. Reapply the public bounds after the solver has finished. */
+  for (int i = 0; i < anvil_physics_active_capacity; ++i) {
+    AnvilPhysicsBody *body = &anvil_physics_bodies[i];
+    if (!body->active)
+      continue;
+    body->vx = fmax(-ANVIL_PHYSICS_MAX_SPEED,
+                    fmin(ANVIL_PHYSICS_MAX_SPEED, body->vx));
+    body->vy = fmax(-ANVIL_PHYSICS_MAX_SPEED,
+                    fmin(ANVIL_PHYSICS_MAX_SPEED, body->vy));
+    if (body->x > ANVIL_PHYSICS_MAX_COORDINATE) {
+      body->x = ANVIL_PHYSICS_MAX_COORDINATE;
+      body->vx = 0.0;
+    } else if (body->x < -ANVIL_PHYSICS_MAX_COORDINATE) {
+      body->x = -ANVIL_PHYSICS_MAX_COORDINATE;
+      body->vx = 0.0;
+    }
+    if (body->y > ANVIL_PHYSICS_MAX_COORDINATE) {
+      body->y = ANVIL_PHYSICS_MAX_COORDINATE;
+      body->vy = 0.0;
+    } else if (body->y < -ANVIL_PHYSICS_MAX_COORDINATE) {
+      body->y = -ANVIL_PHYSICS_MAX_COORDINATE;
+      body->vy = 0.0;
+    }
+    if (!isfinite(body->x) || !isfinite(body->y) || !isfinite(body->vx) ||
+        !isfinite(body->vy)) {
+      body->x = body->y = body->vx = body->vy = 0.0;
+    }
+  }
+  return (double)contact_count;
 }
 
 static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
@@ -1130,16 +2476,1465 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     return 0;
   }
   }
-  return DefWindowProcW(window, message, wparam, lparam);
+  return DefWindowProcA(window, message, wparam, lparam);
 }
 
-static void anvil_release_frame_resources(void) {
-  for (size_t i = anvil_shutdown_hook_count; i > 0; --i) {
-    AnvilRuntimeShutdownHook hook = anvil_shutdown_hooks[i - 1];
-    anvil_shutdown_hooks[i - 1] = NULL;
-    hook();
+/* ---- Saves -------------------------------------------------------------
+   A small key/value store for game state: one number or one text value per
+   named slot, written atomically into %LOCALAPPDATA%\Anvil\<project> (or
+   $ANVIL_SAVE_DIR when a host sets it). Each file carries a magic and a type
+   byte so a wrong-type read is a readable error instead of a reinterpreted
+   value, and slot names are restricted to a safe character set so a save can
+   never escape its directory. */
+enum {
+  ANVIL_SAVE_SLOT_MAX = 64,
+  ANVIL_SAVE_TEXT_MAX = 255,
+  ANVIL_SAVE_BUFFERS = 8
+};
+
+static const char ANVIL_SAVE_MAGIC[8] = {'A', 'N', 'V', 'S',
+                                         'A', 'V', 'E', '1'};
+static char anvil_project_name[64] = "Anvil Game";
+static char anvil_save_error_detail[192];
+static const char *anvil_save_error_text = "";
+static char anvil_save_buffers[ANVIL_SAVE_BUFFERS][ANVIL_SAVE_TEXT_MAX + 1];
+static int anvil_save_buffer_index;
+
+static void anvil_save_error_note(const char *format, ...) {
+  va_list arguments;
+  va_start(arguments, format);
+  _vsnprintf_s(anvil_save_error_detail, sizeof(anvil_save_error_detail),
+               _TRUNCATE, format, arguments);
+  va_end(arguments);
+  anvil_save_error_text = anvil_save_error_detail;
+}
+
+const char *anvil_save_error(void) { return anvil_save_error_text; }
+
+void anvil_set_project(const char *name) {
+  if (!name || name[0] == '\0')
+    return;
+  size_t index = 0;
+  for (; name[index] != '\0' && index < sizeof(anvil_project_name) - 1; ++index) {
+    char c = name[index];
+    int safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
+    anvil_project_name[index] = safe ? c : '_';
   }
-  anvil_shutdown_hook_count = 0;
+  anvil_project_name[index] = '\0';
+  if (anvil_project_name[0] == '\0' ||
+      strcmp(anvil_project_name, ".") == 0 ||
+      strcmp(anvil_project_name, "..") == 0)
+    strcpy_s(anvil_project_name, sizeof(anvil_project_name), "Anvil Game");
+}
+
+static int anvil_save_slot_ok(const char *slot) {
+  if (!slot || slot[0] == '\0')
+    return 0;
+  size_t length = strlen(slot);
+  if (length > ANVIL_SAVE_SLOT_MAX)
+    return 0;
+  if (slot[0] == '.')
+    return 0;
+  for (size_t i = 0; i < length; ++i) {
+    char c = slot[i];
+    int safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
+    if (!safe)
+      return 0;
+  }
+  return strstr(slot, "..") == NULL;
+}
+
+/* Create every missing component of a path that names a directory. */
+static int anvil_save_make_dirs(const char *path) {
+  char buffer[MAX_PATH];
+  size_t length = strlen(path);
+  if (length == 0 || length >= sizeof(buffer))
+    return 0;
+  memcpy(buffer, path, length + 1);
+  for (size_t i = 1; i < length; ++i) {
+    if (buffer[i] == '\\' || buffer[i] == '/') {
+      char saved = buffer[i];
+      buffer[i] = '\0';
+      if (!CreateDirectoryA(buffer, NULL) &&
+          GetLastError() != ERROR_ALREADY_EXISTS) {
+        buffer[i] = saved;
+        return 0;
+      }
+      buffer[i] = saved;
+    }
+  }
+  if (!CreateDirectoryA(buffer, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+    return 0;
+  return 1;
+}
+
+static int anvil_save_root(char *destination, size_t capacity) {
+  const char *override = getenv("ANVIL_SAVE_DIR");
+  if (override && override[0] != '\0') {
+    if (strlen(override) >= capacity - 1)
+      return 0;
+    strcpy_s(destination, capacity, override);
+    return 1;
+  }
+  const char *base = getenv("LOCALAPPDATA");
+  if (!base || base[0] == '\0')
+    base = ".";
+  int written = _snprintf_s(destination, capacity, _TRUNCATE, "%s\\Anvil\\%s",
+                            base, anvil_project_name);
+  return written > 0;
+}
+
+static int anvil_save_path(const char *slot, const char *extension,
+                           char *destination, size_t capacity) {
+  if (!anvil_save_slot_ok(slot)) {
+    anvil_save_error_text = "the save slot is invalid";
+    return 0;
+  }
+  char root[MAX_PATH];
+  if (!anvil_save_root(root, sizeof(root))) {
+    anvil_save_error_text = "the save folder is too long";
+    return 0;
+  }
+  int written = _snprintf_s(destination, capacity, _TRUNCATE, "%s\\%s.%s", root,
+                            slot, extension);
+  if (written <= 0) {
+    anvil_save_error_text = "the save path is too long";
+    return 0;
+  }
+  if (!anvil_save_make_dirs(root)) {
+    anvil_save_error_text = "the save folder could not be created";
+    return 0;
+  }
+  return 1;
+}
+
+static int anvil_save_write(const char *slot, unsigned char type,
+                            const void *payload, size_t bytes) {
+  char path[MAX_PATH];
+  if (!anvil_save_path(slot, "sav", path, sizeof(path)))
+    return 0;
+  char temporary[MAX_PATH];
+  int written = _snprintf_s(temporary, sizeof(temporary), _TRUNCATE, "%s.tmp",
+                            path);
+  if (written <= 0) {
+    anvil_save_error_text = "the save path is too long";
+    return 0;
+  }
+  FILE *file = fopen(temporary, "wb");
+  if (!file) {
+    anvil_save_error_text = "the save could not be opened for writing";
+    return 0;
+  }
+  unsigned char header[9];
+  memcpy(header, ANVIL_SAVE_MAGIC, sizeof(ANVIL_SAVE_MAGIC));
+  header[8] = type;
+  int ok = fwrite(header, 1, sizeof(header), file) == sizeof(header) &&
+           fwrite(payload, 1, bytes, file) == bytes;
+  ok = (fclose(file) == 0) && ok;
+  if (!ok) {
+    DeleteFileA(temporary);
+    anvil_save_error_text = "the save could not be written";
+    return 0;
+  }
+  if (!MoveFileExA(temporary, path, MOVEFILE_REPLACE_EXISTING)) {
+    DeleteFileA(temporary);
+    anvil_save_error_text = "the save could not replace the previous file";
+    return 0;
+  }
+  anvil_save_error_text = "";
+  return 1;
+}
+
+static int anvil_save_read(const char *slot, unsigned char expected,
+                           void *payload, size_t bytes, int exact) {
+  char path[MAX_PATH];
+  if (!anvil_save_path(slot, "sav", path, sizeof(path)))
+    return 0;
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    /* A slot that was never written is a normal first run, not an error. */
+    anvil_save_error_text = "";
+    return 0;
+  }
+  unsigned char header[9];
+  int ok = fread(header, 1, sizeof(header), file) == sizeof(header) &&
+           memcmp(header, ANVIL_SAVE_MAGIC, sizeof(ANVIL_SAVE_MAGIC)) == 0;
+  if (!ok) {
+    fclose(file);
+    anvil_save_error_text = "the save is not a readable Anvil save";
+    return 0;
+  }
+  if (header[8] != expected) {
+    fclose(file);
+    anvil_save_error_text = expected == 1
+                                ? "the save holds text, not a number"
+                                : "the save holds a number, not text";
+    return 0;
+  }
+  size_t got = fread(payload, 1, bytes, file);
+  fclose(file);
+  if (exact) {
+    if (got != bytes) {
+      anvil_save_error_text = "the save ended before its value did";
+      return 0;
+    }
+  } else {
+    /* Text is stored with its terminator; a shorter file is still valid. */
+    if (got == bytes)
+      got = bytes - 1;
+    ((char *)payload)[got] = '\0';
+  }
+  anvil_save_error_text = "";
+  return 1;
+}
+
+double anvil_save_number(const char *slot, double value) {
+  double stored = value;
+  return anvil_save_write(slot, 1, &stored, sizeof(stored)) ? 1.0 : 0.0;
+}
+
+double anvil_load_number(const char *slot) {
+  double stored = 0.0;
+  if (!anvil_save_read(slot, 1, &stored, sizeof(stored), 1))
+    return 0.0;
+  if (!isfinite(stored)) {
+    anvil_save_error_text = "the save holds a non-finite number";
+    return 0.0;
+  }
+  return stored;
+}
+
+double anvil_save_text(const char *slot, const char *text) {
+  const char *value = text ? text : "";
+  size_t length = strlen(value);
+  if (length > ANVIL_SAVE_TEXT_MAX) {
+    anvil_save_error_note(
+        "the text is %llu bytes; the save limit is %d",
+        (unsigned long long)length, ANVIL_SAVE_TEXT_MAX);
+    return 0.0;
+  }
+  return anvil_save_write(slot, 2, value, length + 1) ? 1.0 : 0.0;
+}
+
+const char *anvil_load_text(const char *slot) {
+  char *buffer = anvil_save_buffers[anvil_save_buffer_index &
+                                    (ANVIL_SAVE_BUFFERS - 1)];
+  anvil_save_buffer_index += 1;
+  buffer[0] = '\0';
+  if (!anvil_save_read(slot, 2, buffer, ANVIL_SAVE_TEXT_MAX + 1, 0))
+    return buffer;
+  buffer[ANVIL_SAVE_TEXT_MAX] = '\0';
+  return buffer;
+}
+
+double anvil_save_exists(const char *slot) {
+  char path[MAX_PATH];
+  if (!anvil_save_path(slot, "sav", path, sizeof(path)))
+    return 0.0;
+  DWORD attributes = GetFileAttributesA(path);
+  return attributes != INVALID_FILE_ATTRIBUTES ? 1.0 : 0.0;
+}
+
+double anvil_save_delete(const char *slot) {
+  char path[MAX_PATH];
+  if (!anvil_save_path(slot, "sav", path, sizeof(path)))
+    return 0.0;
+  if (DeleteFileA(path))
+    return 1.0;
+  return 0.0;
+}
+
+/* ---- Audio -------------------------------------------------------------
+   A bounded WAV player: at most 16 loaded sounds, 8 simultaneous voices and
+   48 MiB of decoded audio, mixed at 48 kHz stereo into three 10 ms buffers
+   driven by waveOut. Everything is 16-bit PCM after load, so playback is a
+   linear resample by pitch. The device is opened lazily on the first play and
+   a missing or lost device degrades to silence with a readable error rather
+   than a crash. */
+enum {
+  ANVIL_SOUND_SLOTS = 16,
+  ANVIL_SOUND_VOICES = 8,
+  ANVIL_AUDIO_RATE = 48000,
+  ANVIL_AUDIO_FRAMES = 480,
+  ANVIL_AUDIO_BUFFERS = 3,
+  ANVIL_SOUND_SLOT_BYTES = 8 * 1024 * 1024,
+  ANVIL_SOUND_TOTAL_BYTES = 48 * 1024 * 1024
+};
+
+typedef struct {
+  short *frames;
+  size_t frame_count;
+  int used;
+  int group;  /* 1..3; master is group 0 and applies to every sound */
+} AnvilSound;
+
+typedef struct {
+  int sound;
+  double position;
+  double pitch;
+  double volume;
+  double pan;
+  int loop;
+} AnvilVoice;
+
+static AnvilSound anvil_sounds[ANVIL_SOUND_SLOTS];
+static AnvilVoice anvil_voices[ANVIL_SOUND_VOICES];
+/* Index 0 is the master gain; 1..3 are mixer groups. Muting is separate so a
+   group keeps its volume while silent. */
+static double anvil_group_gain[4] = {1.0, 1.0, 1.0, 1.0};
+static int anvil_group_muted[4];
+static size_t anvil_sound_bytes;
+static CRITICAL_SECTION anvil_audio_lock;
+static int anvil_audio_lock_ready;
+static HWAVEOUT anvil_audio_device;
+static WAVEHDR anvil_audio_headers[ANVIL_AUDIO_BUFFERS];
+static short anvil_audio_buffers[ANVIL_AUDIO_BUFFERS][ANVIL_AUDIO_FRAMES * 2];
+static HANDLE anvil_audio_event;
+static HANDLE anvil_audio_thread;
+static volatile LONG anvil_audio_running;
+static char anvil_sound_error_detail[192];
+static const char *anvil_sound_error_text = "";
+
+static void anvil_sound_error_note(const char *format, ...) {
+  va_list arguments;
+  va_start(arguments, format);
+  _vsnprintf_s(anvil_sound_error_detail, sizeof(anvil_sound_error_detail),
+               _TRUNCATE, format, arguments);
+  va_end(arguments);
+  anvil_sound_error_text = anvil_sound_error_detail;
+}
+
+const char *anvil_sound_error(void) { return anvil_sound_error_text; }
+
+static unsigned anvil_sound_u16(const unsigned char *bytes) {
+  return (unsigned)bytes[0] | ((unsigned)bytes[1] << 8);
+}
+
+static unsigned long anvil_sound_u32(const unsigned char *bytes) {
+  return (unsigned long)bytes[0] | ((unsigned long)bytes[1] << 8) |
+         ((unsigned long)bytes[2] << 16) | ((unsigned long)bytes[3] << 24);
+}
+
+static int anvil_audio_lock_init(void) {
+  if (!anvil_audio_lock_ready) {
+    InitializeCriticalSection(&anvil_audio_lock);
+    anvil_audio_lock_ready = 1;
+  }
+  return 1;
+}
+
+static void anvil_audio_shutdown(void);
+static int anvil_audio_atexit_registered;
+
+static void anvil_audio_at_exit(void) { anvil_audio_shutdown(); }
+
+static void anvil_audio_register_atexit(void) {
+  if (!anvil_audio_atexit_registered) {
+    atexit(anvil_audio_at_exit);
+    anvil_audio_atexit_registered = 1;
+  }
+}
+
+static double anvil_audio_clamp(double value, double low, double high) {
+  if (!isfinite(value))
+    return low;
+  if (value < low)
+    return low;
+  if (value > high)
+    return high;
+  return value;
+}
+
+/* ---- Streaming music ---------------------------------------------------
+   One track at a time, decoded from disk as it plays instead of being held in
+   memory. The mixer keeps an 8192-frame (about 170 ms) staging buffer that is
+   refilled from the file; linear interpolation converts any source rate to the
+   fixed 48 kHz mix. */
+enum { ANVIL_MUSIC_BUFFER_FRAMES = 8192 };
+
+typedef struct {
+  FILE *file;
+  long data_offset;
+  long data_bytes;
+  int frame_bytes;
+  int channels;
+  int bits;
+  int rate;
+  int loop;
+  int playing;
+  int draining;
+  int adpcm;
+  int block_align;
+  int block_frames;
+  unsigned char *block_bytes;
+  short *block_pcm;
+  int block_count;
+  int block_index;
+  long bytes_left;
+  double volume;
+  double length;
+  double seconds;
+  double step;
+  double phase;
+  short last_l, last_r, next_l, next_r;
+  long frames_left;
+} AnvilMusic;
+
+static AnvilMusic anvil_music;
+static short anvil_music_buffer[ANVIL_MUSIC_BUFFER_FRAMES * 2];
+static size_t anvil_music_buffer_frames, anvil_music_buffer_index;
+static const char *anvil_music_error_text = "";
+static int anvil_music_volume_seeded;
+
+static int anvil_music_read_frame(short *left, short *right) {
+  if (anvil_music.adpcm) {
+    if (anvil_music.block_index >= anvil_music.block_count) {
+      if (anvil_music.bytes_left < anvil_music.block_align) {
+        if (!anvil_music.loop)
+          return 0;
+        fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+        anvil_music.bytes_left = anvil_music.data_bytes;
+      }
+      if (fread(anvil_music.block_bytes, 1, (size_t)anvil_music.block_align,
+                anvil_music.file) != (size_t)anvil_music.block_align) {
+        if (!anvil_music.loop)
+          return 0;
+        fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+        anvil_music.bytes_left = anvil_music.data_bytes;
+        if (fread(anvil_music.block_bytes, 1, (size_t)anvil_music.block_align,
+                  anvil_music.file) != (size_t)anvil_music.block_align)
+          return 0;
+      }
+      anvil_music.bytes_left -= anvil_music.block_align;
+      anvil_music.block_count = anvil_ima_decode_block(
+          anvil_music.block_bytes, anvil_music.block_align,
+          anvil_music.channels, anvil_music.block_pcm);
+      anvil_music.block_index = 0;
+      if (anvil_music.block_count <= 0)
+        return 0;
+    }
+    int at = anvil_music.block_index * anvil_music.channels;
+    *left = anvil_music.block_pcm[at];
+    *right = anvil_music.channels == 2 ? anvil_music.block_pcm[at + 1] : *left;
+    anvil_music.block_index++;
+    return 1;
+  }
+  unsigned char raw[6];
+  size_t bytes = (size_t)anvil_music.frame_bytes;
+  if (anvil_music.frames_left <= 0) {
+    if (!anvil_music.loop)
+      return 0;
+    fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+    anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+    if (anvil_music.frames_left <= 0)
+      return 0;
+  }
+  if (fread(raw, 1, bytes, anvil_music.file) != bytes) {
+    if (!anvil_music.loop)
+      return 0;
+    fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+    anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+    if (fread(raw, 1, bytes, anvil_music.file) != bytes)
+      return 0;
+  }
+  anvil_music.frames_left--;
+  if (anvil_music.bits == 16) {
+    *left = (short)(raw[0] | (raw[1] << 8));
+    *right = anvil_music.channels == 2 ? (short)(raw[2] | (raw[3] << 8)) : *left;
+  } else {
+    *left = (short)((raw[0] - 128) << 8);
+    *right = anvil_music.channels == 2 ? (short)((raw[1] - 128) << 8) : *left;
+  }
+  return 1;
+}
+
+static void anvil_music_prime(void) {
+  anvil_music.phase = 0.0;
+  anvil_music_buffer_frames = 0;
+  anvil_music_buffer_index = 0;
+  if (!anvil_music_read_frame(&anvil_music.last_l, &anvil_music.last_r)) {
+    anvil_music.last_l = anvil_music.last_r = 0;
+    anvil_music.next_l = anvil_music.next_r = 0;
+    return;
+  }
+  if (!anvil_music_read_frame(&anvil_music.next_l, &anvil_music.next_r)) {
+    anvil_music.next_l = anvil_music.last_l;
+    anvil_music.next_r = anvil_music.last_r;
+  }
+}
+
+static void anvil_music_fill(void) {
+  size_t produced = 0;
+  anvil_music_buffer_index = 0;
+  anvil_music_buffer_frames = 0;
+  while (produced < ANVIL_MUSIC_BUFFER_FRAMES) {
+    while (anvil_music.phase >= 1.0) {
+      anvil_music.last_l = anvil_music.next_l;
+      anvil_music.last_r = anvil_music.next_r;
+      if (!anvil_music_read_frame(&anvil_music.next_l, &anvil_music.next_r)) {
+        anvil_music.draining = 1;
+        anvil_music_buffer_frames = produced;
+        return;
+      }
+      anvil_music.phase -= 1.0;
+    }
+    double fraction = anvil_music.phase;
+    anvil_music_buffer[produced * 2] = (short)lrint(
+        anvil_music.last_l + (anvil_music.next_l - anvil_music.last_l) * fraction);
+    anvil_music_buffer[produced * 2 + 1] = (short)lrint(
+        anvil_music.last_r + (anvil_music.next_r - anvil_music.last_r) * fraction);
+    produced++;
+    anvil_music.phase += anvil_music.step;
+    anvil_music.seconds += 1.0 / 48000.0;
+    if (anvil_music.length > 0.0 && anvil_music.seconds >= anvil_music.length)
+      anvil_music.seconds -= anvil_music.length;
+  }
+  anvil_music_buffer_frames = produced;
+}
+
+static void anvil_audio_mix(short *out, int frames) {
+  memset(out, 0, (size_t)frames * 2 * sizeof(short));
+  if (!anvil_audio_lock_ready)
+    return;
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int v = 0; v < ANVIL_SOUND_VOICES; ++v) {
+    AnvilVoice *voice = &anvil_voices[v];
+    if (!voice->sound)
+      continue;
+    AnvilSound *sound = &anvil_sounds[voice->sound - 1];
+    if (!sound->used || !sound->frames || sound->frame_count == 0) {
+      voice->sound = 0;
+      continue;
+    }
+    double master = anvil_group_muted[0] ? 0.0 : anvil_group_gain[0];
+    int group = sound->group >= 1 && sound->group <= 3 ? sound->group : 1;
+    double group_gain = anvil_group_muted[group] ? 0.0 : anvil_group_gain[group];
+    double gain = voice->volume * group_gain * master;
+    double left = gain * (voice->pan > 0.0 ? 1.0 - voice->pan : 1.0);
+    double right = gain * (voice->pan < 0.0 ? 1.0 + voice->pan : 1.0);
+    for (int i = 0; i < frames; ++i) {
+      if (voice->position >= (double)sound->frame_count) {
+        if (!voice->loop) {
+          voice->sound = 0;
+          break;
+        }
+        voice->position -= (double)sound->frame_count;
+      }
+      size_t index = (size_t)voice->position;
+      double fraction = voice->position - (double)index;
+      size_t next = index + 1 < sound->frame_count ? index + 1 : index;
+      double l = (double)sound->frames[index * 2] +
+                 ((double)sound->frames[next * 2] -
+                  (double)sound->frames[index * 2]) * fraction;
+      double r = (double)sound->frames[index * 2 + 1] +
+                 ((double)sound->frames[next * 2 + 1] -
+                  (double)sound->frames[index * 2 + 1]) * fraction;
+      int sl = (int)out[i * 2] + (int)(l * left);
+      int sr = (int)out[i * 2 + 1] + (int)(r * right);
+      out[i * 2] = (short)(sl < -32768 ? -32768 : sl > 32767 ? 32767 : sl);
+      out[i * 2 + 1] =
+          (short)(sr < -32768 ? -32768 : sr > 32767 ? 32767 : sr);
+      voice->position += voice->pitch;
+    }
+  }
+  if (anvil_music.playing) {
+    if (anvil_music_buffer_index >= anvil_music_buffer_frames)
+      anvil_music_fill();
+    size_t available = anvil_music_buffer_frames - anvil_music_buffer_index;
+    size_t use = available < (size_t)frames ? available : (size_t)frames;
+    double gain = anvil_music.volume * (anvil_group_muted[0] ? 0.0 : anvil_group_gain[0]);
+    for (size_t i = 0; i < use; ++i) {
+      int sl = (int)out[i * 2] +
+               (int)(anvil_music_buffer[(anvil_music_buffer_index + i) * 2] * gain);
+      int sr = (int)out[i * 2 + 1] +
+               (int)(anvil_music_buffer[(anvil_music_buffer_index + i) * 2 + 1] * gain);
+      out[i * 2] = (short)(sl < -32768 ? -32768 : sl > 32767 ? 32767 : sl);
+      out[i * 2 + 1] =
+          (short)(sr < -32768 ? -32768 : sr > 32767 ? 32767 : sr);
+    }
+    anvil_music_buffer_index += use;
+    if (use == 0 && anvil_music.draining)
+      anvil_music.playing = 0;
+  }
+  LeaveCriticalSection(&anvil_audio_lock);
+}
+
+static DWORD WINAPI anvil_audio_thread_main(LPVOID parameter) {
+  (void)parameter;
+  while (anvil_audio_running) {
+    DWORD wait = WaitForSingleObject(anvil_audio_event, 50);
+    if (!anvil_audio_running)
+      break;
+    if (wait != WAIT_OBJECT_0 && wait != WAIT_TIMEOUT)
+      break;
+    for (int i = 0; i < ANVIL_AUDIO_BUFFERS; ++i) {
+      WAVEHDR *header = &anvil_audio_headers[i];
+      if ((header->dwFlags & WHDR_DONE) == 0)
+        continue;
+      anvil_audio_mix(anvil_audio_buffers[i], ANVIL_AUDIO_FRAMES);
+      header->dwFlags &= ~WHDR_DONE;
+      if (waveOutWrite(anvil_audio_device, header, sizeof(WAVEHDR)) !=
+          MMSYSERR_NOERROR) {
+        /* Device loss: stop mixing and let the next play retry the device. */
+        anvil_audio_running = 0;
+        anvil_sound_error_text = "the audio device was lost";
+        break;
+      }
+    }
+  }
+  return 0;
+}
+
+static int anvil_audio_start(void) {
+  if (anvil_audio_device)
+    return 1;
+  anvil_audio_lock_init();
+  anvil_audio_register_atexit();
+  if (!anvil_audio_event)
+    anvil_audio_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+  if (!anvil_audio_event) {
+    anvil_sound_error_text = "the audio event could not be created";
+    return 0;
+  }
+  WAVEFORMATEX format;
+  memset(&format, 0, sizeof(format));
+  format.wFormatTag = WAVE_FORMAT_PCM;
+  format.nChannels = 2;
+  format.nSamplesPerSec = ANVIL_AUDIO_RATE;
+  format.wBitsPerSample = 16;
+  format.nBlockAlign = (WORD)(format.nChannels * format.wBitsPerSample / 8);
+  format.nAvgBytesPerSec = format.nSamplesPerSec * format.nBlockAlign;
+  if (waveOutOpen(&anvil_audio_device, WAVE_MAPPER, &format,
+                  (DWORD_PTR)anvil_audio_event, 0, CALLBACK_EVENT) !=
+      MMSYSERR_NOERROR) {
+    anvil_audio_device = NULL;
+    anvil_sound_error_text = "the audio device is unavailable";
+    return 0;
+  }
+  memset(anvil_audio_headers, 0, sizeof(anvil_audio_headers));
+  for (int i = 0; i < ANVIL_AUDIO_BUFFERS; ++i) {
+    WAVEHDR *header = &anvil_audio_headers[i];
+    header->lpData = (LPSTR)anvil_audio_buffers[i];
+    header->dwBufferLength = (DWORD)sizeof(anvil_audio_buffers[i]);
+    if (waveOutPrepareHeader(anvil_audio_device, header, sizeof(WAVEHDR)) !=
+        MMSYSERR_NOERROR) {
+      waveOutClose(anvil_audio_device);
+      anvil_audio_device = NULL;
+      anvil_sound_error_text = "the audio buffers could not be prepared";
+      return 0;
+    }
+    anvil_audio_mix(anvil_audio_buffers[i], ANVIL_AUDIO_FRAMES);
+    waveOutWrite(anvil_audio_device, header, sizeof(WAVEHDR));
+  }
+  anvil_audio_running = 1;
+  anvil_audio_thread =
+      CreateThread(NULL, 0, anvil_audio_thread_main, NULL, 0, NULL);
+  if (!anvil_audio_thread) {
+    anvil_audio_running = 0;
+    waveOutReset(anvil_audio_device);
+    for (int i = 0; i < ANVIL_AUDIO_BUFFERS; ++i)
+      waveOutUnprepareHeader(anvil_audio_device, &anvil_audio_headers[i],
+                             sizeof(WAVEHDR));
+    waveOutClose(anvil_audio_device);
+    anvil_audio_device = NULL;
+    anvil_sound_error_text = "the audio thread could not be started";
+    return 0;
+  }
+  return 1;
+}
+
+static void anvil_audio_shutdown(void) {
+  if (anvil_audio_thread) {
+    anvil_audio_running = 0;
+    if (anvil_audio_event)
+      SetEvent(anvil_audio_event);
+    WaitForSingleObject(anvil_audio_thread, 2000);
+    CloseHandle(anvil_audio_thread);
+    anvil_audio_thread = NULL;
+  }
+  if (anvil_audio_device) {
+    waveOutReset(anvil_audio_device);
+    for (int i = 0; i < ANVIL_AUDIO_BUFFERS; ++i)
+      waveOutUnprepareHeader(anvil_audio_device, &anvil_audio_headers[i],
+                             sizeof(WAVEHDR));
+    waveOutClose(anvil_audio_device);
+    anvil_audio_device = NULL;
+  }
+  if (anvil_audio_event) {
+    CloseHandle(anvil_audio_event);
+    anvil_audio_event = NULL;
+  }
+  if (anvil_audio_lock_ready) {
+    EnterCriticalSection(&anvil_audio_lock);
+    memset(anvil_voices, 0, sizeof(anvil_voices));
+    LeaveCriticalSection(&anvil_audio_lock);
+  }
+  for (int i = 0; i < ANVIL_SOUND_SLOTS; ++i) {
+    free(anvil_sounds[i].frames);
+    memset(&anvil_sounds[i], 0, sizeof(anvil_sounds[i]));
+  }
+  anvil_sound_bytes = 0;
+}
+
+/* Load a PCM WAV and convert it to the mixer's 48 kHz stereo 16-bit form. */
+/* ---- IMA ADPCM ---------------------------------------------------------
+   Standard 4-bit IMA ADPCM blocks as written by WAV format tag 0x0011: each
+   channel starts with a 4-byte header (int16 predictor, step index, reserved)
+   followed by 4-byte groups of nibbles per channel, low nibble first. */
+static const int anvil_ima_step[89] = {
+    7,     8,     9,     10,    11,    12,    13,    14,    16,    17,
+    19,    21,    23,    25,    28,    31,    34,    37,    41,    45,
+    50,    55,    60,    66,    73,    80,    88,    97,    107,   118,
+    130,   143,   157,   173,   190,   209,   230,   253,   279,   307,
+    337,   371,   408,   449,   494,   544,   598,   658,   724,   796,
+    876,   963,   1060,  1166,  1282,  1411,  1552,  1707,  1878,  2066,
+    2272,  2499,  2749,  3024,  3327,  3660,  4026,  4428,  4871,  5358,
+    5894,  6484,  7132,  7845,  8630,  9493,  10442, 11487, 12635, 13899,
+    15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767};
+
+static const int anvil_ima_index[16] = {-1, -1, -1, -1, 2, 4, 6, 8,
+                                        -1, -1, -1, -1, 2, 4, 6, 8};
+
+static int anvil_ima_nibble(int nibble, int *predictor, int *index) {
+  int step = anvil_ima_step[*index];
+  int diff = step >> 3;
+  if (nibble & 1)
+    diff += step >> 2;
+  if (nibble & 2)
+    diff += step >> 1;
+  if (nibble & 4)
+    diff += step;
+  if (nibble & 8)
+    diff = -diff;
+  *predictor += diff;
+  if (*predictor > 32767)
+    *predictor = 32767;
+  if (*predictor < -32768)
+    *predictor = -32768;
+  *index += anvil_ima_index[nibble];
+  if (*index < 0)
+    *index = 0;
+  if (*index > 88)
+    *index = 88;
+  return *predictor;
+}
+
+static int anvil_ima_decode_block(const unsigned char *block, int block_align,
+                                  int channels, short *out) {
+  if (!block || block_align < 4 * channels + 4 || channels < 1 || channels > 2)
+    return 0;
+  int predictor[2] = {0, 0}, index[2] = {0, 0};
+  for (int ch = 0; ch < channels; ++ch) {
+    int at = ch * 4;
+    predictor[ch] = (short)((unsigned)block[at] | ((unsigned)block[at + 1] << 8));
+    index[ch] = block[at + 2];
+    if (index[ch] > 88)
+      index[ch] = 88;
+    out[ch] = (short)predictor[ch];
+  }
+  int max_frames = (block_align - 4 * channels) * 2 / channels + 1;
+  int frame = 1;
+  int offset = 4 * channels;
+  while (frame < max_frames) {
+    for (int ch = 0; ch < channels; ++ch) {
+      for (int byte = 0; byte < 4 && offset < block_align; ++byte) {
+        unsigned char value = block[offset++];
+        for (int half = 0; half < 2; ++half) {
+          int nibble = half == 0 ? (value & 0x0F) : (value >> 4);
+          int sample = anvil_ima_nibble(nibble, &predictor[ch], &index[ch]);
+          int target = frame + byte * 2 + half;
+          if (target < max_frames)
+            out[target * channels + ch] = (short)sample;
+        }
+      }
+    }
+    frame += 8;
+  }
+  return max_frames;
+}
+
+double anvil_sound_load(const char *path) {
+  anvil_sound_error_text = "";
+  if (!path || path[0] == '\0') {
+    anvil_sound_error_text = "the path is empty";
+    return 0.0;
+  }
+  int slot = -1;
+  for (int i = 0; i < ANVIL_SOUND_SLOTS; ++i) {
+    if (!anvil_sounds[i].used) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    anvil_sound_error_text = "no free sound slot";
+    return 0.0;
+  }
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    anvil_sound_error_text = "cannot open the file";
+    return 0.0;
+  }
+  unsigned char riff[12];
+  if (fread(riff, 1, 12, file) != 12 || memcmp(riff, "RIFF", 4) != 0 ||
+      memcmp(riff + 8, "WAVE", 4) != 0) {
+    fclose(file);
+    anvil_sound_error_text = "the file is not a readable WAV";
+    return 0.0;
+  }
+  unsigned channels = 0, bits = 0, format = 0, rate = 0, block = 0;
+  long data_offset = -1;
+  unsigned long data_size = 0;
+  const char *parse_error = NULL;
+  for (;;) {
+    unsigned char chunk[8];
+    if (fread(chunk, 1, 8, file) != 8)
+      break;
+    unsigned long size = anvil_sound_u32(chunk + 4);
+    if (memcmp(chunk, "fmt ", 4) == 0) {
+      unsigned char fmt[16];
+      if (size < 16 || fread(fmt, 1, 16, file) != 16) {
+        parse_error = "the WAV format chunk is truncated";
+        break;
+      }
+      format = anvil_sound_u16(fmt);
+      channels = anvil_sound_u16(fmt + 2);
+      rate = anvil_sound_u32(fmt + 4);
+      block = anvil_sound_u16(fmt + 12);
+      bits = anvil_sound_u16(fmt + 14);
+      if (size > 16)
+        fseek(file, (long)(size - 16), SEEK_CUR);
+    } else if (memcmp(chunk, "data", 4) == 0) {
+      data_offset = ftell(file);
+      data_size = size;
+      fseek(file, (long)size, SEEK_CUR);
+    } else {
+      fseek(file, (long)size, SEEK_CUR);
+    }
+    if (size & 1)
+      fseek(file, 1, SEEK_CUR);
+    if (data_offset >= 0 && channels)
+      break;
+  }
+  if (!parse_error) {
+    if (format == 0 || channels == 0)
+      parse_error = "the file has no format chunk";
+    else if (format != 1 && format != 17)
+      parse_error = "only PCM and IMA ADPCM WAV files are supported";
+    else if (channels != 1 && channels != 2)
+      parse_error = "only mono or stereo WAV is supported";
+    else if (format == 1 && bits != 8 && bits != 16)
+      parse_error = "only 8- or 16-bit PCM WAV is supported";
+    else if (format == 17 && bits != 4)
+      parse_error = "IMA ADPCM WAV files must be 4-bit";
+    else if (rate < 8000 || rate > 192000)
+      parse_error = "the sample rate is outside 8000..192000 Hz";
+    else if (format == 1 && block != (unsigned)channels * (bits / 8))
+      parse_error = "the WAV block alignment is inconsistent";
+    else if (format == 17 && (block < 4u * channels + 4u || block > 4096u))
+      parse_error = "the ADPCM block alignment is invalid";
+    else if (data_offset < 0)
+      parse_error = "the file has no data chunk";
+  }
+  if (parse_error) {
+    fclose(file);
+    anvil_sound_error_text = parse_error;
+    return 0.0;
+  }
+  size_t samples_per_block = 0;
+  size_t source_frames = 0;
+  if (format == 17) {
+    samples_per_block = (size_t)(block - 4 * channels) * 2 / channels + 1;
+    source_frames = (size_t)(data_size / block) * samples_per_block;
+  } else {
+    source_frames = (size_t)(data_size / block);
+  }
+  size_t frame_count =
+      (size_t)((double)source_frames * (double)ANVIL_AUDIO_RATE / (double)rate +
+               0.5);
+  size_t bytes = frame_count * 2 * sizeof(short);
+  if (frame_count == 0) {
+    fclose(file);
+    anvil_sound_error_text = "the WAV has no audio frames";
+    return 0.0;
+  }
+  if (bytes > (size_t)ANVIL_SOUND_SLOT_BYTES) {
+    fclose(file);
+    anvil_sound_error_note(
+        "the sound needs %llu KiB decoded; the per-sound limit is %d KiB",
+        (unsigned long long)(bytes / 1024), ANVIL_SOUND_SLOT_BYTES / 1024);
+    return 0.0;
+  }
+  if (anvil_sound_bytes + bytes > (size_t)ANVIL_SOUND_TOTAL_BYTES) {
+    fclose(file);
+    anvil_sound_error_note(
+        "loading the sound would exceed the %d MiB audio budget",
+        ANVIL_SOUND_TOTAL_BYTES / (1024 * 1024));
+    return 0.0;
+  }
+  unsigned char *source = NULL;
+  short *frames = (short *)malloc(bytes);
+  if (format == 17) {
+    size_t decoded_bytes = source_frames * channels * sizeof(short);
+    if (decoded_bytes > 64u * 1024u * 1024u) {
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text =
+          "the ADPCM sound decodes to more than the 64 MiB decode budget";
+      return 0.0;
+    }
+    unsigned char *block_bytes = (unsigned char *)malloc(block);
+    short *decoded = (short *)malloc(decoded_bytes ? decoded_bytes : 1);
+    if (!block_bytes || !decoded || !frames) {
+      free(block_bytes);
+      free(decoded);
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text = "the sound could not be allocated";
+      return 0.0;
+    }
+    if (fseek(file, data_offset, SEEK_SET) != 0) {
+      free(block_bytes);
+      free(decoded);
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text = "the file ended before the sound data did";
+      return 0.0;
+    }
+    size_t blocks = (size_t)(data_size / block);
+    for (size_t b = 0; b < blocks; ++b) {
+      if (fread(block_bytes, 1, block, file) != (size_t)block) {
+        free(block_bytes);
+        free(decoded);
+        free(frames);
+        fclose(file);
+        anvil_sound_error_text = "the file ended before the sound data did";
+        return 0.0;
+      }
+      anvil_ima_decode_block(block_bytes, (int)block, (int)channels,
+                             decoded + b * samples_per_block * channels);
+    }
+    free(block_bytes);
+    source = (unsigned char *)decoded;
+    bits = 16;
+  } else {
+    source = (unsigned char *)malloc(data_size ? data_size : 1);
+    if (!source || !frames) {
+      free(source);
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text = "the sound could not be allocated";
+      return 0.0;
+    }
+    if (fseek(file, data_offset, SEEK_SET) != 0 ||
+        fread(source, 1, data_size, file) != data_size) {
+      free(source);
+      free(frames);
+      fclose(file);
+      anvil_sound_error_text = "the file ended before the sound data did";
+      return 0.0;
+    }
+  }
+  fclose(file);
+  for (size_t i = 0; i < frame_count; ++i) {
+    double position = (double)i * (double)rate / (double)ANVIL_AUDIO_RATE;
+    size_t index = (size_t)position;
+    double fraction = position - (double)index;
+    if (index >= source_frames)
+      index = source_frames - 1;
+    size_t next = index + 1 < source_frames ? index + 1 : index;
+    for (int channel = 0; channel < 2; ++channel) {
+      int source_channel = channels == 1 ? 0 : channel;
+      double first, second;
+      if (bits == 16) {
+        size_t at = (index * channels + (size_t)source_channel) * 2;
+        size_t after = (next * channels + (size_t)source_channel) * 2;
+        first = (double)(short)((unsigned)source[at] |
+                                ((unsigned)source[at + 1] << 8));
+        second = (double)(short)((unsigned)source[after] |
+                                 ((unsigned)source[after + 1] << 8));
+      } else {
+        size_t at = index * channels + (size_t)source_channel;
+        size_t after = next * channels + (size_t)source_channel;
+        first = ((double)source[at] - 128.0) * 256.0;
+        second = ((double)source[after] - 128.0) * 256.0;
+      }
+      double value = first + (second - first) * fraction;
+      frames[i * 2 + channel] =
+          (short)(value < -32768.0 ? -32768 : value > 32767.0 ? 32767 : value);
+    }
+  }
+  free(source);
+  anvil_sounds[slot].frames = frames;
+  anvil_sounds[slot].frame_count = frame_count;
+  anvil_sounds[slot].used = 1;
+  anvil_sounds[slot].group = 1;
+  anvil_sound_bytes += bytes;
+  return (double)(slot + 1);
+}
+
+static int anvil_sound_valid(double handle) {
+  if (!isfinite(handle) || handle < 1.0 || handle > (double)ANVIL_SOUND_SLOTS ||
+      floor(handle) != handle)
+    return 0;
+  return anvil_sounds[(int)handle - 1].used;
+}
+
+static int anvil_voice_valid(double handle) {
+  if (!isfinite(handle) || handle < 1.0 || handle > (double)ANVIL_SOUND_VOICES ||
+      floor(handle) != handle)
+    return 0;
+  return anvil_voices[(int)handle - 1].sound != 0;
+}
+
+static double anvil_sound_play_internal(double handle, int loop) {
+  anvil_sound_error_text = "";
+  if (!anvil_sound_valid(handle)) {
+    anvil_sound_error_text = "the sound handle is not loaded";
+    return 0.0;
+  }
+  if (!anvil_audio_start())
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  int voice = -1;
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i) {
+    if (!anvil_voices[i].sound) {
+      voice = i;
+      break;
+    }
+  }
+  if (voice < 0) {
+    LeaveCriticalSection(&anvil_audio_lock);
+    anvil_sound_error_text = "all voices are busy";
+    return 0.0;
+  }
+  anvil_voices[voice].sound = (int)handle;
+  anvil_voices[voice].position = 0.0;
+  anvil_voices[voice].pitch = 1.0;
+  anvil_voices[voice].volume = 1.0;
+  anvil_voices[voice].pan = 0.0;
+  anvil_voices[voice].loop = loop;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)(voice + 1);
+}
+
+double anvil_sound_play(double handle) {
+  return anvil_sound_play_internal(handle, 0);
+}
+
+double anvil_sound_play_loop(double handle) {
+  return anvil_sound_play_internal(handle, 1);
+}
+
+double anvil_sound_stop(double voice_handle) {
+  if (!anvil_voice_valid(voice_handle))
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  memset(&anvil_voices[(int)voice_handle - 1], 0, sizeof(AnvilVoice));
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+double anvil_sound_stop_all(void) {
+  if (!anvil_audio_lock_ready)
+    return 0.0;
+  int stopped = 0;
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i) {
+    if (anvil_voices[i].sound) {
+      memset(&anvil_voices[i], 0, sizeof(AnvilVoice));
+      stopped++;
+    }
+  }
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)stopped;
+}
+
+/* Mixer groups: 0 is the master gain, 1..3 are assignable groups. A sound is
+   in group 1 until moved, so existing programs are unaffected. */
+static int anvil_sound_group_index(double value, int allow_master) {
+  int low = allow_master ? 0 : 1;
+  if (!isfinite(value) || value < (double)low || value > 3.0 ||
+      floor(value) != value)
+    return -1;
+  return (int)value;
+}
+
+double anvil_sound_group(double handle, double group) {
+  int index = anvil_sound_group_index(group, 0);
+  if (!anvil_sound_valid(handle) || index < 0)
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_sounds[(int)handle - 1].group = index;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)index;
+}
+
+double anvil_sound_group_volume(double group, double volume) {
+  int index = anvil_sound_group_index(group, 1);
+  if (index < 0)
+    return 0.0;
+  double applied = anvil_audio_clamp(volume, 0.0, 1.0);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_group_gain[index] = applied;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return applied;
+}
+
+double anvil_sound_group_mute(double group, double on) {
+  int index = anvil_sound_group_index(group, 1);
+  if (index < 0)
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_group_muted[index] = on != 0.0;
+  int muted = anvil_group_muted[index];
+  LeaveCriticalSection(&anvil_audio_lock);
+  return muted ? 1.0 : 0.0;
+}
+
+double anvil_sound_group_gain(double group) {
+  int index = anvil_sound_group_index(group, 1);
+  if (index < 0 || anvil_group_muted[index])
+    return 0.0;
+  return anvil_group_gain[index];
+}
+
+double anvil_sound_group_stop(double group) {
+  int index = anvil_sound_group_index(group, 1);
+  if (index < 0 || !anvil_audio_lock_ready)
+    return 0.0;
+  int stopped = 0;
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i) {
+    if (!anvil_voices[i].sound)
+      continue;
+    int slot = anvil_voices[i].sound - 1;
+    int voice_group = anvil_sounds[slot].used ? anvil_sounds[slot].group : 0;
+    if (index == 0 || voice_group == index) {
+      memset(&anvil_voices[i], 0, sizeof(AnvilVoice));
+      stopped++;
+    }
+  }
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)stopped;
+}
+
+double anvil_sound_volume(double voice_handle, double volume) {
+  if (!anvil_voice_valid(voice_handle))
+    return 0.0;
+  double applied = anvil_audio_clamp(volume, 0.0, 1.0);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_voices[(int)voice_handle - 1].volume = applied;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return applied;
+}
+
+double anvil_sound_pan(double voice_handle, double pan) {
+  if (!anvil_voice_valid(voice_handle))
+    return 0.0;
+  double applied = anvil_audio_clamp(pan, -1.0, 1.0);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_voices[(int)voice_handle - 1].pan = applied;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return applied;
+}
+
+double anvil_sound_pitch(double voice_handle, double pitch) {
+  if (!anvil_voice_valid(voice_handle))
+    return 0.0;
+  double applied = anvil_audio_clamp(pitch, 0.25, 4.0);
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_voices[(int)voice_handle - 1].pitch = applied;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return applied;
+}
+
+double anvil_sound_active(void) {
+  if (!anvil_audio_lock_ready)
+    return 0.0;
+  int active = 0;
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i)
+    if (anvil_voices[i].sound)
+      active++;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return (double)active;
+}
+
+double anvil_sound_duration(double handle) {
+  if (!anvil_sound_valid(handle))
+    return 0.0;
+  return (double)anvil_sounds[(int)handle - 1].frame_count / 48000.0;
+}
+
+double anvil_sound_rms(double handle) {
+  if (!anvil_sound_valid(handle))
+    return 0.0;
+  AnvilSound *sound = &anvil_sounds[(int)handle - 1];
+  if (!sound->frames || sound->frame_count == 0)
+    return 0.0;
+  double total = 0.0;
+  size_t samples = sound->frame_count * 2;
+  for (size_t i = 0; i < samples; ++i) {
+    double value = (double)sound->frames[i];
+    total += value * value;
+  }
+  return sqrt(total / (double)samples);
+}
+
+double anvil_sound_destroy(double handle) {
+  if (!anvil_sound_valid(handle))
+    return 0.0;
+  int slot = (int)handle - 1;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  for (int i = 0; i < ANVIL_SOUND_VOICES; ++i)
+    if (anvil_voices[i].sound == slot + 1)
+      memset(&anvil_voices[i], 0, sizeof(AnvilVoice));
+  anvil_sound_bytes -= anvil_sounds[slot].frame_count * 2 * sizeof(short);
+  free(anvil_sounds[slot].frames);
+  memset(&anvil_sounds[slot], 0, sizeof(anvil_sounds[slot]));
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+/* ---- Streaming music API ----------------------------------------------- */
+
+static int anvil_music_parse_wav(FILE *file, long *data_offset, long *data_bytes,
+                                 int *channels, int *bits, int *rate,
+                                 int *format_out, int *block_out) {
+  unsigned char header[12];
+  if (fread(header, 1, 12, file) != 12 || memcmp(header, "RIFF", 4) != 0 ||
+      memcmp(header + 8, "WAVE", 4) != 0)
+    return 0;
+  int have_format = 0;
+  for (;;) {
+    unsigned char chunk[8];
+    if (fread(chunk, 1, 8, file) != 8)
+      return 0;
+    unsigned long size = (unsigned long)chunk[4] |
+                         ((unsigned long)chunk[5] << 8) |
+                         ((unsigned long)chunk[6] << 16) |
+                         ((unsigned long)chunk[7] << 24);
+    if (memcmp(chunk, "fmt ", 4) == 0) {
+      unsigned char fmt[16];
+      if (size < 16 || fread(fmt, 1, 16, file) != 16)
+        return 0;
+      int format = fmt[0] | (fmt[1] << 8);
+      *format_out = format;
+      *channels = fmt[2] | (fmt[3] << 8);
+      *rate = fmt[4] | (fmt[5] << 8) | (fmt[6] << 16) | (fmt[7] << 24);
+      *bits = fmt[14] | (fmt[15] << 8);
+      *block_out = fmt[12] | (fmt[13] << 8);
+      have_format = 1;
+      long skip = (long)size - 16;
+      if (skip > 0)
+        fseek(file, skip + (skip & 1), SEEK_CUR);
+    } else if (memcmp(chunk, "data", 4) == 0) {
+      if (!have_format)
+        return 0;
+      *data_offset = ftell(file);
+      *data_bytes = (long)size;
+      return 1;
+    } else {
+      fseek(file, (long)size + (long)(size & 1), SEEK_CUR);
+    }
+  }
+}
+
+double anvil_music_load(const char *path) {
+  anvil_music_error_text = "";
+  if (!path || path[0] == '\0') {
+    anvil_music_error_text = "the path is empty";
+    return 0.0;
+  }
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    anvil_music_error_text = "cannot open the file";
+    return 0.0;
+  }
+  long data_offset = 0, data_bytes = 0;
+  int channels = 0, bits = 0, rate = 0, format = 0, block_align = 0;
+  if (!anvil_music_parse_wav(file, &data_offset, &data_bytes, &channels, &bits,
+                             &rate, &format, &block_align)) {
+    fclose(file);
+    anvil_music_error_text = "not a readable WAV file";
+    return 0.0;
+  }
+  if (channels < 1 || channels > 2) {
+    fclose(file);
+    anvil_music_error_text = "only mono and stereo music is supported";
+    return 0.0;
+  }
+  if (format != 1 && format != 17) {
+    fclose(file);
+    anvil_music_error_text = "only PCM and IMA ADPCM music is supported";
+    return 0.0;
+  }
+  if (format == 1 && bits != 8 && bits != 16) {
+    fclose(file);
+    anvil_music_error_text = "music must be 8-bit or 16-bit PCM";
+    return 0.0;
+  }
+  if (format == 17 && bits != 4) {
+    fclose(file);
+    anvil_music_error_text = "IMA ADPCM music must be 4-bit";
+    return 0.0;
+  }
+  if (format == 17 && (block_align < 4 * channels + 4 || block_align > 4096)) {
+    fclose(file);
+    anvil_music_error_text = "the ADPCM block alignment is invalid";
+    return 0.0;
+  }
+  if (rate < 8000 || rate > 192000) {
+    fclose(file);
+    anvil_music_error_text = "music rate must be 8000-192000 Hz";
+    return 0.0;
+  }
+  if (data_bytes <= 0) {
+    fclose(file);
+    anvil_music_error_text = "the music has no samples";
+    return 0.0;
+  }
+  int frame_bytes = format == 17 ? block_align : channels * (bits / 8);
+  int block_frames = 0;
+  if (format == 17)
+    block_frames = (block_align - 4 * channels) * 2 / channels + 1;
+  unsigned char *block_bytes = NULL;
+  short *block_pcm = NULL;
+  if (format == 17) {
+    block_bytes = (unsigned char *)malloc((size_t)block_align);
+    block_pcm = (short *)malloc((size_t)block_frames * channels * sizeof(short));
+    if (!block_bytes || !block_pcm) {
+      free(block_bytes);
+      free(block_pcm);
+      fclose(file);
+      anvil_music_error_text = "the music could not be allocated";
+      return 0.0;
+    }
+  }
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  double previous_volume = anvil_music_volume_seeded ? anvil_music.volume : 1.0;
+  if (anvil_music.file)
+    fclose(anvil_music.file);
+  free(anvil_music.block_bytes);
+  free(anvil_music.block_pcm);
+  memset(&anvil_music, 0, sizeof(anvil_music));
+  anvil_music.file = file;
+  anvil_music.data_offset = data_offset;
+  anvil_music.data_bytes = data_bytes;
+  anvil_music.frame_bytes = frame_bytes;
+  anvil_music.channels = channels;
+  anvil_music.bits = bits;
+  anvil_music.rate = rate;
+  anvil_music.adpcm = format == 17;
+  anvil_music.block_align = block_align;
+  anvil_music.block_frames = block_frames;
+  anvil_music.block_bytes = block_bytes;
+  anvil_music.block_pcm = block_pcm;
+  anvil_music.bytes_left = data_bytes;
+  anvil_music.length = anvil_music.adpcm
+                          ? (double)((data_bytes / block_align) * block_frames) /
+                                (double)rate
+                          : (double)(data_bytes / frame_bytes) / (double)rate;
+  anvil_music.volume = previous_volume;
+  anvil_music_volume_seeded = 1;
+  anvil_music.frames_left = data_bytes / frame_bytes;
+  anvil_music.step = (double)rate / 48000.0;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+static double anvil_music_start(int loop) {
+  anvil_music_error_text = "";
+  if (!anvil_music.file) {
+    anvil_music_error_text = "no music is loaded";
+    return 0.0;
+  }
+  if (!anvil_audio_start())
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_music.loop = loop;
+  anvil_music.playing = 1;
+  anvil_music.draining = 0;
+  anvil_music.seconds = 0.0;
+  anvil_music.step = (double)anvil_music.rate / 48000.0;
+  fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+  anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+  anvil_music.bytes_left = anvil_music.data_bytes;
+  anvil_music.block_count = 0;
+  anvil_music.block_index = 0;
+  anvil_music_prime();
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+double anvil_music_play(void) { return anvil_music_start(0); }
+double anvil_music_play_loop(void) { return anvil_music_start(1); }
+
+double anvil_music_stop(void) {
+  if (!anvil_music.file)
+    return 0.0;
+  anvil_audio_lock_init();
+  EnterCriticalSection(&anvil_audio_lock);
+  anvil_music.playing = 0;
+  anvil_music.draining = 0;
+  anvil_music.seconds = 0.0;
+  anvil_music_buffer_frames = 0;
+  anvil_music_buffer_index = 0;
+  fseek(anvil_music.file, anvil_music.data_offset, SEEK_SET);
+  anvil_music.frames_left = anvil_music.data_bytes / anvil_music.frame_bytes;
+  anvil_music.bytes_left = anvil_music.data_bytes;
+  anvil_music.block_count = 0;
+  anvil_music.block_index = 0;
+  LeaveCriticalSection(&anvil_audio_lock);
+  return 1.0;
+}
+
+double anvil_music_playing(void) { return anvil_music.playing ? 1.0 : 0.0; }
+
+double anvil_music_volume(double volume) {
+  if (!anvil_music.file || !isfinite(volume))
+    return 0.0;
+  double applied = anvil_audio_clamp(volume, 0.0, 1.0);
+  anvil_music.volume = applied;
+  return applied;
+}
+
+double anvil_music_position(void) { return anvil_music.seconds; }
+double anvil_music_length(void) { return anvil_music.length; }
+const char *anvil_music_error(void) { return anvil_music_error_text; }
+
+static void anvil_release_frame_resources(void) {
+  anvil_audio_shutdown();
+  memset(anvil_particles, 0, sizeof(anvil_particles));
+  anvil_particle_live = 0;
+  if (anvil_music.file) {
+    fclose(anvil_music.file);
+    anvil_music.file = NULL;
+  }
+  free(anvil_music.block_bytes);
+  free(anvil_music.block_pcm);
+  anvil_music.block_bytes = NULL;
+  anvil_music.block_pcm = NULL;
+  anvil_music.playing = 0;
+  for (int i = 0; i < ANVIL_IMAGES; ++i) {
+    free(anvil_images[i].pixels);
+    memset(&anvil_images[i], 0, sizeof(anvil_images[i]));
+  }
+  anvil_image_memory_used = 0;
   if (anvil_memory_dc && anvil_old_bitmap)
     SelectObject(anvil_memory_dc, anvil_old_bitmap);
   if (anvil_bitmap)
@@ -1155,17 +3950,60 @@ static void anvil_release_frame_resources(void) {
   anvil_memory_dc = NULL;
 }
 
-void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
-  HINSTANCE instance = GetModuleHandleW(NULL);
-  const char *utf8_title = title ? title : "Anvil Game";
-  int title_units = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_title, -1, NULL, 0);
-  if (title_units <= 0) return;
-  wchar_t *wide_title = (wchar_t *)malloc((size_t)title_units * sizeof(wchar_t));
-  if (!wide_title) return;
-  if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8_title, -1, wide_title, title_units)) {
-    free(wide_title); return;
+double anvil_window_on_top(double on) {
+  if (!anvil_window)
+    return 0.0;
+  HWND after = on != 0.0 ? HWND_TOPMOST : HWND_NOTOPMOST;
+  return SetWindowPos(anvil_window, after, 0, 0, 0, 0,
+                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+             ? 1.0
+             : 0.0;
+}
+
+double anvil_window_fullscreen(double on) {
+  if (!anvil_window)
+    return 0.0;
+  if ((on != 0.0) == anvil_window_is_fullscreen)
+    return 1.0;
+  if (on != 0.0) {
+    MONITORINFO info;
+    memset(&info, 0, sizeof(info));
+    info.cbSize = sizeof(info);
+    HMONITOR monitor = MonitorFromWindow(anvil_window, MONITOR_DEFAULTTONEAREST);
+    if (!GetMonitorInfoA(monitor, &info))
+      return 0.0;
+    anvil_window_saved_style = (LONG)GetWindowLongPtrA(anvil_window, GWL_STYLE);
+    if (!GetWindowRect(anvil_window, &anvil_window_saved_rect))
+      return 0.0;
+    SetWindowLongPtrA(anvil_window, GWL_STYLE, (LONG_PTR)(WS_POPUP | WS_VISIBLE));
+    int width = info.rcMonitor.right - info.rcMonitor.left;
+    int height = info.rcMonitor.bottom - info.rcMonitor.top;
+    if (!SetWindowPos(anvil_window, HWND_TOP, info.rcMonitor.left,
+                      info.rcMonitor.top, width, height,
+                      SWP_FRAMECHANGED | SWP_NOOWNERZORDER)) {
+      SetWindowLongPtrA(anvil_window, GWL_STYLE,
+                        (LONG_PTR)anvil_window_saved_style);
+      return 0.0;
+    }
+    anvil_window_is_fullscreen = 1;
+  } else {
+    SetWindowLongPtrA(anvil_window, GWL_STYLE,
+                      (LONG_PTR)anvil_window_saved_style);
+    int width = anvil_window_saved_rect.right - anvil_window_saved_rect.left;
+    int height = anvil_window_saved_rect.bottom - anvil_window_saved_rect.top;
+    if (!SetWindowPos(anvil_window, NULL, anvil_window_saved_rect.left,
+                      anvil_window_saved_rect.top, width, height,
+                      SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOOWNERZORDER))
+      return 0.0;
+    anvil_window_is_fullscreen = 0;
   }
-  WNDCLASSEXW wc;
+  InvalidateRect(anvil_window, NULL, FALSE);
+  return 1.0;
+}
+
+void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
+  HINSTANCE instance = GetModuleHandleA(NULL);
+  WNDCLASSEXA wc;
   memset(&wc, 0, sizeof(wc));
   wc.cbSize = sizeof(wc);
   wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -1173,17 +4011,16 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   wc.hInstance = instance;
   wc.hCursor = LoadCursor(NULL, IDC_ARROW);
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-  wc.lpszClassName = L"AnvilNativeGameWindow";
-  if (!RegisterClassExW(&wc)) { free(wide_title); return; }
+  wc.lpszClassName = "AnvilNativeGameWindow";
+  RegisterClassExA(&wc);
   RECT rect = {0, 0, ANVIL_WIDTH, ANVIL_HEIGHT};
   AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
-  anvil_window = CreateWindowExW(
-      0, wc.lpszClassName, wide_title, WS_OVERLAPPEDWINDOW,
+  anvil_window = CreateWindowExA(
+      0, wc.lpszClassName, title ? title : "Anvil Game", WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, CW_USEDEFAULT, rect.right - rect.left,
       rect.bottom - rect.top, NULL, NULL, instance, NULL);
-  free(wide_title);
   if (!anvil_window) {
-    UnregisterClassW(wc.lpszClassName, instance);
+    UnregisterClassA(wc.lpszClassName, instance);
     return;
   }
   anvil_memory_dc = CreateCompatibleDC(NULL);
@@ -1199,11 +4036,11 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   anvil_bitmap =
       CreateDIBSection(anvil_memory_dc, &anvil_bitmap_info, DIB_RGB_COLORS,
                        (void **)&anvil_pixels, NULL, 0);
-  anvil_old_bitmap = SelectObject(anvil_memory_dc, anvil_bitmap);
   anvil_depth_buffer =
       (double *)malloc((size_t)ANVIL_WIDTH * ANVIL_HEIGHT * sizeof(double));
   if (!anvil_bitmap || !anvil_pixels || !anvil_depth_buffer)
     goto failed_startup;
+  anvil_old_bitmap = SelectObject(anvil_memory_dc, anvil_bitmap);
   QueryPerformanceFrequency(&anvil_clock_frequency);
   QueryPerformanceCounter(&anvil_clock_start);
   LARGE_INTEGER prev = anvil_clock_start;
@@ -1214,13 +4051,13 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   anvil_running = 1;
   MSG msg;
   while (anvil_running) {
-    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
+    while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
       if (msg.message == WM_QUIT) {
         anvil_running = 0;
         break;
       }
       TranslateMessage(&msg);
-      DispatchMessageW(&msg);
+      DispatchMessageA(&msg);
     }
     if (!anvil_running)
       break;
@@ -1235,10 +4072,13 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
         (double)(now.QuadPart - anvil_clock_start.QuadPart) /
         (double)anvil_clock_frequency.QuadPart;
     accumulator += frame_elapsed;
+    LARGE_INTEGER phase_start, phase_update_end, phase_render_end, phase_present_end;
+    QueryPerformanceCounter(&phase_start);
     int update_count = 0;
     while (accumulator >= step_seconds) {
       anvil_delta_seconds = step_seconds;
       anvil_camera_update();
+      anvil_particles_update(step_seconds);
       if (update)
         update();
       accumulator -= step_seconds;
@@ -1251,9 +4091,11 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
         anvil_mouse_wheel_delta = 0.0;
       }
     }
+    QueryPerformanceCounter(&phase_update_end);
     anvil_clear_frame();
     if (draw)
       draw();
+    anvil_particles_draw();
     anvil_trace_finish();
     if (!update) {
       memset(anvil_pressed_keys, 0, sizeof(anvil_pressed_keys));
@@ -1261,8 +4103,19 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
              sizeof(anvil_mouse_pressed_buttons));
       anvil_mouse_wheel_delta = 0.0;
     }
+    QueryPerformanceCounter(&phase_render_end);
     InvalidateRect(anvil_window, NULL, FALSE);
     UpdateWindow(anvil_window);
+    QueryPerformanceCounter(&phase_present_end);
+    anvil_frame_tick_seconds =
+        (double)(phase_update_end.QuadPart - phase_start.QuadPart) /
+        (double)anvil_clock_frequency.QuadPart;
+    anvil_frame_render_seconds =
+        (double)(phase_render_end.QuadPart - phase_update_end.QuadPart) /
+        (double)anvil_clock_frequency.QuadPart;
+    anvil_frame_present_seconds =
+        (double)(phase_present_end.QuadPart - phase_render_end.QuadPart) /
+        (double)anvil_clock_frequency.QuadPart;
     double sleep_seconds = step_seconds - accumulator;
     if (sleep_seconds > 0.002)
       Sleep((DWORD)(sleep_seconds * 1000.0));
@@ -1270,14 +4123,14 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
       Sleep(0);
   }
   anvil_release_frame_resources();
-  UnregisterClassW(wc.lpszClassName, instance);
+  UnregisterClassA(wc.lpszClassName, instance);
   return;
 
 failed_startup:
   anvil_release_frame_resources();
   if (anvil_window)
     DestroyWindow(anvil_window);
-  UnregisterClassW(wc.lpszClassName, instance);
+  UnregisterClassA(wc.lpszClassName, instance);
 }
 
 static size_t anvil_array_checked_index(const double *values, int size,
@@ -1304,3 +4157,279 @@ void anvil_array_set(double *values, int size, double index, double value,
   values[anvil_array_checked_index(values, size, index, source, line)] = value;
 }
 
+/* Lists are arrays with a used count. Reading past the count is a mistake even
+   though the slot exists, so it gets the same treatment as text lists. */
+double anvil_list_get(const double *values, int index, double count,
+                      const char *path, int line) {
+  if (!values || index < 0 || index >= (int)count) {
+    fprintf(stderr, "%s:%d: list index %d is outside 0..%d\n", path, line, index,
+            (int)count - 1);
+    exit(2);
+  }
+  return values[index];
+}
+
+
+
+#define ANVIL_TEXT_BUFFERS 64
+#define ANVIL_TEXT_CAPACITY 256
+static char anvil_text_buffers[ANVIL_TEXT_BUFFERS][ANVIL_TEXT_CAPACITY];
+static int anvil_text_buffer_index = 0;
+
+static char *anvil_text_buffer(void) {
+    char *destination = anvil_text_buffers[anvil_text_buffer_index & (ANVIL_TEXT_BUFFERS - 1)];
+    anvil_text_buffer_index += 1;
+    return destination;
+}
+
+static char *anvil_text_case(const char *source, int to_lower) {
+    char *destination = anvil_text_buffer();
+    size_t index = 0;
+    for (; source[index] != '\0' && index < 255; ++index) {
+        char letter = source[index];
+        if (to_lower) {
+            if (letter >= 'A' && letter <= 'Z') {
+                letter = (char)(letter + 32);
+            }
+        } else {
+            if (letter >= 'a' && letter <= 'z') {
+                letter = (char)(letter - 32);
+            }
+        }
+        destination[index] = letter;
+    }
+    destination[index] = '\0';
+    return destination;
+}
+
+char *anvil_text_upper(const char *source) {
+    return anvil_text_case(source, 0);
+}
+
+char *anvil_text_lower(const char *source) {
+    return anvil_text_case(source, 1);
+}
+
+/* Clamp a numeric text argument into [0, limit] without converting a value
+   whose truncation C leaves undefined.  NaN and non-finite values become 0,
+   and anything at or past the limit clamps to the limit. */
+static size_t anvil_text_index(double value, size_t limit) {
+    if (!(value == value) || value <= 0.0) {
+        return 0;
+    }
+    if (value >= (double)limit) {
+        return limit;
+    }
+    return (size_t)value;
+}
+
+char *anvil_text_chr(double code) {
+    char *destination = anvil_text_buffer();
+    if (!(code == code) || code < 0.0 || code > 255.0) {
+        fprintf(stderr, "Anvil chr out of range\n");
+        exit(1);
+    }
+    destination[0] = (char)(int)code;
+    destination[1] = '\0';
+    return destination;
+}
+
+double anvil_text_ord(const char *source) {
+    return (double)(unsigned char)source[0];
+}
+
+char *anvil_text_trim(const char *source) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    size_t start = 0;
+    size_t end = length;
+    while (start < end && (source[start] == ' ' || source[start] == '\t')) {
+        start += 1;
+    }
+    while (end > start && (source[end - 1] == ' ' || source[end - 1] == '\t')) {
+        end -= 1;
+    }
+    memcpy(destination, source + start, end - start);
+    destination[end - start] = '\0';
+    return destination;
+}
+
+double anvil_text_to_number(const char *source) {
+    /* Decimal only, matching the native backend: optional leading spaces, a
+       sign, digits, an optional fraction, an optional exponent, optional
+       trailing spaces and then the end of the text.  Hex, "inf" and "nan" read
+       as 0 instead of strtod's surprises, and so does any text that is not a
+       complete number: a valid prefix followed by junk reads 0 rather than a
+       silently truncated value.  At most nine fraction digits are accumulated,
+       so the fixed-point accumulator cannot overflow; further digits are
+       skipped and the value stays within the documented rounding rule. */
+    const char *cursor = source;
+    while (*cursor == ' ' || *cursor == '\t') {
+        cursor++;
+    }
+    int negative = 0;
+    if (*cursor == '-') {
+        negative = 1;
+        cursor++;
+    } else if (*cursor == '+') {
+        cursor++;
+    }
+    double value = 0.0;
+    int digits = 0;
+    while (*cursor >= '0' && *cursor <= '9') {
+        value = value * 10.0 + (double)(*cursor - '0');
+        cursor++;
+        digits++;
+    }
+    if (*cursor == '.') {
+        cursor++;
+        long long fraction = 0;
+        long long scale = 1;
+        while (*cursor >= '0' && *cursor <= '9') {
+            /* Nine fraction digits stay well inside signed 64-bit range; extra
+               digits are skipped so the accumulator can never overflow. */
+            if (scale < 1000000000LL) {
+                fraction = fraction * 10 + (*cursor - '0');
+                scale *= 10;
+            }
+            cursor++;
+            digits++;
+        }
+        if (scale > 1) {
+            value += (double)fraction / (double)scale;
+        }
+    }
+    if (digits == 0) {
+        return 0.0;
+    }
+    if (*cursor == 'e' || *cursor == 'E') {
+        cursor++;
+        int exponent_negative = 0;
+        if (*cursor == '-') {
+            exponent_negative = 1;
+            cursor++;
+        } else if (*cursor == '+') {
+            cursor++;
+        }
+        int exponent = 0;
+        int exponent_digits = 0;
+        while (*cursor >= '0' && *cursor <= '9' && exponent < 1000) {
+            exponent = exponent * 10 + (*cursor - '0');
+            cursor++;
+            exponent_digits++;
+        }
+        if (exponent_digits == 0) {
+            /* 'e' with no exponent digits is malformed, not a mantissa. */
+            return 0.0;
+        }
+        while (exponent-- > 0) {
+            value = exponent_negative ? value / 10.0 : value * 10.0;
+        }
+    }
+    if (!(value <= 1.7976931348623157e308)) {
+        /* Overflow to infinity (or a NaN) is not a usable number: both
+           backends read it as 0 instead of one overflowing and the other
+           clamping silently. */
+        return 0.0;
+    }
+    while (*cursor == ' ' || *cursor == '\t') {
+        cursor++;
+    }
+    if (*cursor != '\0') {
+        /* A valid prefix followed by junk is not a number. */
+        return 0.0;
+    }
+    return negative ? -value : value;
+}
+
+char *anvil_text_char(const char *source, double index) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    /* Fractional indexes truncate toward zero.  NaN and the infinities have no
+       sensible character, so they read as empty text. */
+    if (!(index == index) || index < 0.0 || index >= (double)length) {
+        destination[0] = '\0';
+        return destination;
+    }
+    destination[0] = source[(size_t)index];
+    destination[1] = '\0';
+    return destination;
+}
+
+int anvil_str_contains(const char *source, const char *needle) {
+    return strstr(source, needle) != NULL;
+}
+
+char *anvil_text_mid(const char *source, double start, double count) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    size_t from = anvil_text_index(start, length);
+    size_t take = anvil_text_index(count, length);
+    if (take > length - from) {
+        take = length - from;
+    }
+    memcpy(destination, source + from, take);
+    destination[take] = '\0';
+    return destination;
+}
+
+char *anvil_text_left(const char *source, double count) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    size_t take = anvil_text_index(count, length);
+    memcpy(destination, source, take);
+    destination[take] = '\0';
+    return destination;
+}
+
+char *anvil_text_right(const char *source, double count) {
+    char *destination = anvil_text_buffer();
+    size_t length = strlen(source);
+    size_t take = anvil_text_index(count, length);
+    memcpy(destination, source + (length - take), take);
+    destination[take] = '\0';
+    return destination;
+}
+
+double anvil_zero_clean(double value) {
+    /* printf renders negative zero as "-0", which reads as a bug to beginners. */
+    return value == 0.0 ? 0.0 : value;
+}
+
+const char *anvil_format_number(double value) {
+    /* Matches the native backend: up to six fractional digits, no trailing
+       zeros, and no exponent notation for ordinary magnitudes. */
+    static char buffers[4][64];
+    static unsigned index = 0;
+    char *text = buffers[index++ & 3u];
+    if (value == 0.0) {
+        memcpy(text, "0", 2);
+        return text;
+    }
+    _snprintf_s(text, 64, _TRUNCATE, "%.6f", value);
+    size_t length = strlen(text);
+    while (length > 0 && text[length - 1] == '0') {
+        length--;
+    }
+    if (length > 0 && text[length - 1] == '.') {
+        length--;
+    }
+    text[length] = '\0';
+    if (strcmp(text, "-0") == 0) {
+        memcpy(text, "0", 2);
+    }
+    return text;
+}
+
+int anvil_str_starts(const char *source, const char *prefix) {
+    return strncmp(source, prefix, strlen(prefix)) == 0;
+}
+
+int anvil_str_ends(const char *source, const char *suffix) {
+    size_t source_length = strlen(source);
+    size_t suffix_length = strlen(suffix);
+    if (suffix_length > source_length) {
+        return 0;
+    }
+    return strcmp(source + source_length - suffix_length, suffix) == 0;
+}

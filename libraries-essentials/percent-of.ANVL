@@ -1,0 +1,6 @@
+fn(percent-of, part, whole)
+  if var(whole) = 0
+    output 0
+  end
+  output var(part) / var(whole) * 100
+end

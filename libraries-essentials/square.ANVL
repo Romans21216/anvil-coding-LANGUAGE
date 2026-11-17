@@ -1,0 +1,3 @@
+fn(square, n)
+  output var(n) * var(n)
+end

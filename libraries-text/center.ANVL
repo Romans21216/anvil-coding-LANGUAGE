@@ -1,0 +1,11 @@
+fn(center, text, width)
+  # Adds one space each side until it will not fit, then pads the right.
+  # Recursive rather than a global accumulator, so it is reentrant.
+  if len(var(text)) + 2 > floor(var(width))
+    if len(var(text)) < floor(var(width))
+      output call fn(pad-right, var(text), var(width))
+    end
+    output var(text)
+  end
+  output call fn(center, " " & var(text) & " ", var(width))
+end

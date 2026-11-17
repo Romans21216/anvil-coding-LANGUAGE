@@ -1,0 +1,10 @@
+{
+  "name": "mathx",
+  "kind": "dll",
+  "dll": "mathx.dll",
+  "lib": "mathx.lib",
+  "functions": [
+    {"name": "gcd", "symbol": "anvil_ext_gcd", "arity": 2},
+    {"name": "lcm", "symbol": "anvil_ext_lcm", "arity": 2}
+  ]
+}

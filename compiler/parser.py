@@ -10,55 +10,31 @@ from compiler.common import (
     ArrayDeclarations,
     MAX_ARRAY_SIZE,
     MAX_LOCAL_ARRAY_ELEMENTS,
-    MAX_ACTIVE_LOCAL_ARRAY_BYTES,
-    MAX_ACTIVE_LOCAL_ARRAY_MIB,
     CompileError,
     Node,
     ParsedProgram,
-    function_reference,
 )
 from compiler.expressions import split_args
-from compiler.lexer import mask_strings, split_keyword, strip_comment, validate_port
+from compiler.lexer import split_keyword, strip_comment, validate_port
 from compiler.semantics import validate_program
 
+# `list <name>` reserves this many slots; `add` appends until it is full.
+LIST_CAPACITY = 256
 
-def parse_syntax(
-    path: pathlib.Path,
-    source: str,
-    *,
-    local_array_elements: int = MAX_LOCAL_ARRAY_ELEMENTS,
-    active_local_array_bytes: int = MAX_ACTIVE_LOCAL_ARRAY_BYTES,
-) -> ParsedProgram:
-    if (
-        isinstance(local_array_elements, bool)
-        or not isinstance(local_array_elements, int)
-        or not 1 <= local_array_elements <= MAX_ARRAY_SIZE
-    ):
-        raise CompileError(
-            f"{path}: local array element limit must be from 1 to {MAX_ARRAY_SIZE}"
-        )
-    if (
-        isinstance(active_local_array_bytes, bool)
-        or not isinstance(active_local_array_bytes, int)
-        or not 1024 * 1024 <= active_local_array_bytes
-        <= MAX_ACTIVE_LOCAL_ARRAY_MIB * 1024 * 1024
-        or active_local_array_bytes % (1024 * 1024)
-    ):
-        raise CompileError(
-            f"{path}: active-call memory limit must be an integer number of MiB "
-            f"from 1 to {MAX_ACTIVE_LOCAL_ARRAY_MIB} MiB"
-        )
+
+def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
     functions: dict[str, Node] = {}
     top: list[Node] = []
     variables: set[str] = set()
     arrays = ArrayDeclarations()
+    lists: set[str] = set()
+    text_lists: set[str] = set()
+    enum_values: dict[str, float] = {}
     variable_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     local_references: list[tuple[str, int, str | None, pathlib.Path]] = []
     stack: list[tuple[list[Node], str, Node | None]] = [(top, "top", None)]
     version_declared = False
     source_code_seen = False
-    version = "1"
-    metadata_keys = set()
     for line_no, raw in enumerate(source.splitlines(), 1):
         line = strip_comment(raw).strip()
         if not line:
@@ -84,54 +60,88 @@ def parse_syntax(
             # Compare decimal text without constructing an unbounded Python int.
             # Python limits extremely long int conversions and would leak ValueError.
             version = version_text.lstrip("0") or "0"
-            if version not in ("1","2"):
+            if version != str(LANGUAGE_VERSION):
                 shown_version = version if len(version) <= 32 else "value too large"
                 raise CompileError(
                     f"{path}:{line_no}: unsupported Anvil language version "
-                    f"{shown_version}; compiler supports versions 1 and 2"
+                    f"{shown_version}; compiler supports version {LANGUAGE_VERSION}"
                 )
             continue
         source_code_seen = True
         current_function = next(
             (frame[2] for frame in reversed(stack) if frame[1] == "function"), None
         )
-        if version == "2":
-            # Version1 keeps legacy global var(); version2 uses var() locally.
-            # Rewrite only unquoted tokens; varl() always denotes a global.
-            for match in reversed(list(re.finditer(r'\bvar\(',mask_strings(line)))):
-                line=line[:match.start()]+"local("+line[match.end():]
-        metadata = re.fullmatch(r'(name|author|version)(?:\s+(.+)|\((.*)\))',line)
-        if metadata:
-            if len(stack)!=1:
-                raise CompileError(f'{path}:{line_no}: program metadata must be top-level')
-            key=metadata[1]
-            if key in metadata_keys:
-                raise CompileError(f'{path}:{line_no}: duplicate program metadata {key!r}')
-            from compiler.program_metadata import metadata_value
-            value=metadata_value(metadata[2] if metadata[2] is not None else metadata[3],path,line_no)
-            metadata_keys.add(key)
-            top.append(Node('metadata',line_no,value=value,name=key,source=path))
+        selective = re.fullmatch(
+            r"include\s+fn\(([A-Za-z_][\w-]*)\)\s*(?:--|-)\s*(\".*\")(?:\s+as\s+([A-Za-z_][\w-]*))?",
+            line,
+        )
+        if selective:
+            if len(stack) != 1:
+                raise CompileError(
+                    f"{path}:{line_no}: include must be at top level"
+                )
+            name, raw_path, alias = selective.groups()
+            from compiler.modules import include_name
+
+            include_name(raw_path, path, line_no)
+            top.append(
+                Node(
+                    "include_fn",
+                    line_no,
+                    value=raw_path,
+                    name=name,
+                    params=[alias or ""],
+                    source=path,
+                )
+            )
+            continue
+        library_import = re.fullmatch(r"library\s+import\s+([A-Za-z_][\w-]*)", line)
+        if library_import:
+            if len(stack) != 1:
+                raise CompileError(
+                    f"{path}:{line_no}: library import must be at top level"
+                )
+            top.append(
+                Node(
+                    "library_import",
+                    line_no,
+                    value=library_import.group(1),
+                    source=path,
+                )
+            )
             continue
         if re.match(r"include\b", line):
             if len(stack) != 1:
                 raise CompileError(f"{path}:{line_no}: include must be at top level")
-            from compiler.modules import include_spec
+            from compiler.modules import include_name
             raw_name = line[len("include"):].strip()
-            selected, alias, filename = include_spec(raw_name, path, line_no)
-            top.append(Node("include", line_no, value=filename, name=selected,
-                            params=[alias] if alias else [], source=path))
+            include_name(raw_name, path, line_no)
+            top.append(Node("include", line_no, value=raw_name, source=path))
             continue
-        reference_text = mask_strings(line)
-        for reference in re.finditer(r"\b(varl|var)\(([A-Za-z_][\w-]*)\)", reference_text):
+        imported = re.fullmatch(r"import\s+([A-Za-z_][\w-]*)", line)
+        if imported:
+            if len(stack) != 1:
+                raise CompileError(f"{path}:{line_no}: import must be at top level")
+            module = imported.group(1)
+            from compiler.builtin_usage import BUILTIN_MODULES
+
+            if module not in BUILTIN_MODULES:
+                known = ", ".join(sorted(BUILTIN_MODULES))
+                raise CompileError(
+                    f"{path}:{line_no}: unknown import {module!r}; available: {known}"
+                )
+            top.append(Node("import", line_no, value=module, source=path))
+            continue
+        for reference in re.finditer(r"var\(([A-Za-z_][\w-]*)\)", line):
             variable_references.append(
                 (
-                    reference.group(2),
+                    reference.group(1),
                     line_no,
-                    current_function.name if current_function and reference[1]=='var' else None,
+                    current_function.name if current_function else None,
                     path,
                 )
             )
-        for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", reference_text):
+        for reference in re.finditer(r"local\(([A-Za-z_][\w-]*)\)", line):
             local_references.append(
                 (
                     reference.group(1),
@@ -141,10 +151,15 @@ def parse_syntax(
                 )
             )
         array_decl = re.fullmatch(
-            r"array\s+([A-Za-z_][\w-]*)\s*\(\s*([0-9]+)\s*\)", line
+            r"array\s+([A-Za-z_][\w-]*)\s*\(\s*([^()]*)\s*\)", line
         )
         if array_decl:
             name, raw_size = array_decl.groups()
+            if not raw_size.isdigit():
+                raise CompileError(
+                    f"{path}:{line_no}: array size must be a whole number, "
+                    f"got {raw_size.strip()!r}"
+                )
             normalized_size = raw_size.lstrip("0") or "0"
             max_array_text = str(MAX_ARRAY_SIZE)
             if len(normalized_size) > len(max_array_text) or (
@@ -178,22 +193,72 @@ def parse_syntax(
                     )
                 if (
                     sum(current_function.local_arrays.values()) + size
-                    > local_array_elements
+                    > MAX_LOCAL_ARRAY_ELEMENTS
                 ):
                     raise CompileError(
                         f"{path}:{line_no}: local arrays in a function may "
-                        f"contain at most {local_array_elements} elements total"
+                        f"contain at most {MAX_LOCAL_ARRAY_ELEMENTS} elements total"
                     )
                 current_function.local_arrays[name] = size
                 current_function.local_array_lines[name] = line_no
-                local_bytes = sum(current_function.local_arrays.values()) * 8
-                if local_bytes > active_local_array_bytes:
+            continue
+        enum_decl = re.fullmatch(
+            r"enum\s+([A-Za-z_][\w-]*)\s+(.+)", line
+        )
+        if enum_decl:
+            if current_function is not None or len(stack) != 1:
+                raise CompileError(
+                    f"{path}:{line_no}: enums must be declared at top level"
+                )
+            type_name, values_text = enum_decl.groups()
+            values = [part.strip() for part in split_args(values_text)]
+            if not values or any(not re.fullmatch(r"[A-Za-z_][\w-]*", part) for part in values):
+                raise CompileError(
+                    f"{path}:{line_no}: enum {type_name} expects value names, "
+                    "for example: enum State idle, playing, paused"
+                )
+            for index, value_name in enumerate(values):
+                if value_name in enum_values:
                     raise CompileError(
-                        f"{path}:{line_no}: local arrays in function "
-                        f"{current_function.name!r} need {local_bytes} bytes, "
-                        f"above the active-call memory limit of "
-                        f"{active_local_array_bytes} bytes"
+                        f"{path}:{line_no}: enum value {value_name!r} is already "
+                        "declared"
                     )
+                if value_name in functions or value_name in variables:
+                    raise CompileError(
+                        f"{path}:{line_no}: enum value {value_name!r} conflicts "
+                        "with a function or variable"
+                    )
+                enum_values[value_name] = float(index)
+            continue
+        list_decl = re.fullmatch(
+            r"list\s+([A-Za-z_][\w-]*)(?:\s*:\s*([A-Za-z]+))?", line
+        )
+        if list_decl:
+            name = list_decl.group(1)
+            if current_function is not None or len(stack) != 1:
+                raise CompileError(
+                    f"{path}:{line_no}: lists must be declared at top level"
+                )
+            if name in arrays:
+                raise CompileError(
+                    f"{path}:{line_no}: duplicate array or list '{name}'"
+                )
+            declared = list_decl.group(2)
+            if declared is not None and declared not in ("number", "text"):
+                raise CompileError(
+                    f"{path}:{line_no}: unknown list type {declared!r}; write "
+                    "number or text"
+                )
+            if declared == "text":
+                text_lists.add(name)
+            else:
+                arrays[name] = LIST_CAPACITY
+                arrays.locations[name] = (path, line_no)
+                lists.add(name)
+            # The counter is a normal global; both backends zero-initialise
+            # globals, so no top-level `set` node is needed (native rejects
+            # top-level statements in console programs).
+            variables.add(f"{name}__count")
             continue
         fn = re.fullmatch(r"fn\(([A-Za-z_][\w-]*)(?:\s*,\s*(.*))?\)", line)
         if fn:
@@ -222,6 +287,23 @@ def parse_syntax(
             assert block is not None
             stack[-1] = (block.otherwise, "else", block)
             continue
+        elif_match = re.fullmatch(r"elif\s+(.+)", line)
+        if elif_match:
+            # `elif` chains read as one decision; compile as a nested if in the
+            # previous if's else branch, so both backends need no new node kind.
+            if stack[-1][1] != "if":
+                raise CompileError(
+                    f"{path}:{line_no}: 'elif' must directly follow an 'if' body"
+                )
+            chain = stack[-1][2]
+            assert chain is not None
+            condition = elif_match.group(1).strip()
+            if not condition:
+                raise CompileError(f"{path}:{line_no}: elif needs a condition")
+            node = Node("if", line_no, value=condition)
+            chain.otherwise.append(node)
+            stack[-1] = (node.body, "if", node)
+            continue
         if line == "end":
             if len(stack) == 1:
                 raise CompileError(f"{path}:{line_no}: unexpected 'end'")
@@ -241,6 +323,69 @@ def parse_syntax(
             node = Node("while", line_no, value=condition)
             stack[-1][0].append(node)
             stack.append((node.body, "while", node))
+            continue
+        if line == "stop":
+            node = Node("stop", line_no)
+            stack[-1][0].append(node)
+            continue
+        if line in ("break", "continue"):
+            if not any(entry[1] in ("while", "for", "repeat") for entry in stack):
+                raise CompileError(
+                    f"{path}:{line_no}: {line} must be inside a loop"
+                )
+            stack[-1][0].append(Node(line, line_no))
+            continue
+        if line == "repeat" or line.startswith("repeat "):
+            count = line[len("repeat "):].strip() if line != "repeat" else ""
+            if not count:
+                raise CompileError(f"{path}:{line_no}: repeat needs a count")
+            if current_function is None:
+                raise CompileError(
+                    f"{path}:{line_no}: repeat loops must be inside a function"
+                )
+            loop_name = f"repeat{line_no}"
+            current_function.locals.add(loop_name)
+            node = Node("for", line_no, name=loop_name, params=["1", count, "1"])
+            stack[-1][0].append(node)
+            stack.append((node.body, "for", node))
+            continue
+        each_loop = re.fullmatch(
+            r"for\s+each\s+([A-Za-z_][\w-]*)\s+in\s+([A-Za-z_][\w-]*)", line
+        )
+        if each_loop:
+            if current_function is None:
+                raise CompileError(
+                    f"{path}:{line_no}: for each loops must be inside a function"
+                )
+            item_name, list_name = each_loop.groups()
+            if list_name not in lists and list_name not in text_lists:
+                raise CompileError(
+                    f"{path}:{line_no}: unknown list {list_name!r}; declare it "
+                    f"with `list {list_name}` at the top of the file"
+                )
+            if item_name in arrays:
+                raise CompileError(
+                    f"{path}:{line_no}: for each variable {item_name!r} is already "
+                    "an array or list"
+                )
+            cursor = f"{list_name}__each{line_no}"
+            # Both the element and the cursor are plain globals so `var(item)`
+            # reads like any other variable; that is what keeps the desugar
+            # backend-free.
+            variables.add(item_name)
+            current_function.locals.add(cursor)
+            seed = Node(
+                "set", line_no, f"array({list_name}, local({cursor}))", item_name
+            )
+            node = Node(
+                "for",
+                line_no,
+                name=cursor,
+                params=["0", f"count({list_name}) - 1", "1"],
+                body=[seed],
+            )
+            stack[-1][0].append(node)
+            stack.append((node.body, "for", node))
             continue
         for_loop = re.fullmatch(r"for\s+local\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
         if for_loop:
@@ -277,8 +422,7 @@ def parse_syntax(
                 raise CompileError(
                     f"{path}:{line_no}: for loop needs start, end, and step expressions"
                 )
-            if loop_name not in current_function.params:
-                current_function.locals.add(loop_name)
+            current_function.locals.add(loop_name)
             node = Node(
                 "for", line_no, name=loop_name, params=[start_expr, end_expr, step_expr]
             )
@@ -286,37 +430,26 @@ def parse_syntax(
             stack.append((node.body, "for", node))
             continue
         node = None
-        null_assignment = re.fullmatch(
-            r"set\s+(varl|var|local)\(([A-Za-z_][\w-]*)\)\s*=\s*null", line
-        )
-        if null_assignment:
-            storage, name = null_assignment.groups()
-            if storage == "local":
-                if current_function is None:
-                    raise CompileError(f"{path}:{line_no}: local variables must be declared inside a function")
-                if name in current_function.params and version == "1":
-                    raise CompileError(f"{path}:{line_no}: local variable {name!r} conflicts with a function parameter")
-                if name not in current_function.params:
-                    current_function.locals.add(name)
-            elif storage == "varl":
-                variables.add(name)
-            elif current_function is None or name not in current_function.params:
-                variables.add(name)
-            node = Node("callback_clear", line_no, name=name, params=[storage])
+        if re.fullmatch(r"set\s+var\([A-Za-z_][\w-]*\)\s*=\s*null", line):
+            # `null` used to be a silent no-op, which left the variable undefined
+            # and produced a confusing error later. Say what is wrong instead.
+            raise CompileError(
+                f"{path}:{line_no}: null is not a value in Anvil; assign a "
+                "number or text"
+            )
         match = re.fullmatch(r"set\s+local\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
-        if match and node is None:
+        if match:
             if current_function is None:
                 raise CompileError(
                     f"{path}:{line_no}: local variables must be "
                     "declared inside a function"
                 )
-            if match.group(1) in current_function.params and version == "1":
+            if match.group(1) in current_function.params:
                 raise CompileError(
                     f"{path}:{line_no}: local variable {match.group(1)!r} "
                     "conflicts with a function parameter"
                 )
-            if match.group(1) not in current_function.params:
-                current_function.locals.add(match.group(1))
+            current_function.locals.add(match.group(1))
             node = Node("local_set", line_no, match.group(2), match.group(1))
         if node is None:
             match = re.fullmatch(
@@ -331,24 +464,25 @@ def parse_syntax(
                 node = Node(
                     "array_set", line_no, value_expr, array_name, params=[index_expr]
                 )
-        match = re.fullmatch(r"set\s+var\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)", line)
+        match = re.fullmatch(
+            r"set\s+var\(([A-Za-z_][\w-]*)\)(?:\s*:\s*([A-Za-z]+))?\s*=\s*(.+)",
+            line,
+        )
         if node is None and match:
-            node = Node("set", line_no, match.group(2), match.group(1))
+            declared = match.group(2)
+            if declared is not None:
+                if declared not in ("number", "text", "bool"):
+                    raise CompileError(
+                        f"{path}:{line_no}: unknown type {declared!r}; write "
+                        "number, text or bool"
+                    )
+            node = Node("set", line_no, match.group(3), match.group(1))
+            node.declared_type = declared
             if (
                 current_function is None
                 or match.group(1) not in current_function.params
             ):
                 variables.add(match.group(1))
-        if node is None:
-            match=re.fullmatch(r"set\s+varl\(([A-Za-z_][\w-]*)\)\s*=\s*(.+)",line)
-            if match:
-                node=Node('global_set',line_no,match[2],match[1])
-                variables.add(match[1])
-        if node is None:
-            match=re.fullmatch(r"(add|sub)\s+varl\(([A-Za-z_][\w-]*)\)\s+(.+)",line)
-            if match:
-                node=Node('global_'+match[1],line_no,match[3],match[2])
-                variables.add(match[2])
         if node is None:
             match = re.fullmatch(r"(add|sub)\s+local\(([A-Za-z_][\w-]*)\)\s+(.+)", line)
             if match:
@@ -357,16 +491,101 @@ def parse_syntax(
                         f"{path}:{line_no}: local variables can only be "
                         "changed inside a function"
                     )
-                if match.group(2) in current_function.params and version == "1":
+                if match.group(2) in current_function.params:
                     raise CompileError(
                         f"{path}:{line_no}: local variable {match.group(2)!r} "
                         "conflicts with a function parameter"
                     )
-                if match.group(2) not in current_function.params:
-                    current_function.locals.add(match.group(2))
+                current_function.locals.add(match.group(2))
                 node = Node(
                     "local_" + match.group(1), line_no, match.group(3), match.group(2)
                 )
+        if node is None:
+            match = re.fullmatch(r"remove\s+([A-Za-z_][\w-]*)\s+(.+)", line)
+            if match and match.group(1) in text_lists:
+                if current_function is None:
+                    raise CompileError(
+                        f"{path}:{line_no}: list writes must be inside a function"
+                    )
+                name = match.group(1)
+                index_expr = match.group(2)
+                counter = f"{name}__count"
+                cursor = f"{name}__textrm{line_no}"
+                variables.add(cursor)
+                guard = Node(
+                    "if",
+                    line_no,
+                    f"var({cursor}) >= 0 and var({cursor}) < var({counter})",
+                    body=[
+                        Node("text_list_remove", line_no, f"var({cursor})", name),
+                        Node("sub", line_no, "1", counter),
+                    ],
+                )
+                stack[-1][0].append(Node("set", line_no, index_expr, cursor))
+                stack[-1][0].append(guard)
+                continue
+            if match and match.group(1) in lists:
+                if current_function is None:
+                    raise CompileError(
+                        f"{path}:{line_no}: list writes must be inside a function"
+                    )
+                name = match.group(1)
+                index_expr = match.group(2)
+                counter = f"{name}__count"
+                cursor = f"{name}__cursor{line_no}"
+                variables.add(cursor)
+                shift = Node(
+                    "array_set",
+                    line_no,
+                    f"array({name}, var({cursor}) + 1)",
+                    name,
+                    params=[f"var({cursor})"],
+                )
+                body = [
+                    shift,
+                    Node("add", line_no, "1", cursor),
+                ]
+                loop = Node(
+                    "while",
+                    line_no,
+                    f"var({cursor}) < var({counter}) - 1",
+                    body=body,
+                )
+                guard = Node(
+                    "if",
+                    line_no,
+                    f"var({cursor}) >= 0 and var({cursor}) < var({counter})",
+                    body=[loop, Node("sub", line_no, "1", counter)],
+                )
+                stack[-1][0].append(Node("set", line_no, index_expr, cursor))
+                stack[-1][0].append(guard)
+                continue
+        if node is None:
+            match = re.fullmatch(r"add\s+([A-Za-z_][\w-]*)\s+(.+)", line)
+            if match and (match.group(1) in lists or match.group(1) in text_lists):
+                if current_function is None:
+                    raise CompileError(
+                        f"{path}:{line_no}: list writes must be inside a function"
+                    )
+                list_name, value_expr = match.group(1), match.group(2)
+                counter = f"{list_name}__count"
+                if list_name in text_lists:
+                    stack[-1][0].append(
+                        Node("text_list_add", line_no, value_expr, list_name)
+                    )
+                    stack[-1][0].append(Node("add", line_no, "1", counter))
+                    continue
+                stack[-1][0].append(
+                    Node(
+                        "array_set",
+                        line_no,
+                        value_expr,
+                        list_name,
+                        params=[f"var({counter})"],
+                    )
+                )
+                stack[-1][0].append(Node("add", line_no, "1", counter))
+                continue
         if node is None:
             match = re.fullmatch(r"(add|sub)\s+var\(([A-Za-z_][\w-]*)\)\s+(.+)", line)
             if match:
@@ -381,23 +600,49 @@ def parse_syntax(
             if match:
                 node = Node("output", line_no, match.group(1))
         if node is None:
-            match=re.fullmatch(r'call\s+(varl|var|local)\((.*)\)',line)
+            if line == "write" or line.startswith("write "):
+                parts = line[len("write "):].strip() if line != "write" else ""
+                if not parts:
+                    raise CompileError(f"{path}:{line_no}: write expects text or a value")
+                node = Node("write", line_no, parts)
+                stack[-1][0].append(node)
+                continue
+            match = re.fullmatch(r"say\s+(.+)", line)
             if match:
-                parts=split_args(match[2])
-                if not parts or not re.fullmatch(r'[A-Za-z_][\w-]*',parts[0]):
-                    raise CompileError(f'{path}:{line_no}: callback call needs a variable name')
-                node=Node('indirect_call',line_no,value=', '.join(parts[1:]),name=parts[0],params=[match[1]])
+                node = Node("say", line_no, match.group(1))
+        if node is None:
+            match = re.fullmatch(r"wait\s+(.+)", line)
+            if match:
+                node = Node("wait", line_no, match.group(1))
+        if node is None and line == "press enter":
+            node = Node("press_enter", line_no)
+        if node is None:
+            match = re.fullmatch(r"ask\s+(.+)", line)
+            if match:
+                parts = split_args(match.group(1))
+                target = None
+                if parts and re.fullmatch(r"var\([A-Za-z_][\w-]*\)", parts[-1].strip()):
+                    target = parts[-1].strip()[4:-1]
+                    parts = parts[:-1]
+                if target is None:
+                    raise CompileError(
+                        f"{path}:{line_no}: ask needs a variable to store the answer, "
+                        "like ask \"Name? \", var(name)"
+                    )
+                if target not in variables:
+                    variables.add(target)
+                node = Node("ask", line_no, ", ".join(parts), target, params=[target])
         if node is None:
             match = re.fullmatch(r"call\s+fn\((.*)\)", line)
             if match:
                 call_args = split_args(match.group(1))
-                if not call_args:
+                if not call_args or not re.fullmatch(r"[A-Za-z_][\w-]*", call_args[0]):
                     raise CompileError(
                         f"{path}:{line_no}: expected a function name in call"
                     )
-                name, module = function_reference(call_args[0], path, line_no)
-                node = Node("call", line_no, value=", ".join(call_args[1:]),
-                            name=name + (" - " + module if module else ""))
+                node = Node(
+                    "call", line_no, value=", ".join(call_args[1:]), name=call_args[0]
+                )
         if node is None:
             if re.fullmatch(r"scene\s+(?:2d|3d)", line):
                 node = Node("scene", line_no, value=line.split()[1])
@@ -413,25 +658,67 @@ def parse_syntax(
                 node = Node("clear", line_no, value=line[len("clear rgba") :])
             elif line.startswith("display "):
                 node = Node("display", line_no, value=line[len("display ") :])
-            elif m := re.fullmatch(r"(?:net\s+host|nethost|netHost)\(([0-9]+)\)(?:\s+(--local))?", line):
+            elif m := re.fullmatch(r"net\s+host\(([0-9]+)\)", line):
                 validate_port(path, line_no, m.group(1))
-                node = Node("net_host", line_no, value=m.group(1),params=['local'] if m[2] else [])
-            elif m := re.fullmatch(r'(?:netip|netIP)\((.*)\)',line):
-                from compiler.network_config import ipv4
-                node=Node('net_ip',line_no,value=ipv4(m[1],path,line_no))
+                variables.add("net_ok")
+                node = Node("net_host", line_no, value=m.group(1))
             elif m := re.fullmatch(
-                r'(?:net\s+join|netjoin|netJoin)\(("(?:\\.|[^"\\])*")\s*,\s*([0-9]+)\)', line
+                r'net\s+join\(("(?:\\.|[^"\\])*")\s*,\s*([0-9]+)\)', line
             ):
                 validate_port(path, line_no, m.group(2))
-                from compiler.network_config import ipv4
-                node = Node("net_join", line_no, value='"'+ipv4(m[1],path,line_no)+'",'+m.group(2))
-            elif m := re.fullmatch(r'(?:net\s+send|netsend|netSend)\((.*)\)',line):
-                node = Node("net_send", line_no, value=m[1])
-            elif re.fullmatch(r'(?:netleave|netLeave|net\s+leave)\(\)',line):
-                node=Node('net_leave',line_no)
+                variables.add("net_ok")
+                node = Node("net_join", line_no, value=m.group(1) + "," + m.group(2))
+            elif line.startswith("net send(") and line.endswith(")"):
+                variables.add("net_ok")
+                node = Node("net_send", line_no, value=line[len("net send(") : -1])
+            elif m := re.fullmatch(r"window_(on_top|fullscreen)\((.*)\)", line):
+                node = Node("window_set", line_no, name=m.group(1), value=m.group(2))
             elif line.startswith("seed(") and line.endswith(")"):
                 node = Node("seed", line_no, value=line[5:-1])
         if node is None:
+            # The catch-all is the last resort: name the mistake when the shape is
+            # recognisable, so "unsupported statement" is not the whole answer.
+            feature = re.fullmatch(r"(enum|record|union)\s*\(.*\)", line)
+            if feature:
+                what = {"enum": "enums", "record": "records", "union": "unions"}[
+                    feature.group(1)
+                ]
+                raise CompileError(
+                    f"{path}:{line_no}: {what} are not implemented in this language "
+                    "version yet"
+                )
+            if re.fullmatch(r"array\s+[A-Za-z_][\w-]*\s*\[.*\]", line) or re.fullmatch(
+                r"array\s+[A-Za-z_][\w-]*\s*=.*", line
+            ):
+                raise CompileError(
+                    f"{path}:{line_no}: an array is declared as array <name>(size), "
+                    f"for example array scores(4)"
+                )
+            if re.fullmatch(r"list\s+[A-Za-z_][\w-]*\s*\(.*\)", line):
+                raise CompileError(
+                    f"{path}:{line_no}: lists are created with list() and grown with "
+                    "add, for example set local(items) = list()"
+                )
+            if re.match(r"camera\b", line):
+                raise CompileError(
+                    f"{path}:{line_no}: camera is written camera perspective <x,y,z>, "
+                    "camera fov(<degrees>) or camera control(...)"
+                )
+            if re.match(r"library\b", line):
+                raise CompileError(
+                    f"{path}:{line_no}: a library is written library import <name>, "
+                    "where <name> uses letters, digits, _ and - "
+                    "(the folder is libraries-<name> or libraries/<name>)"
+                )
+            # add/remove on a name nobody declared: say which list is missing
+            # rather than "unsupported statement", matching count() and array().
+            list_write = re.fullmatch(r"(?:add|remove)\s+([A-Za-z_][\w-]*)(?:\s+.*)?", line)
+            if list_write:
+                missing_name = list_write.group(1)
+                raise CompileError(
+                    f"{path}:{line_no}: unknown list {missing_name!r}; "
+                    f"declare it with list {missing_name}"
+                )
             raise CompileError(f"{path}:{line_no}: unsupported statement: {line}")
         stack[-1][0].append(node)
     if len(stack) != 1:
@@ -447,6 +734,19 @@ def parse_syntax(
             pending.extend(node.body)
             pending.extend(node.otherwise)
 
+    from compiler.expressions import ENUM_VALUES, LISTS, TEXT_LISTS
+
+    # Accumulate: a program may include several files, each declaring lists.
+    # load_program clears the registry once per program.
+    LISTS.update(lists)
+    TEXT_LISTS.update(text_lists)
+    for value_name in enum_values:
+        if value_name in variables:
+            raise CompileError(
+                f"{path}: enum value {value_name!r} conflicts with a function "
+                "or variable"
+            )
+    ENUM_VALUES.update(enum_values)
     mark_source(top)
     for function in functions.values():
         function.source = path
@@ -463,22 +763,10 @@ def parse_syntax(
 
 
 def parse(
-    path: pathlib.Path,
-    source: str,
-    *,
-    include_root: pathlib.Path | None = None,
-    local_array_elements: int = MAX_LOCAL_ARRAY_ELEMENTS,
-    active_local_array_bytes: int = MAX_ACTIVE_LOCAL_ARRAY_BYTES,
+    path: pathlib.Path, source: str, *, include_root: pathlib.Path | None = None
 ) -> tuple[dict[str, Node], list[Node], set[str], dict[str, int]]:
     """Parse Anvil syntax, run semantic checks, and preserve the legacy tuple API."""
     from compiler.modules import load_program
-    program = load_program(
-        path, source, include_root=include_root,
-        local_array_elements=local_array_elements,
-        active_local_array_bytes=active_local_array_bytes,
-    )
-    validate_program(program)
-    from compiler.callables import lower_callables
-    lower_callables(program)
+    program = load_program(path, source, include_root=include_root)
     validate_program(program)
     return program.functions, program.top, program.variables, program.arrays

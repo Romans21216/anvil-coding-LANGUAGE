@@ -1,0 +1,10 @@
+# Lesson 6: your own functions return a value with output.
+fn(double, value)
+  output var(value) * 2
+end
+
+fn(main)
+  say call fn(double, 21)
+  say call fn(double, 3.5)
+end
+call fn(main)

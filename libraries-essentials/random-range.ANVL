@@ -1,0 +1,8 @@
+fn(random-range, low, high, seed)
+  set local(span) = floor(var(high)) - floor(var(low)) + 1
+  if local(span) <= 0
+    output floor(var(low))
+  end
+  set local(v) = call fn(random-pipeline, var(seed))
+  output floor(var(low)) + floor(local(v) / 4294967296 * local(span))
+end

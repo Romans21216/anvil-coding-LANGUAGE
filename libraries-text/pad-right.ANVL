@@ -1,0 +1,7 @@
+fn(pad-right, text, width)
+  # Recursive rather than a global accumulator, so it is reentrant.
+  if len(var(text)) >= floor(var(width))
+    output var(text)
+  end
+  output call fn(pad-right, var(text) & " ", var(width))
+end

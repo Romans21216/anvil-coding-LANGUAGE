@@ -1,0 +1,15 @@
+# Lesson 5: repeat, for and while.
+fn(main)
+  repeat 3
+    say "hip"
+  end
+  for local(index) = 1 to 3
+    say "count " & local(index)
+  end
+  set var(n) = 3
+  while var(n) > 0
+    say var(n)
+    add var(n) -1
+  end
+end
+call fn(main)

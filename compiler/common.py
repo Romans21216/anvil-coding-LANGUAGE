@@ -25,8 +25,8 @@ class Node:
     local_arrays: dict[str, int] = field(default_factory=dict)
     local_array_lines: dict[str, int] = field(default_factory=dict)
     source: pathlib.Path | None = None
-    original_name: str = ""
-    c_temporaries: set[str] = field(default_factory=set)
+    string: bool = False
+    declared_type: str | None = None
 
 
 class ArrayDeclarations(dict):
@@ -48,46 +48,46 @@ class ParsedProgram:
     arrays: dict[str, int]
     variable_references: list[tuple[str, int, str | None, pathlib.Path]]
     local_references: list[tuple[str, int, str | None, pathlib.Path]]
+    # Names that came from `library import`, so a library file can tell its own
+    # functions from the ones it pulled in.
+    library_functions: set[str] = field(default_factory=set)
+
+
+def decode_string(raw: str) -> str:
+    """Decode an Anvil string literal token (including quotes) into text."""
+    inner = raw[1:-1]
+    decoded = []
+    index = 0
+    escapes = {"n": "\n", "t": "\t", '"': '"', "\\": "\\"}
+    while index < len(inner):
+        char = inner[index]
+        if char == "\\" and index + 1 < len(inner):
+            decoded.append(escapes.get(inner[index + 1], char + inner[index + 1]))
+            index += 2
+        else:
+            decoded.append(char)
+            index += 1
+    return "".join(decoded)
 
 
 class CompileError(Exception):
     pass
 
 
-IDENTIFIER = r"[A-Za-z_][\w-]*"
-FUNCTION_REFERENCE = rf"({IDENTIFIER})(?:\s+--?\s+({IDENTIFIER}))?"
+def constant_truth(value: str) -> bool | None:
+    """True/False when the text is a bare numeric literal, else None.
 
-
-def function_reference(raw: str, path, line: int) -> tuple[str, str | None]:
-    """A spaced dash qualifies a function; embedded hyphens remain identifiers."""
-    match = re.fullmatch(FUNCTION_REFERENCE, raw.strip())
-    if not match:
-        raise CompileError(f"{path}:{line}: expected a function name or 'name - module'")
-    return match[1], match[2]
+    Only literals qualify: anything with an operator or a name can have effects
+    or depend on runtime state, so those keep their runtime evaluation.
+    """
+    text = (value or "").strip()
+    if not re.fullmatch(r"[-+]?[0-9]+(?:\.[0-9]+)?", text):
+        return None
+    return float(text) != 0.0
 
 
 def c_name(name: str) -> str:
     return "anvil_" + re.sub(r"[^A-Za-z0-9_]", "_", name)
-
-
-def c_string_literal(value: str) -> str:
-    """Encode UTF-8 bytes as a C narrow literal, without JSON surrogate escapes.
-
-    Fixed three-digit octal escapes cannot consume a following hex digit.
-    Keep ordinary ASCII readable and independent of the C execution charset.
-    """
-    try:
-        payload = value.encode("utf-8")
-    except UnicodeError as error:
-        raise CompileError("C string requires valid Unicode scalar values") from error
-    return c_bytes_literal(payload)
-
-
-def c_bytes_literal(payload: bytes) -> str:
-    escapes = {8: r"\b", 9: r"\t", 10: r"\n", 12: r"\f", 13: r"\r",
-               34: r'\"', 92: r"\\"}
-    return '"' + ''.join(escapes.get(byte, chr(byte) if 32 <= byte < 127
-                                   else f"\\{byte:03o}") for byte in payload) + '"'
 
 
 def variable_code(name: str, scope: Node | None = None) -> str:
@@ -110,19 +110,24 @@ def array_code(name: str, scope: Node | None) -> str:
 
 RUNTIME_C_NAMES = {
     "anvil_run",
-    "anvil_runtime_register_shutdown_hook",
-    "anvil_runtime_framebuffer",
     "anvil_divide",
     "anvil_check_number",
     "anvil_set_scene3d",
-    "anvil_set_fixed_hz",
-    "anvil_camera_fov",
-    "anvil_camera_control",
-    "anvil_trace_sphere",
-    "anvil_trace_finish",
     "anvil_camera_perspective",
+    "anvil_camera2d",
+    "anvil_camera_angle",
+    "anvil_mesh_culled",
+    "anvil_mesh_drawn",
+    "anvil_mesh_culling",
+    "anvil_shadow",
+    "anvil_shadow_height",
+    "anvil_shadow_alpha",
     "anvil_clear",
     "anvil_rect",
+    "anvil_particle_emit",
+    "anvil_particle_count",
+    "anvil_particle_clear",
+    "anvil_particle_gravity",
     "anvil_circle",
     "anvil_line",
     "anvil_cube",
@@ -131,6 +136,9 @@ RUNTIME_C_NAMES = {
     "anvil_text",
     "anvil_text_number",
     "anvil_time",
+    "anvil_frame_tick",
+    "anvil_frame_render",
+    "anvil_frame_present",
     "anvil_delta",
     "anvil_pressed",
     "anvil_held",
@@ -139,26 +147,59 @@ RUNTIME_C_NAMES = {
     "anvil_mouse_pressed",
     "anvil_mouse_held",
     "anvil_mouse_wheel",
-    "anvil_image_shutdown",
     "anvil_image_load",
     "anvil_image_width",
     "anvil_image_height",
     "anvil_image_destroy",
     "anvil_image_draw",
     "anvil_image_draw_scaled",
+    "anvil_image_draw_rotated",
+    "anvil_image_draw_region",
+    "anvil_image_tint",
+    "anvil_image_flip",
+    "anvil_sound_error",
+    "anvil_sound_load",
+    "anvil_sound_play",
+    "anvil_sound_play_loop",
+    "anvil_sound_stop",
+    "anvil_sound_stop_all",
+    "anvil_sound_group",
+    "anvil_sound_group_volume",
+    "anvil_sound_group_mute",
+    "anvil_sound_group_gain",
+    "anvil_sound_group_stop",
+    "anvil_music_load",
+    "anvil_music_play",
+    "anvil_music_play_loop",
+    "anvil_music_stop",
+    "anvil_music_playing",
+    "anvil_music_volume",
+    "anvil_music_position",
+    "anvil_music_length",
+    "anvil_music_error",
+    "anvil_sound_volume",
+    "anvil_sound_pan",
+    "anvil_sound_pitch",
+    "anvil_sound_active",
+    "anvil_sound_duration",
+    "anvil_sound_rms",
+    "anvil_sound_destroy",
+    "anvil_save_error",
+    "anvil_set_project",
+    "anvil_save_number",
+    "anvil_load_number",
+    "anvil_save_text",
+    "anvil_load_text",
+    "anvil_save_exists",
+    "anvil_save_delete",
     "anvil_rnd",
     "anvil_seed",
     "anvil_noise",
     "anvil_fbm",
     "anvil_net_host",
-    "anvil_net_host_at",
-    "anvil_net_set_ip",
     "anvil_net_join",
     "anvil_net_send",
     "anvil_net_receive",
-    "anvil_net_packet_send",
-    "anvil_net_packet_receive",
-    "anvil_net_packet_id",
     "anvil_net_close",
     "anvil_array_get",
     "anvil_array_set",
@@ -182,6 +223,8 @@ RUNTIME_C_NAMES = {
     "anvil_physics_capacity",
     "anvil_physics_gravity",
     "anvil_physics_step",
+    "anvil_frame_enter",
+    "anvil_frame_leave",
 }
 
 MAX_ARRAY_SIZE = 1_048_576
@@ -189,7 +232,6 @@ MAX_ARRAY_SIZE = 1_048_576
 MAX_LOCAL_ARRAY_ELEMENTS = 8_192
 
 MAX_ACTIVE_LOCAL_ARRAY_BYTES = 16 * 1024 * 1024
-MAX_ACTIVE_LOCAL_ARRAY_MIB = 2048
 
 LANGUAGE_VERSION = 1
 

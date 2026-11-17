@@ -1,0 +1,3 @@
+fn(fahrenheit-to-celsius, f)
+  output (var(f) - 32) * 5 / 9
+end

@@ -1,0 +1,379 @@
+# ANVIL SLOTS - a complete 2D slot machine drawn entirely from primitives.
+# No image files: every symbol, panel and button is rects, circles, lines and text.
+scene 2d
+clear rgba(6, 9, 17, 255)
+
+set var(t) = 0
+set var(credits) = 200
+set var(bet) = 5
+set var(win) = 0
+set var(state) = 0
+set var(spin_t) = 0
+set var(show_pay) = 0
+set var(flash) = 0
+set var(last_win) = 0
+set var(init) = 0
+
+array grid(9)
+array sreel(3)
+
+fn(pick)
+  set local(r) = rnd(0, 999)
+  if local(r) < 300
+    output 0
+  end
+  if local(r) < 540
+    output 1
+  end
+  if local(r) < 700
+    output 2
+  end
+  if local(r) < 820
+    output 3
+  end
+  if local(r) < 920
+    output 4
+  end
+  if local(r) < 980
+    output 5
+  end
+  output 6
+end
+
+fn(pay, sym)
+  if var(sym) = 0
+    output 5
+  end
+  if var(sym) = 1
+    output 8
+  end
+  if var(sym) = 2
+    output 12
+  end
+  if var(sym) = 3
+    output 20
+  end
+  if var(sym) = 4
+    output 30
+  end
+  if var(sym) = 5
+    output 100
+  end
+  output 250
+end
+
+fn(icon, id, cx, cy)
+  if var(id) = 0
+    display line(var(cx), var(cy) - 24, var(cx) - 13, var(cy) - 6) -rgb(64, 152, 86)
+    display line(var(cx), var(cy) - 24, var(cx) + 13, var(cy) - 6) -rgb(64, 152, 86)
+    display circle(var(cx) - 11, var(cy) + 5, 14) -rgb(214, 48, 62)
+    display circle(var(cx) + 11, var(cy) + 11, 12) -rgb(176, 30, 46)
+  end
+  if var(id) = 1
+    display circle(var(cx), var(cy), 19) -rgb(240, 205, 70)
+    display circle(var(cx) - 11, var(cy) - 7, 6) -rgb(250, 232, 150)
+    display rect(var(cx) + 15, var(cy) - 19, 8, 6) -rgb(96, 150, 70)
+  end
+  if var(id) = 2
+    display circle(var(cx), var(cy) - 3, 18) -rgb(238, 186, 66)
+    display rect(var(cx) - 15, var(cy) + 11, 30, 8) -rgb(172, 124, 32)
+    display circle(var(cx), var(cy) + 21, 5) -rgb(238, 186, 66)
+  end
+  if var(id) = 3
+    display rect(var(cx) - 29, var(cy) - 21, 58, 13) -rgb(196, 52, 58)
+    display rect(var(cx) - 29, var(cy) - 6, 58, 13) -rgb(236, 240, 248)
+    display rect(var(cx) - 29, var(cy) + 9, 58, 13) -rgb(196, 52, 58)
+  end
+  if var(id) = 4
+    display line(var(cx), var(cy) - 23, var(cx) + 19, var(cy)) -rgb(96, 216, 230)
+    display line(var(cx) + 19, var(cy), var(cx), var(cy) + 23) -rgb(96, 216, 230)
+    display line(var(cx), var(cy) + 23, var(cx) - 19, var(cy)) -rgb(96, 216, 230)
+    display line(var(cx) - 19, var(cy), var(cx), var(cy) - 23) -rgb(96, 216, 230)
+    display circle(var(cx), var(cy), 7) -rgb(64, 170, 196)
+  end
+  if var(id) = 5
+    display rect(var(cx) - 21, var(cy) - 23, 44, 10) -rgb(226, 64, 120)
+    display rect(var(cx) + 3, var(cy) - 14, 11, 18) -rgb(226, 64, 120)
+    display rect(var(cx) - 7, var(cy) + 2, 11, 24) -rgb(226, 64, 120)
+  end
+  if var(id) = 6
+    display circle(var(cx), var(cy), 22) -rgb(150, 104, 232)
+    display circle(var(cx), var(cy), 16) -rgb(46, 30, 74)
+    display line(var(cx), var(cy) - 15, var(cx), var(cy) + 15) -rgb(250, 246, 255)
+    display line(var(cx) - 15, var(cy), var(cx) + 15, var(cy)) -rgb(250, 246, 255)
+    display line(var(cx) - 9, var(cy) - 9, var(cx) + 9, var(cy) + 9) -rgb(196, 160, 255)
+    display line(var(cx) + 9, var(cy) - 9, var(cx) - 9, var(cy) + 9) -rgb(196, 160, 255)
+    display circle(var(cx), var(cy), 5) -rgb(250, 214, 120)
+  end
+end
+
+fn(panel, x, y, w, h)
+  display rect(var(x), var(y), var(w), var(h)) -rgb(14, 18, 28)
+  display rect(var(x) + 2, var(y) + 2, var(w) - 4, var(h) - 4) -rgb(24, 30, 44)
+  display rect(var(x) + 2, var(y) + 2, var(w) - 4, 2) -rgb(44, 54, 74)
+end
+
+fn(reel_panel, x, y)
+  display rect(var(x), var(y), 196, 232) -rgb(8, 10, 18)
+  display rect(var(x) + 3, var(y) + 3, 190, 226) -rgb(18, 22, 34)
+  display rect(var(x) + 3, var(y) + 3, 190, 2) -rgb(40, 48, 66)
+end
+
+fn(button, x, y, w, h, hot)
+  if var(hot) = 1
+    display rect(var(x), var(y), var(w), var(h)) -rgb(240, 190, 74)
+    display rect(var(x) + 3, var(y) + 3, var(w) - 6, var(h) - 6) -rgb(58, 44, 18)
+  else
+    display rect(var(x), var(y), var(w), var(h)) -rgb(120, 92, 36)
+    display rect(var(x) + 3, var(y) + 3, var(w) - 6, var(h) - 6) -rgb(30, 26, 20)
+  end
+end
+
+fn(hit, mx, my, x, y, w, h)
+  if var(mx) < var(x)
+    output 0
+  end
+  if var(my) < var(y)
+    output 0
+  end
+  if var(mx) > var(x) + var(w)
+    output 0
+  end
+  if var(my) > var(y) + var(h)
+    output 0
+  end
+  output 1
+end
+
+fn(spin_start)
+  if var(credits) < var(bet)
+    output 0
+  end
+  set var(credits) = var(credits) - var(bet)
+  set var(win) = 0
+  set var(last_win) = 0
+  set var(state) = 1
+  set var(spin_t) = 0
+  for local(i) = 0 to 8
+    set array(grid, local(i)) = call fn(pick)
+  end
+  for local(r) = 0 to 2
+    set array(sreel, local(r)) = call fn(pick)
+  end
+  output 1
+end
+
+fn(settle)
+  set local(a) = array(grid, 1)
+  set local(b) = array(grid, 4)
+  set local(c) = array(grid, 7)
+  if local(a) = 6
+    set local(a) = local(b)
+  end
+  if local(c) = 6
+    set local(c) = local(b)
+  end
+  if local(a) = 6
+    set local(a) = 5
+  end
+  if local(a) = local(b) and local(b) = local(c)
+    set var(win) = call fn(pay, local(a)) * var(bet)
+    set var(last_win) = var(win)
+    set var(credits) = var(credits) + var(win)
+    output 1
+  end
+  if local(a) = local(b) or local(b) = local(c)
+    if local(b) >= 3
+      set var(win) = var(bet) * 2
+      set var(last_win) = var(win)
+      set var(credits) = var(credits) + var(win)
+      output 1
+    end
+  end
+  set var(win) = 0
+  set var(last_win) = 0
+  output 0
+end
+
+fn(update)
+  if var(init) = 0
+    for local(i) = 0 to 8
+      set array(grid, local(i)) = call fn(pick)
+    end
+    set var(init) = 1
+  end
+  set var(t) = var(t) + delta()
+  set var(flash) = 0.5 + 0.5 * sin(var(t) * 7)
+
+  if pressed(P)
+    set var(show_pay) = 1 - var(show_pay)
+  end
+  if var(show_pay) = 1
+    if mouse_pressed("left")
+      set var(show_pay) = 0
+    end
+  end
+  if pressed(R)
+    set var(credits) = 200
+    set var(state) = 0
+    set var(win) = 0
+    set var(last_win) = 0
+  end
+
+  if var(state) = 1
+    set var(spin_t) = var(spin_t) + delta()
+    if var(spin_t) > 1.75
+      set var(state) = 2
+      call fn(settle)
+    end
+  end
+
+  if var(show_pay) = 0
+    if pressed(SPACE) and var(state) != 1
+      call fn(spin_start)
+    end
+    if pressed(LEFT) and var(state) != 1
+      if var(bet) > 1
+        set var(bet) = var(bet) - 1
+      end
+    end
+    if pressed(RIGHT) and var(state) != 1
+      if var(bet) < 20
+        set var(bet) = var(bet) + 1
+      end
+    end
+    if mouse_pressed("left")
+      set local(mx) = mouse_x()
+      set local(my) = mouse_y()
+      if call fn(hit, local(mx), local(my), 380, 492, 200, 30) = 1 and var(state) != 1
+        call fn(spin_start)
+      end
+      if call fn(hit, local(mx), local(my), 380, 428, 60, 40) = 1 and var(state) != 1
+        if var(bet) > 1
+          set var(bet) = var(bet) - 1
+        end
+      end
+      if call fn(hit, local(mx), local(my), 520, 428, 60, 40) = 1 and var(state) != 1
+        if var(bet) < 20
+          set var(bet) = var(bet) + 1
+        end
+      end
+    end
+  end
+end
+
+fn(draw)
+  display rect(0, 0, 960, 120) -rgb(7, 9, 16)
+  display rect(0, 120, 960, 120) -rgb(9, 12, 21)
+  display rect(0, 240, 960, 120) -rgb(10, 14, 24)
+  display rect(0, 360, 960, 120) -rgb(12, 16, 27)
+  display rect(0, 480, 960, 120) -rgb(13, 18, 31)
+
+  call fn(panel, 120, 56, 720, 488)
+  # Bulbs are steady while the machine is idle: blinking them between frames
+  # reads as flicker, not light. On a win they run a chase, one bulb after the
+  # next, instead of all flashing together.
+  for local(bx) = 0 to 11
+    set local(lit) = 0
+    if var(state) = 2 and var(last_win) > 0
+      if (local(bx) + floor(var(t) * 8)) % 2 = 0
+        set local(lit) = 1
+      end
+    end
+    if local(lit) = 1
+      display circle(146 + local(bx) * 60, 64, 4) -rgb(255, 232, 168)
+      display circle(146 + local(bx) * 60, 536, 4) -rgb(255, 232, 168)
+    else
+      display circle(146 + local(bx) * 60, 64, 4) -rgb(176, 132, 52)
+      display circle(146 + local(bx) * 60, 536, 4) -rgb(176, 132, 52)
+    end
+  end
+
+  display rect(128, 62, 704, 3) -rgb(226, 178, 66)
+  display text("ANVIL SLOTS") -l(432, 74) -rgb(240, 214, 140)
+
+  set local(rx) = 176
+  for local(reel) = 0 to 2
+    call fn(reel_panel, local(rx), 150)
+    for local(row) = 0 to 2
+      set local(sym) = 0
+      if var(state) = 1
+        if var(spin_t) < 0.9 + local(reel) * 0.28
+          set local(sym) = (array(sreel, local(reel)) + floor(var(spin_t) * 26) + local(row)) % 7
+        else
+          set local(sym) = array(grid, local(reel) * 3 + local(row))
+        end
+      else
+        set local(sym) = array(grid, local(reel) * 3 + local(row))
+      end
+      call fn(icon, local(sym), local(rx) + 98, 186 + local(row) * 72)
+    end
+    set local(rx) = local(rx) + 208
+  end
+
+  if var(state) = 2 and var(last_win) > 0
+    if var(flash) > 0.5
+      display rect(176, 278, 604, 12) -rgb(255, 236, 150)
+      display rect(176, 292, 604, 3) -rgb(255, 214, 96)
+    else
+      display rect(176, 282, 604, 8) -rgb(214, 160, 60)
+      display rect(176, 292, 604, 2) -rgb(140, 108, 40)
+    end
+  else
+    display rect(176, 286, 604, 3) -rgb(226, 178, 66)
+    display rect(176, 291, 604, 1) -rgb(110, 84, 32)
+  end
+
+  display text("CREDITS " + var(credits)) -l(150, 402) -rgb(232, 238, 248)
+  display text("BET " + var(bet)) -l(452, 402) -rgb(226, 178, 66)
+  if var(win) > 0
+    display text("WIN " + var(win)) -l(700, 402) -rgb(150, 232, 180)
+  else
+    display text("WIN 0") -l(700, 402) -rgb(120, 134, 156)
+  end
+
+  call fn(button, 380, 428, 60, 40, 0)
+  display text("-") -l(406, 440) -rgb(232, 238, 248)
+  call fn(button, 520, 428, 60, 40, 0)
+  display text("+") -l(546, 440) -rgb(232, 238, 248)
+
+  if var(state) = 1
+    call fn(button, 380, 492, 200, 30, 1)
+    display text("SPINNING...") -l(440, 499) -rgb(250, 236, 200)
+  else
+    call fn(button, 380, 492, 200, 30, 0)
+    display text("SPIN  (SPACE)") -l(418, 499) -rgb(226, 178, 66)
+  end
+
+  if var(credits) < var(bet) and var(state) != 1
+    display text("NOT ENOUGH CREDITS - R RESETS") -l(346, 472) -rgb(226, 96, 96)
+  else
+    if var(state) = 2 and var(last_win) > 0
+      display text("PAYOUT " + var(last_win)) -l(428, 472) -rgb(150, 232, 180)
+    end
+    if var(state) = 2 and var(last_win) = 0
+      display text("NO WIN - TRY AGAIN") -l(406, 472) -rgb(150, 160, 180)
+    end
+  end
+
+  if var(show_pay) = 1
+    display rect(0, 0, 960, 600) -rgba(4, 6, 12, 228)
+    display rect(180, 104, 600, 392) -rgb(226, 178, 66)
+    display rect(183, 107, 594, 386) -rgb(16, 20, 32)
+    display rect(183, 107, 594, 2) -rgb(240, 214, 140)
+    display text("PAYTABLE") -l(430, 122) -rgb(240, 214, 140)
+    display text("P OR CLICK TO CLOSE") -l(398, 142) -rgb(150, 166, 190)
+    display text("3 CHERRY  x5") -l(214, 176) -rgb(222, 228, 240)
+    display text("3 LEMON   x8") -l(214, 202) -rgb(222, 228, 240)
+    display text("3 BELL    x12") -l(214, 228) -rgb(222, 228, 240)
+    display text("3 BAR     x20") -l(214, 254) -rgb(222, 228, 240)
+    display text("3 DIAMOND x30") -l(470, 176) -rgb(222, 228, 240)
+    display text("3 SEVEN   x100") -l(470, 202) -rgb(222, 228, 240)
+    display text("3 WILD    x250") -l(470, 228) -rgb(222, 228, 240)
+    display text("Two BAR or better, mixed with wild, pays x2.") -l(214, 292) -rgb(168, 186, 212)
+    display text("WILD stands in for any symbol.") -l(214, 316) -rgb(168, 186, 212)
+    display text("Odds: cherry 30%  lemon 24%  bell 16%  bar 12%") -l(214, 350) -rgb(168, 186, 212)
+    display text("diamond 10%  seven 6%  wild 2%") -l(214, 374) -rgb(168, 186, 212)
+    display text("SPACE spin        - / + bet        R reset") -l(214, 436) -rgb(226, 178, 66)
+  end
+end

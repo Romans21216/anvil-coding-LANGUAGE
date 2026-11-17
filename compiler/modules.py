@@ -6,8 +6,7 @@ import json
 from pathlib import Path
 import re
 
-from compiler.common import CompileError, IDENTIFIER, FUNCTION_REFERENCE
-from compiler.lexer import mask_strings
+from compiler.common import ArrayDeclarations, CompileError, ParsedProgram
 
 MAX_INCLUDE_FILES = 256
 MAX_INCLUDE_DEPTH = 64
@@ -22,35 +21,247 @@ def include_name(raw, path, line):
     if not isinstance(name, str) or not name or any(ord(char) < 32 for char in name):
         raise CompileError(f'{path}:{line}: include expects a quoted relative .ANVL path')
     relative = Path(name)
-    if relative.is_absolute() or relative.drive or relative.root or relative.suffix.lower() != ".anvl":
+    if relative.is_absolute() or relative.drive or relative.suffix.lower() != ".anvl":
         raise CompileError(f'{path}:{line}: include requires a relative .ANVL file')
     return relative
 
 
-def include_spec(raw, path, line):
-    """Return selected function, public alias and the original quoted path."""
-    if not raw.startswith("fn("):
-        include_name(raw, path, line)
-        return "", "", raw
-    match = re.fullmatch(rf'fn\(\s*({IDENTIFIER})\s*\)\s+--?\s+("(?:\\.|[^"\\])*")(?:\s+as\s+({IDENTIFIER}))?', raw)
-    if not match:
-        raise CompileError(f'{path}:{line}: expected include fn(name) - "file.ANVL" [as alias]')
-    relative = include_name(match[2], path, line)
-    alias = match[3] or relative.stem
-    if not re.fullmatch(IDENTIFIER, alias):
-        raise CompileError(f"{path}:{line}: filename needs an explicit 'as alias' identifier")
-    return match[1], alias, match[2]
+def load_program(path, source, *, include_root=None):
+    from compiler.expressions import LISTS
+    from compiler.parser import parse_syntax
+
+    LISTS.clear()
+    from compiler.expressions import TEXT_LISTS
+
+    TEXT_LISTS.clear()
+    from compiler.expressions import ENUM_VALUES
+
+    ENUM_VALUES.clear()
+    from compiler.expressions import set_bool_variables
+
+    set_bool_variables(set())
+    path = Path(path)
+    root = Path(include_root).resolve() if include_root is not None else path.resolve().parent
+    result = ParsedProgram(path, {}, [], set(), ArrayDeclarations(), [], [])
+    seen = set()
+    active = []
+    total_bytes = 0
+
+    def visit(unit_path, text, origin=None):
+        nonlocal total_bytes
+        canonical = unit_path.resolve()
+        where = f"{origin.source}:{origin.line}" if origin is not None else str(unit_path)
+        if canonical in active:
+            chain = " -> ".join(str(item) for item in active + [canonical])
+            raise CompileError(f"{where}: include cycle: {chain}")
+        if canonical in seen:
+            return
+        if len(active) >= MAX_INCLUDE_DEPTH:
+            raise CompileError(f"{where}: include nesting exceeds {MAX_INCLUDE_DEPTH} files")
+        if len(seen) >= MAX_INCLUDE_FILES:
+            raise CompileError(f"{where}: include graph exceeds {MAX_INCLUDE_FILES} files")
+        if text is None:
+            try:
+                with canonical.open("rb") as stream:
+                    payload = stream.read(MAX_SOURCE_BYTES - total_bytes + 1)
+                if len(payload) + total_bytes > MAX_SOURCE_BYTES:
+                    raise CompileError(f"{where}: include source exceeds the 4 MiB budget")
+                text = payload.decode("utf-8-sig")
+            except (OSError, UnicodeError) as error:
+                raise CompileError(f"{where}: cannot read include {canonical}: {error}") from error
+            source_bytes = len(payload)
+        else:
+            source_bytes = len(text.encode("utf-8"))
+        total_bytes += source_bytes
+        if total_bytes > MAX_SOURCE_BYTES:
+            raise CompileError(f"{where}: include source exceeds the 4 MiB budget")
+        unit = parse_syntax(unit_path, text)
+        seen.add(canonical)
+        active.append(canonical)
+        for name, function in unit.functions.items():
+            if name in result.functions:
+                previous = result.functions[name]
+                raise CompileError(f"{unit_path}:{function.line}: duplicate function {name!r}; already declared at {previous.source}:{previous.line}")
+            result.functions[name] = function
+        for name, size in unit.arrays.items():
+            if name in result.arrays:
+                previous_path, previous_line = result.arrays.locations[name]
+                raise CompileError(f"{unit_path}:{unit.arrays.locations[name][1]}: duplicate array {name!r}; already declared at {previous_path}:{previous_line}")
+            result.arrays[name] = size
+            result.arrays.locations[name] = unit.arrays.locations[name]
+        result.variables.update(unit.variables)
+        result.variable_references.extend(unit.variable_references)
+        result.local_references.extend(unit.local_references)
+        for node in unit.top:
+            if node.kind == "include_fn":
+                relative = include_name(node.value, unit_path, node.line)
+                target = (canonical.parent / relative).resolve()
+                try:
+                    target.relative_to(root)
+                except ValueError as error:
+                    raise CompileError(
+                        f"{unit_path}:{node.line}: include must resolve inside {root}"
+                    ) from error
+                qualifier = node.params[0] if node.params and node.params[0] else target.stem
+                try:
+                    payload = target.read_bytes()
+                    if len(payload) + total_bytes > MAX_SOURCE_BYTES:
+                        raise CompileError(
+                            f"{unit_path}:{node.line}: include source exceeds the 4 MiB budget"
+                        )
+                    target_text = payload.decode("utf-8-sig")
+                except (OSError, UnicodeError) as error:
+                    raise CompileError(
+                        f"{unit_path}:{node.line}: cannot read include {target}: {error}"
+                    ) from error
+                module = parse_syntax(target, target_text)
+                seen.add(target)
+                wanted = {node.name}
+                pending = [node.name]
+                while pending:
+                    current = pending.pop()
+                    function = module.functions.get(current)
+                    if function is None:
+                        continue
+                    for dependency in called_functions(function.body) - wanted:
+                        if dependency in module.functions:
+                            wanted.add(dependency)
+                            pending.append(dependency)
+                for function_name in sorted(wanted):
+                    function = module.functions.get(function_name)
+                    if function is None:
+                        raise CompileError(
+                            f"{unit_path}:{node.line}: {target.name} has no function {node.name!r}; add it or import a different name"
+                        )
+                    for body_node in [function, *list(_walk(function.body))]:
+                        for text_value in [body_node.value] + body_node.params:
+                            for reference in re.findall(
+                                r"var\(([A-Za-z_][\w-]*)\)|local\(([A-Za-z_][\w-]*)\)",
+                                text_value or "",
+                            ):
+                                global_name = reference[0]
+                                if global_name and global_name not in function.params:
+                                    raise CompileError(
+                                        f"{function.source}:{function.line}: selectively "
+                                        f"imported function {function_name!r} uses the "
+                                        f"global {global_name!r}; pass values as parameters"
+                                    )
+                    qualified = f"{function_name}--{qualifier}"
+                    if qualified in result.functions:
+                        raise CompileError(
+                            f"{unit_path}:{node.line}: duplicate function {qualified!r}"
+                        )
+                    result.functions[qualified] = _requalify(function, wanted, qualifier)
+                # A selectively included file may declare its own library
+                # imports; carry them, resolved beside the file that wrote them,
+                # so the file can state the dependency it actually has.
+                from compiler import libraries as library_loader
+
+                for extra in module.top:
+                    if getattr(extra, "kind", "") != "library_import":
+                        continue
+                    for lib_name, lib_function in library_loader.load(
+                        target, extra.value, target, extra.line
+                    ):
+                        if lib_name in result.functions:
+                            raise CompileError(
+                                f"{target}:{extra.line}: library {extra.value!r} "
+                                f"defines {lib_name!r}, which already exists in the program"
+                            )
+                        result.functions[lib_name] = lib_function
+                        result.library_functions.add(lib_name)
+            elif node.kind == "include":
+                relative = include_name(node.value, unit_path, node.line)
+                target = (canonical.parent / relative).resolve()
+                try:
+                    target.relative_to(root)
+                except ValueError as error:
+                    raise CompileError(f"{unit_path}:{node.line}: include must resolve inside {root}") from error
+                visit(target, None, node)
+            else:
+                result.top.append(node)
+        active.pop()
+
+    visit(path, source)
+
+    # `library import name` pulls in a folder of one-function files. Reachability
+    # later drops every function the program never calls, so the output only
+    # carries what is used.
+    library_nodes = [node for node in result.top if node.kind == "library_import"]
+    if library_nodes:
+        from compiler import libraries as library_loader
+
+        imported: set[str] = set()
+        for node in library_nodes:
+            if node.value in imported:
+                continue        # importing the same library twice is harmless
+            imported.add(node.value)
+            for name, function in library_loader.load(
+                path, node.value, node.source or path, node.line
+            ):
+                if name in result.functions:
+                    raise CompileError(
+                        f"{node.source or path}:{node.line}: library {node.value!r} "
+                        f"defines {name!r}, which already exists in the program"
+                    )
+                result.functions[name] = function
+                result.library_functions.add(name)
+
+    # random(seed) is sugar for the shipped mixer, so the mixer joins the
+    # program whenever it is called and the program does not define its own.
+    if (
+        "random(" in source
+        and "random-pipeline" not in result.functions
+    ):
+        mixer = Path(__file__).resolve().parents[1] / "stdlib" / "random_pipeline.ANVL"
+        if mixer.is_file():
+            mixer_source = mixer.read_text(encoding="utf-8")
+            from compiler.parser import parse as parse_program
+
+            mixer_functions, mixer_top, mixer_variables, mixer_arrays = parse_program(
+                mixer, mixer_source
+            )
+            for name, function in mixer_functions.items():
+                result.functions.setdefault(name, function)
+            result.top.extend(mixer_top)
+            result.variables.update(mixer_variables)
+            result.arrays.update(mixer_arrays)
+    return result
 
 
-def load_program(
-    path, source, *, include_root=None, local_array_elements=None,
-    active_local_array_bytes=None,
-):
-    from compiler.module_loader import ProgramLoader
-    return ProgramLoader(
-        path, include_root, local_array_elements=local_array_elements,
-        active_local_array_bytes=active_local_array_bytes,
-    ).load(source)
+def _walk(nodes):
+    for node in nodes:
+        yield node
+        yield from _walk(node.body)
+        yield from _walk(node.otherwise)
+
+
+def _requalify(function, names, qualifier):
+    """Rewrite `call fn(x)` for imported callees to the qualified name."""
+    import copy
+
+    clone = copy.deepcopy(function)
+    clone.name = f"{function.name}--{qualifier}"
+    for node in _walk([clone]):
+        for attribute in ("value", "params"):
+            current = getattr(node, attribute)
+            if isinstance(current, list):
+                node.params = [_requalify_text(item, names, qualifier) for item in current]
+            else:
+                setattr(node, attribute, _requalify_text(current, names, qualifier))
+    return clone
+
+
+def _requalify_text(text, names, qualifier):
+    import re as _re
+
+    def replace(match):
+        name = match.group(1)
+        if name in names:
+            return f"call fn({name}--{qualifier}"
+        return match.group(0)
+
+    return _re.sub(r"call\s+fn\(\s*([A-Za-z_][\w-]*)", replace, text or "")
 
 
 def called_functions(nodes):
@@ -62,20 +273,17 @@ def called_functions(nodes):
         if node.kind == "call":
             result.add(node.name)
         for text in [node.value] + node.params:
-            unquoted = mask_strings(text)
-            for match in re.finditer(rf'\bcall\s+fn\(\s*({FUNCTION_REFERENCE})(?=\s*[,\)])', unquoted):
-                result.add(match[2] + (" - " + match[3] if match[3] else ""))
+            unquoted = re.sub(r'"(?:\\.|[^"\\])*"', '""', text)
+            result.update(re.findall(r'\bcall\s+fn\(\s*([A-Za-z_][\w-]*)', unquoted))
         pending.extend(node.body)
         pending.extend(node.otherwise)
     return result
 
 
-def reachable_functions(functions, top, *, graphical):
+def reachable_functions(functions, top, *, graphical, extra=()):
     needed = called_functions(top)
-    if graphical:
-        needed.update(name for name in ("draw", "update") if name in functions)
-    elif not any(node.kind == "call" for node in top) and "main" in functions:
-        needed.add("main")
+    needed.update(name for name in extra if name in functions)
+    needed.update(name for name in (("draw", "update") if graphical else ("main",)) if name in functions)
     pending = list(needed)
     while pending:
         name = pending.pop()
@@ -85,59 +293,3 @@ def reachable_functions(functions, top, *, graphical):
             needed.add(dependency)
             pending.append(dependency)
     return [(name, fn) for name, fn in functions.items() if name in needed]
-
-
-_GLOBAL_VARIABLE = re.compile(rf"\b(varl|var)\(\s*({IDENTIFIER})\s*\)")
-_GLOBAL_ARRAY = re.compile(rf"\barray\(\s*({IDENTIFIER})\s*,")
-
-
-def reachable_storage(top, emitted_functions, variables, arrays):
-    """Find global storage needed by emitted code and top-level initialization.
-
-    Function bodies have already been validated. This pass only controls which
-    global scalar and array declarations are emitted; it does not remove writes
-    or expression evaluation, whose effects and runtime checks remain observable.
-    """
-    used_variables = set()
-    used_arrays = set()
-    pending = [(node, None) for node in top]
-    for _name, function in emitted_functions:
-        pending.extend((node, function) for node in function.body)
-
-    while pending:
-        node, scope = pending.pop()
-        if node.kind in ("global_set", "global_add", "global_sub"):
-            used_variables.add(node.name)
-        elif node.kind in ("set", "add", "sub") and (
-            scope is None or node.name not in scope.params
-        ):
-            # Version 1 `var(name)` may refer to a parameter. Version 2 local
-            # variables have distinct node kinds and never reach this branch.
-            used_variables.add(node.name)
-        elif node.kind in ("indirect_call", "callback_clear") and node.params:
-            storage = node.params[0]
-            if storage == "varl" or (
-                storage == "var" and (scope is None or node.name not in scope.params)
-            ):
-                used_variables.add(node.name)
-
-        if node.kind == "array_set" and (
-            scope is None or node.name not in scope.local_arrays
-        ):
-            used_arrays.add(node.name)
-
-        for text in (node.value, *node.params):
-            masked = mask_strings(text)
-            for match in _GLOBAL_VARIABLE.finditer(masked):
-                storage, name = match.groups()
-                if storage == "varl" or (scope is None or name not in scope.params):
-                    used_variables.add(name)
-            for match in _GLOBAL_ARRAY.finditer(masked):
-                name = match.group(1)
-                if scope is None or name not in scope.local_arrays:
-                    used_arrays.add(name)
-
-        pending.extend((child, scope) for child in node.body)
-        pending.extend((child, scope) for child in node.otherwise)
-
-    return used_variables & set(variables), used_arrays & set(arrays)

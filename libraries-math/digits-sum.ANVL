@@ -1,0 +1,9 @@
+fn(digits-sum, n)
+  set local(k) = floor(abs(var(n)))
+  set local(total) = 0
+  while local(k) > 0
+    set local(total) = local(total) + local(k) % 10
+    set local(k) = floor(local(k) / 10)
+  end
+  output local(total)
+end

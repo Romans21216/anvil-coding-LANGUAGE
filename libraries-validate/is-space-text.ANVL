@@ -1,0 +1,14 @@
+fn(is-space-text, text)
+  if len(var(text)) = 0
+    output 0
+  end
+  set local(ok) = 1
+  set local(i) = 0
+  while local(i) < len(var(text))
+    if mid(var(text), local(i), 1) != " "
+      set local(ok) = 0
+    end
+    set local(i) = local(i) + 1
+  end
+  output local(ok)
+end

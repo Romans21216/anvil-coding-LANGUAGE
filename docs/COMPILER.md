@@ -45,21 +45,127 @@ The existing C backend requires Python 3.11+ and Visual Studio 2022 Build Tools 
 
 ## Current language slice
 
-The compiler supports numeric global `var` bindings, fixed-size numeric arrays declared as `array name(size)` globally or inside a function, indexed with `array(name,index)`, function-local `local` bindings, `fn(name, parameters...)` functions, recursive calls, numeric `output` return values, `set/add/sub`, arithmetic and comparisons, `if/else/end`, `while condition ... end`, inclusive `for local(index) = start to end [step amount] ... end`, and `call fn(name, arguments...)` as both a statement and a numeric expression. Function-local arrays have zero-initialized per-call heap storage that is freed on every return, with an 8,192-element per-function limit and a 16 MiB total active-call budget. Array indexes are checked at runtime, with source-location diagnostics; see [the language guide](LANGUAGE.md#fixed-size-numeric-arrays). It also supports 2D/3D display primitives, keyboard and resize-aware mouse input, configurable camera movement and field of view, delta/time, random/noise helpers, and the UDP numeric API. `display ray_sphere(x,y,z,radius)` is a built-in ray-traced primitive. Its C runtime builds a per-frame BVH for up to 32 traced spheres and uses the tree for closest-hit and hard-shadow queries. The `ray_backend(name)` and `ray_backend_available(name)` built-ins select a ray-tracing backend at runtime and query support. The current build only implements CPU BVH; DXR and Embree return unavailable. Unsupported statements receive a file and line diagnostic.
+The compiler supports numeric global `var` bindings, fixed-size numeric arrays declared as `array name(size)` globally or inside a function, indexed with `array(name,index)`, function-local `local` bindings, `fn(name, parameters...)` functions, recursive calls, numeric `output` return values, `set/add/sub`, arithmetic and comparisons, `if/else/end`, `while condition ... end`, inclusive `for local(index) = start to end [step amount] ... end`, and `call fn(name, arguments...)` as both a statement and a numeric expression. Function-local arrays have zero-initialized per-call heap storage that is freed on every return, with an 8,192-element per-function limit and a 16 MiB total active-call budget. Array indexes are checked at runtime, with source-location diagnostics; see [the language guide](LANGUAGE.md#fixed-size-numeric-arrays). It also supports 2D/3D display primitives, keyboard and resize-aware mouse input, configurable camera movement and field of view, delta/time, random/noise helpers, and the UDP numeric API. `display ray_sphere(x,y,z,radius)` is a built-in ray-traced primitive. Its C runtime builds a per-frame BVH for up to 32 traced spheres and uses the tree for closest-hit and hard-shadow queries. The `ray_backend(name)` and `ray_backend_available(name)` built-ins select a ray-tracing backend at runtime and query support. The current build only implements CPU BVH; DXR and Embree return unavailable. Unsupported statements receive a file and line diagnostic, and unknown function or variable names name the closest declared match when one is unambiguous.
 
-The current parser checks expression structure and operator precedence, built-in and user-function call arity, number/string expression types, declared global/local/array references, source function calls, C-name collisions, project settings, and project path containment before C generation. An optional `language version 1` declaration selects the historical syntax; version 2 adds local `var(...)`, global `varl(...)`, executable metadata, and checked function references. Unversioned files retain version 1 behavior for compatibility. Malformed, duplicate, late, and unsupported version declarations receive path-and-line diagnostics. Generated numeric division calls a runtime guard that reports the source path and line and exits with code 2 when the divisor is zero. Numeric expressions also reject NaN and infinite results, including overflow and invalid math outputs, with source-located exit code 2 diagnostics. Numeric `while`/inclusive `for` loops, fixed-size global and function-local numeric arrays, fixed-step 2D circle/axis-aligned-box physics, and BMP image/sprite loading are supported; dynamic arrays, structures, imports, general image formats, saves, audio, 3D physics, static types, and general strings are not. `.ANVLproj` is a UTF-8 TOML project manifest. It uses `name`, `entry`, and optional `engine.fixed_hz` (1–240), plus optional `[memory]` settings `local_array_elements` (1–1,048,576, default8,192) and `active_call_memory_mib` (1–2,048 MiB, default16). The per-function array element limit is compile-time checked; the shared active-call budget is checked at runtime across recursive calls and compiled errors reject a function whose own local arrays exceed it. Unknown settings are rejected, and entry paths cannot escape the project folder.
+The current parser checks expression structure and operator precedence, built-in and user-function call arity, number/string expression types, declared global/local/array references, source function calls, C-name collisions, project settings, and project path containment before C generation. An optional `language version 1` declaration selects the current syntax; unversioned files retain version 1 behavior for compatibility. Malformed, duplicate, late, and unsupported version declarations receive path-and-line diagnostics. Generated numeric division calls a runtime guard that reports the source path and line and exits with code 2 when the divisor is zero. Numeric expressions also reject NaN and infinite results, including overflow and invalid math outputs, with source-located exit code 2 diagnostics. Numeric `while`/inclusive `for` loops, `break`/`continue`, fixed-size global and function-local numeric arrays, growable numeric and text lists (capped at 256 entries), text values with `len`/`char`/`mid` and text function parameters and returns, optional `number`/`text`/`bool` annotations, enums, whole-file includes and selective function imports, fixed-step 2D circle/axis-aligned-box physics, and BMP image/sprite loading are supported. Records/structures, general image formats, saves, audio, 3D physics, and Unicode code-point indexing are not. `.ANVLproj` is a UTF-8 TOML project manifest. It uses `name`, `entry`, and optional `engine.fixed_hz` (1–240); unsupported keys are rejected, and entry paths cannot escape the project folder. An optional `[assets]` table with `files = [...]` lists packaged assets; `--package` also picks up literal `image_load("...")` and `sound_load("...")` paths from the sources, rejects assets outside the project folder, and refuses to package when any asset is missing. The generated `anvil-package.json` records the format, name, target, backend, compiler identity (path plus SHA-256 for cl, language version for native), used builtins, the program size and hash, each asset path/size/hash and a checksums map. It contains no timestamps, so identical inputs produce identical manifest bytes. The measured backend capability table lives in `docs/CAPABILITY_MATRIX.md` and is generated by `tools/capability_matrix.py`; `--check` fails when it drifts. A project test case is any `.ANVL` file under `tests/`; it passes when the built program exits 0, failures print the captured build/run output, and `--test` exits 1 if any case fails or no tests exist. The formatter only rewrites whitespace and leading indentation (Anvil ignores indentation); it never changes tokens, collapses runs of blank lines, ends the file with one newline, is idempotent, and every example still compiles after formatting.
 
 ## Native performance
 
-Ahead-of-time compilation removes VM dispatch from generated function calls. MSVC release builds use `/O2` with function/data COMDAT elimination (`/Gy`, `/Gw`, `/OPT:REF`). A paired Windows release build of a small numeric program printed `23` in both variants; removing the legacy unconditional engine/network roots reduced the executable from143,360 to142,848 bytes (512 bytes). This is one executable-size sample, not a general estimate or runtime-speed result. No broader benchmark suite or cross-language comparison exists. The conventional software rasterizer and CPU BVH ray tracing are both CPU-bound; there is no GPU/DXR backend.
+Ahead-of-time compilation removes VM dispatch from generated function calls. MSVC
+release builds use `/O2`. The conventional software rasterizer and CPU BVH ray
+tracing are both CPU-bound; there is no GPU/DXR backend. A 116-case differential
+probe compares both backends' output on every build.
+
+Measured on the rarity-roll program (one function calling a 500-line mixer), best
+of three runs:
+
+| backend | compile time | executable |
+|---|---|---|
+| native | 0.12 s | 130,048 B |
+| C, `--release` | 0.42 s cold, 0.05 s cached | 182,784 B |
+
+The native build has no external toolchain to start and no cache, so it is steady;
+the C build's first run pays for loading the MSVC environment and later runs reuse
+the build cache.
+
+`--timings` reports each phase separately so a slow step is identifiable: a cold C build on this machine measured about 0.4-0.6 s depending on load (parse and generate are ~3 ms each; the rest is `cl.exe`), while a cache hit replaces the build with a ~0.11-0.18 s copy plus the dependency-sidecar digests. The build phase was 1,597 ms before the Visual Studio environment was cached: `VsDevCmd.bat -arch=x64` costs 1.3-1.7 s and is now run once per toolset, with the captured environment reused for later builds. Published ceilings for compile time and executable size live in `tools/bench_budgets.json` and are enforced by `python tools/bench_anvil.py --check`.
+
+The cache key covers the generated C, every runtime source and header, the compiler
+Python sources, the **contents** of `cl.exe`, the contents of the `link.exe` beside it,
+and a content fingerprint of the selected Windows SDK (every file under the newest
+version's Include and Lib trees, by path, size and modification time; about 10-40 ms
+thanks to directory-enumeration metadata, so an SDK library or header changed in place
+inside an unchanged version directory still invalidates the cache). A compiler replaced
+in place with the same size and a restored timestamp, or a different linker in the same
+toolset, therefore misses the cache instead of reusing a stale executable. The captured
+Visual Studio environment is named from a digest of `VsDevCmd.bat` and `vcvarsall.bat`
+contents, so a same-size script replacement cannot revive a stale environment. Libraries passed to `build_c`
+through `libraries=` are not part of the key yet.
+
+On top of the metadata fingerprint, a successful C build records the headers it actually
+read with `cl /sourceDependencies` into `<cache>/<base-key>.deps.json`, and the cache key
+then folds in the **bytes** of those headers. A real program (`examples/first_world.ANVL`)
+consumes 120 distinct headers, 5.45 MB, and digesting them costs about 10 ms per cache
+lookup; the flag adds no measurable compile time (315 ms with and without it). This closes
+the same-size, same-mtime header collision that a metadata-only fingerprint cannot see,
+without paying the ~5.9 s that hashing the whole 1.2 GB SDK tree would cost. The sidecar is
+absent after the first build with an older cache entry, in which case the build falls back
+to the metadata key and rewrites it on the next real build.
+
+Static libraries get the same treatment from the other end of the toolchain. A cached
+build runs the linker with `/VERBOSE` and records every `.lib` it resolved (the
+`#pragma comment(lib, …)` defaults inside SDK headers never appear on the command line)
+into `<cache>/<base-key>.libs.json`; those files' bytes are folded into the key too. A real
+build resolves nine libraries totalling 62 MB, which costs about 36 ms to digest, taking a
+`first_world` cache hit from ~145 ms to ~170 ms against a 315 ms cold build. Header and
+library sidecars are independent: either may be missing, and the key falls back for that
+half alone.
 
 ## Native backend limits
 
-The direct backend supports up to sixteen numeric parameters, scalar globals/locals, checked fixed-size global arrays, arithmetic except remainder, comparisons, short-circuit Boolean operators, branches and numeric loops. It emits console output rounded to six fractional digits and rejects values outside the signed 64-bit formatting range with a controlled diagnostic. Its initial buffered Win32 2D runtime supports opaque rectangles, fixed updates, keyboard/mouse input and time/delta queries. Basic math, seeded RNG, gradient noise/fBm and local source includes with reachable-function selection are also available.
+The direct backend handles console programs (numeric functions with up to sixteen
+parameters, arithmetic including remainder, comparisons, short-circuit Boolean
+operators, `if`/`while`/`for`, numeric and text locals and globals, arrays and text
+lists, and output rounded to six fractional digits) and a `scene 2d` window whose
+drawing is limited to `display rect`.
 
-Other graphics primitives, text/alpha blending, 3D/camera, assets/audio, physics/networking and trigonometry remain unsupported on the direct path. The C/MSVC backend is the primary supported build. See [native semantics and limits](NATIVE_X64_COMPILER_MIGRATION.md), [include troubleshooting](INCLUDES.md#compiler-depth-limits-and-troubleshooting) and [current evaluation evidence](QA_REPORT.md).
+Not ported yet: `scene 3d`, physics, image calls, ray tracing, network receive, and
+`net_host`/`net_join` inside a native scene. Each refusal names the missing feature
+and points at the other backend, for example
+`body_force() is not available in the native x64 backend yet; build with --backend c`
+or `native 2D graphics currently supports display rect only`.
 
-Native project builds accept `.ANVLproj` with `--backend native`. The existing `name` supplies the Unicode window title, `entry` resolves inside the project directory, and `[engine].fixed_hz` accepts integer rates1–240 (default60). Includes may span the project tree. Native graphical updates, `time()` and `delta()` use that rate. Direct source titles and console behavior retain their defaults. Unsupported native features fail explicitly without invoking C/Rust.
+Output values outside its signed 64-bit formatting range (about 9.2e18) stop with a
+controlled error instead of printing; the C backend prints the full decimal
+expansion. The backend is not the default until the remaining features are ported
+and verified.
 
+## Output size
 
-By default, the CLI keeps generated C, MSVC object files, and its environment helper in build-owned temporary directories and removes them after the build. Use `--generated-c PATH` to retain C while building, or `--emit-c PATH` to write C and stop before linking.
+The C backend builds optimized by default: `anvil program.ANVL` links a release
+image, and `--debug` opts back into `/Od`. A hello-world measures:
+
+| build | bytes |
+|---|---|
+| default (release, static CRT) | 143,360 |
+| `--debug` | 263,680 |
+| `--dynamic-runtime` (`/MD`) | 9,728 |
+| `--backend native` | 2,560 |
+
+`--dynamic-runtime` links the system VC++ runtime instead of baking the static
+CRT into the image — about 15x smaller, but the machine that runs the executable
+must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
+`/OPT:REF /OPT:ICF`, and the gcc path gets `-ffunction-sections
+-fdata-sections -Wl,--gc-sections`, so unused code never reaches the image.
+
+## Command line
+
+| flag | effect |
+|---|---|
+| `--backend c\|native` | pick the C toolchain (default) or the Anvil-owned x64 PE backend |
+| `--output`, `-o` | name the executable |
+| `--debug` | build the C output unoptimized (`/Od`); release is the default |
+| `--dynamic-runtime` | link the system VC++ runtime (`/MD`) instead of the static CRT |
+| `--cc <path>` | use a specific C compiler instead of the one discovery finds |
+| `--emit-c <path>` | write the generated C and stop, without building |
+| `--generated-c <path>` | choose where the generated C is written |
+| `--check` | parse and validate only, with no output written |
+| `--deny-warnings` | treat warnings as build failures |
+| `--no-cache` | ignore the build cache and do not store a new entry |
+| `--diagnostics caret\|editor` | caret blocks (default) or one-line `path:line:column` messages for editors |
+| `--explain CODE` | print the cause and fix for a stable diagnostic code (see [diagnostic codes](ERRORS.md)) |
+| `--timings` | print `read/parse/generate/build` milliseconds to stderr (C backend; `--check` has no build phase) |
+| `--package <dir>` | copy the program and its assets into `dir` with `anvil-package.json` |
+| `--package-dry-run` | validate assets and print the package manifest without writing |
+| `--run` | build the program and run it, returning its exit code |
+| `--clean` | remove generated build artifacts beside the source |
+| `--doctor` | report the Python, C compiler, native backend and runtime state |
+| `--new <dir>` | create a starter project with a manifest, program and README |
+| `--format` | normalise line endings, trailing whitespace, blank runs and block indentation |
+| `--format-check` | exit 1 when `--format` would change the source file |
+| `--test` | compile and run every `tests/**/*.ANVL` case with the selected backend |
+| `--print-imports` | print the builtins the program actually uses and stop |
+| `--extension <manifest>` | register an extension (repeatable), see `docs/EXTENSIONS.md` |
+| `--repl-backend c\|native` | backend used by the interactive shell |
+| `--repl` | start the interactive shell instead of compiling a file |
+| `--hello` | build and run a greeting program, so the first command always works |

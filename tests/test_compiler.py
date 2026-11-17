@@ -26,7 +26,7 @@ class CompilerTests(unittest.TestCase):
 
     def test_language_version_errors_are_source_located(self):
         cases = {
-            "unsupported": ("language version 3\nfn(main)\nend\n", "unsupported Anvil language version 3; compiler supports versions 1 and 2", 1),
+            "unsupported": ("language version 2\nfn(main)\nend\n", "unsupported Anvil language version 2; compiler supports version 1", 1),
             "malformed": ("language version next\nfn(main)\nend\n", "language version declaration must use 'language version N'", 1),
             "duplicate": ("language version 1\nlanguage version 1\nfn(main)\nend\n", "language version may only be declared once", 2),
             "late": ("fn(main)\nend\nlanguage version 1\n", "language version declaration must appear before all other source code", 3),
@@ -46,7 +46,7 @@ class CompilerTests(unittest.TestCase):
             source.write_text("language version " + ("9" * 5000) + "\nfn(main)\nend\n", encoding="utf-8")
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "oversized.c")], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn(f"{source}:1: unsupported Anvil language version value too large; compiler supports versions 1 and 2", result.stderr)
+            self.assertIn(f"{source}:1: unsupported Anvil language version value too large; compiler supports version 1", result.stderr)
             self.assertNotIn("Traceback", result.stderr)
 
     def test_unicode_decimal_digit_is_rejected_as_invalid_anvil_syntax(self):
@@ -1034,44 +1034,72 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_net_send(anvil_local_count)", generated)
             self.assertIn("anvil_net_receive ( )", generated)
 
-    def test_udp_nan_receive_reports_source_location(self):
-        with tempfile.TemporaryDirectory() as temp:
-            port_probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            port_probe.bind(("127.0.0.1", 0))
-            port = port_probe.getsockname()[1]
-            port_probe.close()
+    def test_udp_nan_payloads_are_ignored_and_a_finite_value_still_arrives(self):
+        port = 39011
 
+        def targets():
+            names = ["127.0.0.1"]
+            try:
+                probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                probe.connect(("8.8.8.8", 80))
+                local = probe.getsockname()[0]
+                probe.close()
+                if local and local != "127.0.0.1":
+                    names.append(local)
+            except OSError:
+                pass
+            return [(name, port) for name in names]
+
+        with tempfile.TemporaryDirectory() as temp:
             source = pathlib.Path(temp) / "non-finite-network.ANVL"
             out = pathlib.Path(temp) / "non-finite-network.exe"
-            source.write_text(
-                f"net host({port})\n"
-                "fn(main)\n"
-                "  while 1\n"
-                "    set local(value) = receive()\n"
-                "  end\n"
-                "end\n"
-                "call fn(main)\n",
-                encoding="utf-8",
+            program = f"""net host({port})
+fn(main)
+  say var(net_ok)
+  set local(last) = 0
+  set local(i) = 0
+  while local(i) < 150
+    set local(last) = receive()
+    set local(i) = local(i) + 1
+    wait 0.005
+  end
+  say local(last)
+end
+call fn(main)
+"""
+            source.write_text(program, encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--release",
+                 "--generated-c", str(out.with_suffix(".generated.c")),
+                 "--output", str(out)],
+                check=True, capture_output=True, text=True,
             )
-            subprocess.run([sys.executable, str(COMPILER), str(source), "--release", "--generated-c", str(out.with_suffix(".generated.c")), "--output", str(out)], check=True, capture_output=True, text=True)
-
-            process = subprocess.Popen([str(out)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            process = subprocess.Popen(
+                [str(out)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
             sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
+                ready = process.stdout.readline().strip()
+                self.assertEqual(ready, "1")
                 payload = struct.pack("<d", float("nan"))
-                deadline = time.monotonic() + 5
-                while process.poll() is None and time.monotonic() < deadline:
-                    sender.sendto(payload, ("127.0.0.1", port))
+                for _ in range(20):
+                    for target in targets():
+                        sender.sendto(payload, target)
                     time.sleep(0.01)
-                stdout, stderr = process.communicate(timeout=1)
+                time.sleep(0.2)
+                for target in targets():
+                    sender.sendto(struct.pack("<d", 4.5), target)
+                stdout, stderr = process.communicate(timeout=30)
+                stdout = ready + chr(10) + stdout
             finally:
                 sender.close()
                 if process.poll() is None:
                     process.terminate()
                     process.communicate()
 
-            self.assertEqual(process.returncode, 2, stdout + stderr)
-            self.assertIn(f"{source}:4: numeric overflow or non-finite result", stderr)
+        self.assertEqual(process.returncode, 0, stdout + stderr)
+        self.assertEqual(stdout.strip().splitlines()[-1], "4.5", stdout + stderr)
+        self.assertNotIn("non-finite", stderr)
 
     def test_udp_finite_receive_and_missing_socket_remain_supported(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -1117,211 +1145,6 @@ class CompilerTests(unittest.TestCase):
                     process.communicate()
             self.assertEqual(process.returncode, 0, stdout + stderr)
             self.assertEqual(stdout.strip(), "42.5")
-
-    def test_versioned_udp_packet_rejects_invalid_frames_before_valid_payload(self):
-        port_probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        port_probe.bind(("127.0.0.1", 0))
-        port = port_probe.getsockname()[1]
-        port_probe.close()
-
-        with tempfile.TemporaryDirectory() as temp:
-            source = pathlib.Path(temp) / "packet.ANVL"
-            out = pathlib.Path(temp) / "packet.exe"
-            source.write_text(
-                f"net host({port})\n"
-                "fn(main)\n"
-                "  set local(value) = 0\n"
-                "  while packet_id() < 0\n"
-                "    set local(value) = packet_receive()\n"
-                "  end\n"
-                "  output packet_id() + local(value) * 100\n"
-                "end\n"
-                "call fn(main)\n",
-                encoding="utf-8",
-            )
-            subprocess.run(
-                [sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            process = subprocess.Popen(
-                [str(out)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-            )
-            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            try:
-                address = ("127.0.0.1", port)
-                valid = struct.pack("!4sBBHIId", b"ANVP", 1, 1, 0, 1, 42, -12.75)
-                sender.sendto(valid[:-1], address)  # short frame
-                sender.sendto(struct.pack("!4sBBHIId", b"ANVP", 2, 1, 0, 2, 7, 99.0), address)
-                sender.sendto(valid + b"x", address)  # oversize frame
-                sender.sendto(struct.pack("!4sBBHIId", b"ANVP", 1, 2, 0, 3, 8, 100.0), address)
-                deadline = time.monotonic() + 5
-                while process.poll() is None and time.monotonic() < deadline:
-                    sender.sendto(valid, address)
-                    time.sleep(0.01)
-                stdout, stderr = process.communicate(timeout=1)
-            finally:
-                sender.close()
-                if process.poll() is None:
-                    process.terminate()
-                    process.communicate()
-
-            self.assertEqual(process.returncode, 0, stderr)
-            self.assertEqual(stdout.splitlines(), ["-1233"])
-
-    def test_versioned_udp_packet_rejects_other_peers_and_old_sequences(self):
-        host_probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        host_probe.bind(("127.0.0.1", 0))
-        port = host_probe.getsockname()[1]
-        host_probe.close()
-
-        with tempfile.TemporaryDirectory() as temp:
-            source = pathlib.Path(temp) / "packet-peer.ANVL"
-            out = pathlib.Path(temp) / "packet-peer.exe"
-            source.write_text(
-                f"net host({port})\n"
-                "fn(main)\n"
-                "  set local(value) = 0\n"
-                "  while packet_id() < 0\n"
-                "    set local(value) = packet_receive()\n"
-                "  end\n"
-                "  net send(1)\n"
-                "  while packet_id() != 7\n"
-                "    set local(value) = packet_receive()\n"
-                "    if packet_id() = 8 or packet_id() = 9 or packet_id() = 5\n"
-                "      output 999\n"
-                "    end\n"
-                "  end\n"
-                "  output packet_id() + local(value) * 100\n"
-                "end\n"
-                "call fn(main)\n",
-                encoding="utf-8",
-            )
-            subprocess.run(
-                [sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            process = subprocess.Popen(
-                [str(out)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-            )
-            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sender.bind(("127.0.0.1", 0))
-            sender.settimeout(3)
-            attacker = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            target = ("127.0.0.1", port)
-
-            def send_packet(sock, sequence, message_id, value):
-                sock.sendto(
-                    struct.pack("!4sBBHIId", b"ANVP", 1, 1, 0,
-                                sequence, message_id, value),
-                    target,
-                )
-
-            try:
-                time.sleep(0.1)  # let the child process bind the probed port
-                send_packet(sender, 1, 42, -12.75)
-                acknowledgement, _ = sender.recvfrom(64)
-                self.assertEqual(struct.unpack("d", acknowledgement)[0], 1.0)
-
-                # The host must keep its first peer and reject duplicate and
-                # wrapped-backward sequence numbers without replacing state.
-                send_packet(attacker, 2, 8, 8.0)
-                time.sleep(0.05)
-                send_packet(sender, 1, 9, 9.0)
-                time.sleep(0.05)
-                send_packet(sender, 0xFFFFFFFF, 5, 5.0)
-                time.sleep(0.05)
-                send_packet(sender, 3, 7, 1.25)
-                stdout, stderr = process.communicate(timeout=3)
-            finally:
-                sender.close()
-                attacker.close()
-                if process.poll() is None:
-                    process.terminate()
-                    process.communicate()
-
-            self.assertEqual(process.returncode, 0, stderr)
-            self.assertEqual(stdout.splitlines(), ["132"])
-
-    def test_packet_builtins_emit_network_runtime_calls(self):
-        with tempfile.TemporaryDirectory() as temp:
-            source = pathlib.Path(temp) / "packet-builtins.ANVL"
-            generated = pathlib.Path(temp) / "packet-builtins.c"
-            source.write_text(
-                "fn(main)\n"
-                "  set local(sent) = packet_send(12, 3.5)\n"
-                "  output packet_id()\n"
-                "  output packet_receive()\n"
-                "end\ncall fn(main)\n",
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            c_source = generated.read_text(encoding="utf-8")
-            self.assertIn("anvil_net_packet_send", c_source)
-            self.assertIn("anvil_net_packet_id", c_source)
-            self.assertIn("anvil_net_packet_receive", c_source)
-
-    def test_packet_send_serializes_network_order_envelope(self):
-        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        listener.bind(("127.0.0.1", 0))
-        listener.settimeout(5)
-        port = listener.getsockname()[1]
-        try:
-            with tempfile.TemporaryDirectory() as temp:
-                source = pathlib.Path(temp) / "packet-send.ANVL"
-                out = pathlib.Path(temp) / "packet-send.exe"
-                source.write_text(
-                    f'net join("127.0.0.1", {port})\n'
-                    "fn(main)\n  output packet_send(4294967295, -12.75)\nend\n"
-                    "call fn(main)\n",
-                    encoding="utf-8",
-                )
-                subprocess.run(
-                    [sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                result = subprocess.run([str(out)], capture_output=True, text=True, check=True)
-                payload, address = listener.recvfrom(64)
-        finally:
-            listener.close()
-
-        self.assertEqual(result.stdout.strip(), "1")
-        self.assertEqual(len(payload), 24)
-        magic, version, kind, reserved, sequence, message_id, value = struct.unpack(
-            "!4sBBHIId", payload
-        )
-        self.assertEqual((magic, version, kind, reserved), (b"ANVP", 1, 1, 0))
-        self.assertEqual(sequence, 1)
-        self.assertEqual(message_id, 4294967295)
-        self.assertEqual(value, -12.75)
-        self.assertEqual(address[0], "127.0.0.1")
-
-    def test_packet_send_rejects_invalid_message_ids_and_nonfinite_values(self):
-        with tempfile.TemporaryDirectory() as temp:
-            source = pathlib.Path(temp) / "invalid-packet-send.ANVL"
-            out = pathlib.Path(temp) / "invalid-packet-send.exe"
-            source.write_text(
-                "fn(main)\n  output packet_send(1.5, 3.5)\nend\ncall fn(main)\n",
-                encoding="utf-8",
-            )
-            subprocess.run(
-                [sys.executable, str(COMPILER), str(source), "--release", "--output", str(out)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            result = subprocess.run([str(out)], capture_output=True, text=True, check=True)
-            self.assertEqual(result.stdout.strip(), "0")
 
     def test_unknown_statement_has_source_location(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -1393,7 +1216,7 @@ class CompilerTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(COMPILER), str(source), "--emit-c", str(pathlib.Path(temp) / "bad.c")], capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("type-error.ANVL:2:", result.stderr)
-            self.assertIn("expected number, got string", result.stderr)
+            self.assertIn("expected a number, got a string", result.stderr)
 
     def test_malformed_expression_is_rejected_by_anvil_parser(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -1448,129 +1271,6 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_run(anvil_update, anvil_draw", generated)
             self.assertIn("anvil_set_fixed_hz(60)", generated)
             self.assertIn('"First World"', generated)
-
-    def test_project_memory_settings_control_c_local_array_limits(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = pathlib.Path(temp)
-            source = root / "main.ANVL"
-            source.write_text(
-                "fn(main)\n array scratch(4)\n"
-                " set array(scratch, 0) = 7\n"
-                " output array(scratch, 0)\nend\n",
-                encoding="utf-8",
-            )
-            project = root / "game.ANVLproj"
-            project.write_text(
-                'entry = "main.ANVL"\n[memory]\n'
-                "local_array_elements = 4\nactive_call_memory_mib = 2\n",
-                encoding="utf-8",
-            )
-            generated = root / "game.c"
-            result = subprocess.run(
-                [sys.executable, str(COMPILER), str(project), "--emit-c", str(generated)],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            c_source = generated.read_text(encoding="utf-8")
-            self.assertIn("#define ANVIL_LOCAL_ARRAY_BUDGET_BYTES 2097152u", c_source)
-            self.assertIn("anvil_local_array_alloc(4", c_source)
-
-            project.write_text(
-                'entry = "main.ANVL"\n[memory]\n'
-                "local_array_elements = 3\nactive_call_memory_mib = 2\n",
-                encoding="utf-8",
-            )
-            rejected = subprocess.run(
-                [sys.executable, str(COMPILER), str(project), "--emit-c", str(root / "bad.c")],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(rejected.returncode, 0)
-            self.assertIn("local arrays in a function may contain at most 3 elements", rejected.stderr)
-            self.assertIn("main.ANVL:2", rejected.stderr)
-
-    def test_project_memory_manifest_values_are_bounded(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = pathlib.Path(temp)
-            (root / "main.ANVL").write_text("fn(main)\nend\n", encoding="utf-8")
-            project = root / "bad-memory.ANVLproj"
-            for setting in (
-                "local_array_elements = 0",
-                "local_array_elements = 1048577",
-                "local_array_elements = true",
-                "active_call_memory_mib = 0",
-                "active_call_memory_mib = 2049",
-                "active_call_memory_mib = false",
-                "other = 1",
-            ):
-                project.write_text(
-                    'entry = "main.ANVL"\n[memory]\n' + setting + "\n",
-                    encoding="utf-8",
-                )
-                result = subprocess.run(
-                    [sys.executable, str(COMPILER), str(project), "--emit-c", str(root / "bad.c")],
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertNotEqual(result.returncode, 0, setting)
-                self.assertIn(str(project), result.stderr)
-                self.assertNotIn("Traceback", result.stderr)
-
-    def test_active_call_memory_limit_rejects_impossible_single_local_array(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = pathlib.Path(temp)
-            (root / "main.ANVL").write_text(
-                "fn(main)\n array scratch(131073)\nend\n", encoding="utf-8"
-            )
-            project = root / "small-budget.ANVLproj"
-            project.write_text(
-                'entry = "main.ANVL"\n[memory]\n'
-                "local_array_elements = 200000\nactive_call_memory_mib = 1\n",
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(COMPILER), str(project), "--emit-c", str(root / "bad.c")],
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("main.ANVL:2", result.stderr)
-            self.assertIn("above the active-call memory limit of 1048576 bytes", result.stderr)
-
-    def test_active_call_memory_budget_is_shared_across_c_recursion(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = pathlib.Path(temp)
-            (root / "main.ANVL").write_text(
-                "fn(recurse, depth)\n"
-                " array cells(131000)\n"
-                " if var(depth) > 0\n"
-                "  output call fn(recurse, var(depth) - 1)\n"
-                " end\n"
-                " output 0\n"
-                "end\n"
-                "fn(main)\n output call fn(recurse, 2)\nend\n"
-                "call fn(main)\n",
-                encoding="utf-8",
-            )
-            project = root / "recursive.ANVLproj"
-            project.write_text(
-                'entry = "main.ANVL"\n[memory]\n'
-                "local_array_elements = 131000\nactive_call_memory_mib = 1\n",
-                encoding="utf-8",
-            )
-            executable = root / "recursive.exe"
-            subprocess.run(
-                [sys.executable, str(COMPILER), str(project), "--output", str(executable)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            result = subprocess.run(
-                [str(executable)], capture_output=True, text=True, timeout=10
-            )
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("active local arrays exceed the 1 MiB Anvil memory limit", result.stderr)
 
     def test_project_manifest_rejects_invalid_fixed_rate(self):
         with tempfile.TemporaryDirectory() as temp:

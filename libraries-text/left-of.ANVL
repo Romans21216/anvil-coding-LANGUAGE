@@ -1,0 +1,7 @@
+fn(left-of, text, separator)
+  set local(at) = call fn(index-of, var(text), var(separator))
+  if local(at) < 0
+    output var(text)
+  end
+  output mid(var(text), 0, local(at))
+end

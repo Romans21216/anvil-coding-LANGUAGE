@@ -63,6 +63,8 @@ end
         user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
         user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
         user.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+        user.ShowWindow.restype = wintypes.BOOL
         user.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int,
                                      ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT]
         gdi.GetPixel.argtypes = [wintypes.HDC, ctypes.c_int, ctypes.c_int]
@@ -179,6 +181,18 @@ end
                     time.sleep(0.05)
                 self.assertLessEqual(user.GetGuiResources(process_handle, 0), gdi_before + 2,
                                      "resizing leaked GDI bitmaps or device contexts")
+                # Minimize and restore: the OS discards the visible surface, so
+                # the window must repaint from the backbuffer afterwards (8.11).
+                self.assertTrue(user.ShowWindow(hwnd, 6))  # SW_MINIMIZE
+                time.sleep(0.25)
+                self.assertTrue(user.ShowWindow(hwnd, 9))  # SW_RESTORE
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline and pixel(hwnd, 20, 20) != colour:
+                    time.sleep(0.05)
+                self.assertEqual(pixel(hwnd, 20, 20), colour,
+                                 "window did not repaint after minimize/restore")
+                self.assertLessEqual(user.GetGuiResources(process_handle, 0), gdi_before + 2,
+                                     "minimize/restore leaked GDI objects")
                 user.PostMessageW(hwnd, 0x10, 0, 0)  # WM_CLOSE
                 stdout, stderr = process.communicate(timeout=5)
                 self.assertEqual(process.returncode, 0, (stdout, stderr))
@@ -206,14 +220,15 @@ end
             sections = pe + 24 + struct.unpack_from("<H", image, pe + 20)[0]
             text_raw = struct.unpack_from("<I", image, sections + 20)[0]
             call = next(offset - 2 for offset, target in generator.code.fixups
-                        if target == "iat:CreateDIBSection")
+                        if target == "iat:CreateCompatibleBitmap")
             # Simulate a NULL allocation result at the emitted API call itself.
             image[text_raw + call:text_raw + call + 6] = b"\x31\xc0\x90\x90\x90\x90"
             executable = pathlib.Path(temp) / "failure.exe"
             executable.write_bytes(image)
             result = subprocess.run([str(executable)], capture_output=True, timeout=5)
             self.assertEqual(result.returncode, 2)
-            self.assertEqual(result.stdout, b"Anvil native painting error\n")
+            self.assertEqual(result.stdout, b"")
+            self.assertEqual(result.stderr, b"Anvil native painting error\n")
 
     def test_unsupported_native_graphics_have_compile_diagnostics(self):
         cases = [
@@ -223,7 +238,7 @@ end
             ("scene 3d\nfn(draw)\nend\n", "one scene 2d"),
             ("scene 2d\nfn(draw, x)\nend\n", "fn(draw) with no parameters"),
             ("scene 2d\nfn(update, value)\nend\nfn(draw)\nend\n", "fn(update) cannot have parameters"),
-            ("scene 2d\nfn(draw)\n display plane(0,0,4,4,5)\nend\n", "display rect, circle, line or text only"),
+            ("scene 2d\nfn(draw)\n display circle(0,0,4)\nend\n", "display rect only"),
             ("scene 2d\nclear rgba(0,0,0,20)\nfn(draw)\nend\n", "alpha 255"),
         ]
         for source, diagnostic in cases:

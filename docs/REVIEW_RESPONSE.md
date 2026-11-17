@@ -1,0 +1,99 @@
+# Response to the commit review and the language roadmap
+
+Two documents were reviewed against this codebase: a commit review (P0–P2
+findings, 79/100) and a language roadmap (priorities 1–9). This page records
+what changed, what is verified, and what is still open. Verification means a
+test in `tests/` or a case in `scripts/differential_probe.py` that compiles and
+runs the same program on both backends and compares output.
+
+## What this batch changed
+
+| Change | Where | Verified by |
+|---|---|---|
+| Unreachable functions no longer reach generated C (the native backend already did this) | `compiler/codegen.py` | `tests/test_deadcode.py` (C text, native image, engine callbacks, recursion, both outputs) |
+| The REPL remembers multi-line blocks that only change state, so `repeat 3 … end` then `say var(x)` shows the new value; blocks that print are not replayed | `compiler/repl.py` | `tests/test_repl.py` (block persistence, no double-applied mutation, no replayed output) |
+| `break` and `continue` in `for`/`while`/`repeat`, both backends, nested loops | `compiler/parser.py`, `compiler/codegen.py`, `compiler/native_codegen.py` | `tests/test_break_continue.py` (both backends, nested loops, error outside a loop) |
+| `set var(x) = null` is an explicit error instead of a silent no-op that left `x` undefined | `compiler/parser.py` | manual + diagnostics suite |
+| Native backend names unsupported builtins (`image_load() is not available…`) and reuses the spelling suggestions (`random` → `rnd`) | `compiler/native_codegen.py` | `tests/test_native_x64.py` |
+| Language spec, guide and README reconciled with the implementation (text, lists, arrays, escapes, break/continue, native limits) | `docs/LANGUAGE_SPEC.md`, `docs/LANGUAGE.md`, `README.md` | examples in the docs are run by the suite |
+| Backend capability matrix | `docs/BACKENDS.md` | each row names its test file |
+| Versioning and stability policy | `docs/VERSIONING.md` | tutorial and probe run on every change |
+| Compile-time and executable-size measurements | `tools/bench_anvil.py` | measured below |
+
+### Measured this machine (Windows 11, MSVC 2022, `python tools/bench_anvil.py`)
+
+| program | backend | compile (median) | exe bytes |
+|---|---|---|---|
+| tiny (hello) | native | 0.002 s | 2,560 |
+| tiny (hello) | C | 2.265 s | 143,360 |
+| texty (text + loop + calls) | native | 0.002 s | 6,144 |
+| texty (text + loop + calls) | C | 2.000 s | 148,992 |
+| big (40 helpers, all called) | native | 0.005 s | 25,600 |
+| big (40 helpers, all called) | C | 1.776 s | 153,088 |
+| big_trim (40 helpers, none called) | native | 0.002 s | 2,560 |
+| big_trim (40 helpers, none called) | C | 1.691 s | 143,360 |
+
+Statically dead branches are dropped at code generation: with a literal condition the taken side is emitted and the other side is not, so `if 0` with 20 statements produces the 2,560-byte baseline image instead of 3,584 bytes (native, this machine), and `while 0` emits nothing. `tests/test_dead_branches.py` pins the output, the size, the `else` behaviour and the diagnostics boundary.
+
+The CLI caches built executables in `<output dir>/.anvil-cache`, keyed by a SHA-256 of the generated C, the runtime sources, the compiler's own Python files and the release flag, so a repeated build of unchanged source reuses the executable: measured 2.06 s cold against 0.11 s warm for the same program, with byte-identical output. Editing either the source or the generated C changes the key and rebuilds.
+
+The C timings are dominated by `cl.exe`, not by Anvil. The `big` and `big_trim`
+pair measures reachability instead of asserting it: calling the helpers grows the
+native image from 2,560 to 25,600 bytes and the C executable from 143,360 to
+153,088, while the same helpers unreachable produce byte-identical output to the
+hello program on both backends. `tests/test_bench.py` pins both properties. These
+are single-machine observations, not a performance claim.
+
+## Commit review findings
+
+| Finding | Status | Notes |
+|---|---|---|
+| **P0** integrate this branch onto current GitHub `main` | **Not done** | This checkout has no configured upstream remote and the review's snapshot is not available here. The work above was made directly against this tree, not rebased onto newer history. Forward-porting needs the upstream repository. |
+| **P1** REPL state is replay-observable; block mutations lost | **Done** | Mutations were already replayed correctly (a fresh program each prompt, so no double application — covered by a regression). Multi-line state-only blocks are now remembered; blocks that print are not replayed. |
+| **P1** C backend emits every function | **Done** | `emit_c` now filters with the same `reachable_functions` the native backend uses, rooted at top-level calls, `main`, and active `draw`/`update`. `tests/test_deadcode.py` asserts the unused helper is absent from generated C and from the native image. |
+| **P1** one typed intermediate representation | **Not started** | Large architectural change. The two string-classification heuristics that motivated it were fixed directly this cycle (`&` is a top-level join operator, joins of builtins are text), which removed the visible mismatches. |
+| **P1** define and verify backend parity | **Done (documented)** | `docs/BACKENDS.md` is a capability matrix where each row names the test that proves it, and every native gap is a source-located error rather than a mis-compile. |
+| **P1** measure performance and executable size | **Done (first pass)** | `tools/bench_anvil.py` reports compile time and exe size for four programs on both backends; numbers above. No optimization work was done off the back of it. |
+| **P2** reconcile the language specification | **Done** | Text, joining, escapes, lists, arrays, text-returning functions and break/continue are documented as present; the "unfinished" list now names only what is genuinely missing; native limits are listed in both the spec and the migration guide. |
+| **P2** strengthen what 100/100 means | **Done** | `docs/GRADE.md` states that the scorecard covers a narrow beginner workflow set and points to `docs/QA_REPORT.md` as a separate historical review. |
+| **P2** language/version and stability policy | **Done** | `docs/VERSIONING.md`: what version 1 promises, what is experimental, how breaking changes become version 2, and which tests enforce compatibility. |
+
+## Language roadmap priorities
+
+| Priority | Status | Notes |
+|---|---|---|
+| Selective imports | **Done (first cut)** | `include fn(move) -- "lib.ANVL"` imports one function plus its callees under a `name--qualifier` binding, on both backends; globals stay private and are rejected with a clear message, and nested selective includes are not supported yet. |
+| Records and enums | **Partial** | Enums ship on both backends (`enum State idle, playing, paused`, numeric values, collision checks). Records are not started. |
+| 8. Useful failure results | **Partial** | `net host`, `net join` and `net send` now store their status (1 success, 0 failure) in `net_ok`, and the runtime's send returns a status instead of void. File and image calls still need the same treatment. |
+| 2. Simple types and real booleans | **Mostly done** | Annotations are enforced with source-located errors, inference stays the default, and a `bool` variable prints `true`/`false` on both backends. Comparisons and `and`/`or`/`not` still produce numbers, so 1/0 output is unchanged for unannotated code. |
+| 0. Integrate against GitHub main | **Blocked, scoped** | `main` is a parallel lineage (73 commits, modular compiler + selective imports + image/network). Measured conflict map and porting order: `docs/FORWARD_PORT.md`. |
+| 1. General function arguments (text in/out) | **Done** | Text parameters work on both backends, including recursion, mixed text/number parameters, text comparisons and nested text-returning calls. A parameter's kind is inferred from the body (text builtin, join with a literal, text comparison, text-returning output) plus call-site evidence, with a call-site error on a mismatch. `tests/test_text_params.py` covers both backends; a recursive join in the native backend needed a preserved right operand so the result is not truncated. |
+| 3. Complete the string model | **Documented, not changed** | Bytes are the defined unit (`len("héllo")` is 6) and this is now stated in the spec, guide and README. Unicode code-point indexing is not implemented. |
+| 4. Growable, typed collections | **Partial** | `list` supports `remove` (tail shift, out-of-range no-op) and `for each item in list` (break/continue included) on both backends, both desugared at parse time. Text lists (`list names: text`, `array` reads, `for each`) work on both backends; native keeps each list in a 64 KB data block and refuses out-of-range reads with exit code 2. |
+| 5. Records and enumerations | **Not started** | |
+| 6. Explicit function references | **Not started** | |
+| 7. Control-flow completeness | **Done for break/continue** | Both commands work in nested `for`/`while`/`repeat` on both backends (`continue` applies the `for` step). `match`/`case` is not started and should follow enums. |
+| 8. Module and package syntax | **Not started** | Whole-file `include` only; selective imports and namespaces remain open. |
+| 9. Error and optional-value handling | **Partially done** | The confusing `null` no-op is now an explicit error. No `result`/`option` type yet; file/image/network calls still report failure as `0`/`-1`/handle values. |
+
+## What remains, in the order I would take it
+
+1. **Text function parameters** (roadmap 1) — the single biggest usability gap,
+   and the roadmap's own success criterion.
+2. **A typed expression representation** (review P1) — stops the class of bug
+   where the semantic classifier and the expression parser disagree; two such
+   bugs were found and fixed by hand this cycle.
+3. **Optional type annotations** (roadmap 2) with a `language version 2` line.
+4. **Selective imports** (roadmap 8) and **records/enums** (roadmap 5), which
+   unlock non-toy programs.
+5. **Forward-port onto current `main`** (review P0) once the upstream remote is
+   available.
+
+## Reproducing everything on this page
+
+```powershell
+python -m pytest tests -q            # full suite
+python scripts/differential_probe.py # both backends, one program at a time
+python tools/grade_anvil.py          # beginner scorecard (10.0/10 on this commit)
+python tools/bench_anvil.py          # compile time and executable size
+```

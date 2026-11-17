@@ -1,0 +1,9 @@
+fn(clamp, value, low, high)
+  if var(value) < var(low)
+    output var(low)
+  end
+  if var(value) > var(high)
+    output var(high)
+  end
+  output var(value)
+end

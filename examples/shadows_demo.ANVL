@@ -1,0 +1,14 @@
+scene 3d
+camera perspective 0 6 10
+camera fov(60)
+set var(look) = camera_angle(0, -30)
+set var(on) = shadow(1)
+set var(h) = shadow_height(0)
+set var(a) = shadow_alpha(140)
+
+fn(draw)
+  display plane(0, 0, 0, 14, 14) -rgb(44, 52, 66)
+  display cube(0, 1.5, 0, 1.6) -rgb(88, 164, 255)
+  display cube(2.5, 1.0, -1.0, 1.2) -rgb(255, 157, 91)
+  display text("Overhead shadows") -l(24, 24) -rgb(240, 245, 255)
+end

@@ -52,7 +52,7 @@ class NativeProceduralTests(unittest.TestCase):
             exe.write_bytes(image)
             result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=5)
         self.assertEqual(result.returncode, code, result.stdout + result.stderr)
-        return result.stdout
+        return result.stdout + result.stderr
 
     def test_math_primitives_bounds_and_once_only_arguments(self):
         checks = ['floor(-1.25) = -2', 'ceil(-1.25) = -1', 'floor(1.25) = 1',
@@ -143,7 +143,7 @@ end
         self.assertEqual(self.run_source(f'fn(main)\n set var(passed) = 0\n{body}\n output var(passed) = {len(checks)}\nend\n'), '1\n')
 
     def test_invalid_numeric_domains_exit_with_controlled_diagnostics(self):
-        for expression, message in [('sqrt(-1)', 'numeric error'),
+        for expression, message in [('sqrt(-1)', 'numeric overflow or non-finite result'),
                                     ('rnd(-1e100,1)', 'random range error'),
                                     ('noise(2147483647,0,0)', 'noise coordinate range error'),
                                     ('noise(0,-2147483649,0)', 'noise coordinate range error')]:

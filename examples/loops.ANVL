@@ -20,7 +20,9 @@ end
 
 fn(main)
   # 1 + 2 + 3 + 4 + 5 = 15
-  output call fn(sum-range, 1, 5, 1)
+  say call fn(sum-range, 1, 5, 1)
+  # while counts the same way: 1 + 2 + 3 + 4 + 5 = 15
+  say call fn(sum-to, 5)
 end
 
 call fn(main)

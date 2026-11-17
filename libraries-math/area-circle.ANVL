@@ -1,0 +1,3 @@
+fn(area-circle, radius)
+  output 3.141592653589793 * var(radius) * var(radius)
+end

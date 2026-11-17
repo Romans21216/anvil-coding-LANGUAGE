@@ -1,0 +1,6 @@
+fn(is-empty, text)
+  if len(var(text)) = 0
+    output 1
+  end
+  output 0
+end

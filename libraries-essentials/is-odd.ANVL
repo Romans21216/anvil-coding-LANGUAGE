@@ -1,0 +1,6 @@
+fn(is-odd, n)
+  if floor(var(n)) % 2 != 0
+    output 1
+  end
+  output 0
+end

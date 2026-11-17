@@ -2,12 +2,18 @@
 
 The master backlog is maintained only in GitHub issue [#23](https://github.com/Romans21216/anvil-coding-LANGUAGE/issues/23) and its comments: original items 1–450, Forge additions 451–457, and the OS specification 458–497. This ledger and `IMPLEMENTATION_STATUS.json` record only the audited subset.
 
-Updated 2026-11-02. Latest independent candidate `9d69a44e563373e5085fb30445c29312ec793ed3` (base `513b1d02de3b599070d04324a8d3460300e40241`); full binary diff SHA256 `0c365af6b748171406d69b554485e8013eb1cc3c9c6f2edb6e1cf8baba614651`; all-text diff `f66d13c0eec7cc08a00281116e8ce7d3e831bb78763502a293067516d219e654`; compiler/runtime/tests diff `9ff18d6826b7b907558789a1de8f5505f6b4618cdbd393aa3b29e207d8d36ebd`; docs diff `02273fa646348096ac1abdd91ef3fb44fad3e99a2a0e382c008648f3cbe2f7a1`. Raw78; 79/100 after criterion38 synchronization, FAIL against98; categories13/20,19/20,15/20,17/20,15/20. Local full266/366.905s; independent full266/416.764s; independent focused image tests4/5.239s. Compileall, npm extension validation, QA, strict JSON and diff checks pass. Image BMP support now builds as a reachable optional runtime module and its shutdown cleanup is tested. No defect found. VS Code0.1.4 unchanged. User packages, broad engine, DXR/Embree, Forge/media, OS/UEFI, portability, editor workflows and performance remain incomplete. Full goal active below98.
+Updated 2026-10-28. Latest full review exact `edfbe86252deb5af39504161f6e8571ae917fbb9`: 71/100 — FAIL against 98; 125 tests pass. Source includes work; #64 provenance and #65 compiler recursion were independently found. Follow-up fixes are pending review. #63 remains open; all full backlog additions stay only in issue 23 comments.
 
 
 The primary build translates `.ANVL` to inspectable C and invokes MSVC to compile and link the executable. The direct AMD64/PE path is an optional experiment for numeric functions, checked arrays, source includes, a limited 2D surface, input, and procedural math. It is not a prerequisite for C-backend features. Engine breadth, Forge/media/OS targets, actual DXR/Embree backends, richer types, portability, measurements, and #63 remain incomplete. See [capability matrix](COMPLETION_MATRIX.md), [experimental native backend](NATIVE_X64_COMPILER_MIGRATION.md) and [include rules](INCLUDES.md).
 
-The source extension package is 0.1.13 and passes grammar/package checks. Installed version 0.1.4 is preserved per user preference; newer tokens have no fresh visible-editor verification.
+Historical keyboard milestone (21fc960, 73/100, 99 tests): held/pressed, repeat/focus/system-key handling, numeric key bounds and edge lifetimes were independently verified. Those regressions also passed in the later 111-test reviewed snapshot; the unreviewed include candidate now passes 125 tests.
+
+Historical verified mouse milestone 900106e: 72/100 with 102 tests. Pointer/buttons/wheel/capture functionality remains verified; current coordinate coverage explicitly uses test instrumentation (#63).
+
+Verified procedural milestone: basic math/RNG/noise/fBm, Anvil-written runtime helpers, sixteen-argument calls and larger locals pass. The completed 111-test review verified explicit-main values/side effects/arity and the test-race correction. The newer include candidate below is still awaiting a full review.
+
+Verified include/dependency implementation onedfbe86: local source graphs and native static function selection pass125tests and native/C demos. Two adversarial diagnostic/depth findings#64/#65 require the current unreviewed follow-up; VSIX0.1.10 validated and installed0.1.4 preserved.
 
 ## Status counts
 

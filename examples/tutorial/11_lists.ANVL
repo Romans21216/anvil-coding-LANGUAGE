@@ -1,0 +1,16 @@
+# Lesson 11: a list grows as you add to it.
+list scores
+
+fn(main)
+  add scores 10
+  add scores 20
+  add scores 30
+  say count(scores)
+  say array(scores, 1)
+  set var(total) = 0
+  for local(i) = 0 to count(scores) - 1
+    add var(total) array(scores, local(i))
+  end
+  say "total=" & var(total)
+end
+call fn(main)
