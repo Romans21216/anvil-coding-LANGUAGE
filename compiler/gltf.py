@@ -27,6 +27,10 @@ import re
 import struct
 
 MAX_TRIANGLES = 200_000
+# The C runtime keeps one clip clock per model in ANVIL_MODEL_STATES slots; a
+# posed model (animated or skinned) past this index would silently read 0 and
+# never move, so the importer refuses it at the model_draw line instead.
+MODEL_STATES = 32
 
 COMPONENTS = {
     5120: ("b", 1, 127.0),
@@ -316,7 +320,7 @@ def _static_walk(
         node = nodes[index]
         world = _multiply(parent, _node_matrix(node))
         if "mesh" in node:
-            mesh = document["meshes"][node["mesh"]]
+            mesh = _mesh_for_node(document, node)
             for primitive in mesh.get("primitives", []):
                 triangles.extend(
                     _primitive(document, primitive, world, base_dir, binary, morph_out)
@@ -330,6 +334,25 @@ def _static_walk(
     for root in roots:
         visit(root, _identity(), 0)
     return triangles, target_counts
+
+
+def _mesh_for_node(document: dict, node: dict) -> dict:
+    """Resolve the mesh a node references.
+
+    A negative index is not a Python from-end index here: glTF indices are
+    unsigned, so `-1` used to select the last mesh and silently bake the wrong
+    geometry. Every loader goes through this check.
+    """
+    index = node["mesh"]
+    meshes = document.get("meshes") or []
+    if (
+        not isinstance(index, int)
+        or isinstance(index, bool)
+        or index < 0
+        or index >= len(meshes)
+    ):
+        raise ModelError("a mesh index is out of range")
+    return meshes[index]
 
 
 def _static_document(path: pathlib.Path) -> tuple[dict, bytes | None]:
@@ -419,6 +442,19 @@ def _node_trs(node: dict) -> tuple[list[float], list[float], list[float]]:
     ]
     if min(scale) <= 1.0e-12:
         raise ModelError("a node matrix collapses an axis and cannot be used with animation")
+    determinant = (
+        columns[0][0] * (columns[1][1] * columns[2][2] - columns[1][2] * columns[2][1])
+        - columns[1][0] * (columns[0][1] * columns[2][2] - columns[0][2] * columns[2][1])
+        + columns[2][0] * (columns[0][1] * columns[1][2] - columns[0][2] * columns[1][1])
+    )
+    if determinant < 0.0:
+        # The decomposition below takes a positive scale per column, so a
+        # mirrored matrix would silently lose its reflection and pose a
+        # different shape. Refuse it instead of pretending to decompose it.
+        raise ModelError(
+            "a node matrix mirrors an axis (negative determinant) and cannot be "
+            "decomposed for animation"
+        )
     r = [[columns[column][row] / scale[column] for column in range(3)] for row in range(3)]
     trace = r[0][0] + r[1][1] + r[2][2]
     if trace > 0.0:
@@ -531,7 +567,16 @@ def load_skinned(path: pathlib.Path) -> dict:
     for node in joint_nodes:
         if not 0 <= node < len(nodes_doc):
             raise ModelError("a skin joint is not a node")
-    bind_rows = _accessor(document, skin["inverseBindMatrices"], path.parent, binary)
+    bind_accessor = skin.get("inverseBindMatrices")
+    if bind_accessor is None:
+        # Khronos marks inverseBindMatrices optional: without it every joint
+        # binds in mesh space, which is an identity matrix per joint.
+        bind_rows = [
+            [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+            for _ in joint_nodes
+        ]
+    else:
+        bind_rows = _accessor(document, bind_accessor, path.parent, binary)
     if len(bind_rows) != len(joint_nodes):
         raise ModelError("the inverse bind matrices do not match the joint count")
     bind: list[float] = []
@@ -562,7 +607,7 @@ def load_skinned(path: pathlib.Path) -> dict:
         node = nodes_doc[node_index]
         if "mesh" not in node:
             continue
-        for primitive in document["meshes"][node["mesh"]].get("primitives", []):
+        for primitive in _mesh_for_node(document, node).get("primitives", []):
             vertices.extend(_skinned_primitive(document, primitive, path.parent, binary))
         if len(vertices) // 14 > MAX_TRIANGLES * 3:
             raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
@@ -586,6 +631,12 @@ def load_skinned(path: pathlib.Path) -> dict:
 def _skinned_primitive(
     document: dict, primitive: dict, base_dir: pathlib.Path, binary: bytes | None
 ) -> list[float]:
+    if primitive.get("targets"):
+        # The skinned draw path has no morph input, so a combined mesh would
+        # silently render its base shape. Refuse it rather than mislead.
+        raise ModelError(
+            "a skinned mesh with morph targets is not supported; split the mesh"
+        )
     attributes = primitive.get("attributes", {})
     for required in ("POSITION", "JOINTS_0", "WEIGHTS_0"):
         if required not in attributes:
@@ -681,11 +732,8 @@ def load_animated(path: pathlib.Path) -> dict:
             raise ModelError("a node index is out of range")
         node = nodes_doc[index]
         if "mesh" in node:
-            mesh_index = node["mesh"]
-            if not isinstance(mesh_index, int) or mesh_index >= len(document["meshes"]):
-                raise ModelError("a mesh index is out of range")
             first = len(vertices) // 12
-            for primitive in document["meshes"][mesh_index].get("primitives", []):
+            for primitive in _mesh_for_node(document, node).get("primitives", []):
                 vertices.extend(_primitive(document, primitive, _identity(), base_dir, binary))
             count = len(vertices) // 12 - first
             if count:
@@ -854,6 +902,13 @@ def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
         data = load_triangles(path)
         entry.update({"animated": False, "count": len(data) // 12, "data": data})
         entry["bounds"] = bounds_of(data)
+    if (entry.get("animated") or entry.get("skinned")) and entry["id"] >= MODEL_STATES:
+        # The runtime's clock table has MODEL_STATES slots; a posed model past
+        # it would read clock 0 forever and never move. Fail at the source line.
+        raise ModelError(
+            f"the model needs clock slot {entry['id']} but only {MODEL_STATES} "
+            "models can be registered; reduce the number of models before it"
+        )
     _registry[key] = entry
     return entry
 

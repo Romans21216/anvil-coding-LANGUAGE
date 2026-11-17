@@ -135,6 +135,11 @@ remote desktop can prevent window creation:
   drawn ink bounds across poses: translation moves it by half the key at 0.5 s,
   rotation changes the silhouette, STEP holds the left key until 1.0 s, the clip
   wraps at its length, and the static/wasm refusals name the source line.
+- `test_gltf_import_bounds` — a skin that omits the optional
+  `inverseBindMatrices` still follows its joint (identity bind), a negative mesh
+  index, a skinned primitive with morph targets, and a posed model past the
+  runtime's 32 clock slots are refused at the source line, while 33 static
+  models still build.
 - `test_screen_fade` — draws a white rectangle, then samples the live window
   while `screen_fade` runs: white at alpha 0, 127 grey at 128, black at 255
   (a 300 argument clamps), and `screen_fade_to(0, 0.5)` ramps through a mid

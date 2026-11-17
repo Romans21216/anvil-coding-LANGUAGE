@@ -36,11 +36,14 @@ around X, Y and Z. The order is scale, rotate, translate.
 | Positions | `POSITION` as VEC3 float |
 | Indices | ubyte/ushort/uint, or none (sequential) |
 | Colour | `COLOR_0` (averaged per triangle) or material `baseColorFactor` |
+| Animation | One clip; TRANSLATION/ROTATION/SCALE channels, `LINEAR` and `STEP` keys |
+| Skin | One skin, 1-64 joints, four influences per vertex, optional bind matrices |
+| Morph targets | Up to eight `POSITION` deltas, per-mesh default weights |
 | Budget | 200,000 triangles, checked at compile time |
 
-Not supported yet, and reported as a located compile error: skins, morph
-targets, animations, textures, sparse accessors and primitive modes other than
-triangles/strips/fans.
+Not supported yet, and reported as a located compile error: textures, sparse
+accessors, `CUBICSPLINE` keys, multiple skins or clips, morph targets combined
+with a skin, and primitive modes other than triangles/strips/fans.
 
 ## Shading
 
@@ -94,6 +97,10 @@ set var(ok) = model_draw("walk.gltf", 0, 0, 0, 1, 0, 0, 0)
   seconds, resolved at compile time.
 - The clock starts at 0, which is the rest pose at the first key. Calling
   `model_animate` on a model with no clip is a compile error naming the line.
+- The runtime keeps 32 clip clocks. A posed model (animated or skinned) that
+  would need slot 32 or higher is refused at its `model_draw` line instead of
+  silently reading clock 0 forever; static models past that point still build,
+  because they never read a clock.
 - Animated models skip the bounding-sphere culling test and overhead shadows;
   the whole hierarchy is drawn every frame.
 - The browser backend bakes world-space triangles and has no pose code, so
@@ -119,6 +126,12 @@ and blends the four influences per vertex, then applies the usual model
 placement and shading. One skin with 1-64 joints is supported; a primitive
 missing `JOINTS_0` or `WEIGHTS_0`, a bind-matrix count that does not match the
 joint list, and a second skin are refused at compile time with a located error.
+
+`inverseBindMatrices` is optional in glTF. When a skin omits it, every joint
+binds in mesh space, which the importer models as an identity matrix per joint.
+A skinned primitive that also declares morph targets is refused: the skinned
+draw path has no morph input, so accepting it would render the base shape and
+quietly drop the targets.
 
 A skinned model shares the animation clock: `model_animate(path, seconds)`
 drives its joint channels, and `model_draw` poses it. With no clip it draws at
