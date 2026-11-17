@@ -104,6 +104,9 @@ ALLOWED_BUILTINS = {
     "mesh_culled",
     "mesh_culling",
     "shadow",
+    "screen_fade",
+    "screen_fade_to",
+    "screen_fade_alpha",
     "shadow_height",
     "shadow_alpha",
     "music_load",
@@ -370,7 +373,11 @@ async function start() {
       while (end < bytes.length && bytes[end] !== 0) end++;
       return utf8.decode(bytes.subarray(pointer, end));
     };
+    let pendingFade = 0;
     const imports = { env: {
+      fade(alpha) {
+        pendingFade = alpha;
+      },
       write(fd, pointer, length) {
         const view = new Uint8Array(memory.buffer, pointer, length);
         const text = utf8.decode(view);
@@ -564,26 +571,32 @@ async function start() {
         scene3dState.active = enabled !== 0;
       },
       present() {
-        if (!triangles.length) return;
-        if (!forcePainter && scene3dState.active && drawGl(triangles)) {
-          triangles.length = 0;
-          return;
+        if (triangles.length) {
+          if (!forcePainter && scene3dState.active && drawGl(triangles)) {
+            triangles.length = 0;
+          } else {
+            if (!skipSort) triangles.sort(
+              (first, second) =>
+                first[13] - second[13] ||
+                second[2] + second[5] + second[8] - (first[2] + first[5] + first[8])
+            );
+            for (const t of triangles) {
+              context.fillStyle = "rgba(" + t[9] + "," + t[10] + "," + t[11] + "," + (t[12] / 255) + ")";
+              context.beginPath();
+              context.moveTo(t[0], t[1]);
+              context.lineTo(t[3], t[4]);
+              context.lineTo(t[6], t[7]);
+              context.closePath();
+              context.fill();
+            }
+            triangles.length = 0;
+          }
         }
-        if (!skipSort) triangles.sort(
-          (first, second) =>
-            first[13] - second[13] ||
-            second[2] + second[5] + second[8] - (first[2] + first[5] + first[8])
-        );
-        for (const t of triangles) {
-          context.fillStyle = "rgba(" + t[9] + "," + t[10] + "," + t[11] + "," + (t[12] / 255) + ")";
-          context.beginPath();
-          context.moveTo(t[0], t[1]);
-          context.lineTo(t[3], t[4]);
-          context.lineTo(t[6], t[7]);
-          context.closePath();
-          context.fill();
+        // The fade sits above everything the frame drew, including 3D.
+        if (pendingFade > 0) {
+          context.fillStyle = "rgba(0,0,0," + Math.min(1, pendingFade / 255) + ")";
+          context.fillRect(0, 0, canvas.width, canvas.height);
         }
-        triangles.length = 0;
       },
       save_read(pointer, out, capacity) {
         const value = localStorage.getItem("anvil:" + readCString(pointer));

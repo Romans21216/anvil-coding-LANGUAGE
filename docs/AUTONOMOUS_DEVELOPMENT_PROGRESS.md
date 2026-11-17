@@ -896,3 +896,11 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Bounds:** the chain is a fixed 64-entry array of `const char *`; the site copies at most eight names at load time, so no allocation happens on the load path and a deep recursion cannot grow the report.
 - **Wasm:** the shared C generator emits the same calls, so the shim defines no-op `anvil_call_enter`/`anvil_call_leave`; the browser bakes its loads at compile time and has no report to attribute.
 - **Tests:** `tests/test_memory_report.py` adds a three-level chain (`fn(main) > fn(setup) > fn(load_world)`), a setup-block load (`from top level`) and a nine-deep chain that must be truncated after eight names; the two original site/byte-count tests still pass unchanged.
+
+## Batch 91 — a screen fade for scene transitions (8.14)
+
+- **Builtins:** `screen_fade(alpha)` sets a 0-255 black overlay and returns the previous value; `screen_fade_to(target, seconds)` walks it linearly over frame time (a zero or non-finite duration applies at once); `screen_fade_alpha()` reads it. The overlay is composited after the frame's own draws — 2D, sprites, particles, 3D — and before the present, so a menu, a level change or a hit can dim the frame without the scene knowing.
+- **Cost:** one comparison per frame while alpha is 0; the full-screen blend only runs while a fade is active.
+- **Wasm:** the shim imports `fade` and the page applies the same overlay above the canvas (including the 3D blit) inside `present()`, which previously returned early when a frame had no triangles.
+- **Tests:** `tests/test_screen_fade.py` reads real window pixels at alpha 0/128/255 and through a 0.5 s ramp (the first attempt read a dark pixel because `GetPixel` samples the screen, so the window is raised first); the wasm case asserts the `fade` op lands after `rect` and before `present`.
+

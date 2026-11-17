@@ -23,6 +23,8 @@ extern void anvil_host_text(double x, double y, const char *text, int length,
                             int r, int g, int b, int a);
 __attribute__((import_module("env"), import_name("present")))
 extern void anvil_host_present(void);
+__attribute__((import_module("env"), import_name("fade")))
+extern void anvil_host_fade(double alpha);
 __attribute__((import_module("env"), import_name("save_read")))
 extern int anvil_host_save_read(const char *key, char *out, int capacity);
 __attribute__((import_module("env"), import_name("save_write")))
@@ -2584,6 +2586,61 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
 }
 
 /* Called by the host once per animation frame; delta in milliseconds. */
+/* Screen fade: the same 0..255 black overlay as the C runtime, applied by the
+   host after the frame's own draws and before the present. */
+static double anvil_screen_fade_value;
+static double anvil_screen_fade_target;
+static double anvil_screen_fade_speed;
+static int anvil_screen_fade_active;
+
+double anvil_screen_fade(double alpha) {
+  double previous = anvil_screen_fade_value;
+  if (alpha == alpha && alpha > -1.0e308 && alpha < 1.0e308) {
+    anvil_screen_fade_value =
+        alpha < 0.0 ? 0.0 : alpha > 255.0 ? 255.0 : alpha;
+    anvil_screen_fade_active = 0;
+  }
+  return previous;
+}
+
+double anvil_screen_fade_to(double target, double seconds) {
+  double previous = anvil_screen_fade_value;
+  if (!(target == target) || target > 1.0e308 || target < -1.0e308)
+    return previous;
+  double clamped = target < 0.0 ? 0.0 : target > 255.0 ? 255.0 : target;
+  if (!(seconds > 0.0) || seconds > 1.0e308) {
+    anvil_screen_fade_value = clamped;
+    anvil_screen_fade_active = 0;
+    return previous;
+  }
+  anvil_screen_fade_target = clamped;
+  double distance = clamped - anvil_screen_fade_value;
+  anvil_screen_fade_speed = (distance < 0.0 ? -distance : distance) / seconds;
+  anvil_screen_fade_active = anvil_screen_fade_speed > 0.0;
+  return previous;
+}
+
+double anvil_screen_fade_alpha(void) { return anvil_screen_fade_value; }
+
+static void anvil_screen_fade_advance(double seconds) {
+  if (!anvil_screen_fade_active)
+    return;
+  double step = anvil_screen_fade_speed * seconds;
+  if (anvil_screen_fade_value < anvil_screen_fade_target) {
+    anvil_screen_fade_value += step;
+    if (anvil_screen_fade_value >= anvil_screen_fade_target) {
+      anvil_screen_fade_value = anvil_screen_fade_target;
+      anvil_screen_fade_active = 0;
+    }
+  } else {
+    anvil_screen_fade_value -= step;
+    if (anvil_screen_fade_value <= anvil_screen_fade_target) {
+      anvil_screen_fade_value = anvil_screen_fade_target;
+      anvil_screen_fade_active = 0;
+    }
+  }
+}
+
 __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   if (delta_ms < 0.0)
     delta_ms = 0.0;
@@ -2591,6 +2648,7 @@ __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
     delta_ms = 250.0;
   anvil_delta_seconds = delta_ms / 1000.0;
   anvil_time_seconds += anvil_delta_seconds;
+  anvil_screen_fade_advance(anvil_delta_seconds);
   if (anvil_frame_update)
     anvil_frame_update();
   anvil_particles_update(anvil_delta_seconds);
@@ -2602,6 +2660,9 @@ __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   if (anvil_frame_draw)
     anvil_frame_draw();
   anvil_particles_draw();
+  /* Only when a fade is active, so an ordinary frame's op stream is unchanged. */
+  if (anvil_screen_fade_value > 0.0)
+    anvil_host_fade(anvil_screen_fade_value);
   anvil_host_present();
 }
 

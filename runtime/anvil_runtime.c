@@ -3550,6 +3550,89 @@ double anvil_physics_step(void) {
    60 Hz that repaint churn is what read as flicker. WM_PAINT is still handled
    for occlusion, resize and the first frame. */
 static int anvil_present_full_fill = 1;
+
+/* Screen fade: a black overlay composited after every draw and before the
+   present, which is what a scene transition needs - a menu, a level change or
+   a hit can dim the frame without touching what the scene drew. alpha is
+   0..255; fade_to() walks it over real seconds using the frame clock. */
+static double anvil_screen_fade_value;
+static double anvil_screen_fade_target;
+static double anvil_screen_fade_speed; /* alpha units per second */
+static int anvil_screen_fade_active;
+
+double anvil_screen_fade(double alpha) {
+  double previous = anvil_screen_fade_value;
+  if (isfinite(alpha)) {
+    anvil_screen_fade_value = alpha < 0.0 ? 0.0 : alpha > 255.0 ? 255.0 : alpha;
+    anvil_screen_fade_active = 0;
+  }
+  return previous;
+}
+
+double anvil_screen_fade_to(double target, double seconds) {
+  double previous = anvil_screen_fade_value;
+  if (!isfinite(target))
+    return previous;
+  double clamped = target < 0.0 ? 0.0 : target > 255.0 ? 255.0 : target;
+  if (!isfinite(seconds) || seconds <= 0.0) {
+    anvil_screen_fade_value = clamped;
+    anvil_screen_fade_active = 0;
+    return previous;
+  }
+  anvil_screen_fade_target = clamped;
+  anvil_screen_fade_speed = fabs(clamped - anvil_screen_fade_value) / seconds;
+  anvil_screen_fade_active = anvil_screen_fade_speed > 0.0;
+  return previous;
+}
+
+double anvil_screen_fade_alpha(void) { return anvil_screen_fade_value; }
+
+static void anvil_screen_fade_advance(double seconds) {
+  if (!anvil_screen_fade_active)
+    return;
+  double step = anvil_screen_fade_speed * seconds;
+  if (anvil_screen_fade_value < anvil_screen_fade_target) {
+    anvil_screen_fade_value += step;
+    if (anvil_screen_fade_value >= anvil_screen_fade_target) {
+      anvil_screen_fade_value = anvil_screen_fade_target;
+      anvil_screen_fade_active = 0;
+    }
+  } else {
+    anvil_screen_fade_value -= step;
+    if (anvil_screen_fade_value <= anvil_screen_fade_target) {
+      anvil_screen_fade_value = anvil_screen_fade_target;
+      anvil_screen_fade_active = 0;
+    }
+  }
+}
+
+/* Whole-screen dim, straight into the backbuffer: out = in * (255 - alpha)/255.
+   Runs only while alpha is above zero, so a program that never fades pays one
+   comparison per frame. */
+static void anvil_screen_fade_apply(void) {
+  if (!anvil_pixels)
+    return;
+  int alpha = (int)lrint(anvil_screen_fade_value);
+  if (alpha <= 0)
+    return;
+  if (alpha > 255)
+    alpha = 255;
+  size_t count = (size_t)ANVIL_WIDTH * (size_t)ANVIL_HEIGHT;
+  if (alpha >= 255) {
+    for (size_t i = 0; i < count; ++i)
+      anvil_pixels[i] = 0u;
+    return;
+  }
+  int keep = 255 - alpha;
+  for (size_t i = 0; i < count; ++i) {
+    uint32_t pixel = anvil_pixels[i];
+    int r = (int)((pixel >> 16) & 255u) * keep / 255;
+    int g = (int)((pixel >> 8) & 255u) * keep / 255;
+    int b = (int)(pixel & 255u) * keep / 255;
+    anvil_pixels[i] = anvil_color(r, g, b);
+  }
+}
+
 /* Double buffering is on unless a program turns it off with buffer(0). */
 static int anvil_double_buffer = 1;
 
@@ -5433,12 +5516,14 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
       }
     }
     QueryPerformanceCounter(&phase_update_end);
+    anvil_screen_fade_advance(frame_elapsed);
     anvil_clear_frame();
     if (draw)
       draw();
     anvil_sprite_flush();
     anvil_particles_draw();
     anvil_trace_finish();
+    anvil_screen_fade_apply();
     if (!update) {
       memset(anvil_pressed_keys, 0, sizeof(anvil_pressed_keys));
       memset(anvil_mouse_pressed_buttons, 0,

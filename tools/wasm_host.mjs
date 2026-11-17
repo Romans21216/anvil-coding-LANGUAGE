@@ -177,6 +177,9 @@ const imports = {
     scene_mode(enabled) {
       ops.push(["scene_mode", enabled ? 1 : 0]);
     },
+    fade(alpha) {
+      ops.push(["fade", Math.round(alpha)]);
+    },
     present() {
       if (triangles.length) {
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;

@@ -1694,5 +1694,43 @@ class WasmFocusReleaseTests(unittest.TestCase):
         self.assertEqual(values, ["1", "1", "0", "0", "1", "1"])
 
 
+_FADE_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "clear rgba(0, 0, 0, 255)",
+        "set var(alpha) = screen_fade(128)",
+        "fn(draw)",
+        "  display rect(10, 20, 30, 40) -rgb(255, 0, 0)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmScreenFadeTests(unittest.TestCase):
+    def test_the_host_dims_the_frame_before_the_present(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _FADE_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            names = [op[0] for op in ops]
+            self.assertIn("fade", names)
+            fade = ops[names.index("fade")]
+            self.assertEqual(fade[1], 128)
+            # The overlay has to land above the frame's own draws.
+            self.assertGreater(names.index("fade"), names.index("rect"))
+            self.assertLess(names.index("fade"), names.index("present"))
+
+
 if __name__ == "__main__":
     unittest.main()

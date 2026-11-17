@@ -123,6 +123,12 @@ remote desktop can prevent window creation:
 - `test_parallax` — clamps the factor and returns the previous value, then pans
   the camera 100 px and proves with captured pixels that a factor-1 layer
   lands at x=0 and a 0.5 layer at x=50.
+- `test_screen_fade` — draws a white rectangle, then samples the live window
+  while `screen_fade` runs: white at alpha 0, 127 grey at 128, black at 255
+  (a 300 argument clamps), and `screen_fade_to(0, 0.5)` ramps through a mid
+  value and lands exactly on 0; a second headless case checks the
+  return/zero-duration sequence. The window must be raised first, because
+  `GetPixel` reads what is on screen.
 - `test_memory_report` — builds a headless `fn(main)` program that loads an
   image and a WAV, asserts `memory_report()` names the exact `file:line` and
   byte counts of each live resource, that destroying the image drops it from
