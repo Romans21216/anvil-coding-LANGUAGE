@@ -627,6 +627,24 @@ double cos(double radians) {
   return sum;
 }
 
+/* tan as sin/cos: the same wrapped series the other two use, so the three
+   agree with each other by construction. */
+double tan(double radians) {
+  double x = anvil_wrap_angle(radians);
+  double x2 = x * x;
+  double sine_term = x, sine = x;
+  for (int n = 1; n <= 9; ++n) {
+    sine_term *= -x2 / ((2.0 * n) * (2.0 * n + 1.0));
+    sine += sine_term;
+  }
+  double cosine_term = 1.0, cosine = 1.0;
+  for (int n = 1; n <= 9; ++n) {
+    cosine_term *= -x2 / ((2.0 * n - 1.0) * (2.0 * n));
+    cosine += cosine_term;
+  }
+  return sine / cosine;
+}
+
 /* Inclusive integer range, matching the C runtime's anvil_rnd. */
 double anvil_rnd(double min_value, double max_value) {
   if (min_value > max_value) {

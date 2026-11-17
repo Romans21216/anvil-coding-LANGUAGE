@@ -50,6 +50,7 @@ ALLOWED_BUILTINS = {
     "mouse_wheel",
     "sin",
     "cos",
+    "tan",
     "rnd",
     "save_number",
     "load_number",

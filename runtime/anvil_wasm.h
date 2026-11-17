@@ -155,6 +155,7 @@ const char *anvil_ui_focus_label(void);
 double anvil_ui_accessible(double on);
 double sin(double radians);
 double cos(double radians);
+double tan(double radians);
 double anvil_rnd(double min_value, double max_value);
 
 /* Saves: typed slots persisted by the host (localStorage in the browser). */

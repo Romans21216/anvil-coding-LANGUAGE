@@ -135,6 +135,10 @@ remote desktop can prevent window creation:
   drawn ink bounds across poses: translation moves it by half the key at 0.5 s,
   rotation changes the silhouette, STEP holds the left key until 1.0 s, the clip
   wraps at its length, and the static/wasm refusals name the source line.
+- `test_tan` — builds the same `tan` program for the C and wasm backends and compares their
+  printed lines byte for byte over straight angles, a large angle, the `tan = sin/cos`
+  identity and a scaled known value; the native backend must refuse `tan` with a located
+  "not available" diagnostic.
 - `test_ui_focus` — registers two regions and checks context traversal (`ui_focus_next`,
   `ui_focus_prev`), topmost hit-testing, `ui_focus_set`'s returned previous handle, the
   one-frame `ui_focus_activate`, and `ui_focus_clear`; a real window takes a posted
