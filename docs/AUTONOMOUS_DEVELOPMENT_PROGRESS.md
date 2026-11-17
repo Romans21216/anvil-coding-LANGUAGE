@@ -972,3 +972,10 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Evidence correction:** the 8.12 row listed 4-bit BMPs as missing from the wasm target; the baker has decoded 4-bit palettes since the palette work (`tests/test_bmp_palette.py` covers both backends), so the claim is dropped.
 - **Tests:** `tests/test_tan.py` (2 cases) compares C and wasm output byte for byte over nine angles plus the `tan = sin/cos` identity and a scaled known value, and pins the native refusal.
 - **Full suite:** 951 passed, 1 skipped, 1 xfailed in 480.88 s, exit 0.
+
+## Batch 100 — real video memory and memory_gpu (8.15)
+
+- **Accounting bug:** `memory_video()` reported one 960x600x4 framebuffer while the renderer holds two DIB backbuffers and a double-precision depth buffer, so `memory_total()` under-reported the footprint four times over. It now reports 9,216,000 bytes.
+- **New counter:** `memory_gpu()` reports the compositor-visible subset — the two DIB sections at 4,608,000 bytes — and is the measured answer to 8.15's "GPU VRAM beyond the backbuffer": rendering is CPU-side, so there is nothing else. The browser reports 0 for both because the page owns the canvas.
+- **Budgets:** `tools/mem_budgets.json` and `tests/test_memory_budget.py` re-baseline `video_bytes` to 9,216,000, and `tests/test_memory_builtins.py` asserts both counters.
+- **Full suite:** 951 passed, 1 skipped, 1 xfailed in 480.41 s, exit 0.
