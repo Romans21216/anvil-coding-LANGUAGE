@@ -148,8 +148,9 @@ set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
 - `model_morph(path, index, weight)` clamps the weight to 0-1, stores it and
   returns the previous value, so a caller can restore it. A non-finite weight
   leaves the stored value alone.
-- The weights start at the mesh's `weights` array and stay per model for the
-  life of the process.
+- The weights start at the mesh's `weights` array the first time the model is
+  drawn or a weight is set (so setting one weight before the first draw keeps
+  the rest at their defaults), and stay per model for the life of the process.
 - Blending is additive on the vertex position before scale/rotate/translate;
   vertex colour does not animate, and culling still uses the rest-pose bounding
   sphere.

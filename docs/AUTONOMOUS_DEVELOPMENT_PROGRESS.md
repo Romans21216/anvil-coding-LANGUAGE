@@ -927,3 +927,8 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Limits:** static models only — `model_morph` on an animated or skinned model is a located compile error, and wasm refuses a morphing model.
 - **Tests:** `tests/test_gltf_morph.py` measures ink (full delta at 1, half at 0.5, default weight applied, clamp/previous sequence, no-target refusal at the line, wasm refusal).
 
+### Follow-up — two morph bugs the tests caught
+
+- A program that used `model_morph` without `model_draw` emitted a call to the model's arrays while the pre-scan never registered the model (the path regex did not include `model_morph`), so the identifiers were undefined and C treated them as `int`. The regex now covers it and the clamp test fails loudly if it regresses.
+- Setting a weight before the first draw initialised the whole weight table to zero, wiping the mesh defaults. `anvil_model_morph` now takes the default array and count, so the first touch initialises from the mesh's `weights` whatever order the program uses.
+
