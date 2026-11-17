@@ -950,3 +950,10 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Input:** `TAB` joins the key tokens (virtual-key 9), and a press is hit-tested at its own position so a click still lands after Windows has sent `WM_MOUSELEAVE` for the tracked cursor.
 - **Tests:** `tests/test_ui_focus.py` (6 cases) covers headless traversal and previous-handle returns, a posted click in a real window, the label read back from the MSAA child window, the oversized-label refusal, and two wasm cases asserting one `announce` op per focus change including a scripted click.
 - **Full suite:** 939 passed, 1 skipped, 1 xfailed in 472.62 s, exit 0.
+
+## Batch 97 — scene transition primitives (8.14)
+
+- **Transition API:** `scene_change(name, seconds)` accepts names of 1–63 bytes, refuses overlap while a timed transition runs, and swaps immediately for non-positive or non-finite duration. A timed transition fades to black, swaps at its midpoint, then fades in. `scene_name`, `scene_target`, `scene_changing`, `scene_changed`, and `scene_progress` expose state. The runtime stores identifiers; user code still loads and draws scene contents.
+- **Backend scope:** C and wasm implementations share the timeline and overlay behavior. The native backend does not support this API.
+- **Reviewed risk/fix:** code review found that an immediate transition requested from C `update()` set the one-frame `scene_changed` event before `anvil_scene_update()` cleared it. The event reset now occurs before user update, matching wasm ordering. This correction is not test-verified in this review.
+- **Tests:** `tests/test_scene_manager.py` inspects immediate/timed transitions, visual black midpoint, overlap refusal, name limits, and wasm fade operations. Tests were inspected but not run in this review.

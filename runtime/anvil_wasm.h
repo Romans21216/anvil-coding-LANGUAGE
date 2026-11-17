@@ -67,6 +67,14 @@ void anvil_net_close(void);
 double anvil_screen_fade(double alpha);
 double anvil_screen_fade_to(double target, double seconds);
 double anvil_screen_fade_alpha(void);
+/* Scene manager: a fade out, a swap of the current scene name while the screen
+   is black, and a fade back in. */
+double anvil_scene_change(const char *name, double seconds);
+const char *anvil_scene_name(void);
+const char *anvil_scene_target(void);
+double anvil_scene_changing(void);
+double anvil_scene_changed(void);
+double anvil_scene_progress(void);
 void anvil_frame_enter(void);
 void anvil_frame_leave(void);
 void anvil_call_enter(const char *name);

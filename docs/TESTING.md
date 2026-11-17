@@ -141,6 +141,12 @@ remote desktop can prevent window creation:
   click at the pointer and reports the activation, the focused label is read back from
   the MSAA child window, a 200-byte label is refused with a warning, and the wasm build
   records exactly one `announce` op for the focus change.
+- `test_scene_manager` — an immediate `scene_change` swaps the name and reports the
+  one-frame `scene_changed` flag; a timed change keeps the old name until the swap,
+  reports progress, and a real window reads black at the midpoint and the drawn
+  frame afterwards; a second change while one runs, an empty name and a 70-byte name
+  are refused without disturbing the running transition; the wasm build records a
+  fade ramp that peaks at 255 and comes back to no overlay.
 - `test_gltf_import_bounds` — a skin that omits the optional
   `inverseBindMatrices` still follows its joint (identity bind), a negative mesh
   index, a skinned primitive with morph targets, and a posed model past the

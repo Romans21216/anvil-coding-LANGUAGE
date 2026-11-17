@@ -208,6 +208,12 @@ BUILTINS = {
     "ui_focus_activate": (0, 0),
     "ui_focus_label": (0, 0),
     "ui_accessible": (1, 1),
+    "scene_change": (2, 2),
+    "scene_name": (0, 0),
+    "scene_target": (0, 0),
+    "scene_changing": (0, 0),
+    "scene_changed": (0, 0),
+    "scene_progress": (0, 0),
     "receive": (0, 0),
     "body_create": (4, 4),
     "body_create_box": (5, 5),
@@ -359,6 +365,12 @@ BUILTIN_C_NAMES = {
     "ui_focus_activate": "anvil_ui_focus_activate",
     "ui_focus_label": "anvil_ui_focus_label",
     "ui_accessible": "anvil_ui_accessible",
+    "scene_change": "anvil_scene_change",
+    "scene_name": "anvil_scene_name",
+    "scene_target": "anvil_scene_target",
+    "scene_changing": "anvil_scene_changing",
+    "scene_changed": "anvil_scene_changed",
+    "scene_progress": "anvil_scene_progress",
     "receive": "anvil_net_receive",
     "buffer": "anvil_buffer",
     "text_width": "anvil_text_width",
@@ -461,6 +473,8 @@ BUILTIN_TEXT_RETURNING = {
     "music_error",
     "tilemap_error",
     "ui_focus_label",
+    "scene_name",
+    "scene_target",
 }
 
 # Common names from other languages, mapped to the Anvil spelling. A beginner
@@ -498,6 +512,7 @@ BUILTIN_ARG_KINDS = {
     "ui_focus_set": ("number",),
     "ui_focus_at": ("number", "number"),
     "ui_accessible": ("number",),
+    "scene_change": ("string", "number"),
 }
 
 # Loads take the Anvil source site as extra arguments so memory_report() can

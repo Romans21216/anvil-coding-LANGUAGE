@@ -158,6 +158,12 @@ ALLOWED_BUILTINS = {
     "ui_focus_activate",
     "ui_focus_label",
     "ui_accessible",
+    "scene_change",
+    "scene_name",
+    "scene_target",
+    "scene_changing",
+    "scene_changed",
+    "scene_progress",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)

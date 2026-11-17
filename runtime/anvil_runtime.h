@@ -83,6 +83,14 @@ double anvil_image_load_site(const char *path, const char *file, int line);
 double anvil_screen_fade(double alpha);
 double anvil_screen_fade_to(double target, double seconds);
 double anvil_screen_fade_alpha(void);
+/* Scene manager: a fade out, a swap of the current scene name while the screen
+   is black, and a fade back in. */
+double anvil_scene_change(const char *name, double seconds);
+const char *anvil_scene_name(void);
+const char *anvil_scene_target(void);
+double anvil_scene_changing(void);
+double anvil_scene_changed(void);
+double anvil_scene_progress(void);
 double anvil_memory_report(void);
 double anvil_image_width(double handle);
 double anvil_image_height(double handle);

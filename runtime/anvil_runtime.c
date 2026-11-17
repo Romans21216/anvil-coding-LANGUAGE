@@ -4273,6 +4273,99 @@ static void anvil_screen_fade_apply(void) {
   }
 }
 
+/* ---- Scene manager -------------------------------------------------------
+   A scene change is a fade out, a swap of the current scene name while the
+   screen is black, and a fade back in. The engine owns that timeline and the
+   name; the program asks which scene is current and draws that scene, so
+   nothing has to be threaded through callbacks the language cannot express. */
+
+enum { ANVIL_SCENE_NAME_MAX = 64 };
+
+/* The buffers carry different names from the accessor functions: C has one
+   namespace, so `anvil_scene_name` cannot be both a buffer and a function. */
+static char anvil_scene_current[ANVIL_SCENE_NAME_MAX];
+static char anvil_scene_pending[ANVIL_SCENE_NAME_MAX];
+static double anvil_scene_elapsed;
+static double anvil_scene_total;
+static int anvil_scene_switching;
+static int anvil_scene_swapped; /* set for the frame the name swapped */
+static int anvil_scene_warned;
+
+double anvil_scene_change(const char *name, double seconds) {
+  const char *text = name ? name : "";
+  size_t length = strlen(text);
+  if (!length || length >= ANVIL_SCENE_NAME_MAX) {
+    if (!anvil_scene_warned) {
+      anvil_scene_warned = 1;
+      fprintf(stderr,
+              "Anvil scene: a scene change needs a name of 1 to %d bytes.\n",
+              ANVIL_SCENE_NAME_MAX - 1);
+    }
+    return 0.0;
+  }
+  if (anvil_scene_switching)
+    return 0.0; /* one transition at a time; poll scene_changing() */
+  /* An immediate change needs no transition and no fade. */
+  if (!isfinite(seconds) || seconds <= 0.0) {
+    memcpy(anvil_scene_current, text, length + 1);
+    anvil_scene_pending[0] = '\0';
+    anvil_scene_switching = 0;
+    anvil_scene_swapped = 1;
+    return 1.0;
+  }
+  memcpy(anvil_scene_pending, text, length + 1);
+  anvil_scene_elapsed = 0.0;
+  anvil_scene_total = seconds;
+  anvil_scene_switching = 1;
+  /* The transition owns the fade for its duration. */
+  anvil_screen_fade_active = 0;
+  anvil_screen_fade_value = 0.0;
+  return 1.0;
+}
+
+const char *anvil_scene_name(void) { return anvil_scene_current; }
+
+/* The scene being transitioned to, or empty text once the swap has happened. */
+const char *anvil_scene_target(void) { return anvil_scene_pending; }
+
+double anvil_scene_changing(void) { return (double)anvil_scene_switching; }
+
+double anvil_scene_changed(void) { return (double)anvil_scene_swapped; }
+
+double anvil_scene_progress(void) {
+  if (!anvil_scene_switching || !(anvil_scene_total > 0.0))
+    return 1.0;
+  double progress = anvil_scene_elapsed / anvil_scene_total;
+  return progress < 0.0 ? 0.0 : progress > 1.0 ? 1.0 : progress;
+}
+
+/* Once per frame, before the draw. The name swaps at the midpoint, which is
+   inside the black hold, so the change itself is never seen. */
+static void anvil_scene_update(double seconds) {
+  if (!anvil_scene_switching)
+    return;
+  anvil_scene_elapsed += seconds > 0.0 ? seconds : 0.0;
+  double progress = anvil_scene_elapsed / anvil_scene_total;
+  if (progress >= 0.5 && anvil_scene_pending[0]) {
+    memcpy(anvil_scene_current, anvil_scene_pending, sizeof(anvil_scene_current));
+    anvil_scene_pending[0] = '\0';
+    anvil_scene_swapped = 1;
+  }
+  double alpha;
+  if (progress < 0.45)
+    alpha = 255.0 * (progress / 0.45);
+  else if (progress < 0.55)
+    alpha = 255.0;
+  else
+    alpha = 255.0 * (1.0 - (progress - 0.55) / 0.45);
+  anvil_screen_fade_active = 0;
+  anvil_screen_fade_value = alpha < 0.0 ? 0.0 : alpha > 255.0 ? 255.0 : alpha;
+  if (progress >= 1.0) {
+    anvil_scene_switching = 0;
+    anvil_screen_fade_value = 0.0;
+  }
+}
+
 /* Double buffering is on unless a program turns it off with buffer(0). */
 static int anvil_double_buffer = 1;
 
@@ -6145,6 +6238,9 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
     QueryPerformanceCounter(&phase_start);
     /* Before update(), so the frame sees this frame's focus and activation. */
     anvil_focus_frame();
+    /* Clear one-frame scene events before user update code can raise one.
+       Scene transitions advance below, after update and before draw. */
+    anvil_scene_swapped = 0;
     int update_count = 0;
     while (accumulator >= step_seconds) {
       anvil_delta_seconds = step_seconds;
@@ -6164,6 +6260,9 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
     }
     QueryPerformanceCounter(&phase_update_end);
     anvil_screen_fade_advance(frame_elapsed);
+    /* After the fade's own advance and before the draw: a running scene
+       transition owns the overlay and the current scene name. */
+    anvil_scene_update(frame_elapsed);
     anvil_clear_frame();
     if (draw)
       draw();

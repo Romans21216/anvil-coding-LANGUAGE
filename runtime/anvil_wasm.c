@@ -2651,6 +2651,80 @@ static void anvil_screen_fade_advance(double seconds) {
   }
 }
 
+/* ---- Scene manager -------------------------------------------------------
+   Same timeline as the C runtime: fade out, swap the scene name inside the
+   black hold, fade back in. */
+
+enum { ANVIL_SCENE_NAME_MAX = 64 };
+
+/* Distinct names from the accessor functions: C has one namespace. */
+static char anvil_scene_current[ANVIL_SCENE_NAME_MAX];
+static char anvil_scene_pending[ANVIL_SCENE_NAME_MAX];
+static double anvil_scene_elapsed;
+static double anvil_scene_total;
+static int anvil_scene_switching;
+static int anvil_scene_swapped;
+
+double anvil_scene_change(const char *name, double seconds) {
+  const char *text = name ? name : "";
+  size_t length = strlen(text);
+  if (!length || length >= ANVIL_SCENE_NAME_MAX)
+    return 0.0;
+  if (anvil_scene_switching)
+    return 0.0;
+  if (!anvil_wasm_finite(seconds) || seconds <= 0.0) {
+    memcpy(anvil_scene_current, text, length + 1);
+    anvil_scene_pending[0] = '\0';
+    anvil_scene_switching = 0;
+    anvil_scene_swapped = 1;
+    return 1.0;
+  }
+  memcpy(anvil_scene_pending, text, length + 1);
+  anvil_scene_elapsed = 0.0;
+  anvil_scene_total = seconds;
+  anvil_scene_switching = 1;
+  anvil_screen_fade_active = 0;
+  anvil_screen_fade_value = 0.0;
+  return 1.0;
+}
+
+const char *anvil_scene_name(void) { return anvil_scene_current; }
+const char *anvil_scene_target(void) { return anvil_scene_pending; }
+double anvil_scene_changing(void) { return (double)anvil_scene_switching; }
+double anvil_scene_changed(void) { return (double)anvil_scene_swapped; }
+
+double anvil_scene_progress(void) {
+  if (!anvil_scene_switching || !(anvil_scene_total > 0.0))
+    return 1.0;
+  double progress = anvil_scene_elapsed / anvil_scene_total;
+  return progress < 0.0 ? 0.0 : progress > 1.0 ? 1.0 : progress;
+}
+
+static void anvil_scene_update(double seconds) {
+  if (!anvil_scene_switching)
+    return;
+  anvil_scene_elapsed += seconds > 0.0 ? seconds : 0.0;
+  double progress = anvil_scene_elapsed / anvil_scene_total;
+  if (progress >= 0.5 && anvil_scene_pending[0]) {
+    memcpy(anvil_scene_current, anvil_scene_pending, sizeof(anvil_scene_current));
+    anvil_scene_pending[0] = '\0';
+    anvil_scene_swapped = 1;
+  }
+  double alpha;
+  if (progress < 0.45)
+    alpha = 255.0 * (progress / 0.45);
+  else if (progress < 0.55)
+    alpha = 255.0;
+  else
+    alpha = 255.0 * (1.0 - (progress - 0.55) / 0.45);
+  anvil_screen_fade_active = 0;
+  anvil_screen_fade_value = alpha < 0.0 ? 0.0 : alpha > 255.0 ? 255.0 : alpha;
+  if (progress >= 1.0) {
+    anvil_scene_switching = 0;
+    anvil_screen_fade_value = 0.0;
+  }
+}
+
 /* ---- UI focus and accessible labels -------------------------------------
    Same registry as the C runtime. There is no window manager here, so the
    announcement goes through the host's aria-live region instead of an MSAA
@@ -2837,9 +2911,11 @@ __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   anvil_delta_seconds = delta_ms / 1000.0;
   anvil_time_seconds += anvil_delta_seconds;
   anvil_screen_fade_advance(anvil_delta_seconds);
+  anvil_scene_swapped = 0;
   anvil_focus_frame();
   if (anvil_frame_update)
     anvil_frame_update();
+  anvil_scene_update(anvil_delta_seconds);
   anvil_particles_update(anvil_delta_seconds);
   /* Edges last one frame, like the C runtime's first-update clearing. */
   memset(anvil_keys_pressed, 0, sizeof(anvil_keys_pressed));
