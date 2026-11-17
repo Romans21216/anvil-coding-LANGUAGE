@@ -170,6 +170,7 @@ class WasmCanvasTests(unittest.TestCase):
             )
             self.assertEqual(run.returncode, 0, run.stderr)
             ops = json.loads(run.stdout.strip().splitlines()[-1])
+            ops = [op for op in ops if op[0] != "scene_mode"]
             self.assertEqual(
                 ops,
                 [
@@ -1519,6 +1520,30 @@ class WasmPhysicsTests(unittest.TestCase):
                 [str(executable)], capture_output=True, text=True, timeout=60
             )
             self.assertEqual(native.stdout, run.stdout)
+
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmSceneModeTests(unittest.TestCase):
+    def test_a_3d_scene_tells_the_host_to_use_the_depth_renderer(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _THREE_D_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            page = out.with_suffix(".html").read_text(encoding="utf-8")
+            self.assertIn("scene_mode", page)
+            self.assertIn("webgl", page.lower())
+            self.assertIn('has("painter")', page)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            self.assertIn(["scene_mode", 1], ops)
 
 
 if __name__ == "__main__":

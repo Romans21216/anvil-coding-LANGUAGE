@@ -174,6 +174,9 @@ const imports = {
     triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
       triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
     },
+    scene_mode(enabled) {
+      ops.push(["scene_mode", enabled ? 1 : 0]);
+    },
     present() {
       if (triangles.length) {
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;

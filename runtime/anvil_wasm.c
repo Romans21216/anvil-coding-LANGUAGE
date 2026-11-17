@@ -29,6 +29,9 @@ __attribute__((import_module("env"), import_name("save_write")))
 extern void anvil_host_save_write(const char *key, const char *value);
 __attribute__((import_module("env"), import_name("save_delete")))
 extern int anvil_host_save_delete(const char *key);
+__attribute__((import_module("env"), import_name("scene_mode")))
+extern void anvil_host_scene_mode(int enabled);
+
 __attribute__((import_module("env"), import_name("triangle")))
 extern void anvil_host_triangle(double x1, double y1, double z1, double x2,
                                 double y2, double z2, double x3, double y3,
@@ -559,7 +562,10 @@ static double anvil_camera_x, anvil_camera_y, anvil_camera_z;
 static double anvil_camera_yaw, anvil_camera_pitch;
 static double anvil_camera_focal = 520.0;
 
-void anvil_set_scene3d(int enabled) { anvil_scene_is_3d = enabled != 0; }
+void anvil_set_scene3d(int enabled) {
+  anvil_scene_is_3d = enabled != 0;
+  anvil_host_scene_mode(anvil_scene_is_3d);
+}
 
 void anvil_camera_perspective(double x, double y, double z) {
   anvil_camera_x = x;

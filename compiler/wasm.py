@@ -181,6 +181,103 @@ async function start() {
     const module = await WebAssembly.compile(bytes);
     let memory = null;
     let app = null;
+    const scene3dState = { active: false };
+    const pageParams = new URLSearchParams(location.search);
+    const forcePainter = pageParams.has("painter");
+    const skipSort = pageParams.has("nosort");
+    let glRenderer = null;
+    const createGlRenderer = () => {
+      if (glRenderer !== null) return glRenderer;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 960;
+        canvas.height = 600;
+        const gl = canvas.getContext("webgl", { antialias: false, premultipliedAlpha: false });
+        if (!gl) return (glRenderer = false);
+        const compile = (type, source) => {
+          const shader = gl.createShader(type);
+          gl.shaderSource(shader, source);
+          gl.compileShader(shader);
+          if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            throw new Error(gl.getShaderInfoLog(shader));
+          }
+          return shader;
+        };
+        const program = gl.createProgram();
+        gl.attachShader(program, compile(gl.VERTEX_SHADER,
+          "attribute vec2 pos; attribute float depth; attribute vec4 colour;" +
+          "varying vec4 v_colour;" +
+          "void main() {" +
+          "  float z = clamp(depth / 500.0, 0.0, 1.0) * 2.0 - 1.0;" +
+          "  gl_Position = vec4(pos.x / 480.0 - 1.0, 1.0 - pos.y / 300.0, z, 1.0);" +
+          "  v_colour = colour;" +
+          "}"));
+        gl.attachShader(program, compile(gl.FRAGMENT_SHADER,
+          "precision mediump float; varying vec4 v_colour;" +
+          "void main() { gl_FragColor = v_colour; }"));
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          throw new Error(gl.getProgramInfoLog(program));
+        }
+        gl.useProgram(program);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        glRenderer = {
+          canvas,
+          gl,
+          pos: gl.getAttribLocation(program, "pos"),
+          depth: gl.getAttribLocation(program, "depth"),
+          colour: gl.getAttribLocation(program, "colour"),
+        };
+      } catch (error) {
+        glRenderer = false;
+      }
+      return glRenderer;
+    };
+    const drawGl = (list) => {
+      const renderer = createGlRenderer();
+      if (!renderer) return false;
+      const { canvas, gl } = renderer;
+      gl.viewport(0, 0, 960, 600);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      const stride = 7 * 4;
+      const upload = (entries, depthTest) => {
+        if (!entries.length) return;
+        const data = new Float32Array(entries.length * 3 * 7);
+        let at = 0;
+        for (const entry of entries) {
+          for (const corner of [[entry[0], entry[1], entry[2]], [entry[3], entry[4], entry[5]], [entry[6], entry[7], entry[8]]]) {
+            data[at++] = corner[0];
+            data[at++] = corner[1];
+            data[at++] = corner[2];
+            data[at++] = entry[9] / 255;
+            data[at++] = entry[10] / 255;
+            data[at++] = entry[11] / 255;
+            data[at++] = entry[12] / 255;
+          }
+        }
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(renderer.pos);
+        gl.vertexAttribPointer(renderer.pos, 2, gl.FLOAT, false, stride, 0);
+        gl.enableVertexAttribArray(renderer.depth);
+        gl.vertexAttribPointer(renderer.depth, 1, gl.FLOAT, false, stride, 2 * 4);
+        gl.enableVertexAttribArray(renderer.colour);
+        gl.vertexAttribPointer(renderer.colour, 4, gl.FLOAT, false, stride, 3 * 4);
+        if (depthTest) gl.enable(gl.DEPTH_TEST);
+        else gl.disable(gl.DEPTH_TEST);
+        gl.drawArrays(gl.TRIANGLES, 0, entries.length * 3);
+        gl.deleteBuffer(buffer);
+      };
+      upload(list.filter((entry) => entry[13] !== 1), true);
+      upload(list.filter((entry) => entry[13] === 1), false);
+      context.drawImage(canvas, 0, 0);
+      return true;
+    };
     const imageCache = new Map();
     const audioState = { ctx: null, voices: new Map(), nextVoice: 0, active: 0 };
     const musicState = { source: null, gain: null, startedAt: 0, loop: false, length: 0 };
@@ -450,9 +547,16 @@ async function start() {
       triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
         triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
       },
+      scene_mode(enabled) {
+        scene3dState.active = enabled !== 0;
+      },
       present() {
         if (!triangles.length) return;
-        triangles.sort(
+        if (!forcePainter && scene3dState.active && drawGl(triangles)) {
+          triangles.length = 0;
+          return;
+        }
+        if (!skipSort) triangles.sort(
           (first, second) =>
             first[13] - second[13] ||
             second[2] + second[5] + second[8] - (first[2] + first[5] + first[8])

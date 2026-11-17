@@ -145,10 +145,18 @@ submits them through the same path as the primitives. `mesh_drawn()` counts the
 triangles submitted in the frame; `mesh_culled()` is always 0 because there is
 no bounding-sphere test yet, and `mesh_culling(on)` only echoes its argument.
 
-The host draws them with the painter's algorithm on the 2D canvas: triangles are
-collected during the frame and sorted far-to-near at `present()`. That means no
-depth buffer, so overlapping triangles at the same depth can sort wrongly, and
-3D is always painted after any 2D drawing in the frame. Skins, morph targets,
+The page renders triangles with WebGL into an offscreen 960x600 canvas and blits
+it onto the visible canvas at `present()`. The shader maps camera depth onto the
+clip-space z axis and a real depth buffer resolves every pixel, so submission
+order no longer matters and intersecting geometry is correct. Shadows (layer 1)
+are drawn after geometry with the depth test disabled, which keeps them on top
+of the floor without letting them cover the object.
+
+Two fallbacks still use the painter's algorithm: the Node host (no WebGL) and a
+page opened with `?painter=1`. `?nosort=1` additionally skips the far-to-near
+sort, which is how the depth test is demonstrated — an unsorted painter shows
+the farther cube, WebGL shows the nearer one. 3D is still painted after any 2D
+drawing in the frame, and 2D primitives in a 3D scene are covered by the blit. Skins, morph targets,
 textures and `ray_sphere` remain C-backend only.
 
 ## Audio
