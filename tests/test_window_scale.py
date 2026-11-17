@@ -105,7 +105,12 @@ class WindowScaleTests(unittest.TestCase):
             # Sample until the program exits rather than for a fixed time: the
             # frame clock decides when each resize happens, not the test.
             while process.poll() is None and time.monotonic() - start < 8.0:
-                left, top, right, bottom = reader.client_rect()
+                try:
+                    left, top, right, bottom = reader.client_rect()
+                except Exception:
+                    # The window can close between the poll and the query; the
+                    # sizes sampled so far are still the evidence.
+                    break
                 size = (right - left, bottom - top)
                 if not seen or seen[-1] != size:
                     seen.append(size)
