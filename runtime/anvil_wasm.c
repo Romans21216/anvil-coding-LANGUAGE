@@ -320,6 +320,16 @@ char *anvil_str_cat(char *dest, const char *a, const char *b, const char *path,
   return dest;
 }
 
+/* Format a number into a scratch slot so `text & number` joins work on wasm.
+   The C runtime keeps this beside anvil_str_cat; the wasm shim was missing it
+   entirely, so any program that joined a number to text failed to link. */
+char *anvil_str_from_number(int slot, double value) {
+  if (slot < 0 || slot >= 256)
+    anvil_runtime_error("text slot is invalid");
+  anvil_str_set(anvil_str_scratch[slot], anvil_format_number(value), NULL, 0);
+  return anvil_str_scratch[slot];
+}
+
 char *anvil_text_upper(const char *source) {
   char *destination = anvil_text_buffer();
   size_t index = 0;
@@ -1485,6 +1495,15 @@ double anvil_image_load(const char *path) {
   return 0.0;
 }
 
+/* The browser backend bakes every literal load at compile time, so there is no
+   call site to remember: memory_report() does not exist here and the extra
+   arguments are accepted only to keep the shared C generator's calls linking. */
+double anvil_image_load_site(const char *path, const char *file, int line) {
+  (void)file;
+  (void)line;
+  return anvil_image_load(path);
+}
+
 double anvil_image_width(double handle) {
   AnvilWasmImageSlot *slot = anvil_image_slot(handle);
   return slot ? (double)slot->source->width : 0.0;
@@ -1708,6 +1727,12 @@ double anvil_sound_load(const char *path) {
       "the sound was not baked into this build; only literal sound_load() "
       "paths are available in the wasm backend";
   return 0.0;
+}
+
+double anvil_sound_load_site(const char *path, const char *file, int line) {
+  (void)file;
+  (void)line;
+  return anvil_sound_load(path);
 }
 
 double anvil_sound_start(double handle, int loop);

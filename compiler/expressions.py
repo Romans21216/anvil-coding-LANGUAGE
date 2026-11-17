@@ -218,6 +218,7 @@ BUILTINS = {
     "ray_backend_available": (1, 1),
     "buffer": (1, 1),
     "text_width": (1, 1),
+    "memory_report": (0, 0),
     "frame_capture": (0, 0),
     "sprite_batch": (1, 1),
     "sprite_depth": (1, 1),
@@ -310,6 +311,7 @@ BUILTIN_C_NAMES = {
     "receive": "anvil_net_receive",
     "buffer": "anvil_buffer",
     "text_width": "anvil_text_width",
+    "memory_report": "anvil_memory_report",
     "frame_capture": "anvil_frame_capture",
     "sprite_batch": "anvil_sprite_batch",
     "sprite_depth": "anvil_sprite_depth",
@@ -413,6 +415,13 @@ BUILTIN_ARG_KINDS = {
     "save_exists": ("string",),
     "save_delete": ("string",),
     "music_load": ("string",),
+}
+
+# Loads take the Anvil source site as extra arguments so memory_report() can
+# name the line that created each live resource.
+SITE_BUILTINS = {
+    "image_load": "anvil_image_load_site",
+    "sound_load": "anvil_sound_load_site",
 }
 
 BUILTIN_STRING_ARGUMENTS = {
@@ -804,7 +813,12 @@ class ExpressionParser:
                     f"argument(s), got {len(args)}{hint}"
                 )
             name = BUILTIN_C_NAMES.get(value, value)
-            call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"
+            site_name = SITE_BUILTINS.get(value)
+            if site_name is not None and len(args) == 1:
+                escaped = str(self.path).replace("\\", "\\\\").replace('"', '\\"')
+                call = f'{site_name} ( {args[0]}, "{escaped}", {self.line} )'
+            else:
+                call = f"{name} ( {', '.join(args)} )" if args else f"{name} ( )"
             if value in BUILTIN_TEXT_RETURNING:
                 left = (call, "string")
             else:

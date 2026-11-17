@@ -75,6 +75,7 @@ void anvil_array_set(double *values, int size, double index, double value,
 void anvil_str_set(char *dest, const char *value, const char *path, int line);
 char *anvil_str_cat(char *dest, const char *a, const char *b, const char *path,
                     int line);
+char *anvil_str_from_number(int slot, double value);
 char *anvil_text_upper(const char *source);
 char *anvil_text_mid(const char *source, double start, double count);
 double anvil_text_to_number(const char *source);
@@ -191,6 +192,7 @@ typedef struct {
 
 void anvil_wasm_set_images(const AnvilWasmImage *images, int count);
 double anvil_image_load(const char *path);
+double anvil_image_load_site(const char *path, const char *file, int line);
 double anvil_image_width(double handle);
 double anvil_image_pixel(double handle, double x, double y);
 double anvil_image_height(double handle);
@@ -216,6 +218,7 @@ typedef struct {
 
 void anvil_wasm_set_sounds(const AnvilWasmSound *sounds, int count);
 double anvil_sound_load(const char *path);
+double anvil_sound_load_site(const char *path, const char *file, int line);
 double anvil_sound_play(double handle);
 double anvil_sound_play_loop(double handle);
 double anvil_sound_pan(double voice, double pan);

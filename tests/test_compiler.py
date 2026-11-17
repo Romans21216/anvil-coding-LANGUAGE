@@ -249,8 +249,13 @@ class CompilerTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             emitted = generated.read_text(encoding="utf-8")
+            # image_load carries its Anvil source site so memory_report() can
+            # name the line that allocated each image.
+            self.assertIn(
+                'anvil_image_load_site ( "assets/player.bmp",', emitted
+            )
+            self.assertIn('images.ANVL", 2 )', emitted)
             for call in (
-                'anvil_image_load ( "assets/player.bmp" )',
                 "anvil_image_width ( anvil_sprite )",
                 "anvil_image_height ( anvil_sprite )",
                 "anvil_image_draw ( anvil_sprite, 20.0, 30.0 )",

@@ -99,6 +99,11 @@ remote desktop can prevent window creation:
   delay until `pressed(A)` fires; interactive, kept to a few presses.
 - `test_memory_builtins` — loads images and a WAV and asserts the exact byte
   counts from `memory_images`/`memory_audio`/`memory_video`/`memory_total`.
+- `test_memory_report` — builds a headless `fn(main)` program that loads an
+  image and a WAV, asserts `memory_report()` names the exact `file:line` and
+  byte counts of each live resource, that destroying the image drops it from
+  the report, and that the wasm backend refuses the builtin with a located
+  message.
 - `test_memory_budget` — samples the compiler's process tree and each scene's
   working set, checks generated C and executable sizes, and enforces
   `tools/mem_budgets.json`.

@@ -120,6 +120,16 @@ static int anvil_mouse_invalid_button_warned;
 static AnvilImage anvil_images[ANVIL_IMAGES];
 static size_t anvil_image_memory_used;
 static size_t anvil_sound_bytes;
+/* Where each live resource came from: the compiler passes the Anvil source
+   file and line to every load, so memory_report() can name the call site
+   instead of just a byte total. Declared up here because the image loader
+   records its site long before the sound section is defined. */
+typedef struct {
+  const char *file;
+  const char *path;
+  int line;
+} AnvilAllocSite;
+static AnvilAllocSite anvil_image_sites[ANVIL_IMAGES];
 static int anvil_clear_color[4] = {12, 17, 29, 255};
 static int anvil_scene_is_3d = 1;
 static double anvil_camera_x = 0.0, anvil_camera_y = 3.0, anvil_camera_z = 8.0;
@@ -1277,6 +1287,17 @@ double anvil_image_load(const char *path) {
   anvil_image_memory_used += (size_t)output_bytes;
   return (double)(anvil_images[slot].generation - 1) * ANVIL_IMAGES + slot + 1;
 }
+double anvil_image_load_site(const char *path, const char *file, int line) {
+  double handle = anvil_image_load(path);
+  if (handle >= 1.0) {
+    int slot = ((int)handle - 1) % ANVIL_IMAGES;
+    anvil_image_sites[slot].file = file;
+    anvil_image_sites[slot].path = path;
+    anvil_image_sites[slot].line = line;
+  }
+  return handle;
+}
+
 double anvil_memory_images(void) { return (double)anvil_image_memory_used; }
 double anvil_memory_audio(void) { return (double)anvil_sound_bytes; }
 double anvil_memory_video(void) {
@@ -3282,6 +3303,10 @@ typedef struct {
   int loop;
 } AnvilVoice;
 
+/* AnvilAllocSite itself is declared up with the image table; the sound slots
+   just need their own array of it. */
+static AnvilAllocSite anvil_sound_sites[ANVIL_SOUND_SLOTS];
+
 static AnvilSound anvil_sounds[ANVIL_SOUND_SLOTS];
 static AnvilVoice anvil_voices[ANVIL_SOUND_VOICES];
 /* Index 0 is the master gain; 1..3 are mixer groups. Muting is separate so a
@@ -3975,6 +4000,57 @@ double anvil_sound_load(const char *path) {
   anvil_sounds[slot].group = 1;
   anvil_sound_bytes += bytes;
   return (double)(slot + 1);
+}
+
+double anvil_sound_load_site(const char *path, const char *file, int line) {
+  double handle = anvil_sound_load(path);
+  if (handle >= 1.0 && handle <= (double)ANVIL_SOUND_SLOTS) {
+    int slot = (int)handle - 1;
+    anvil_sound_sites[slot].file = file;
+    anvil_sound_sites[slot].path = path;
+    anvil_sound_sites[slot].line = line;
+  }
+  return handle;
+}
+
+/* Print every live image and sound with its size and the source line that
+   created it. Returns the number of live allocations so a program can react
+   (for example, log a warning above a threshold). Lives down here because it
+   walks the sound table, which is only defined in this section. */
+double anvil_memory_report(void) {
+  int live = 0;
+  size_t image_bytes = 0, audio_bytes = 0;
+  printf("Anvil memory report\n");
+  for (int i = 0; i < ANVIL_IMAGES; ++i) {
+    if (!anvil_images[i].pixels)
+      continue;
+    size_t bytes = (size_t)anvil_images[i].width * (size_t)anvil_images[i].height * 4u;
+    image_bytes += bytes;
+    const AnvilAllocSite *site = &anvil_image_sites[i];
+    printf("  image %d  %dx%d  %llu bytes  %s:%d  %s\n", i,
+           anvil_images[i].width, anvil_images[i].height,
+           (unsigned long long)bytes,
+           site->file ? site->file : "?", site->line,
+           site->path ? site->path : "?");
+    ++live;
+  }
+  for (int i = 0; i < ANVIL_SOUND_SLOTS; ++i) {
+    if (!anvil_sounds[i].used)
+      continue;
+    size_t bytes = anvil_sounds[i].frame_count * 2u * sizeof(short);
+    audio_bytes += bytes;
+    const AnvilAllocSite *site = &anvil_sound_sites[i];
+    printf("  sound %d  %llu frames  %llu bytes  %s:%d  %s\n", i,
+           (unsigned long long)anvil_sounds[i].frame_count,
+           (unsigned long long)bytes,
+           site->file ? site->file : "?", site->line,
+           site->path ? site->path : "?");
+    ++live;
+  }
+  printf("  live allocations: %d  (%llu image bytes, %llu audio bytes)\n", live,
+         (unsigned long long)image_bytes, (unsigned long long)audio_bytes);
+  fflush(stdout);
+  return (double)live;
 }
 
 static int anvil_sound_valid(double handle) {
