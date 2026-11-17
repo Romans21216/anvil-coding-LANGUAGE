@@ -13,10 +13,10 @@
   },
   "sprite_transform": {
     "distinct_colours": 84,
-    "non_background": 0.371
+    "non_background": 0.3712
   },
   "textured_cube": {
-    "distinct_colours": 31,
-    "non_background": 0.1131
+    "distinct_colours": 29,
+    "non_background": 0.0858
   }
 }

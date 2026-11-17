@@ -97,7 +97,12 @@ static LONG anvil_window_saved_style;
 static RECT anvil_window_saved_rect;
 static int anvil_window_is_fullscreen;
 static HDC anvil_memory_dc;
-static HBITMAP anvil_bitmap;
+/* Two framebuffers: the program draws into the back one while the front one is
+   on screen, and they swap at present, so no frame is ever shown half-drawn. */
+static HBITMAP anvil_bitmaps[2];
+static uint32_t *anvil_buffers[2];
+static uint32_t *anvil_display_pixels;
+static int anvil_back_index;
 static HGDIOBJ anvil_old_bitmap;
 static BITMAPINFO anvil_bitmap_info;
 static uint32_t *anvil_pixels;
@@ -1253,7 +1258,98 @@ double anvil_image_flip(double handle, double x, double y) {
   image->flip_y = y != 0.0;
   return 1.0;
 }
-double anvil_image_draw_scaled(double handle, double x, double y, double width,
+/* ---- Sprite queue ------------------------------------------------------
+   sprite_batch(1) defers image draws to the end of the frame so they can be
+   ordered by sprite_depth() instead of submission order — the y-sorting every
+   2D game ends up writing by hand. With batching off (the default) draws go
+   straight to the framebuffer, so existing programs are unchanged. */
+enum { ANVIL_SPRITE_QUEUE = 4096 };
+
+typedef struct {
+  double args[9];
+  double depth;
+  int kind;
+} AnvilSpriteDraw;
+
+static double anvil_image_draw_scaled_now(double handle, double x, double y,
+                                          double width, double height);
+static double anvil_image_draw_rotated_now(double handle, double cx, double cy,
+                                           double angle, double scale);
+static double anvil_image_draw_region_now(double handle, double sx, double sy,
+                                          double sw, double sh, double dx,
+                                          double dy, double dw, double dh);
+static void anvil_sprite_flush(void);
+
+static AnvilSpriteDraw anvil_sprite_queue[ANVIL_SPRITE_QUEUE];
+static int anvil_sprite_count;
+static int anvil_sprite_batch_on;
+static double anvil_sprite_depth_value;
+static int anvil_sprite_flushed_last_frame;
+
+double anvil_sprite_batch(double on) {
+  int previous = anvil_sprite_batch_on;
+  anvil_sprite_batch_on = on != 0.0;
+  if (!anvil_sprite_batch_on)
+    anvil_sprite_flush();
+  return (double)previous;
+}
+
+double anvil_sprite_depth(double depth) {
+  double previous = anvil_sprite_depth_value;
+  if (isfinite(depth))
+    anvil_sprite_depth_value = depth;
+  return previous;
+}
+
+double anvil_sprite_queued(void) { return (double)anvil_sprite_flushed_last_frame; }
+
+static int anvil_sprite_push(int kind, const double *args) {
+  if (anvil_sprite_count >= ANVIL_SPRITE_QUEUE)
+    return 0;
+  AnvilSpriteDraw *entry = &anvil_sprite_queue[anvil_sprite_count++];
+  for (int i = 0; i < 9; ++i)
+    entry->args[i] = args[i];
+  entry->depth = anvil_sprite_depth_value;
+  entry->kind = kind;
+  return 1;
+}
+
+static void anvil_sprite_flush(void) {
+  int count = anvil_sprite_count;
+  anvil_sprite_count = 0;
+  anvil_sprite_flushed_last_frame = count;
+  if (count == 0)
+    return;
+  /* Stable insertion sort: equal depths keep submission order. */
+  for (int i = 1; i < count; ++i) {
+    AnvilSpriteDraw entry = anvil_sprite_queue[i];
+    int j = i - 1;
+    while (j >= 0 && anvil_sprite_queue[j].depth > entry.depth) {
+      anvil_sprite_queue[j + 1] = anvil_sprite_queue[j];
+      --j;
+    }
+    anvil_sprite_queue[j + 1] = entry;
+  }
+  for (int i = 0; i < count; ++i) {
+    AnvilSpriteDraw *entry = &anvil_sprite_queue[i];
+    const double *a = entry->args;
+    if (entry->kind == 0)
+      anvil_image_draw_scaled_now(a[0], a[1], a[2], a[3], a[4]);
+    else if (entry->kind == 1)
+      anvil_image_draw_rotated_now(a[0], a[1], a[2], a[3], a[4]);
+    else
+      anvil_image_draw_region_now(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
+                                  a[8]);
+  }
+}
+
+static double anvil_sprite_dispatch(int kind, const double *args) {
+  if (anvil_sprite_batch_on && anvil_sprite_push(kind, args))
+    return 1.0;
+  return 0.0;
+}
+
+double anvil_image_draw_scaled_now(double handle, double x, double y, double width,
                                double height) {
   AnvilImage *image = anvil_image_from_handle(handle);
   if (!image || !anvil_pixels || !isfinite(x) || !isfinite(y) ||
@@ -1296,7 +1392,7 @@ double anvil_image_draw_scaled(double handle, double x, double y, double width,
 /* Draw an image centred on (cx, cy), rotated clockwise by degrees and scaled
    uniformly. Nearest-neighbour sampling matches the scaled draw; tint and flip
    are the image's own state, so both draw paths share them. */
-double anvil_image_draw_rotated(double handle, double cx, double cy,
+static double anvil_image_draw_rotated_now(double handle, double cx, double cy,
                                 double degrees, double scale) {
   AnvilImage *image = anvil_image_from_handle(handle);
   if (!image || !anvil_pixels || !isfinite(cx) || !isfinite(cy) ||
@@ -1346,7 +1442,7 @@ double anvil_image_draw_rotated(double handle, double cx, double cy,
    rectangle. The source rect must lie fully inside the image; a rect that does
    not is a layout bug, so it returns 0 instead of silently clamping. Flip and
    tint are the image's state, with flip mirrored inside the source rect. */
-double anvil_image_draw_region(double handle, double sx, double sy, double sw,
+static double anvil_image_draw_region_now(double handle, double sx, double sy, double sw,
                                double sh, double dx, double dy, double dw,
                                double dh) {
   AnvilImage *image = anvil_image_from_handle(handle);
@@ -1391,6 +1487,38 @@ double anvil_image_draw_region(double handle, double sx, double sy, double sw,
     }
   }
   return 1.0;
+}
+
+
+double anvil_image_draw_scaled(double handle, double x, double y, double width,
+                               double height) {
+  if (!anvil_image_from_handle(handle))
+    return 0.0;
+  const double args[9] = {handle, x, y, width, height, 0, 0, 0, 0};
+  if (anvil_sprite_dispatch(0, args))
+    return 1.0;
+  return anvil_image_draw_scaled_now(handle, x, y, width, height);
+}
+
+double anvil_image_draw_rotated(double handle, double cx, double cy, double angle,
+                                double scale) {
+  if (!anvil_image_from_handle(handle))
+    return 0.0;
+  const double args[9] = {handle, cx, cy, angle, scale, 0, 0, 0, 0};
+  if (anvil_sprite_dispatch(1, args))
+    return 1.0;
+  return anvil_image_draw_rotated_now(handle, cx, cy, angle, scale);
+}
+
+double anvil_image_draw_region(double handle, double sx, double sy, double sw,
+                               double sh, double dx, double dy, double dw,
+                               double dh) {
+  if (!anvil_image_from_handle(handle))
+    return 0.0;
+  const double args[9] = {handle, sx, sy, sw, sh, dx, dy, dw, dh};
+  if (anvil_sprite_dispatch(2, args))
+    return 1.0;
+  return anvil_image_draw_region_now(handle, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 double anvil_image_draw(double handle, double x, double y) {
@@ -2623,6 +2751,19 @@ static void anvil_present_window(void) {
   if (!anvil_compute_viewport(width, height, ANVIL_WIDTH, ANVIL_HEIGHT,
                               &viewport))
     return;
+  const uint32_t *source = anvil_pixels;
+  if (anvil_double_buffer) {
+    /* The frame just finished becomes the one on screen; drawing continues in
+       the other buffer, so the image being displayed is never touched again. */
+    anvil_display_pixels = anvil_pixels;
+    source = anvil_display_pixels;
+    anvil_back_index ^= 1;
+    SelectObject(anvil_memory_dc, anvil_bitmaps[anvil_back_index]);
+    anvil_pixels = anvil_buffers[anvil_back_index];
+  } else {
+    anvil_display_pixels = anvil_pixels;
+    source = anvil_pixels;
+  }
   HDC dc = GetDC(anvil_window);
   if (!dc)
     return;
@@ -2633,7 +2774,7 @@ static void anvil_present_window(void) {
       anvil_present_full_fill = 0;
     }
     StretchDIBits(anvil_paint_dc, viewport.x, viewport.y, viewport.width,
-                  viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT, anvil_pixels,
+                  viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT, source,
                   &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
     BitBlt(dc, 0, 0, width, height, anvil_paint_dc, 0, 0, SRCCOPY);
   } else {
@@ -2643,8 +2784,8 @@ static void anvil_present_window(void) {
       anvil_present_full_fill = 0;
     }
     StretchDIBits(dc, viewport.x, viewport.y, viewport.width, viewport.height, 0,
-                  0, ANVIL_WIDTH, ANVIL_HEIGHT, anvil_pixels,
-                  &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
+                  0, ANVIL_WIDTH, ANVIL_HEIGHT, source, &anvil_bitmap_info,
+                  DIB_RGB_COLORS, SRCCOPY);
   }
   ReleaseDC(anvil_window, dc);
 }
@@ -2746,8 +2887,9 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
         if (have_viewport)
           StretchDIBits(anvil_paint_dc, viewport.x, viewport.y, viewport.width,
                         viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
-                        anvil_pixels, &anvil_bitmap_info, DIB_RGB_COLORS,
-                        SRCCOPY);
+                        anvil_display_pixels ? anvil_display_pixels
+                                             : anvil_pixels,
+                        &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
         BitBlt(dc, 0, 0, width, height, anvil_paint_dc, 0, 0, SRCCOPY);
       } else {
         /* No double buffer available: paint directly rather than not at all. */
@@ -2755,8 +2897,9 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
         if (have_viewport)
           StretchDIBits(dc, viewport.x, viewport.y, viewport.width,
                         viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
-                        anvil_pixels, &anvil_bitmap_info, DIB_RGB_COLORS,
-                        SRCCOPY);
+                        anvil_display_pixels ? anvil_display_pixels
+                                             : anvil_pixels,
+                        &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
       }
     }
     EndPaint(window, &ps);
@@ -4223,15 +4366,18 @@ static void anvil_release_frame_resources(void) {
   anvil_image_memory_used = 0;
   if (anvil_memory_dc && anvil_old_bitmap)
     SelectObject(anvil_memory_dc, anvil_old_bitmap);
-  if (anvil_bitmap)
-    DeleteObject(anvil_bitmap);
+  for (int i = 0; i < 2; ++i)
+    if (anvil_bitmaps[i])
+      DeleteObject(anvil_bitmaps[i]);
   if (anvil_memory_dc)
     DeleteDC(anvil_memory_dc);
   /* CreateDIBSection owns this pixel memory; DeleteObject releases it. */
   free(anvil_depth_buffer);
   anvil_pixels = NULL;
   anvil_depth_buffer = NULL;
-  anvil_bitmap = NULL;
+  anvil_bitmaps[0] = anvil_bitmaps[1] = NULL;
+  anvil_buffers[0] = anvil_buffers[1] = NULL;
+  anvil_display_pixels = NULL;
   anvil_old_bitmap = NULL;
   anvil_memory_dc = NULL;
 }
@@ -4319,14 +4465,21 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   anvil_bitmap_info.bmiHeader.biPlanes = 1;
   anvil_bitmap_info.bmiHeader.biBitCount = 32;
   anvil_bitmap_info.bmiHeader.biCompression = BI_RGB;
-  anvil_bitmap =
-      CreateDIBSection(anvil_memory_dc, &anvil_bitmap_info, DIB_RGB_COLORS,
-                       (void **)&anvil_pixels, NULL, 0);
+  for (int i = 0; i < 2; ++i) {
+    anvil_bitmaps[i] =
+        CreateDIBSection(anvil_memory_dc, &anvil_bitmap_info, DIB_RGB_COLORS,
+                         (void **)&anvil_buffers[i], NULL, 0);
+    if (!anvil_bitmaps[i] || !anvil_buffers[i])
+      goto failed_startup;
+  }
   anvil_depth_buffer =
       (double *)malloc((size_t)ANVIL_WIDTH * ANVIL_HEIGHT * sizeof(double));
-  if (!anvil_bitmap || !anvil_pixels || !anvil_depth_buffer)
+  if (!anvil_depth_buffer)
     goto failed_startup;
-  anvil_old_bitmap = SelectObject(anvil_memory_dc, anvil_bitmap);
+  anvil_back_index = 0;
+  anvil_pixels = anvil_buffers[0];
+  anvil_display_pixels = anvil_buffers[0];
+  anvil_old_bitmap = SelectObject(anvil_memory_dc, anvil_bitmaps[0]);
   QueryPerformanceFrequency(&anvil_clock_frequency);
   QueryPerformanceCounter(&anvil_clock_start);
   LARGE_INTEGER prev = anvil_clock_start;
@@ -4385,6 +4538,7 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
     anvil_clear_frame();
     if (draw)
       draw();
+    anvil_sprite_flush();
     anvil_particles_draw();
     anvil_trace_finish();
     if (!update) {

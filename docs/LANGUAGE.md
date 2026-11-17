@@ -215,16 +215,32 @@ Implemented draw commands are `rect`, `circle`, `line`, `text`, `cube`, `sphere`
 
 The window itself can be controlled from the game. `window_on_top(1)` keeps it above other applications and `window_on_top(0)` returns it to normal, so a game can float over the editor while it is being written and go behind other programs afterwards. `window_fullscreen(1)` switches to borderless fullscreen on the current monitor and `window_fullscreen(0)` restores the previous window style and position. Both return `1` on success and `0` when no window exists yet, and both work as a statement or inside an expression. They are C-backend only; the native backend reports a located "not available" diagnostic. `examples/window_controls.ANVL` toggles both with F and T.
 
+### Sprite batching and depth
+
+`sprite_batch(1)` defers `image_draw`, `image_draw_scaled`, `image_draw_rotated`
+and `image_draw_region` calls to the end of the frame and draws them sorted by
+`sprite_depth(z)` — the y-sorting a 2D game otherwise writes by hand. Higher
+depth draws later, so it appears on top; equal depths keep submission order.
+`sprite_batch(0)` (the default) draws immediately, and `sprite_queued()` reports
+how many sprites the last frame batched.
+
+Queued sprites are drawn together at the end of the draw callback, so they sit
+above any shape drawn in the same frame. That is the trade for sorting: use
+batching when sprites are layered against each other, and immediate draws when
+they must interleave with shapes. The wasm backend accepts the calls and draws
+immediately, because the canvas compositor already orders by call.
+
 ### Double buffering
 
 `buffer(on)` turns the window's double buffer on or off and returns the previous
-state, so `say buffer(0)` prints `1` the first time. It starts **on**: the frame
-is composed in a memory DC and blitted in one operation, which is what keeps the
-black background from flashing between the clear and the frame. `buffer(0)`
-presents straight to the window DC — it exists to demonstrate the difference and
-for machines where the extra copy costs more than it saves, not because games
-should normally run with it off. The wasm backend accepts the call and records
-the preference, since the browser composites for us.
+state, so `say buffer(0)` prints `1` the first time. It starts **on**: there are
+two framebuffers, and the program draws the next frame into the back one while
+the front one is on screen. At present the buffers swap, so the image being
+displayed is never written to again and a half-drawn frame can never reach the
+screen. `buffer(0)` draws and presents from one buffer, which is faster on a
+machine where the swap matters more than the safety and is how the difference
+can be demonstrated. The wasm backend accepts the call and records the
+preference, since the browser composites for us.
 
 ## Multiplayer
 

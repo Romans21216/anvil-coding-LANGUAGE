@@ -808,3 +808,9 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Why a toggle rather than always-on:** the flag makes the difference visible and measurable (and lets a machine with an expensive copy turn it off), and it gives the flicker fix a name a program can control instead of hidden behaviour.
 - **Wasm:** the call is accepted and only records the preference, because the browser composites the canvas for us.
 - **Tests:** `tests/test_buffer_toggle.py` reads the previous-state values back from the save store (`1, 1, 0, 0` for on/off/off/on), captures the window with buffering on and off, and asserts the full-window rectangle is still drawn. Grammar and language docs updated; 876 passed, 1 xfailed.
+
+## Batch 79 — true double buffering
+
+- **Change:** the window now owns two DIB framebuffers. The program draws into the back one while the front one is displayed; `anvil_present_window` publishes the finished frame and swaps, then re-selects the new back buffer into the memory DC so GDI text lands in the right surface. `buffer(0)` keeps single-buffer drawing, and `WM_PAINT` paints from `anvil_display_pixels`, never from a buffer that is being drawn.
+- **Why it matters:** the earlier version composed one buffer and copied it to the screen. That removed the black flash, but the displayed pixels were still the same memory the next frame was about to overwrite. With two buffers the visible image is immutable until the swap, which is the definition the user asked for: the buffer holds the next frame, so nothing is ever seen half-drawn.
+- **Verified:** the sprite demo shows text, both sprites and the rotated copy with no stale or missing regions; two captures 350 ms apart differ in 3,924 pixels, so the swap is live rather than a frozen first frame. `tests/test_flicker.py`, `test_buffer_toggle.py` and `test_sprite_batch.py` pass (5 tests).

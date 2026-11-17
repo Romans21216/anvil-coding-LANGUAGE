@@ -2516,3 +2516,21 @@ double anvil_buffer(double on) {
   anvil_wasm_double_buffer = on != 0.0 ? 1.0 : 0.0;
   return previous;
 }
+
+/* The wasm host draws through canvas calls immediately; keep the API shape. */
+static double anvil_wasm_sprite_batch, anvil_wasm_sprite_depth;
+
+double anvil_sprite_batch(double on) {
+  double previous = anvil_wasm_sprite_batch;
+  anvil_wasm_sprite_batch = on != 0.0 ? 1.0 : 0.0;
+  return previous;
+}
+
+double anvil_sprite_depth(double depth) {
+  double previous = anvil_wasm_sprite_depth;
+  if (anvil_wasm_finite(depth))
+    anvil_wasm_sprite_depth = depth;
+  return previous;
+}
+
+double anvil_sprite_queued(void) { return 0.0; }

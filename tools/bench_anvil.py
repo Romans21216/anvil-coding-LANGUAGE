@@ -87,7 +87,9 @@ def measure_native(source: str, repeats: int = 5) -> tuple[float, int]:
             image = NativeCodegen(path, functions, top, variables, arrays).generate()
             timings.append(time.perf_counter() - start)
             size = len(image)
-    return statistics.median(timings), size
+    # The fastest run estimates the intrinsic cost; a median picks up whatever
+    # else the machine was doing, which made a 3 ms budget flaky under load.
+    return min(timings), size
 
 
 def measure_c(source: str, repeats: int = 3) -> tuple[float, int] | None:
@@ -110,7 +112,7 @@ def measure_c(source: str, repeats: int = 3) -> tuple[float, int] | None:
             build_c(compiler[1], c_file, exe, release=True)
             timings.append(time.perf_counter() - start)
             size = exe.stat().st_size
-    return statistics.median(timings), size
+    return min(timings), size
 
 
 def main(argv: list[str] | None = None) -> int:

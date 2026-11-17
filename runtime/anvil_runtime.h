@@ -70,6 +70,9 @@ double anvil_image_height(double handle);
 double anvil_image_pixel(double handle, double x, double y);
 double anvil_texture(double handle);
 double anvil_buffer(double on);
+double anvil_sprite_batch(double on);
+double anvil_sprite_depth(double depth);
+double anvil_sprite_queued(void);
 double anvil_image_destroy(double handle);
 double anvil_image_draw(double handle, double x, double y);
 double anvil_image_draw_scaled(double handle, double x, double y, double width,
