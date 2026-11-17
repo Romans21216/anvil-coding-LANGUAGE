@@ -233,21 +233,20 @@ class GltfMorphTests(unittest.TestCase):
             program = "\n".join(
                 [
                     "scene 3d",
-                    "set var(n) = 0",
                     "",
                 ]
                 + [
                     "fn(draw)",
                     "  add var(n) 1",
-                    "  if var(n) = 2",
+                    "  if var(n) = 1",
                     '    set var(a) = model_instance("instance.gltf")',
                     '    set var(b) = model_instance("instance.gltf")',
                     "    clear rgba(0, 0, 0, 255)",
                     '    set var(pa) = model_instance_morph("instance.gltf", var(a), 0, 1)',
                     '    set var(pb) = model_instance_morph("instance.gltf", var(b), 0, 0)',
                     '    say "prev_b " & var(pb)',
-                    '    set var(da) = model_draw_instance("instance.gltf", var(a), -2, 0, 0, 1, 0, 0, 0)',
-                    '    set var(db) = model_draw_instance("instance.gltf", var(b), 2, 0, 0, 1, 0, 0, 0)',
+                    '    set var(db) = model_draw_instance("instance.gltf", var(b), 0, 0, 0, 1, 0, 0, 0)',
+                    '    set var(da) = model_draw_instance("instance.gltf", var(a), 0, 0, 0, 1, 0, 0, 0)',
                     '    say "draws " & var(da) & "," & var(db)',
                     '    set var(pa) = model_instance_morph("instance.gltf", var(a), 0, 0)',
                     '    say "prev_a " & var(pa)',
@@ -261,6 +260,7 @@ class GltfMorphTests(unittest.TestCase):
         self.assertIn("prev_b 0", output)
         self.assertIn("prev_a 1", output)
         self.assertIn("draws 1,1", output)
+
 
     def test_instance_handles_reject_stale_values_after_reuse(self) -> None:
         with tempfile_dir() as root:
