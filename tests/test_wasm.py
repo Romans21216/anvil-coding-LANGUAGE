@@ -1732,5 +1732,53 @@ class WasmScreenFadeTests(unittest.TestCase):
             self.assertLess(names.index("fade"), names.index("present"))
 
 
+_PAGE_SAVE_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        '  say save_number("hp", 42)',
+        '  say load_number("hp")',
+        '  say save_text("name", "Ada")',
+        '  say load_text("name")',
+        '  say save_delete("name")',
+        '  say save_exists("name")',
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmPageSaveTests(unittest.TestCase):
+    """The generated page stores saves itself, and must do so with no IndexedDB.
+
+    The Node page harness provides localStorage but no IndexedDB, so this exercises
+    the page's fallback store - the path a browser in private mode or a locked-down
+    context takes. It also pins the synchronous round trip: Anvil's save API
+    cannot await, so the store has to answer from memory.
+    """
+
+    def test_the_page_round_trips_saves_without_indexeddb(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _PAGE_SAVE_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                [
+                    "node",
+                    str(PAGE_HOST),
+                    str(out.with_suffix(".html")),
+                    json.dumps([["frame"]]),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(
+            run.stdout.replace("\r\n", "\n").splitlines(),
+            ["1", "42", "1", "Ada", "1", "0"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

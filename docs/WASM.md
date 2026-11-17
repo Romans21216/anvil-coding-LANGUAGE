@@ -266,8 +266,15 @@ located build error.
 ## Saves
 
 Saves work in the browser without files. The host page backs them with
-`localStorage` under `anvil:<project>/<slot>`; the project name comes from the
-compiled program (default `Anvil_Game`). Values use the same type rules as the C
+**IndexedDB** (database `anvil-saves`, store `saves`) under
+`anvil:<project>/<slot>`; the project name comes from the compiled program
+(default `Anvil_Game`). Because Anvil's save API is synchronous, the page reads
+the whole namespace into memory before the module starts: reads answer from
+that map, and writes land in the map immediately and reach IndexedDB in the
+background. Where IndexedDB is unavailable - the Node page harness, private
+mode, a locked-down context - the same interface is backed by `localStorage`,
+and saves left there by an older build are migrated into IndexedDB once on the
+next load. Values use the same type rules as the C
 runtime: numbers are stored as 16 hex digits of their IEEE-754 bits (so a
 round trip is exact), text as UTF-8 with a 255-byte limit, and reading the wrong
 type returns `0` with the same messages the C runtime uses ("the save holds
@@ -277,9 +284,10 @@ letters, digits, `.`, `_` or `-`.
 The Node host keeps saves in memory unless `ANVIL_SAVE_FILE` names a JSON file,
 in which case it loads and rewrites that file so saves persist across runs.
 
-`localStorage` is synchronous and small (about 5 MB per origin). A game that
-needs larger or structured storage will get IndexedDB later; the API will not
-change.
+`localStorage` was the original backend and is capped at roughly 5 MB per
+origin; IndexedDB removes that ceiling. `window.anvilSaveBackend` reports which
+store the page actually used (`indexedDB` or `localStorage`), which is what the
+browser checks assert.
 
 ## Hosts
 

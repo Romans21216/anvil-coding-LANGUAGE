@@ -399,6 +399,119 @@ async function start() {
       return utf8.decode(bytes.subarray(pointer, end));
     };
     let pendingFade = 0;
+    // Saves live in IndexedDB so a project is not capped by localStorage's small
+    // string quota. Anvil's save API is synchronous, so the whole namespace is
+    // read into a Map before the module starts; writes land in the Map at once
+    // and reach IndexedDB in the background. Where IndexedDB is unavailable -
+    // the Node harness, a locked-down browser - the same interface is backed by
+    // localStorage, and any saves left there by an older build are carried over
+    // once.
+    const openSaveStore = async () => {
+      // Its own cache, not the wasm `memory` object: the two are unrelated and
+      // a name collision here fails at the first save.
+      const cache = new Map();
+      const localStore = () => ({
+        backend: "localStorage",
+        get: (key) => {
+          try {
+            const value = localStorage.getItem(key);
+            return value === null ? undefined : value;
+          } catch (error) {
+            return undefined;
+          }
+        },
+        set: (key, value) => {
+          try {
+            localStorage.setItem(key, value);
+          } catch (error) {
+            console.warn("Anvil: the save could not be written", error);
+          }
+        },
+        remove: (key) => {
+          try {
+            const existed = localStorage.getItem(key) !== null;
+            localStorage.removeItem(key);
+            return existed;
+          } catch (error) {
+            return false;
+          }
+        },
+      });
+      if (!window.indexedDB) return localStore();
+      let db;
+      try {
+        db = await new Promise((resolve, reject) => {
+          const request = indexedDB.open("anvil-saves", 1);
+          request.onupgradeneeded = () => {
+            const upgraded = request.result;
+            if (!upgraded.objectStoreNames.contains("saves")) {
+              upgraded.createObjectStore("saves");
+            }
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+          request.onblocked = () => reject(new Error("the database is blocked"));
+        });
+        const rows = await new Promise((resolve, reject) => {
+          const request = db.transaction("saves", "readonly").objectStore("saves").openCursor();
+          const found = [];
+          request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) {
+              resolve(found);
+              return;
+            }
+            found.push([cursor.key, cursor.value]);
+            cursor.continue();
+          };
+          request.onerror = () => reject(request.error);
+        });
+        for (const [key, value] of rows) {
+          if (typeof key === "string" && typeof value === "string") cache.set(key, value);
+        }
+      } catch (error) {
+        console.warn("Anvil: IndexedDB is unavailable, saves use localStorage", error);
+        return localStore();
+      }
+      // Carry over saves written by a build that used localStorage.
+      try {
+        for (let index = 0; index < localStorage.length; index++) {
+          const key = localStorage.key(index);
+          if (!key || key.indexOf("anvil:") !== 0 || cache.has(key)) continue;
+          cache.set(key, localStorage.getItem(key));
+          const tx = db.transaction("saves", "readwrite");
+          tx.objectStore("saves").put(cache.get(key), key);
+          localStorage.removeItem(key);
+        }
+      } catch (error) {
+        console.warn("Anvil: old saves could not be migrated", error);
+      }
+      const persist = (key, value, removing) => {
+        try {
+          const store = db.transaction("saves", "readwrite").objectStore("saves");
+          if (removing) store.delete(key);
+          else store.put(value, key);
+        } catch (error) {
+          console.warn("Anvil: the save could not be persisted", error);
+        }
+      };
+      return {
+        backend: "indexedDB",
+        get: (key) => cache.get(key),
+        set: (key, value) => {
+          cache.set(key, value);
+          persist(key, value, false);
+        },
+        remove: (key) => {
+          const existed = cache.has(key);
+          cache.delete(key);
+          persist(key, undefined, true);
+          return existed;
+        },
+      };
+    };
+    const saveStore = await openSaveStore();
+    window.anvilSaveBackend = saveStore.backend;
     const imports = { env: {
       fade(alpha) {
         pendingFade = alpha;
@@ -630,21 +743,18 @@ async function start() {
         }
       },
       save_read(pointer, out, capacity) {
-        const value = localStorage.getItem("anvil:" + readCString(pointer));
-        if (value === null) return -1;
+        const value = saveStore.get("anvil:" + readCString(pointer));
+        if (value === undefined) return -1;
         const bytes = new TextEncoder().encode(value);
         const view = new Uint8Array(memory.buffer, out, Math.min(bytes.length, capacity));
         view.set(bytes.subarray(0, view.length));
         return view.length;
       },
       save_write(pointer, valuePointer) {
-        localStorage.setItem("anvil:" + readCString(pointer), readCString(valuePointer));
+        saveStore.set("anvil:" + readCString(pointer), readCString(valuePointer));
       },
       save_delete(pointer) {
-        const key = "anvil:" + readCString(pointer);
-        const existed = localStorage.getItem(key) !== null;
-        localStorage.removeItem(key);
-        return existed ? 1 : 0;
+        return saveStore.remove("anvil:" + readCString(pointer)) ? 1 : 0;
       },
     }};
     const instance = await WebAssembly.instantiate(module, imports);
