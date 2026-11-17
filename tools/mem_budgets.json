@@ -6,12 +6,17 @@
     "text_ui": 60.0,
     "particles_2d": 60.0,
     "cubes_3d": 60.0,
-    "assets": 60.0
+    "assets": 60.0,
+    "audio": 60.0,
+    "network": 60.0
   },
   "note": "2.5x the measured peak with floors; re-baseline on new hardware",
   "assets": {
     "image_bytes": 131072,
     "audio_bytes": 576000,
     "video_bytes": 9216000
+  },
+  "audio": {
+    "audio_bytes": 1152000
   }
 }

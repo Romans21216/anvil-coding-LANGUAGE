@@ -66,6 +66,55 @@ class MemoryBudgetTests(unittest.TestCase):
             self.assertEqual(result["image_bytes_after_destroy"], 7 * 64 * 64 * 4)
             self.assertGreater(result["audio_bytes"], result["audio_bytes_after_destroy"])
 
+    def test_the_audio_scene_reports_decoded_samples(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            report = pathlib.Path(temp) / "audio.json"
+            run = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--scene",
+                    "audio",
+                    "--json",
+                    str(report),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            result = json.loads(report.read_text(encoding="utf-8"))["results"][0]
+        self.assertEqual(result["scene"], "audio")
+        # Four 1.5 s mono sources decoded to 48 kHz stereo 16-bit.
+        self.assertEqual(result["audio_bytes"], 4 * 72000 * 4)
+        self.assertEqual(result["voices_active"], 3)
+        self.assertEqual(result["audio_bytes_after_play"], 4 * 72000 * 4)
+        self.assertGreaterEqual(result["run_peak_mb"], 1.0)
+
+    def test_the_network_scene_runs_with_a_peer(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            report = pathlib.Path(temp) / "network.json"
+            run = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--scene",
+                    "network",
+                    "--json",
+                    str(report),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            result = json.loads(report.read_text(encoding="utf-8"))["results"][0]
+        self.assertEqual(result["scene"], "network")
+        # The socket lives in the kernel, so the process figure stays small;
+        # what matters is that the transport ran at all and is measured.
+        self.assertGreaterEqual(result["run_peak_mb"], 1.0)
+        self.assertGreater(result["run_ms"], 0.0)
+
     def test_budgets_hold_for_one_scene(self) -> None:
         run = subprocess.run(
             [
@@ -86,7 +135,7 @@ class MemoryBudgetTests(unittest.TestCase):
         budgets = json.loads(BUDGETS.read_text(encoding="utf-8"))
         self.assertGreater(budgets["compile_peak_mb"], 100.0)
         scenes = budgets["run_peak_mb"]
-        for name in ("idle_2d", "overdraw_2d", "text_ui", "particles_2d", "cubes_3d"):
+        for name in ("idle_2d", "overdraw_2d", "text_ui", "particles_2d", "cubes_3d", "audio", "network"):
             self.assertIn(name, scenes)
             self.assertGreater(scenes[name], 10.0)
 

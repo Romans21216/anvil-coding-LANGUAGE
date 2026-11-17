@@ -22,9 +22,11 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 import math
@@ -102,6 +104,86 @@ ASSET_PROGRAM = "\n".join(
         "",
     )
 )
+
+
+AUDIO_SCENE = "audio"
+AUDIO_SOUNDS = 4
+AUDIO_SOUND_FRAMES = 72000  # 1.5 s, decoded to 48 kHz stereo 16-bit
+AUDIO_SOUND_RATE = 48000
+
+AUDIO_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        '  set var(s0) = sound_load("a0.wav")',
+        '  set var(s1) = sound_load("a1.wav")',
+        '  set var(s2) = sound_load("a2.wav")',
+        '  set var(s3) = sound_load("a3.wav")',
+        "  say memory_audio()",
+        "  set var(p0) = sound_play_loop(var(s0))",
+        "  set var(p1) = sound_play_loop(var(s1))",
+        "  set var(p2) = sound_play_loop(var(s2))",
+        "  wait 0.5",
+        "  say sound_active()",
+        "  say memory_audio()",
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+NETWORK_SCENE = "network"
+NETWORK_PORT = 39471
+NETWORK_PACKETS = 200
+
+# A UDP socket's buffers live in the kernel, so this scene measures the process
+# side: the transport running flat out with a peer feeding it, against the same
+# program idle. The difference is the runtime's own cost, not the socket's.
+NETWORK_PROGRAM = "\n".join(
+    (
+        f"net host({NETWORK_PORT})",
+        "fn(main)",
+        "  set var(last) = -1",
+        f"  while var(last) < {NETWORK_PACKETS - 1}",
+        "    set var(last) = receive()",
+        "  end",
+        '  say "packets " & var(last)',
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+
+def write_audio_files(root: pathlib.Path) -> None:
+    samples = b"".join(
+        struct.pack(
+            "<h",
+            int(9000 * math.sin(2 * math.pi * 220 * index / AUDIO_SOUND_RATE)),
+        )
+        for index in range(AUDIO_SOUND_FRAMES)
+    )
+    riff = b"RIFF" + struct.pack("<I", 36 + len(samples)) + b"WAVE"
+    fmt = b"fmt " + struct.pack(
+        "<IHHIIHH", 16, 1, 1, AUDIO_SOUND_RATE, AUDIO_SOUND_RATE * 2, 2, 16
+    )
+    for index in range(AUDIO_SOUNDS):
+        (root / f"a{index}.wav").write_bytes(
+            riff + fmt + b"data" + struct.pack("<I", len(samples)) + samples
+        )
+
+
+def send_packets(port: int, count: int) -> None:
+    """Feed the network scene one datagram per value it counts up to."""
+    peer = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        for index in range(count):
+            try:
+                peer.sendto(struct.pack("<d", float(index)), ("127.0.0.1", port))
+            except OSError:
+                return
+            time.sleep(0.002)
+    finally:
+        peer.close()
 
 
 def write_asset_files(root: pathlib.Path) -> None:
@@ -187,6 +269,7 @@ def measure_run(
     root: pathlib.Path,
     executable: pathlib.Path,
     capture: bool = False,
+    peer: int | None = None,
 ) -> dict[str, float]:
     process = subprocess.Popen(
         [str(executable)],
@@ -195,6 +278,10 @@ def measure_run(
         stderr=subprocess.DEVNULL,
         text=True,
     )
+    if peer:
+        threading.Thread(
+            target=send_packets, args=(peer, NETWORK_PACKETS), daemon=True
+        ).start()
     peak = 0
     started = time.perf_counter()
     while process.poll() is None and time.perf_counter() - started < RUN_SECONDS:
@@ -221,10 +308,21 @@ def measure(name: str) -> dict[str, float]:
         if name == ASSET_SCENE:
             write_asset_files(root)
             build = measure_compile(name, root, ASSET_PROGRAM)
+        elif name == AUDIO_SCENE:
+            write_audio_files(root)
+            build = measure_compile(name, root, AUDIO_PROGRAM)
+        elif name == NETWORK_SCENE:
+            build = measure_compile(name, root, NETWORK_PROGRAM)
         else:
             build = measure_compile(name, root)
         executable = pathlib.Path(build.pop("executable"))
-        run = measure_run(name, root, executable, capture=name == ASSET_SCENE)
+        run = measure_run(
+            name,
+            root,
+            executable,
+            capture=name in (ASSET_SCENE, AUDIO_SCENE),
+            peer=NETWORK_PORT if name == NETWORK_SCENE else None,
+        )
     if name == ASSET_SCENE:
         numbers = [
             float(line)
@@ -238,6 +336,17 @@ def measure(name: str) -> dict[str, float]:
         run["video_bytes"] = int(numbers[2])
         run["image_bytes_after_destroy"] = int(numbers[3])
         run["audio_bytes_after_destroy"] = int(numbers[4])
+    elif name == AUDIO_SCENE:
+        numbers = [
+            float(line)
+            for line in run.pop("stdout", "").splitlines()
+            if line.strip() and line.replace(".", "", 1).replace("-", "", 1).isdigit()
+        ]
+        if len(numbers) < 3:
+            raise SystemExit(f"the audio scene did not report three numbers: {numbers}")
+        run["audio_bytes"] = int(numbers[0])
+        run["voices_active"] = int(numbers[1])
+        run["audio_bytes_after_play"] = int(numbers[2])
     return {"scene": name, **build, **run}
 
 
@@ -271,6 +380,13 @@ def write_budgets(results: list[dict[str, float]]) -> None:
     }
     if asset_budgets:
         document["assets"] = asset_budgets
+    audio_budgets = {
+        "audio_bytes": int(result["audio_bytes"])
+        for result in results
+        if result["scene"] == AUDIO_SCENE
+    }
+    if audio_budgets:
+        document["audio"] = audio_budgets
     BUDGETS.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {BUDGETS.relative_to(ROOT)}")
 
@@ -289,6 +405,11 @@ def check(results: list[dict[str, float]], budgets: dict) -> int:
             failures += 1
         if scene == ASSET_SCENE:
             for key, limit in (budgets.get("assets") or {}).items():
+                if result.get(key, 0) > limit:
+                    print(f"{scene}: {key} {result[key]} over budget {limit}")
+                    failures += 1
+        if scene == AUDIO_SCENE:
+            for key, limit in (budgets.get("audio") or {}).items():
                 if result.get(key, 0) > limit:
                     print(f"{scene}: {key} {result[key]} over budget {limit}")
                     failures += 1
@@ -311,12 +432,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--scene",
         action="append",
-        choices=sorted(list(SCENES) + [ASSET_SCENE]),
+        choices=sorted(list(SCENES) + [ASSET_SCENE, AUDIO_SCENE, NETWORK_SCENE]),
         help="limit the run to one scene (repeatable)",
     )
     arguments = parser.parse_args(argv)
 
-    names = arguments.scene or list(SCENES) + [ASSET_SCENE]
+    names = arguments.scene or list(SCENES) + [ASSET_SCENE, AUDIO_SCENE, NETWORK_SCENE]
     results = [measure(name) for name in names]
 
     print(f"{'scene':<14}{'compile':>10}{'C bytes':>10}{'exe bytes':>12}{'run peak':>10}")
@@ -327,6 +448,11 @@ def main(argv: list[str] | None = None) -> int:
                 f"  images {result['image_bytes']} B, "
                 f"audio {result['audio_bytes']} B, "
                 f"video {result['video_bytes']} B"
+            )
+        elif "audio_bytes" in result:
+            suffix = (
+                f"  audio {result['audio_bytes']} B, "
+                f"voices {result['voices_active']}"
             )
         print(
             f"{result['scene']:<14}{result['compile_peak_mb']:>8.1f} MB"

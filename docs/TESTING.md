@@ -27,7 +27,7 @@ is absent, tests that build C programs raise `SkipTest` instead of failing.
 | Backend capability drift (C, native, wasm) | `python tools/capability_matrix.py --check` |
 | Compile-time and size budgets | `python tools/bench_anvil.py --check` (re-baseline with `--write-budgets`) |
 | Runtime frame-time budgets | `python tools/bench_runtime.py --check` — gates scene work (`frame_tick + frame_render`) and present cost separately, so a slow scene cannot hide behind compositor noise; re-baseline with `--write-budgets` |
-| Compile and runtime memory budgets | `python tools/bench_memory.py --check` (scenes `idle_2d`, `overdraw_2d`, `text_ui`, `particles_2d`, `cubes_3d`, `assets`; re-baseline with `--write-budgets`) |
+| Compile and runtime memory budgets | `python tools/bench_memory.py --check` (scenes `idle_2d`, `overdraw_2d`, `text_ui`, `particles_2d`, `tilemap_large`, `cubes_3d`, `assets`, `audio`, `network`; re-baseline with `--write-budgets`) |
 | Input latency budget (interactive) | `python tools/bench_input.py --check` (re-baseline with `--write-budgets`) |
 | Sprite atlas packing | `python tools/pack_atlas.py sheet.bmp --atlas sheet.json sprites/*.bmp` |
 | WebAssembly console build | `python compiler/anvil.py hello.ANVL --backend wasm -o hello.wasm` then `node tools/wasm_host.mjs hello.wasm` |
