@@ -165,6 +165,8 @@ async function main() {
   expect('set p = parallax(0.35)', 'parallax', 'support.function.anvil');
   expect('say dpi_scale()', 'dpi_scale', 'support.function.anvil');
   expect('set prev = window_scale(2)', 'window_scale', 'support.function.anvil');
+  expect('set ok = light(0, 1, 0)', 'light', 'support.function.anvil');
+  expect('set prev = light_ambient(0.5)', 'light_ambient', 'support.function.anvil');
   expect('set var(ok) = shadow(1)', 'shadow', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');

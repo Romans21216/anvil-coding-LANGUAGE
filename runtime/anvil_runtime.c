@@ -551,6 +551,50 @@ void anvil_line(double x1, double y1, double x2, double y2, int r, int g, int b,
   }
 }
 
+/* One directional light shared by every 3D path. Ambient is the floor a face
+   keeps when it faces away; intensity scales the lit part. */
+static AnvilVec3 anvil_light_direction = {-0.35, 0.8, 0.55};
+static double anvil_light_ambient_value = 0.28;
+static double anvil_light_intensity_value = 1.0;
+
+double anvil_light(double x, double y, double z) {
+  if (!isfinite(x) || !isfinite(y) || !isfinite(z))
+    return 0.0;
+  if (x == 0.0 && y == 0.0 && z == 0.0)
+    return 0.0;
+  anvil_light_direction = (AnvilVec3){x, y, z};
+  return 1.0;
+}
+
+double anvil_light_ambient(double level) {
+  double previous = anvil_light_ambient_value;
+  if (isfinite(level))
+    anvil_light_ambient_value = level < 0.0 ? 0.0 : level > 1.0 ? 1.0 : level;
+  return previous;
+}
+
+double anvil_light_intensity(double level) {
+  double previous = anvil_light_intensity_value;
+  if (isfinite(level))
+    anvil_light_intensity_value = level < 0.0 ? 0.0 : level > 2.0 ? 2.0 : level;
+  return previous;
+}
+
+/* Lit fraction for a face normal; two-sided faces (models) light from either
+   side, the primitives do not. */
+static double anvil_light_level(AnvilVec3 normal, int two_sided) {
+  AnvilVec3 light = anvil_normalize(anvil_light_direction);
+  double facing = anvil_dot(normal, light);
+  if (two_sided)
+    facing = fabs(facing);
+  if (!(facing > 0.0))
+    facing = 0.0;
+  double level = anvil_light_ambient_value +
+                 (1.0 - anvil_light_ambient_value) *
+                     anvil_light_intensity_value * facing;
+  return level < 0.0 ? 0.0 : level > 1.0 ? 1.0 : level;
+}
+
 void anvil_cube(double x, double y, double z, double size, double rx, double ry,
                 double rz, int r, int g, int b, int a) {
   double h = size * .5;
@@ -562,7 +606,6 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
   }
   static const int faces[6][4] = {{0, 4, 6, 2}, {1, 3, 7, 5}, {0, 1, 5, 4},
                                   {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}};
-  AnvilVec3 light = anvil_normalize((AnvilVec3){-0.35, 0.8, 0.55});
   uint32_t base = anvil_color(r, g, b);
   if (anvil_shadows_enabled && a > 0) {
     AnvilVec3 shadow[8];
@@ -585,7 +628,7 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
     AnvilVec3 n =
         anvil_normalize(anvil_cross(anvil_sub(v[faces[f][1]], v[faces[f][0]]),
                                     anvil_sub(v[faces[f][2]], v[faces[f][0]])));
-    double brightness = .28 + .72 * fmax(0.0, anvil_dot(n, light));
+    double brightness = anvil_light_level(n, 0);
     const int triangles[2][3] = {{faces[f][0], faces[f][1], faces[f][2]},
                                  {faces[f][0], faces[f][2], faces[f][3]}};
     for (int t = 0; t < 2; ++t) {
@@ -739,7 +782,6 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
     return 0.0;
   }
   anvil_mesh_drawn_frame++;
-  AnvilVec3 light = anvil_normalize((AnvilVec3){-0.35, 0.8, 0.55});
   if (anvil_shadows_enabled) {
     for (int t = 0; t < triangle_count; ++t) {
       const double *p = data + (size_t)t * 12;
@@ -764,7 +806,7 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
     }
     AnvilVec3 n = anvil_normalize(
         anvil_cross(anvil_sub(v[1], v[0]), anvil_sub(v[2], v[0])));
-    double brightness = .28 + .72 * fabs(anvil_dot(n, light));
+    double brightness = anvil_light_level(n, 1);
     uint32_t base =
         anvil_color((int)p[9], (int)p[10], (int)p[11]);
     anvil_world_triangle(v, base, brightness, 255);
