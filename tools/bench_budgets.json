@@ -128,27 +128,27 @@
         "measured_work_p95_ms": 0.38,
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.12,
-        "measured_max_ms": 0.44
+        "measured_max_ms": 0.45
       },
       "ray_spheres_8": {
-        "work_p50_ms": 6.55,
-        "work_p95_ms": 7.2,
+        "work_p50_ms": 5.95,
+        "work_p95_ms": 5.95,
         "present_p95_ms": 3.0,
-        "measured_work_p50_ms": 2.62,
-        "measured_work_p95_ms": 2.88,
+        "measured_work_p50_ms": 2.38,
+        "measured_work_p95_ms": 2.38,
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.12,
-        "measured_max_ms": 2.98
+        "measured_max_ms": 2.66
       },
       "ray_spheres_32": {
-        "work_p50_ms": 34.05,
-        "work_p95_ms": 36.55,
+        "work_p50_ms": 28.45,
+        "work_p95_ms": 29.7,
         "present_p95_ms": 3.0,
-        "measured_work_p50_ms": 13.62,
-        "measured_work_p95_ms": 14.62,
+        "measured_work_p50_ms": 11.38,
+        "measured_work_p95_ms": 11.88,
         "measured_present_p50_ms": 0.12,
-        "measured_present_p95_ms": 0.38,
-        "measured_max_ms": 14.82
+        "measured_present_p95_ms": 0.12,
+        "measured_max_ms": 12.1
       }
     }
   }

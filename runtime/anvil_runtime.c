@@ -3519,13 +3519,15 @@ static int anvil_ray_box_hit(AnvilVec3 origin, AnvilVec3 direction,
   return 1;
 }
 
-static int anvil_bvh_trace(int node_index, AnvilVec3 origin,
-                           AnvilVec3 direction, double max_t,
-                           double *hit_t, int *hit_sphere) {
-  double near_t;
-  const AnvilBvhNode *node = &anvil_trace_bvh[node_index];
-  if (!anvil_ray_box_hit(origin, direction, node, max_t, &near_t))
+/* `near_t` is the box distance already computed by the parent while ordering
+   its children. Passing it down avoids testing the same child box twice. */
+static int anvil_bvh_trace_node(int node_index, AnvilVec3 origin,
+                                AnvilVec3 direction, double max_t,
+                                double near_t, double *hit_t,
+                                int *hit_sphere) {
+  if (near_t >= max_t)
     return 0;
+  const AnvilBvhNode *node = &anvil_trace_bvh[node_index];
   if (node->sphere >= 0) {
     double t;
     if (anvil_ray_sphere_hit(origin, direction,
@@ -3557,15 +3559,28 @@ static int anvil_bvh_trace(int node_index, AnvilVec3 origin,
   }
   int found = 0;
   if (first_hit)
-    found = anvil_bvh_trace(first, origin, direction, max_t, hit_t, hit_sphere);
+    found = anvil_bvh_trace_node(first, origin, direction, max_t, first_near,
+                                 hit_t, hit_sphere);
   if (found)
     max_t = *hit_t;
   if (second_hit && second_near < max_t) {
-    int second_found = anvil_bvh_trace(second, origin, direction, max_t,
-                                        hit_t, hit_sphere);
+    int second_found = anvil_bvh_trace_node(second, origin, direction, max_t,
+                                            second_near, hit_t, hit_sphere);
     found = found || second_found;
   }
   return found;
+}
+
+static int anvil_bvh_trace(int node_index, AnvilVec3 origin,
+                           AnvilVec3 direction, double max_t,
+                           double *hit_t, int *hit_sphere) {
+  double near_t;
+  if (node_index < 0 || node_index >= anvil_trace_bvh_count ||
+      !anvil_ray_box_hit(origin, direction, &anvil_trace_bvh[node_index],
+                         max_t, &near_t))
+    return 0;
+  return anvil_bvh_trace_node(node_index, origin, direction, max_t, near_t,
+                              hit_t, hit_sphere);
 }
 
 void anvil_trace_finish(void) {
