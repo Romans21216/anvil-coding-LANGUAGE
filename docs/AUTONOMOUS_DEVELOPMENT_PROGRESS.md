@@ -994,3 +994,12 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Tests:** `tests/test_asset_paths.py` (3 cases) covers the C load of an 8x8 BMP and a WAV through a computed name, and the two browser refusals — including the music message, which no document had mentioned.
 - **Evidence:** the 8.12 gap now lists IndexedDB, instruction-level source maps, `ray_sphere` and true streaming music, and says the real limitation is that the browser cannot resolve a path it did not see at build time.
 - **Full suite:** 956 passed, 1 skipped, 1 xfailed in 488.13 s, exit 0.
+
+## Batch 103 — IndexedDB saves in the browser (8.12)
+
+- **Store:** the generated page opens `anvil-saves`, loads the whole save namespace into a map before the module starts, and answers the synchronous save API from it; writes go to IndexedDB in the background.
+- **Fallback:** without IndexedDB (Node page harness, private mode) the same interface uses `localStorage`; saves from an older build are migrated into IndexedDB once and removed from `localStorage`.
+- **Observability:** `window.anvilSaveBackend` reports `indexedDB` or `localStorage`.
+- **Verification:** Chromium over HTTP — backend `indexedDB`, a 42/"Ada" round trip, a second page load reading both back, and a seeded `localStorage` entry migrating across with the old key cleared. `tests/test_wasm.py` covers the fallback round trip in CI.
+- **Bug caught:** the first cut named its map `memory`, colliding with the wasm `Memory` object (`memory.set is not a function`); the Node harness stayed green on the fallback, so only the Chromium run found it.
+- **Full suite:** 957 passed, 1 skipped, 1 xfailed in 493.77 s, exit 0.
