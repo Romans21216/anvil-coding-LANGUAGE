@@ -135,6 +135,7 @@ ALLOWED_BUILTINS = {
     "memory_audio",
     "memory_video",
     "memory_total",
+    "image_pixel",
     "particle_emit",
     "particle_count",
     "particle_clear",
@@ -708,7 +709,7 @@ MAX_BAKED_IMAGE_BYTES = 4 * 1024 * 1024
 
 
 def _bmp_pixels(path: pathlib.Path) -> tuple[int, int, list[int]]:
-    """Decode an uncompressed 24/32-bit BMP into 0xAARRGGBB pixels."""
+    """Decode an uncompressed 4/8/24/32-bit BMP into 0xAARRGGBB pixels."""
     data = path.read_bytes()
     if len(data) < 54 or data[:2] != b"BM":
         raise ValueError("not a BMP file")
@@ -716,14 +717,16 @@ def _bmp_pixels(path: pathlib.Path) -> tuple[int, int, list[int]]:
     width = int.from_bytes(data[18:22], "little", signed=True)
     height = int.from_bytes(data[22:26], "little", signed=True)
     bits = int.from_bytes(data[28:30], "little")
-    if bits not in (8, 24, 32):
-        raise ValueError(f"{bits}-bit BMPs are not supported (8, 24 or 32 only)")
+    if bits not in (4, 8, 24, 32):
+        raise ValueError(f"{bits}-bit BMPs are not supported (4, 8, 24 or 32 only)")
     if width <= 0 or height == 0 or width > 8192 or abs(height) > 8192:
         raise ValueError("the image is outside the 8,192-pixel limit")
     header_size = int.from_bytes(data[14:18], "little")
     palette: list[tuple[int, int, int]] = []
-    if bits == 8:
-        count = int.from_bytes(data[46:50], "little") or 256
+    if bits in (4, 8):
+        default = 1 << bits
+        count = int.from_bytes(data[46:50], "little") or default
+        count = min(count, default)
         base = 14 + header_size
         for index in range(count):
             at = base + index * 4
@@ -732,7 +735,7 @@ def _bmp_pixels(path: pathlib.Path) -> tuple[int, int, list[int]]:
             palette.append((data[at + 2], data[at + 1], data[at]))
     top_down = height < 0
     rows = abs(height)
-    stride = (width * (bits // 8) + 3) & ~3
+    stride = ((width * bits + 7) // 8 + 3) & ~3
     if offset + stride * rows > len(data):
         raise ValueError("the file is too short for its declared size")
     pixels: list[int] = []
@@ -740,14 +743,21 @@ def _bmp_pixels(path: pathlib.Path) -> tuple[int, int, list[int]]:
         source_row = row if top_down else rows - row - 1
         base = offset + source_row * stride
         for column in range(width):
-            at = base + column * (bits // 8)
-            if bits == 8:
-                index = data[at]
+            if bits == 4:
+                packed = data[base + column // 2]
+                index = (packed & 0x0F) if column & 1 else (packed >> 4)
+                if index >= len(palette):
+                    raise ValueError("a pixel index is outside the palette")
+                red, green, blue = palette[index]
+                alpha = 255
+            elif bits == 8:
+                index = data[base + column]
                 if index >= len(palette):
                     raise ValueError("a pixel index is outside the palette")
                 red, green, blue = palette[index]
                 alpha = 255
             else:
+                at = base + column * (bits // 8)
                 blue, green, red = data[at], data[at + 1], data[at + 2]
                 alpha = data[at + 3] if bits == 32 else 255
             pixels.append((alpha << 24) | (red << 16) | (green << 8) | blue)

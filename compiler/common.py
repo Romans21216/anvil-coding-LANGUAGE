@@ -149,6 +149,7 @@ RUNTIME_C_NAMES = {
     "anvil_mouse_wheel",
     "anvil_image_load",
     "anvil_image_width",
+    "anvil_image_pixel",
     "anvil_image_height",
     "anvil_image_destroy",
     "anvil_image_draw",

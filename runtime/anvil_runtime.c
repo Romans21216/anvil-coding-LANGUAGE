@@ -932,9 +932,12 @@ double anvil_image_load(const char *path) {
   uint32_t compression = anvil_read_u32_le(header + 30);
   if (dib_size < 40 || pixel_offset < 14 + (int64_t)dib_size || width <= 0 ||
       signed_height == 0 || signed_height == INT32_MIN || planes != 1 ||
-      (bits_per_pixel != 24 && bits_per_pixel != 32) || compression != BI_RGB) {
+      (bits_per_pixel != 4 && bits_per_pixel != 8 &&
+       bits_per_pixel != 24 && bits_per_pixel != 32) ||
+      compression != BI_RGB) {
     fclose(file);
-    anvil_image_error_text = "the file is not a readable 24- or 32-bit BMP";
+    anvil_image_error_text =
+        "the file is not a readable 4-, 8-, 24- or 32-bit BMP";
     return 0.0;
   }
   int height = signed_height < 0 ? -signed_height : signed_height;
@@ -970,7 +973,41 @@ double anvil_image_load(const char *path) {
                              1048576u));
     return 0.0;
   }
-  uint64_t row_bytes = (uint64_t)(unsigned int)width * (bits_per_pixel / 8);
+  unsigned char palette_r[256] = {0};
+  unsigned char palette_g[256] = {0};
+  unsigned char palette_b[256] = {0};
+  int palette_colors = 0;
+  if (bits_per_pixel == 4 || bits_per_pixel == 8) {
+    palette_colors = (int)anvil_read_u32_le(header + 46);
+    if (palette_colors == 0)
+      palette_colors = 1 << bits_per_pixel;
+    if (palette_colors > (1 << bits_per_pixel))
+      palette_colors = 1 << bits_per_pixel;
+    int64_t palette_offset = 14 + (int64_t)dib_size;
+    if (palette_offset + (int64_t)palette_colors * 4 > pixel_offset) {
+      fclose(file);
+      anvil_image_error_text = "the BMP palette runs past the pixel data";
+      return 0.0;
+    }
+    if (_fseeki64(file, palette_offset, SEEK_SET) != 0) {
+      fclose(file);
+      anvil_image_error_text = "the BMP palette could not be read";
+      return 0.0;
+    }
+    for (int i = 0; i < palette_colors; ++i) {
+      unsigned char entry[4];
+      if (fread(entry, 1, 4, file) != 4) {
+        fclose(file);
+        anvil_image_error_text = "the BMP palette ended early";
+        return 0.0;
+      }
+      palette_b[i] = entry[0];
+      palette_g[i] = entry[1];
+      palette_r[i] = entry[2];
+    }
+  }
+  uint64_t row_bytes =
+      ((uint64_t)(unsigned int)width * (uint64_t)bits_per_pixel + 7u) / 8u;
   uint64_t row_stride = (row_bytes + 3u) & ~UINT64_C(3);
   if (pixel_offset + (int64_t)(row_stride * (uint64_t)(unsigned int)height) >
       file_size) {
@@ -999,12 +1036,28 @@ double anvil_image_load(const char *path) {
     }
     int target_y = signed_height > 0 ? height - source_y - 1 : source_y;
     for (int x = 0; x < width; ++x) {
-      const unsigned char *source = row + (size_t)x * (bits_per_pixel / 8);
-      unsigned int alpha = bits_per_pixel == 32 ? source[3] : 255u;
-      any_alpha |= alpha != 0;
-      pixels[(size_t)target_y * (size_t)width + (size_t)x] =
-          ((uint32_t)alpha << 24) | ((uint32_t)source[2] << 16) |
-          ((uint32_t)source[1] << 8) | (uint32_t)source[0];
+      uint32_t output;
+      if (bits_per_pixel == 4) {
+        unsigned int packed = row[(size_t)x / 2];
+        unsigned int index = (x & 1) ? (packed & 0x0fu) : (packed >> 4);
+        if ((int)index >= palette_colors)
+          index = 0;
+        output = UINT32_C(0xff000000) | ((uint32_t)palette_r[index] << 16) |
+                 ((uint32_t)palette_g[index] << 8) | (uint32_t)palette_b[index];
+      } else if (bits_per_pixel == 8) {
+        unsigned int index = row[(size_t)x];
+        if ((int)index >= palette_colors)
+          index = 0;
+        output = UINT32_C(0xff000000) | ((uint32_t)palette_r[index] << 16) |
+                 ((uint32_t)palette_g[index] << 8) | (uint32_t)palette_b[index];
+      } else {
+        const unsigned char *source = row + (size_t)x * (bits_per_pixel / 8);
+        unsigned int alpha = bits_per_pixel == 32 ? source[3] : 255u;
+        any_alpha |= alpha != 0;
+        output = ((uint32_t)alpha << 24) | ((uint32_t)source[2] << 16) |
+                 ((uint32_t)source[1] << 8) | (uint32_t)source[0];
+      }
+      pixels[(size_t)target_y * (size_t)width + (size_t)x] = output;
     }
   }
   free(row);
@@ -1046,6 +1099,16 @@ double anvil_image_height(double handle) {
   AnvilImage *image = anvil_image_from_handle(handle);
   return image ? (double)image->height : 0.0;
 }
+double anvil_image_pixel(double handle, double x, double y) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  if (!image || !image->pixels)
+    return 0.0;
+  if (!(x >= 0.0) || !(y >= 0.0) || x >= (double)image->width ||
+      y >= (double)image->height)
+    return 0.0;
+  return (double)image->pixels[(size_t)y * (size_t)image->width + (size_t)x];
+}
+
 double anvil_image_destroy(double handle) {
   AnvilImage *image = anvil_image_from_handle(handle);
   if (!image)

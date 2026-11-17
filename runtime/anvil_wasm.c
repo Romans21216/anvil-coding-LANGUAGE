@@ -1495,6 +1495,17 @@ double anvil_image_height(double handle) {
   return slot ? (double)slot->source->height : 0.0;
 }
 
+double anvil_image_pixel(double handle, double x, double y) {
+  AnvilWasmImageSlot *slot = anvil_image_slot(handle);
+  if (!slot || !slot->source)
+    return 0.0;
+  if (!(x >= 0.0) || !(y >= 0.0) || x >= (double)slot->source->width ||
+      y >= (double)slot->source->height)
+    return 0.0;
+  return (double)slot->source
+      ->pixels[(int)y * (int)slot->source->width + (int)x];
+}
+
 double anvil_image_destroy(double handle) {
   AnvilWasmImageSlot *slot = anvil_image_slot(handle);
   if (!slot)
