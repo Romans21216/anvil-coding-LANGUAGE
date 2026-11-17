@@ -1021,3 +1021,9 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Traversal:** parent nodes already intersect each child AABB to visit the nearer one first. Recursion now passes that intersection distance to the child instead of repeating the same AABB test, and still shrinks the far-child limit after a closest hit.
 - **Measured change:** in the 32-sphere workload, work p50/p95 moved from 13.62/14.62 ms to 11.12/11.88 ms. The 8-sphere p50 moved from 2.62 ms to 2.38 ms. The 1/8/32 scene gate passed again and budgets were re-baselined.
 - **Visual check:** all seven examples passed `python tools/visual_smoke.py --check` after the traversal change.
+
+## Batch 107 — raise the desktop ray batch to 40 (backlog #354)
+
+- **Capacity:** the desktop C runtime now accepts up to 40 traced spheres per frame, up from 32. The wasm path remains capped at 32 because it tessellates spheres into triangles.
+- **Performance decision:** the fixed 960×600 benchmark measures 36 spheres at 15.62 ms p95 and 40 at 17.62 ms p95. The 36-sphere scene stays under a 16.7 ms 60 Hz work interval; 40 is slightly above it, but remains within the enforced measured-work budget. The larger supported batch is retained and its cost is recorded in the capability matrix.
+- **Budgets:** `tools/bench_budgets.json` now covers 1/8/32/36/40 sphere cases with scene-work and presentation limits.

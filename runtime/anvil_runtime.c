@@ -49,7 +49,7 @@ void anvil_frame_enter(void) {
 }
 void anvil_frame_leave(void) {}
 #define ANVIL_IMAGE_MEMORY_LIMIT ((size_t)128 * 1024 * 1024)
-enum { ANVIL_TRACE_SPHERES = 32 };
+enum { ANVIL_TRACE_SPHERES = 40 };
 static const double ANVIL_NEAR_DEPTH = 0.08;
 enum {
   ANVIL_RAY_BACKEND_BVH,

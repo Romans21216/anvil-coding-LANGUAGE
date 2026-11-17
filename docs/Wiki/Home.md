@@ -20,5 +20,5 @@ The [master improvement backlog](https://github.com/Romans21216/anvil-coding-LAN
 
 Working features include numeric global variables, fixed-size checked global and function-local numeric arrays, parameterized functions, numeric return values, function-local numeric state, branches, `while` and inclusive numeric `for` loops, recursion, 2D and basic 3D drawing, keyboard and resize-aware mouse input, camera movement, time, deterministic random/noise helpers, CPU BVH ray-traced spheres, and a one-peer UDP numeric prototype.
 
-The implementation is a prototype, not a complete engine. It currently targets Windows/MSVC, uses a fixed-size software rasterizer, supports up to 32 ray-traced spheres per batch, and has no GPU/DXR or Embree backend. The network API is not suitable for public Internet games.
+The implementation is a prototype, not a complete engine. It currently targets Windows/MSVC, uses a fixed-size software rasterizer, supports up to 40 ray-traced spheres per desktop C batch (32 in the wasm approximation), and has no GPU/DXR or Embree backend. The network API is not suitable for public Internet games.
 

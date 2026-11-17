@@ -215,6 +215,8 @@ SCENES.update(
         "ray_spheres_1": ray_sphere_scene(1, 1),
         "ray_spheres_8": ray_sphere_scene(4, 2),
         "ray_spheres_32": ray_sphere_scene(8, 4),
+        "ray_spheres_36": ray_sphere_scene(9, 4),
+        "ray_spheres_40": ray_sphere_scene(8, 5),
     }
 )
 

@@ -17,7 +17,7 @@ Screen-space `rect`, `circle`, `line`, and `text` commands can be mixed with `cu
 
 ## Built-in CPU BVH ray tracing
 
-`display ray_sphere(x, y, z, radius) -rgb(r, g, b)` is the built-in ray-traced sphere draw function. It uses per-pixel CPU rays and a BVH for closest sphere and hard-shadow queries, with diffuse and specular lighting. A trace batch supports up to 32 spheres. Projection bounds use exact sphere tangent extents and are covered by a compiled C regression harness that samples off-axis and near-camera sphere surfaces.
+`display ray_sphere(x, y, z, radius) -rgb(r, g, b)` is the built-in ray-traced sphere draw function. It uses per-pixel CPU rays and a BVH for closest sphere and hard-shadow queries, with diffuse and specular lighting. A desktop C trace batch supports up to 40 spheres; WebAssembly uses a tessellated approximation capped at 32. Projection bounds use exact sphere tangent extents and are covered by a compiled C regression harness that samples off-axis and near-camera sphere surfaces.
 
 BVH CPU ray tracing is the only implemented ray-tracing backend. DXR and Embree are not implemented. Conventional rendering also has no GPU backend, window resizing, texture mapping, mesh import, or robust production clipping across all primitive paths.
 
