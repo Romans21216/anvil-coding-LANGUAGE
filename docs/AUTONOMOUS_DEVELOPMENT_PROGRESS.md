@@ -965,3 +965,10 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Format generation:** a save whose magic names a newer generation now reports `the save needs a newer Anvil version` instead of "not a readable Anvil save"; the wasm store makes the same distinction from its payload type byte.
 - **Tests:** `tests/test_saves.py` gains five cases (round trip and file contents, persistence across processes, the three refusals, a crafted `ANVSAVE2` file, and a wasm round trip through the node host's save file).
 - **Full suite:** 949 passed, 1 skipped, 1 xfailed in 483.51 s, exit 0.
+
+## Batch 99 — tan on both backends (8.12)
+
+- **Builtin:** `tan(x)` — libm on the C backend, `sin/cos` over the existing wrapped Taylor series in the freestanding wasm runtime; the native backend refuses it with a located "not available" diagnostic.
+- **Evidence correction:** the 8.12 row listed 4-bit BMPs as missing from the wasm target; the baker has decoded 4-bit palettes since the palette work (`tests/test_bmp_palette.py` covers both backends), so the claim is dropped.
+- **Tests:** `tests/test_tan.py` (2 cases) compares C and wasm output byte for byte over nine angles plus the `tan = sin/cos` identity and a scaled known value, and pins the native refusal.
+- **Full suite:** 951 passed, 1 skipped, 1 xfailed in 480.88 s, exit 0.
