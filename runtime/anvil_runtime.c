@@ -975,9 +975,82 @@ static const wchar_t *anvil_text_utf16(const char *text) {
   return anvil_text_wide;
 }
 
+/* GDI has no alpha for text, so a run with a < 255 is rendered white on
+   black into a scratch DIB and composited with the same per-pixel blend the
+   other primitives use. The scratch read-back gives the glyph coverage,
+   including the antialiased edge. */
+static void anvil_text_wide_blend(double x, double y, const wchar_t *text,
+                                  int r, int g, int b, int a) {
+  int height = anvil_text_height();
+  HFONT font = anvil_text_font(height);
+  HGDIOBJ old = SelectObject(anvil_memory_dc, font);
+  SIZE size = {0, 0};
+  GetTextExtentPoint32W(anvil_memory_dc, text, (int)wcslen(text), &size);
+  SelectObject(anvil_memory_dc, old);
+  DeleteObject(font);
+  int width = size.cx + 8;
+  int tall = size.cy + 8;
+  if (size.cx <= 0 || size.cy <= 0)
+    return;
+  BITMAPINFO info;
+  memset(&info, 0, sizeof(info));
+  info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  info.bmiHeader.biWidth = width;
+  info.bmiHeader.biHeight = -tall; /* top-down, matching the loop below */
+  info.bmiHeader.biPlanes = 1;
+  info.bmiHeader.biBitCount = 32;
+  info.bmiHeader.biCompression = BI_RGB;
+  void *bits = NULL;
+  HDC scratch = CreateCompatibleDC(NULL);
+  HBITMAP bitmap =
+      scratch ? CreateDIBSection(scratch, &info, DIB_RGB_COLORS, &bits, NULL, 0)
+              : NULL;
+  if (!scratch || !bitmap || !bits) {
+    if (bitmap)
+      DeleteObject(bitmap);
+    if (scratch)
+      DeleteDC(scratch);
+    return;
+  }
+  HGDIOBJ old_bitmap = SelectObject(scratch, bitmap);
+  memset(bits, 0, (size_t)width * (size_t)tall * 4);
+  SetBkMode(scratch, TRANSPARENT);
+  SetTextColor(scratch, RGB(255, 255, 255));
+  HFONT scratch_font = anvil_text_font(height);
+  HGDIOBJ old_font = SelectObject(scratch, scratch_font);
+  TextOutW(scratch, 4, 4, text, (int)wcslen(text));
+  SelectObject(scratch, old_font);
+  DeleteObject(scratch_font);
+  int left = (int)floor(x) - 4;
+  int top = (int)floor(y) - 4;
+  const uint32_t *source = (const uint32_t *)bits;
+  for (int row = 0; row < tall; ++row) {
+    for (int column = 0; column < width; ++column) {
+      uint32_t pixel = source[row * width + column];
+      int cr = (int)((pixel >> 16) & 255u);
+      int cg = (int)((pixel >> 8) & 255u);
+      int cb = (int)(pixel & 255u);
+      int coverage = cr > cg ? cr : cg;
+      if (cb > coverage)
+        coverage = cb;
+      if (!coverage)
+        continue;
+      anvil_pixel(left + column, top + row, anvil_color(r, g, b),
+                  coverage * a / 255);
+    }
+  }
+  SelectObject(scratch, old_bitmap);
+  DeleteObject(bitmap);
+  DeleteDC(scratch);
+}
+
 static void anvil_text_wide_out(double x, double y, const wchar_t *text,
-                                int r, int g, int b) {
+                                int r, int g, int b, int a) {
   anvil_camera2d_point(&x, &y);
+  if (!(a >= 255)) {
+    anvil_text_wide_blend(x, y, text, r, g, b, a < 0 ? 0 : a);
+    return;
+  }
   int height = anvil_text_height();
   SetBkMode(anvil_memory_dc, TRANSPARENT);
   SetTextColor(anvil_memory_dc, RGB(r, g, b));
@@ -992,8 +1065,7 @@ void anvil_text(double x, double y, const char *text, int r, int g, int b,
                 int a) {
   if (!anvil_memory_dc || !text)
     return;
-  anvil_text_wide_out(x, y, anvil_text_utf16(text), r, g, b);
-  (void)a;
+  anvil_text_wide_out(x, y, anvil_text_utf16(text), r, g, b, a);
 }
 
 double anvil_text_width(const char *text) {
@@ -1083,7 +1155,7 @@ void anvil_text_wrap(double x, double y, double max_width, const char *text,
       line[--drawn] = 0;
     SelectObject(anvil_memory_dc, old);
     DeleteObject(font);
-    anvil_text_wide_out(x, line_y, line, r, g, b);
+    anvil_text_wide_out(x, line_y, line, r, g, b, a);
     font = anvil_text_font(height);
     old = SelectObject(anvil_memory_dc, font);
     line_y += (double)height * 1.35;
