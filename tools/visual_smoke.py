@@ -35,6 +35,7 @@ CASES = {
     "first_world": ("examples/first_world.ANVL", 1.0, 6, 0.02),
     "textured_cube": ("examples/textured_cube.ANVL", 1.0, 6, 0.02),
     "tilemap": ("examples/tilemap_demo.ANVL", 1.0, 6, 0.02),
+    "parallax": ("examples/parallax_demo.ANVL", 1.2, 6, 0.02),
 }
 
 

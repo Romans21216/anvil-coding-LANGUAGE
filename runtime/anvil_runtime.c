@@ -140,10 +140,20 @@ static double anvil_camera_move_speed, anvil_camera_turn_speed;
    existing programs draw exactly where they did before. */
 static double anvil_camera2d_x, anvil_camera2d_y;
 static double anvil_camera2d_zoom = 1.0;
+/* Parallax scales how much of the camera pan a layer follows: 1 is the world
+   layer, lower values scroll slower, 0 pins the layer to the screen. */
+static double anvil_parallax_factor = 1.0;
 
 static void anvil_camera2d_point(double *x, double *y) {
-  *x = (*x - anvil_camera2d_x) * anvil_camera2d_zoom;
-  *y = (*y - anvil_camera2d_y) * anvil_camera2d_zoom;
+  *x = (*x - anvil_camera2d_x * anvil_parallax_factor) * anvil_camera2d_zoom;
+  *y = (*y - anvil_camera2d_y * anvil_parallax_factor) * anvil_camera2d_zoom;
+}
+
+double anvil_parallax(double factor) {
+  double previous = anvil_parallax_factor;
+  if (isfinite(factor))
+    anvil_parallax_factor = factor < 0.0 ? 0.0 : factor > 4.0 ? 4.0 : factor;
+  return previous;
 }
 
 double anvil_camera2d(double x, double y, double zoom) {

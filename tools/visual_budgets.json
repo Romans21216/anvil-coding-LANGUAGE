@@ -3,6 +3,10 @@
     "distinct_colours": 3251,
     "non_background": 0.0944
   },
+  "parallax": {
+    "distinct_colours": 42,
+    "non_background": 0.591
+  },
   "particles": {
     "distinct_colours": 113,
     "non_background": 0.2284

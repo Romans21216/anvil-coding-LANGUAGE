@@ -107,6 +107,9 @@ remote desktop can prevent window creation:
   cell and the cell boundary, and an animated-tile test that samples frame 5
   (base tile) and frame 75 (wrapped frame) to prove the drawn tile follows the
   animation clock.
+- `test_parallax` — clamps the factor and returns the previous value, then pans
+  the camera 100 px and proves with captured pixels that a factor-1 layer
+  lands at x=0 and a 0.5 layer at x=50.
 - `test_memory_report` — builds a headless `fn(main)` program that loads an
   image and a WAV, asserts `memory_report()` names the exact `file:line` and
   byte counts of each live resource, that destroying the image drops it from

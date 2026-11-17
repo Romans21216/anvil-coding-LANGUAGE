@@ -115,6 +115,7 @@ RUNTIME_C_NAMES = {
     "anvil_set_scene3d",
     "anvil_camera_perspective",
     "anvil_camera2d",
+    "anvil_parallax",
     "anvil_camera_angle",
     "anvil_mesh_culled",
     "anvil_mesh_drawn",

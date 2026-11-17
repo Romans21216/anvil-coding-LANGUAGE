@@ -1,0 +1,42 @@
+# Parallax demo: a wide sea layer scrolls at 0.35x the camera while the island
+# follows the camera at 1x, so the two visibly separate as the view drifts.
+scene 2d
+clear rgba(8, 14, 26, 255)
+set var(tiles) = image_load("examples/assets/tiles.bmp")
+set var(sea) = tilemap_new(var(tiles), 16, 16, 64, 12)
+set var(isle) = tilemap_new(var(tiles), 16, 16, 16, 10)
+
+set var(ok) = tilemap_fill(var(sea), 16)
+set var(ok) = tilemap_animate(var(sea), 16, 2, 0.7)
+set var(ok) = tilemap_fill(var(isle), 16)
+set var(ok) = tilemap_area(var(isle), 4, 1, 1, 14, 8)
+set var(ok) = tilemap_area(var(isle), 0, 2, 2, 12, 6)
+set var(ok) = tilemap_area(var(isle), 3, 7, 3, 2, 3)
+set var(ok) = tilemap_solid(var(isle), 3, 1)
+# Chamfer both layers at the corners so the island does not read as a box.
+set var(ok) = tilemap_set(var(isle), 1, 1, 16)
+set var(ok) = tilemap_set(var(isle), 14, 1, 16)
+set var(ok) = tilemap_set(var(isle), 1, 8, 16)
+set var(ok) = tilemap_set(var(isle), 14, 8, 16)
+set var(ok) = tilemap_set(var(isle), 2, 2, 4)
+set var(ok) = tilemap_set(var(isle), 13, 2, 4)
+set var(ok) = tilemap_set(var(isle), 2, 7, 4)
+set var(ok) = tilemap_set(var(isle), 13, 7, 4)
+
+fn(update)
+  set var(cam) = camera2d(80 + 80 * sin(time() * 0.6), 0, 1)
+end
+
+fn(draw)
+  # The backdrop and the caption are pinned to the screen (factor 0), which is
+  # also what keeps the clear covering the whole window while the camera pans.
+  set var(p0) = parallax(0)
+  display rect(0, 0, 960, 600) -rgba(8, 14, 26, 255)
+  set var(p1) = parallax(0.35)
+  set var(sea_drawn) = tilemap_draw(var(sea), 0, 24, 3)
+  set var(p2) = parallax(1)
+  set var(isle_drawn) = tilemap_draw(var(isle), 100, 72, 3)
+  set var(p3) = parallax(0)
+  display text("Anvil parallax  0.35x sea / 1x island") -l(12, 4) -rgb(196, 210, 236)
+  set var(p4) = parallax(1)
+end
