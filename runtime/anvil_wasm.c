@@ -1404,6 +1404,8 @@ static const AnvilWasmImage *anvil_baked_images;
 static int anvil_baked_image_count;
 static int anvil_images_ready;
 static const char *anvil_image_error_text = "";
+static double anvil_wasm_image_bytes;
+static double anvil_wasm_audio_bytes;
 
 typedef struct {
   const AnvilWasmImage *source;
@@ -1431,6 +1433,13 @@ static void anvil_images_ensure(void) {
 }
 
 const char *anvil_image_error(void) { return anvil_image_error_text; }
+
+double anvil_memory_images(void) { return anvil_wasm_image_bytes; }
+double anvil_memory_audio(void) { return anvil_wasm_audio_bytes; }
+double anvil_memory_video(void) { return 960.0 * 600.0 * 4.0; }
+double anvil_memory_total(void) {
+  return anvil_memory_images() + anvil_memory_audio() + anvil_memory_video();
+}
 
 static AnvilWasmImageSlot *anvil_image_slot(double handle) {
   if (!(handle >= 1.0) || handle > 1.0e9)
@@ -1461,6 +1470,8 @@ double anvil_image_load(const char *path) {
       slot->tint_b = 255;
       slot->flip_x = 0;
       slot->flip_y = 0;
+      anvil_wasm_image_bytes +=
+          (double)slot->source->width * (double)slot->source->height * 4.0;
       anvil_image_error_text = "";
       return (double)(slot->generation - 1) * ANVIL_WASM_IMAGE_STRIDE +
              slot_index + 1;
@@ -1488,6 +1499,8 @@ double anvil_image_destroy(double handle) {
   AnvilWasmImageSlot *slot = anvil_image_slot(handle);
   if (!slot)
     return 0.0;
+  anvil_wasm_image_bytes -=
+      (double)slot->source->width * (double)slot->source->height * 4.0;
   slot->used = 0;
   slot->source = NULL;
   return 1.0;
@@ -1607,6 +1620,11 @@ enum {
 static const AnvilWasmSound *anvil_baked_sounds;
 static int anvil_baked_sound_count;
 static int anvil_sounds_ready;
+static double anvil_wasm_sound_bytes(const AnvilWasmSound *source) {
+  double rate = source->rate > 0.0 ? source->rate : 48000.0;
+  return (double)source->frames * (48000.0 / rate) * 2.0 * 2.0;
+}
+
 static const char *anvil_sound_error_text = "";
 
 typedef struct {
@@ -1667,6 +1685,7 @@ double anvil_sound_load(const char *path) {
       slot->generation += 1;
       slot->volume = 1.0;
       slot->group = 1;
+      anvil_wasm_audio_bytes += anvil_wasm_sound_bytes(slot->source);
       anvil_sound_error_text = "";
       return (double)(slot->generation - 1) * ANVIL_WASM_SOUND_STRIDE +
              slot_index + 1;
@@ -1790,6 +1809,12 @@ double anvil_sound_destroy(double handle) {
   AnvilWasmSoundSlot *slot = anvil_sound_slot(handle);
   if (!slot)
     return 0.0;
+  if (slot->source) {
+    anvil_wasm_audio_bytes -= anvil_wasm_sound_bytes(slot->source);
+    if (anvil_wasm_audio_bytes < 0.0) {
+      anvil_wasm_audio_bytes = 0.0;
+    }
+  }
   slot->used = 0;
   slot->source = NULL;
   return 1.0;
@@ -2339,6 +2364,111 @@ void anvil_text(double x, double y, const char *text, int r, int g, int b,
 
 void anvil_trace_finish(void) {}
 
+/* ---- Particles ---------------------------------------------------------- */
+enum { ANVIL_PARTICLE_MAX = 4096 };
+
+typedef struct {
+  double x, y, vx, vy, age, life, size;
+  int r, g, b, alive;
+} AnvilParticle;
+
+static AnvilParticle anvil_particles[ANVIL_PARTICLE_MAX];
+static int anvil_particle_live;
+static double anvil_particle_gravity_y;
+
+double anvil_particle_emit(double x, double y, double vx, double vy,
+                           double life, double size, int r, int g, int b) {
+  if (!anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
+      !anvil_wasm_finite(vx) || !anvil_wasm_finite(vy)) {
+    return 0.0;
+  }
+  if (!(life > 0.0) || life > 600.0) {
+    return 0.0;
+  }
+  if (!(size > 0.0) || size > 512.0) {
+    return 0.0;
+  }
+  if (anvil_particle_live >= ANVIL_PARTICLE_MAX) {
+    return 0.0;
+  }
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; i++) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (particle->alive) {
+      continue;
+    }
+    particle->x = x;
+    particle->y = y;
+    particle->vx = vx;
+    particle->vy = vy;
+    particle->age = 0.0;
+    particle->life = life;
+    particle->size = size;
+    particle->r = r < 0 ? 0 : r > 255 ? 255 : r;
+    particle->g = g < 0 ? 0 : g > 255 ? 255 : g;
+    particle->b = b < 0 ? 0 : b > 255 ? 255 : b;
+    particle->alive = 1;
+    anvil_particle_live++;
+    return 1.0;
+  }
+  return 0.0;
+}
+
+double anvil_particle_count(void) { return (double)anvil_particle_live; }
+
+double anvil_particle_clear(void) {
+  int cleared = anvil_particle_live;
+  memset(anvil_particles, 0, sizeof(anvil_particles));
+  anvil_particle_live = 0;
+  return (double)cleared;
+}
+
+double anvil_particle_gravity(double gravity) {
+  if (!anvil_wasm_finite(gravity)) {
+    return anvil_particle_gravity_y;
+  }
+  anvil_particle_gravity_y = gravity;
+  return anvil_particle_gravity_y;
+}
+
+static void anvil_particles_update(double dt) {
+  if (anvil_particle_live == 0) {
+    return;
+  }
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; i++) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (!particle->alive) {
+      continue;
+    }
+    particle->age += dt;
+    if (particle->age >= particle->life) {
+      particle->alive = 0;
+      anvil_particle_live--;
+      continue;
+    }
+    particle->vy += anvil_particle_gravity_y * dt;
+    particle->x += particle->vx * dt;
+    particle->y += particle->vy * dt;
+  }
+}
+
+/* Drawn after the program's own draw pass, so particles sit above the scene. */
+static void anvil_particles_draw(void) {
+  if (anvil_particle_live == 0) {
+    return;
+  }
+  for (int i = 0; i < ANVIL_PARTICLE_MAX; i++) {
+    AnvilParticle *particle = &anvil_particles[i];
+    if (!particle->alive) {
+      continue;
+    }
+    double fade = 1.0 - particle->age / particle->life;
+    int alpha = (int)(255.0 * (fade < 0.0 ? 0.0 : fade > 1.0 ? 1.0 : fade));
+    anvil_rect(particle->x - particle->size * 0.5,
+               particle->y - particle->size * 0.5, particle->size,
+               particle->size, particle->r, particle->g, particle->b, alpha);
+  }
+}
+
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   (void)title;
   anvil_frame_update = update;
@@ -2355,6 +2485,7 @@ __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   anvil_time_seconds += anvil_delta_seconds;
   if (anvil_frame_update)
     anvil_frame_update();
+  anvil_particles_update(anvil_delta_seconds);
   /* Edges last one frame, like the C runtime's first-update clearing. */
   memset(anvil_keys_pressed, 0, sizeof(anvil_keys_pressed));
   memset(anvil_mouse_pressed_buttons, 0, sizeof(anvil_mouse_pressed_buttons));
@@ -2362,5 +2493,6 @@ __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   anvil_host_clear(anvil_clear_r, anvil_clear_g, anvil_clear_b, anvil_clear_a);
   if (anvil_frame_draw)
     anvil_frame_draw();
+  anvil_particles_draw();
   anvil_host_present();
 }

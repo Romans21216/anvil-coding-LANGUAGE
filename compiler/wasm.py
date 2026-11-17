@@ -131,6 +131,14 @@ ALLOWED_BUILTINS = {
     "physics_capacity",
     "physics_gravity",
     "physics_step",
+    "memory_images",
+    "memory_audio",
+    "memory_video",
+    "memory_total",
+    "particle_emit",
+    "particle_count",
+    "particle_clear",
+    "particle_gravity",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)

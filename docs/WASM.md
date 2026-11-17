@@ -78,6 +78,10 @@ Supported today:
   `body_x/y/vx/vy`, `body_set_velocity`, `body_force`, `body_restitution`,
   `body_friction`, `body_collision`, `physics_capacity`, `physics_gravity`,
   `physics_step`
+- particles: `particle_emit`, `particle_count`, `particle_clear`,
+  `particle_gravity` — the same 4,096-particle pool, fading squares drawn after
+  the program's own pass
+- accounting: `memory_images`, `memory_audio`, `memory_video`, `memory_total`
 - saves: `save_number`, `load_number`, `save_text`, `load_text`,
   `save_exists`, `save_delete`, `save_error`
 

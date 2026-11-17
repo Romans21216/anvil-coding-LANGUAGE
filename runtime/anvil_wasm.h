@@ -167,6 +167,12 @@ double anvil_body_collision(double first, double second);
 double anvil_physics_capacity(double requested_capacity);
 double anvil_physics_gravity(double x, double y);
 double anvil_physics_step(void);
+
+double anvil_particle_emit(double x, double y, double vx, double vy,
+                           double life, double size, int r, int g, int b);
+double anvil_particle_count(void);
+double anvil_particle_clear(void);
+double anvil_particle_gravity(double gravity);
 int anvil_str_ends(const char *source, const char *suffix);
 
 /* Perlin-style noise and character conversion, matching the C runtime. */
@@ -243,6 +249,12 @@ double anvil_music_volume(double volume);
 double anvil_music_position(void);
 double anvil_music_length(void);
 const char *anvil_music_error(void);
+
+/* Resource accounting, in bytes. */
+double anvil_memory_images(void);
+double anvil_memory_audio(void);
+double anvil_memory_video(void);
+double anvil_memory_total(void);
 
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);
