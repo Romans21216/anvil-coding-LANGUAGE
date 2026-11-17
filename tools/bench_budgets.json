@@ -209,6 +209,16 @@
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.12,
         "measured_max_ms": 13.42
+      },
+      "ray_mesh_32x32": {
+        "work_p50_ms": 19.7,
+        "work_p95_ms": 20.95,
+        "present_p95_ms": 3.0,
+        "measured_work_p50_ms": 7.88,
+        "measured_work_p95_ms": 8.38,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 0.12,
+        "measured_max_ms": 8.49
       }
     }
   }

@@ -870,6 +870,12 @@ def validate(
             f"{source_path}:{line}: display {match.group(1)}(...) is not available "
             "in the wasm backend yet"
         )
+    match = re.search(r"\bray_mesh\s*\(", text)
+    if match:
+        line = text.count("\n", 0, match.start()) + 1
+        raise CompileError(
+            f"{source_path}:{line}: ray_mesh is not available in the wasm backend yet"
+        )
     match = re.search(r"\bframe_capture\s*\(", text)
     if match:
         line = text.count("\n", 0, match.start()) + 1

@@ -9,7 +9,7 @@ The initial runtime targets Windows and keeps the engine surface intentionally s
 
 ## Available commands
 
-The C runtime also supports `display ray_triangle(x1,y1,z1,x2,y2,z2,x3,y3,z3)` for two-sided world-space triangles. Triangle hits receive closest-hit depth, diffuse/specular shading, hard shadows and alpha coverage. Up to 40 triangles can be queued per batch; triangle intersections use a bounded linear scan while ray-traced spheres use the BVH. WebAssembly reports this primitive as unavailable.
+The C runtime also supports `display ray_triangle(x1,y1,z1,x2,y2,z2,x3,y3,z3)` for two-sided world-space triangles. Triangle hits receive closest-hit depth, diffuse/specular shading, hard shadows and alpha coverage. Up to 40 triangles can be queued per batch; triangle intersections use a bounded linear scan while ray-traced spheres use the BVH. WebAssembly reports this primitive as unavailable. Static imported meshes can be submitted with `ray_mesh("path.glb",x,y,z,scale,rx,ry,rz)`; their per-asset BVH is cached across frames, with a limit of 200,000 triangles per mesh, 40 instances per frame, 32 distinct cached assets and a 128 MiB BVH memory budget.
 
 ```anv
 scene 3d

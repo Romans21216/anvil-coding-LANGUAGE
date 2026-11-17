@@ -233,6 +233,21 @@ def ray_triangle_scene(count: int) -> str:
     return "\n".join(lines)
 
 
+def ray_mesh_scene() -> str:
+    return "\n".join(
+        (
+            "scene 3d",
+            "camera perspective 0 0 12",
+            "camera fov(70)",
+            "clear rgba(11, 16, 27, 255)",
+            "",
+            "fn(draw)",
+            '  set var(mesh_ok) = ray_mesh("mesh.glb", 0, 0, -1, 3, 0, 0, 0)',
+            "end",
+        )
+    )
+
+
 SCENES.update(
     {
         "ray_spheres_1": ray_sphere_scene(1, 1),
@@ -244,6 +259,7 @@ SCENES.update(
         "ray_spheres_40_samples4": "set var(previous_samples) = ray_samples(4)\n" + ray_sphere_scene(8, 5),
         "ray_triangles_8": ray_triangle_scene(8),
         "ray_triangles_40": ray_triangle_scene(40),
+        "ray_mesh_32x32": ray_mesh_scene(),
     }
 )
 
@@ -281,12 +297,59 @@ def write_tileset(path):
     path.write_bytes(bytes(header) + bytes(body))
 
 
+def write_ray_mesh(path, quads: int = 32):
+    """Write an embedded GLB grid with two ray-traced triangles per quad."""
+    import struct
+
+    side = quads + 1
+    positions = bytearray()
+    for y in range(side):
+        for x in range(side):
+            positions += struct.pack("<3f", x / quads - 0.5, y / quads - 0.5, 0.0)
+    indices = bytearray()
+    for y in range(quads):
+        for x in range(quads):
+            a = y * side + x
+            b = a + 1
+            c = a + side
+            d = c + 1
+            indices += struct.pack("<6H", a, b, d, a, d, c)
+    binary = positions + indices
+    document = {
+        "asset": {"version": "2.0"},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0}],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "material": 0}]}],
+        "materials": [{"pbrMetallicRoughness": {"baseColorFactor": [0.7, 0.4, 0.2, 1.0]}}],
+        "accessors": [
+            {"bufferView": 0, "componentType": 5126, "count": side * side, "type": "VEC3"},
+            {"bufferView": 1, "componentType": 5123, "count": quads * quads * 6, "type": "SCALAR"},
+        ],
+        "bufferViews": [
+            {"buffer": 0, "byteOffset": 0, "byteLength": len(positions)},
+            {"buffer": 0, "byteOffset": len(positions), "byteLength": len(indices)},
+        ],
+        "buffers": [{"byteLength": len(binary)}],
+    }
+    json_chunk = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    json_chunk += b" " * ((4 - len(json_chunk) % 4) % 4)
+    binary += bytes((4 - len(binary) % 4) % 4)
+    total = 12 + 8 + len(json_chunk) + 8 + len(binary)
+    glb = b"glTF" + struct.pack("<II", 2, total)
+    glb += struct.pack("<II", len(json_chunk), 0x4E4F534A) + json_chunk
+    glb += struct.pack("<II", len(binary), 0x004E4942) + binary
+    path.write_bytes(glb)
+
+
 def measure(name: str, runs: int) -> dict[str, float]:
     source_text = program(SCENES[name])
     results = []
     with tempfile.TemporaryDirectory() as temp:
         root = pathlib.Path(temp)
         write_tileset(root / "tiles.bmp")
+        if name.startswith("ray_mesh_"):
+            write_ray_mesh(root / "mesh.glb")
         source = root / f"{name}.ANVL"
         source.write_text(source_text, encoding="utf-8")
         executable = root / f"{name}.exe"

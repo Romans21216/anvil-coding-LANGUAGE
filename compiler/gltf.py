@@ -767,7 +767,7 @@ def load_animated(path: pathlib.Path) -> dict:
 _registry: dict[str, tuple[str, int, list[float], tuple[float, float, float, float]]] = {}
 _prescan: set[str] = set()
 PATTERN = re.compile(
-    r'\b(?:model_draw|model_animate|model_animation_length|model_morph)\s*\(\s*"((?:[^"\\]|\\.)*)"'
+    r'\b(?:model_draw|ray_mesh|model_animate|model_animation_length|model_morph)\s*\(\s*"((?:[^"\\]|\\.)*)"'
 )
 
 
@@ -786,8 +786,8 @@ def prescan(source_text: str, source_path: pathlib.Path) -> None:
         try:
             ensure_model(asset, source_path)
         except ModelError:
-            # Leave the report to the model_draw/model_animate lowering, which
-            # knows the source line; a prescan has no line to name.
+            # The lowering reports the model error at its source line; a
+            # prescan has no line to name.
             continue
         _prescan.add(str(_resolve(asset, source_path)))
 

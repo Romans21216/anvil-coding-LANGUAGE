@@ -1,0 +1,9 @@
+language version 1
+scene 3d
+camera perspective 0 0 12
+camera fov(70)
+clear rgba(11, 16, 27, 255)
+
+fn(draw)
+  set var(mesh_visible) = ray_mesh("ray_mesh.glb", 0, 0, -1, 3, 0, time() * 18, 0)
+end

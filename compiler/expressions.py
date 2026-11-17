@@ -274,6 +274,7 @@ BUILTINS = {
     "window_scale": (1, 1),
     "camera_angle": (2, 2),
     "model_draw": (8, 8),
+    "ray_mesh": (8, 8),
     "model_animate": (2, 2),
     "model_animation_length": (1, 1),
     "model_morph": (3, 3),
@@ -860,9 +861,9 @@ class ExpressionParser:
             )
         elif kind == "word" and value in KEY_CODES:
             left = ("ANVIL_KEY_" + value, "number")
-        elif kind == "word" and value == "model_draw":
-            # Lowered at compile time: the glTF file becomes a static triangle
-            # array and the call becomes anvil_mesh_draw.
+        elif kind == "word" and value in ("model_draw", "ray_mesh"):
+            # glTF assets become static arrays; either the raster or ray
+            # runtime consumes that data with a per-instance transform.
             self.expect("(")
             literal = self.require_string(self.parse())
             try:
@@ -877,13 +878,26 @@ class ExpressionParser:
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             symbol, count, bounds = model["symbol"], model["count"], model["bounds"]
+            if value == "ray_mesh" and (
+                model.get("animated") or model.get("skinned") or model.get("morph_count")
+            ):
+                raise CompileError(
+                    f"{self.path}:{self.line}: ray_mesh currently requires a static, "
+                    "unskinned mesh without morph targets"
+                )
             mesh_args = []
             for _ in range(7):
                 self.expect(",")
                 mesh_args.append(self.require_number(self.parse()))
             self.expect(")")
             placement = ", ".join(mesh_args)
-            if model.get("skinned"):
+            if value == "ray_mesh":
+                call = (
+                    f"anvil_trace_mesh((const double *){symbol}, {count}, "
+                    + ", ".join(f"{item:.6g}" for item in bounds)
+                    + f", {placement})"
+                )
+            elif model.get("skinned"):
                 call = (
                     f"anvil_mesh_draw_skinned((const double *){symbol}, {count}, "
                     f"(const double *){symbol}_nodes, {len(model['nodes']) // 10}, "

@@ -49,7 +49,10 @@ void anvil_frame_enter(void) {
 }
 void anvil_frame_leave(void) {}
 #define ANVIL_IMAGE_MEMORY_LIMIT ((size_t)128 * 1024 * 1024)
-enum { ANVIL_TRACE_SPHERES = 40, ANVIL_TRACE_TRIANGLES = 40 };
+enum { ANVIL_TRACE_SPHERES = 40, ANVIL_TRACE_TRIANGLES = 40,
+       ANVIL_TRACE_MESHES = 40, ANVIL_MESH_BVH_CACHE = 32,
+       ANVIL_MESH_MAX_TRIANGLES = 200000 };
+#define ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES ((size_t)128 * 1024 * 1024)
 static const double ANVIL_NEAR_DEPTH = 0.08;
 enum {
   ANVIL_RAY_BACKEND_BVH,
@@ -77,6 +80,18 @@ typedef struct {
   AnvilVec3 minimum, maximum;
   int left, right, sphere;
 } AnvilBvhNode;
+typedef struct {
+  const double *data;
+  int triangle_count;
+  AnvilBvhNode *nodes;
+  int *indices;
+  int node_count;
+} AnvilMeshBvh;
+typedef struct {
+  const AnvilMeshBvh *bvh;
+  double cx, cy, cz, radius;
+  double x, y, z, scale, rx, ry, rz;
+} AnvilTraceMesh;
 typedef struct {
   double x, y, depth;
 } AnvilProjected;
@@ -226,6 +241,13 @@ static AnvilTraceSphere anvil_trace_spheres[ANVIL_TRACE_SPHERES];
 static int anvil_trace_sphere_count;
 static AnvilTraceTriangle anvil_trace_triangles[ANVIL_TRACE_TRIANGLES];
 static int anvil_trace_triangle_count;
+static AnvilTraceMesh anvil_trace_meshes[ANVIL_TRACE_MESHES];
+static int anvil_trace_mesh_count;
+static AnvilMeshBvh anvil_mesh_bvh_cache[ANVIL_MESH_BVH_CACHE];
+static int anvil_mesh_bvh_cache_count;
+static size_t anvil_mesh_bvh_memory_bytes;
+static const AnvilMeshBvh *anvil_mesh_bvh_get(const double *data,
+                                              int triangle_count);
 static AnvilBvhNode anvil_trace_bvh[ANVIL_TRACE_SPHERES * 2];
 static int anvil_trace_bvh_count;
 static int anvil_active_ray_backend = ANVIL_RAY_BACKEND_BVH;
@@ -294,6 +316,7 @@ static void anvil_pixel(int x, int y, uint32_t color, int alpha) {
 static void anvil_clear_frame(void) {
   anvil_trace_sphere_count = 0;
   anvil_trace_triangle_count = 0;
+  anvil_trace_mesh_count = 0;
   anvil_mesh_culled_frame = 0;
   anvil_mesh_drawn_frame = 0;
   uint32_t c = anvil_color(anvil_clear_color[0], anvil_clear_color[1],
@@ -348,6 +371,19 @@ static AnvilVec3 anvil_rotate(AnvilVec3 p, double rx, double ry, double rz) {
   c = cos(rz);
   s = sin(rz);
   p = (AnvilVec3){p.x * c - p.y * s, p.x * s + p.y * c, p.z};
+  return p;
+}
+
+static AnvilVec3 anvil_unrotate(AnvilVec3 p, double rx, double ry, double rz) {
+  const double d = 0.017453292519943295769;
+  double c = cos(rz * d), s = sin(rz * d);
+  p = (AnvilVec3){p.x * c + p.y * s, -p.x * s + p.y * c, p.z};
+  c = cos(ry * d);
+  s = sin(ry * d);
+  p = (AnvilVec3){p.x * c - p.z * s, p.y, p.x * s + p.z * c};
+  c = cos(rx * d);
+  s = sin(rx * d);
+  p = (AnvilVec3){p.x, p.y * c + p.z * s, -p.y * s + p.z * c};
   return p;
 }
 
@@ -3401,6 +3437,34 @@ void anvil_trace_triangle(double x1, double y1, double z1, double x2,
   triangle->a = a;
 }
 
+double anvil_trace_mesh(const double *data, int triangle_count, double cx,
+                        double cy, double cz, double radius, double x,
+                        double y, double z, double scale, double rx,
+                        double ry, double rz) {
+  if (!data || triangle_count <= 0 || triangle_count > ANVIL_MESH_MAX_TRIANGLES ||
+      anvil_trace_mesh_count >= ANVIL_TRACE_MESHES || !isfinite(x) ||
+      !isfinite(y) || !isfinite(z) || !isfinite(scale) || scale == 0.0 ||
+      !isfinite(rx) || !isfinite(ry) || !isfinite(rz))
+    return 0.0;
+  const AnvilMeshBvh *bvh = anvil_mesh_bvh_get(data, triangle_count);
+  if (!bvh)
+    return 0.0;
+  AnvilTraceMesh *mesh = &anvil_trace_meshes[anvil_trace_mesh_count++];
+  mesh->bvh = bvh;
+  mesh->cx = cx;
+  mesh->cy = cy;
+  mesh->cz = cz;
+  mesh->radius = radius;
+  mesh->x = x;
+  mesh->y = y;
+  mesh->z = z;
+  mesh->scale = scale;
+  mesh->rx = rx;
+  mesh->ry = ry;
+  mesh->rz = rz;
+  return 1.0;
+}
+
 static int anvil_ray_backend_id(const char *name) {
   if (!name)
     return -1;
@@ -3589,6 +3653,169 @@ static int anvil_ray_box_hit(AnvilVec3 origin, AnvilVec3 direction,
   return 1;
 }
 
+static const double *anvil_mesh_sort_data;
+static int anvil_mesh_sort_axis;
+
+static double anvil_mesh_centroid(const double *data, int triangle, int axis) {
+  const double *p = data + (size_t)triangle * 12;
+  return (p[axis] + p[axis + 3] + p[axis + 6]) / 3.0;
+}
+
+static int anvil_mesh_index_compare(const void *left, const void *right) {
+  int a = *(const int *)left;
+  int b = *(const int *)right;
+  double ca = anvil_mesh_centroid(anvil_mesh_sort_data, a,
+                                  anvil_mesh_sort_axis);
+  double cb = anvil_mesh_centroid(anvil_mesh_sort_data, b,
+                                  anvil_mesh_sort_axis);
+  return ca < cb ? -1 : ca > cb ? 1 : a < b ? -1 : a > b;
+}
+
+static int anvil_mesh_bvh_build(AnvilMeshBvh *bvh, int start, int count) {
+  int node_index = bvh->node_count++;
+  AnvilBvhNode *node = &bvh->nodes[node_index];
+  node->minimum = (AnvilVec3){1.0e30, 1.0e30, 1.0e30};
+  node->maximum = (AnvilVec3){-1.0e30, -1.0e30, -1.0e30};
+  node->left = node->right = -1;
+  node->sphere = -1;
+  for (int i = start; i < start + count; ++i) {
+    const double *p = bvh->data + (size_t)bvh->indices[i] * 12;
+    for (int vertex = 0; vertex < 3; ++vertex)
+      anvil_bvh_include(&node->minimum, &node->maximum,
+                        (AnvilVec3){p[vertex * 3], p[vertex * 3 + 1],
+                                    p[vertex * 3 + 2]});
+  }
+  if (count == 1) {
+    node->sphere = bvh->indices[start];
+    return node_index;
+  }
+  AnvilVec3 extent = anvil_sub(node->maximum, node->minimum);
+  int axis = extent.y > extent.x ? 1 : 0;
+  if (anvil_axis_value(extent, 2) > anvil_axis_value(extent, axis)) axis = 2;
+  anvil_mesh_sort_data = bvh->data;
+  anvil_mesh_sort_axis = axis;
+  qsort(bvh->indices + start, (size_t)count, sizeof(*bvh->indices),
+        anvil_mesh_index_compare);
+  int left_count = count / 2;
+  node->left = anvil_mesh_bvh_build(bvh, start, left_count);
+  node->right = anvil_mesh_bvh_build(bvh, start + left_count,
+                                     count - left_count);
+  return node_index;
+}
+
+static void anvil_mesh_bvh_cleanup(void) {
+  for (int i = 0; i < anvil_mesh_bvh_cache_count; ++i) {
+    free(anvil_mesh_bvh_cache[i].nodes);
+    free(anvil_mesh_bvh_cache[i].indices);
+  }
+  anvil_mesh_bvh_cache_count = 0;
+  anvil_mesh_bvh_memory_bytes = 0;
+}
+
+static const AnvilMeshBvh *anvil_mesh_bvh_get(const double *data,
+                                               int triangle_count) {
+  for (int i = 0; i < anvil_mesh_bvh_cache_count; ++i)
+    if (anvil_mesh_bvh_cache[i].data == data)
+      return anvil_mesh_bvh_cache[i].triangle_count == triangle_count
+                 ? &anvil_mesh_bvh_cache[i]
+                 : NULL;
+  if (anvil_mesh_bvh_cache_count >= ANVIL_MESH_BVH_CACHE)
+    return NULL;
+  size_t node_bytes = (size_t)triangle_count * 2 * sizeof(AnvilBvhNode);
+  size_t index_bytes = (size_t)triangle_count * sizeof(int);
+  if (node_bytes > ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES -
+                       anvil_mesh_bvh_memory_bytes ||
+      index_bytes > ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES -
+                        anvil_mesh_bvh_memory_bytes - node_bytes)
+    return NULL;
+  AnvilMeshBvh *bvh = &anvil_mesh_bvh_cache[anvil_mesh_bvh_cache_count];
+  memset(bvh, 0, sizeof(*bvh));
+  bvh->data = data;
+  bvh->triangle_count = triangle_count;
+  bvh->nodes = (AnvilBvhNode *)calloc((size_t)triangle_count * 2,
+                                      sizeof(*bvh->nodes));
+  bvh->indices = (int *)malloc((size_t)triangle_count * sizeof(*bvh->indices));
+  if (!bvh->nodes || !bvh->indices) {
+    free(bvh->nodes);
+    free(bvh->indices);
+    memset(bvh, 0, sizeof(*bvh));
+    return NULL;
+  }
+  for (int i = 0; i < triangle_count; ++i) bvh->indices[i] = i;
+  anvil_mesh_bvh_cache_count++;
+  anvil_mesh_bvh_memory_bytes += node_bytes + index_bytes;
+  (void)anvil_mesh_bvh_build(bvh, 0, triangle_count);
+  if (anvil_mesh_bvh_cache_count == 1) atexit(anvil_mesh_bvh_cleanup);
+  return bvh;
+}
+
+static int anvil_mesh_bvh_trace_node(const AnvilMeshBvh *bvh, int node_index,
+                                     AnvilVec3 origin, AnvilVec3 direction,
+                                     double max_t, double near_t,
+                                     double *hit_t, int *hit_triangle,
+                                     AnvilVec3 *hit_normal) {
+  if (near_t >= max_t) return 0;
+  const AnvilBvhNode *node = &bvh->nodes[node_index];
+  if (node->sphere >= 0) {
+    int triangle_index = node->sphere;
+    const double *p = bvh->data + (size_t)triangle_index * 12;
+    AnvilTraceTriangle triangle = {
+        {{p[0], p[1], p[2]}, {p[3], p[4], p[5]}, {p[6], p[7], p[8]}},
+        (int)p[9], (int)p[10], (int)p[11], 255};
+    double t;
+    AnvilVec3 normal;
+    if (anvil_ray_triangle_hit(origin, direction, &triangle, &t, &normal) &&
+        t < max_t) {
+      *hit_t = t;
+      *hit_triangle = triangle_index;
+      *hit_normal = normal;
+      return 1;
+    }
+    return 0;
+  }
+  double left_near = 0.0, right_near = 0.0;
+  int hit_left = anvil_ray_box_hit(origin, direction, &bvh->nodes[node->left],
+                                   max_t, &left_near);
+  int hit_right = anvil_ray_box_hit(origin, direction, &bvh->nodes[node->right],
+                                    max_t, &right_near);
+  int first = node->left, second = node->right;
+  double first_near = left_near, second_near = right_near;
+  int first_hit = hit_left, second_hit = hit_right;
+  if (hit_right && (!hit_left || right_near < left_near)) {
+    first = node->right;
+    second = node->left;
+    first_near = right_near;
+    second_near = left_near;
+    first_hit = hit_right;
+    second_hit = hit_left;
+  }
+  int found = 0;
+  if (first_hit)
+    found = anvil_mesh_bvh_trace_node(bvh, first, origin, direction, max_t,
+                                      first_near, hit_t, hit_triangle,
+                                      hit_normal);
+  if (found) max_t = *hit_t;
+  if (second_hit && second_near < max_t) {
+    int second_found = anvil_mesh_bvh_trace_node(
+        bvh, second, origin, direction, max_t, second_near, hit_t,
+        hit_triangle, hit_normal);
+    found = found || second_found;
+  }
+  return found;
+}
+
+static int anvil_mesh_bvh_trace(const AnvilMeshBvh *bvh, AnvilVec3 origin,
+                                AnvilVec3 direction, double max_t,
+                                double *hit_t, int *hit_triangle,
+                                AnvilVec3 *hit_normal) {
+  double near_t;
+  if (!bvh || bvh->node_count == 0 ||
+      !anvil_ray_box_hit(origin, direction, &bvh->nodes[0], max_t, &near_t))
+    return 0;
+  return anvil_mesh_bvh_trace_node(bvh, 0, origin, direction, max_t, near_t,
+                                   hit_t, hit_triangle, hit_normal);
+}
+
 /* `near_t` is the box distance already computed by the parent while ordering
    its children. Passing it down avoids testing the same child box twice. */
 static int anvil_bvh_trace_node(int node_index, AnvilVec3 origin,
@@ -3653,14 +3880,50 @@ static int anvil_bvh_trace(int node_index, AnvilVec3 origin,
                               hit_t, hit_sphere);
 }
 
+static void anvil_mesh_ray_local(const AnvilTraceMesh *mesh,
+                                 AnvilVec3 world_origin,
+                                 AnvilVec3 world_direction,
+                                 AnvilVec3 *local_origin,
+                                 AnvilVec3 *local_direction) {
+  AnvilVec3 translated = anvil_sub(
+      world_origin, (AnvilVec3){mesh->x, mesh->y, mesh->z});
+  *local_origin = anvil_unrotate(translated, mesh->rx, mesh->ry, mesh->rz);
+  *local_origin = (AnvilVec3){local_origin->x / mesh->scale,
+                              local_origin->y / mesh->scale,
+                              local_origin->z / mesh->scale};
+  *local_direction = anvil_unrotate(world_direction, mesh->rx, mesh->ry,
+                                    mesh->rz);
+  *local_direction = (AnvilVec3){local_direction->x / mesh->scale,
+                                 local_direction->y / mesh->scale,
+                                 local_direction->z / mesh->scale};
+}
+
+static int anvil_trace_meshes_shadow(AnvilVec3 origin,
+                                     AnvilVec3 direction) {
+  for (int i = 0; i < anvil_trace_mesh_count; ++i) {
+    const AnvilTraceMesh *mesh = &anvil_trace_meshes[i];
+    AnvilVec3 local_origin, local_direction, normal;
+    anvil_mesh_ray_local(mesh, origin, direction, &local_origin,
+                         &local_direction);
+    double hit_t = 1.0e30;
+    int triangle;
+    if (anvil_mesh_bvh_trace(mesh->bvh, local_origin, local_direction,
+                             hit_t, &hit_t, &triangle, &normal))
+      return 1;
+  }
+  return 0;
+}
+
 void anvil_trace_finish(void) {
-  if ((anvil_trace_sphere_count == 0 && anvil_trace_triangle_count == 0) ||
+  if ((anvil_trace_sphere_count == 0 && anvil_trace_triangle_count == 0 &&
+       anvil_trace_mesh_count == 0) ||
       !anvil_pixels || !anvil_depth_buffer ||
       !anvil_scene_is_3d)
     return;
   if (anvil_active_ray_backend != ANVIL_RAY_BACKEND_BVH) {
     anvil_trace_sphere_count = 0;
     anvil_trace_triangle_count = 0;
+    anvil_trace_mesh_count = 0;
     return;
   }
 
@@ -3885,8 +4148,112 @@ void anvil_trace_finish(void) {
       }
     }
   }
+  for (int object = 0; object < anvil_trace_mesh_count; ++object) {
+    const AnvilTraceMesh *mesh = &anvil_trace_meshes[object];
+    AnvilVec3 local_center = {mesh->cx * mesh->scale,
+                              mesh->cy * mesh->scale,
+                              mesh->cz * mesh->scale};
+    AnvilVec3 center = anvil_add(
+        (AnvilVec3){mesh->x, mesh->y, mesh->z},
+        anvil_rotate(local_center, mesh->rx, mesh->ry, mesh->rz));
+    AnvilVec3 relative = anvil_sub(center, origin);
+    AnvilPixelBounds bounds;
+    if (!anvil_project_sphere_bounds(
+            anvil_dot(relative, right), anvil_dot(relative, up),
+            anvil_dot(relative, forward), mesh->radius * fabs(mesh->scale),
+            anvil_camera_focal, ANVIL_WIDTH, ANVIL_HEIGHT, &bounds))
+      continue;
+    int step = anvil_ray_pixel_step;
+    int first_x = (bounds.min_x / step) * step;
+    int first_y = (bounds.min_y / step) * step;
+    int grid = 1;
+    while (grid * grid < anvil_ray_sample_count) ++grid;
+    for (int py = first_y; py <= bounds.max_y; py += step) {
+      for (int px = first_x; px <= bounds.max_x; px += step) {
+        double red_sum = 0.0, green_sum = 0.0, blue_sum = 0.0;
+        double alpha_sum = 0.0, nearest_depth = 1.0e30;
+        int hits = 0;
+        for (int sample = 0; sample < anvil_ray_sample_count; ++sample) {
+          double ray_x = px + ((sample % grid) + 0.5) / grid * step;
+          double ray_y = py + ((sample / grid) + 0.5) / grid * step;
+          if (ray_x >= ANVIL_WIDTH) ray_x = ANVIL_WIDTH - 0.5;
+          if (ray_y >= ANVIL_HEIGHT) ray_y = ANVIL_HEIGHT - 0.5;
+          double horizontal = (ray_x - ANVIL_WIDTH * 0.5) / anvil_camera_focal;
+          double vertical = (ANVIL_HEIGHT * 0.54 - ray_y) / anvil_camera_focal;
+          AnvilVec3 direction = anvil_normalize(anvil_add(
+              forward, anvil_add((AnvilVec3){right.x * horizontal,
+                                             right.y * horizontal,
+                                             right.z * horizontal},
+                                 (AnvilVec3){up.x * vertical, up.y * vertical,
+                                             up.z * vertical})));
+          AnvilVec3 local_origin, local_direction, local_normal;
+          anvil_mesh_ray_local(mesh, origin, direction, &local_origin,
+                               &local_direction);
+          double closest = 1.0e30;
+          int triangle_index = -1;
+          if (!anvil_mesh_bvh_trace(mesh->bvh, local_origin, local_direction,
+                                    closest, &closest, &triangle_index,
+                                    &local_normal))
+            continue;
+          const double *triangle =
+              mesh->bvh->data + (size_t)triangle_index * 12;
+          AnvilVec3 normal =
+              anvil_rotate(local_normal, mesh->rx, mesh->ry, mesh->rz);
+          if (mesh->scale < 0.0)
+            normal = (AnvilVec3){-normal.x, -normal.y, -normal.z};
+          double diffuse = fmax(0.0, anvil_dot(normal, light));
+          AnvilVec3 point = anvil_add(origin, (AnvilVec3){direction.x * closest,
+                                                          direction.y * closest,
+                                                          direction.z * closest});
+          AnvilVec3 shadow_origin = anvil_add(point, (AnvilVec3){normal.x * 0.002,
+                                                                normal.y * 0.002,
+                                                                normal.z * 0.002});
+          double shadow_t = 1.0e30;
+          int shadow_index = -1;
+          int shadowed = anvil_bvh_trace(0, shadow_origin, light, shadow_t,
+                                         &shadow_t, &shadow_index);
+          for (int candidate = 0; candidate < anvil_trace_triangle_count;
+               ++candidate) {
+            AnvilVec3 shadow_normal;
+            if (anvil_ray_triangle_hit(shadow_origin, light,
+                                       &anvil_trace_triangles[candidate],
+                                       &shadow_t, &shadow_normal))
+              shadowed = 1;
+          }
+          if (anvil_trace_meshes_shadow(shadow_origin, light)) shadowed = 1;
+          double brightness = shadowed ? 0.13 : 0.16 + 0.78 * diffuse;
+          AnvilVec3 view = {-direction.x, -direction.y, -direction.z};
+          AnvilVec3 halfway = anvil_normalize(anvil_add(light, view));
+          double specular = pow(fmax(0.0, anvil_dot(normal, halfway)), 28.0) * 0.22;
+          red_sum += triangle[9] * brightness + 255.0 * specular;
+          green_sum += triangle[10] * brightness + 255.0 * specular;
+          blue_sum += triangle[11] * brightness + 255.0 * specular;
+          alpha_sum += 255.0;
+          double depth = anvil_dot(anvil_sub(point, origin), forward);
+          if (depth < nearest_depth) nearest_depth = depth;
+          ++hits;
+        }
+        if (hits == 0) continue;
+        uint32_t color = anvil_color((int)(red_sum / hits),
+                                     (int)(green_sum / hits),
+                                     (int)(blue_sum / hits));
+        int alpha = (int)(alpha_sum / anvil_ray_sample_count);
+        for (int fill_y = py; fill_y < py + step && fill_y < ANVIL_HEIGHT;
+             ++fill_y)
+          for (int fill_x = px; fill_x < px + step && fill_x < ANVIL_WIDTH;
+               ++fill_x) {
+            size_t pixel = (size_t)fill_y * ANVIL_WIDTH + (size_t)fill_x;
+            if (nearest_depth < anvil_depth_buffer[pixel]) {
+              anvil_depth_buffer[pixel] = nearest_depth;
+              anvil_pixel(fill_x, fill_y, color, alpha);
+            }
+          }
+      }
+    }
+  }
   anvil_trace_sphere_count = 0;
   anvil_trace_triangle_count = 0;
+  anvil_trace_mesh_count = 0;
 }
 static double anvil_fade(double t) {
   return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);

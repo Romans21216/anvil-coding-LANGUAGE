@@ -177,6 +177,10 @@ void anvil_trace_sphere(double x, double y, double z, double radius, int r,
 void anvil_trace_triangle(double x1, double y1, double z1, double x2,
                           double y2, double z2, double x3, double y3,
                           double z3, int r, int g, int b, int a);
+double anvil_trace_mesh(const double *data, int triangle_count, double cx,
+                        double cy, double cz, double radius, double x,
+                        double y, double z, double scale, double rx,
+                        double ry, double rz);
 void anvil_trace_finish(void);
 int anvil_ray_backend(const char *name);
 int anvil_ray_backend_available(const char *name);
