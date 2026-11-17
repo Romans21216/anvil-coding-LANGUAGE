@@ -1676,7 +1676,8 @@ void anvil_text_wrap(double x, double y, double max_width, const char *text,
 void anvil_text_number(double x, double y, const char *format, double value,
                        int r, int g, int b, int a) {
   char buffer[256];
-  _snprintf_s(buffer, sizeof(buffer), _TRUNCATE, format, value);
+  _snprintf_s(buffer, sizeof(buffer), _TRUNCATE, "%s%s", format,
+              anvil_format_number(value));
   anvil_text(x, y, buffer, r, g, b, a);
 }
 

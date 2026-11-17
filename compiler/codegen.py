@@ -74,9 +74,13 @@ def rgb_style(
     arrays: dict[str, int] | None = None,
 ) -> tuple[list[str], str]:
     color = ["255", "255", "255", "255"]
-    m = re.search(r"-rgba?\(([^)]*)\)", raw)
+    masked = _mask_string_literals(raw)
+    modifiers = list(re.finditer(r"-rgba?\(([^)]*)\)", masked))
+    if len(modifiers) > 1:
+        raise CompileError(f"{path}:{line}: only one -rgb or -rgba colour modifier is allowed")
+    m = modifiers[0] if modifiers else None
     if m:
-        vals = split_args(m.group(1))
+        vals = split_args(raw[m.start(1):m.end(1)])
         if len(vals) not in (3, 4):
             raise CompileError(f"{path}:{line}: -rgb/-rgba expects 3 or 4 values")
         color = [
@@ -84,7 +88,8 @@ def rgb_style(
         ]
         if len(color) == 3:
             color.append("255")
-    raw = re.sub(r"\s+-rgba?\([^)]*\)", "", raw)
+    if m:
+        raw = raw[:m.start()] + raw[m.end():]
     return color, raw
 
 
@@ -122,6 +127,69 @@ def _mask_string_literals(text: str) -> str:
             in_string = True
             out[index] = " "
     return "".join(out)
+
+
+def _unknown_display_modifier(raw: str) -> str | None:
+    """Return an unrecognized modifier following the draw call, if present."""
+    start = re.match(r"\s*[A-Za-z_][A-Za-z_0-9]*\s*\(", raw)
+    if start is None:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start.end() - 1, len(raw)):
+        character = raw[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth == 0:
+                suffix = raw[index + 1:]
+                modifier = re.match(r"\s+-([A-Za-z_][A-Za-z_0-9-]*)\s*\(", suffix)
+                return modifier.group(1) if modifier else None
+    return None
+
+
+def _split_text_additions(raw: str) -> list[str]:
+    """Split legacy text `+` interpolation without splitting nested math."""
+    parts: list[str] = []
+    start = depth = 0
+    quoted = escaped = False
+    for index, character in enumerate(raw):
+        if quoted:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = False
+            continue
+        if character == '"':
+            quoted = True
+        elif character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+        elif character == "+" and depth == 0:
+            # A plus in a scientific-notation exponent belongs to the number.
+            prefix = raw[start:index].rstrip()
+            if re.search(r"[0-9][eE]$", prefix):
+                continue
+            parts.append(raw[start:index].strip())
+            start = index + 1
+    if parts:
+        parts.append(raw[start:].strip())
+    return parts
 
 
 def emit_display(
@@ -179,30 +247,57 @@ def emit_display(
             arrays=arrays,
         )
         raw = raw[:wm.start()] + raw[wm.end():]
+    modifier = _unknown_display_modifier(raw)
+    if modifier:
+        raise CompileError(
+            f"{path}:{node.line}: unknown display modifier '-{modifier}'"
+        )
+    if re.fullmatch(
+        r"(?:cube|sphere|ray_sphere|ray_triangle|plane|rect|circle|line|text)\(.*\)\s+[0-9]+",
+        raw.strip(),
+    ):
+        raise CompileError(
+            f"{path}:{node.line}: an integer after a display command has no effect; "
+            "remove it (draw order follows source order)"
+        )
     call = re.fullmatch(
-        r"(cube|sphere|ray_sphere|ray_triangle|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?",
+        r"(cube|sphere|ray_sphere|ray_triangle|plane|rect|circle|line|text)\((.*)\)",
         raw.strip(),
     )
     if not call:
         raise CompileError(f"{path}:{node.line}: malformed display command")
     shape, arg_text = call.groups()
     args = split_args(arg_text)
-    if shape == "text" and loc:
+    if shape == "text" and loc and len(args) == 1:
         dynamic = re.fullmatch(
             r'\s*("(?:\\.|[^"\\])*")\s*\+\s*(var\([A-Za-z_][\w-]*\))\s*', arg_text
         )
         if dynamic:
-            prefix = dynamic.group(1)[:-1].replace("%", "%%")
+            prefix = decode_string(dynamic.group(1))
             value = expr(
                 path, node.line, dynamic.group(2), functions, scope=scope, arrays=arrays
             )
             separator = "" if prefix.endswith((" ", "\t")) else " "
-            fmt = prefix + separator + '%.0f"'
             return (
-                f"{ind}anvil_text_number({', '.join(loc)}, {fmt}, {value}, "
+                f"{ind}anvil_text_number({', '.join(loc)}, {json.dumps(prefix + separator, ensure_ascii=False)}, {value}, "
                 f"{', '.join(color)});"
             )
+    if shape == "text" and loc is None:
+        raise CompileError(f"{path}:{node.line}: display text requires -l(x, y)")
     expected = "string" if shape == "text" else "number"
+    if shape == "text" and len(args) == 1:
+        additions = _split_text_additions(args[0])
+        if additions and additions[0].startswith('"'):
+            if len(additions) > 16:
+                raise CompileError(
+                    f"{path}:{node.line}: display text may join at most 16 values"
+                )
+            # Preserve the established implicit separator for the original
+            # `"label" + number` form; longer labels can place spaces explicitly.
+            prefix = decode_string(additions[0])
+            if not prefix.endswith((" ", "\t")):
+                additions[0] = json.dumps(prefix + " ", ensure_ascii=False)
+            args = [" & ".join(additions)]
     values = [expr(path, node.line, item, functions, expected, scope) for item in args]
     tail = ", ".join(color)
     if shape == "cube" and len(values) == 4:

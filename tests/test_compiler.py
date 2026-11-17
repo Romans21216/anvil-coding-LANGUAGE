@@ -82,6 +82,74 @@ class CompilerTests(unittest.TestCase):
             self.assertNotIn("Traceback", result.stderr)
             self.assertFalse(generated.exists(), "invalid duplicate location modifier must fail before C generation")
 
+    def test_duplicate_display_colour_modifier_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "duplicate-colour.ANVL"
+            generated = pathlib.Path(temp) / "duplicate-colour.c"
+            source.write_text(
+                "fn(draw)\n  display rect(1,2,3,4) -rgb(1,2,3) -rgba(9,9,9,9)\nend\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(f"{source}:2: only one -rgb or -rgba colour modifier is allowed", result.stderr)
+            self.assertFalse(generated.exists(), "invalid duplicate colour must fail before C generation")
+
+    def test_unknown_display_modifier_names_the_typo(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "unknown-modifier.ANVL"
+            generated = pathlib.Path(temp) / "unknown-modifier.c"
+            source.write_text(
+                'fn(draw)\n  display rect(1,2,3,4) -colour(1,2,3)\nend\n',
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(f"{source}:2: unknown display modifier '-colour'", result.stderr)
+            self.assertFalse(generated.exists())
+
+    def test_display_text_without_position_explains_required_modifier(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "missing-text-position.ANVL"
+            generated = pathlib.Path(temp) / "missing-text-position.c"
+            source.write_text('fn(draw)\n  display text("Hi")\nend\n', encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(f"{source}:2: display text requires -l(x, y)", result.stderr)
+            self.assertFalse(generated.exists())
+
+    def test_ineffective_integer_draw_suffix_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "draw-order.ANVL"
+            generated = pathlib.Path(temp) / "draw-order.c"
+            source.write_text(
+                'scene 2d\nfn(draw)\n  display rect(1,2,3,4) 7\nend\n',
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                f"{source}:3: an integer after a display command has no effect; remove it (draw order follows source order)",
+                result.stderr,
+            )
+            self.assertFalse(generated.exists())
+
     def test_game_source_emits_native_renderer_calls(self):
         with tempfile.TemporaryDirectory() as temp:
             c_file = pathlib.Path(temp) / "world.c"
@@ -94,6 +162,27 @@ class CompilerTests(unittest.TestCase):
             self.assertIn("anvil_trace_sphere(", generated)
             self.assertIn("anvil_camera_fov(70.0)", generated)
             self.assertIn("anvil_camera_control(4.0, 80.0)", generated)
+
+    def test_display_text_accepts_local_and_multiple_numeric_expressions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "text-expressions.ANVL"
+            generated = pathlib.Path(temp) / "text-expressions.c"
+            source.write_text(
+                "set var(total) = 1 / 3\nscene 2d\nfn(draw)\n"
+                "  set local(score) = 2 / 3\n"
+                "  display text(\"global= \" + var(total) + \" local= \" + local(score) + \" sum= \" + (1 + 2)) -l(10, 20)\n"
+                "end\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--emit-c", str(generated)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            code = generated.read_text(encoding="utf-8")
+            self.assertIn("anvil_str_from_number", code)
+            self.assertIn("anvil_draw__score", code)
 
     def test_ray_tracing_batch_flushes_before_hud_drawing(self):
         with tempfile.TemporaryDirectory() as temp:

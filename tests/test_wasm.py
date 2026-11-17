@@ -153,6 +153,35 @@ class WasmRejectionTests(unittest.TestCase):
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmCanvasTests(unittest.TestCase):
+    def test_dynamic_numeric_text_uses_shared_fractional_formatter(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            source = (
+                "set var(amount) = 0.333333333\nscene 2d\n\nfn(draw)\n"
+                "  set local(part) = 0.666666666\n"
+                "  display text(\"value: \" + var(amount) + \" part: \" + local(part) + \" sum: \" + (1 + 2)) -l(5, 7)\n"
+                "end\n"
+            )
+            result, out = build(root, source)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            c_source = out.parent / ".anvil-cache" / f"{out.stem}.wasm.c"
+            generated = c_source.read_text(encoding="utf-8")
+            self.assertIn("anvil_str_from_number", generated)
+
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            self.assertIn(
+                ["text", 5.0, 7.0, "value: 0.333333 part: 0.666667 sum: 3", 255, 255, 255, 255],
+                ops,
+            )
+
     def test_a_2d_scene_emits_canvas_commands(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)

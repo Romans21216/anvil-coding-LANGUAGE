@@ -77,6 +77,15 @@ class NumberFormatCRuntimeTests(unittest.TestCase):
     def test_c_implicit_main_return_is_formatted_like_say(self) -> None:
         self.assertEqual(run_c(MAIN_RETURN_PROGRAM), MAIN_RETURN_EXPECTED)
 
+    def test_dynamic_screen_text_uses_the_console_number_format(self) -> None:
+        program = (
+            'set var(value) = 1 / 3\nscene 2d\n\nfn(draw)\n'
+            '  display text("third = " + var(value)) -l(12.5, 18)\nend\n'
+        )
+        functions, top, variables, arrays = parse(pathlib.Path("label.ANVL"), program)
+        generated = emit_c(pathlib.Path("label.ANVL"), functions, top, variables, arrays)
+        self.assertIn('anvil_text_number(12.5, 18.0, "third = ", anvil_value', generated)
+
 
 class NumberFormatNativeTests(NativeRunMixin, unittest.TestCase):
     def _run(self, text: str) -> str:

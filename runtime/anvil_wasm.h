@@ -333,6 +333,8 @@ void anvil_line(double x1, double y1, double x2, double y2, int r, int g, int b,
 void anvil_text(double x, double y, const char *text, int r, int g, int b,
                 int a);
 void anvil_trace_finish(void);
+void anvil_text_number(double x, double y, const char *prefix, double value,
+                       int r, int g, int b, int a);
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title);
 
 #endif

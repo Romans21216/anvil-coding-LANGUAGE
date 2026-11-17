@@ -1060,3 +1060,27 @@ Ran `python tools/visual_smoke.py --check` after the renderer and sample changes
 The wasm backend now emits a source-line marker before each Anvil statement. Runtime helpers track the active function and line through nested calls and report errors through a host callback; both the generated browser page and Node host show the offending statement, while raw traps retain the function-map fallback. The `chr(300)` regression checks line 6 in both hosts. A broader wasm/docs run initially exposed duplicate stdout output for runtime errors; removing the redundant write restored the existing output contract.
 
 Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py -q` — 51 passed in 28.34 s; `git diff --check` passes. The 1/8/32 ray-sphere benchmark was rerun after source markers and stayed within all budgets; latest checked figures in the feature docs are p95 4.6/4.9/6.0 ms and heap peaks 4.7/17.0/72.6 MiB. Instruction-level debug mappings for arbitrary wasm PCs and true streaming music remain open under 8.12.
+
+8.120 FRACTIONAL DYNAMIC DRAW TEXT (PART 6 B1/B15)
+
+The original defect report identified that `display text("label " + var(value))` formatted values with `%.0f`, so HUD values such as one third lost their fractional part. The C emitter now sends the literal prefix and numeric value to `anvil_text_number`, which appends the same six-fractional-digit, trailing-zero-trimmed formatter used by `say`. The freestanding wasm runtime implements that helper through its identical number formatter. This removes format-string interpretation of user text and gives C and browser draw streams the same result. The native backend still refuses text drawing entirely; docs now state that limitation.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_number_format.py -q` — 61 passed in 32.99 s; the focused C code-generation and wasm host draw-stream checks verify `1/3` renders as `0.333333`. Full suite: `python -m pytest tests -q` — 969 passed, 1 skipped, 1 xfailed in 634.72 s. `git diff --check` passes. The roadmap's general text-value and native-display gaps remain open.
+
+8.121 REJECT DUPLICATE DISPLAY COLOURS (PART 4 B9)
+
+`rgb_style` used to find and remove only the first `-rgb`/`-rgba` modifier, silently ignoring later colour settings. It now scans outside quoted strings and rejects a second colour modifier with a source-line diagnostic before C generation. A compiler regression verifies `-rgb(...) -rgba(...)` fails and leaves no generated output.
+
+Validation: `python -m pytest tests/test_compiler.py -q` — 69 passed in 52.80 s. `git diff --check` passes.
+
+8.122 DISPLAY MODIFIER AND POSITION DIAGNOSTICS (PART 4 B11/B14)
+
+The emitter now recognizes an unknown `-name(...)` after the draw call and reports `unknown display modifier '-name'`; this check runs before the greedy draw-call expression matcher, which had previously absorbed the typo into an argument and produced a misleading expression error. `display text(...)` without `-l(x, y)` now reports the required position modifier directly. Both failure tests assert source locations and that no generated C artifact is left behind.
+
+Validation: `python -m pytest tests/test_compiler.py -q` — 71 passed in 59.01 s; focused unknown-modifier, missing-position and duplicate-colour regressions pass. `git -c core.whitespace=cr-at-eol diff --check` passes (the tracked compiler test file uses CRLF line endings).
+
+8.123 DISPLAY TEXT INTERPOLATION WITH EXPRESSIONS (PART 4 B2)
+
+The dynamic display form no longer requires exactly one `var(name)`. When the first text segment is a literal, top-level `+` segments are lowered through the compiler's existing `&` text-join path. This supports global and local values, multiple interpolations, and parenthesized numeric expressions such as `(1 + 2)` without splitting their arithmetic. The legacy single-global form retains its established automatic separating space; longer forms use explicit spaces in their string segments. The shared formatter keeps fractional values consistent across C and wasm. Documentation now distinguishes interpolation `+` from parenthesized arithmetic and the general `&` join.
+
+Validation: `python -m pytest tests/test_compiler.py tests/test_wasm.py tests/test_wasm_docs.py tests/test_number_format.py -q` — 133 passed in 99.77 s. The wasm host draw-stream regression verifies a label containing `var(amount)`, `local(part)`, and `(1 + 2)` as `value: 0.333333 part: 0.666667 sum: 3`; compiler coverage checks equivalent generated C. `git -c core.whitespace=cr-at-eol diff --check` passes. General string syntax, text parameters and the experimental native renderer remain separate roadmap work.

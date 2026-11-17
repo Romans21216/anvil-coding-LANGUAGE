@@ -252,6 +252,14 @@ static AnvilWasmSourceFrame
     anvil_source_stack[ANVIL_WASM_SOURCE_STACK_MAX];
 static int anvil_source_stack_depth;
 
+/* Format one dynamic numeric text label through the shared six-digit policy. */
+void anvil_text_number(double x, double y, const char *prefix, double value,
+                       int r, int g, int b, int a) {
+  char buffer[ANVIL_STR_CAP];
+  anvil_str_cat(buffer, prefix, anvil_format_number(value), NULL, 0);
+  anvil_host_text(x, y, buffer, (int)strlen(buffer), r, g, b, a);
+}
+
 static void anvil_runtime_error(const char *message) {
   anvil_host_runtime_error(message, anvil_current_function,
                            anvil_current_source_line);
