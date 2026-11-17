@@ -942,3 +942,11 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Evidence (P8-103-4):** the 8.12 and 8.13 rows in `docs/PART8_EVIDENCE.md` no longer list Web Audio, WebGL/3D, animation, skins or morph targets as missing in the row that verifies them; the module count now reads 141.
 - **Tests:** `tests/test_gltf_import_bounds.py` (7 cases) covers the omitted accessor, the negative index, the combined skin+morph refusal, the mirrored ancestor, both sides of the 32/33 boundary, and a check that the importer's `MODEL_STATES` equals the runtime's `ANVIL_MODEL_STATES`.
 - **Full suite:** 933 passed, 1 skipped, 1 xfailed in 456.92 s, exit 0.
+
+## Batch 96 — UI keyboard focus and accessible labels (8.14)
+
+- **Registry:** `ui_focus_add(x,y,w,h,label)` registers up to 64 focusable rectangles with 95-byte labels that are refused rather than truncated; `ui_focus_at` hit-tests the topmost region, `ui_focus_next`/`prev` walk registration order and wrap, `ui_focus_set` returns the previous handle (0 or an unknown handle leaves focus alone), `ui_focus_activate` reports the click or Enter/Space activation for one frame, and `ui_focus_clear` returns how many it removed.
+- **Announcements:** `ui_accessible(1)` writes the focused label as the accessible name of a 1x1 MSAA child window on Windows and into an `aria-live` region on the wasm canvas page, once per focus change rather than once per frame.
+- **Input:** `TAB` joins the key tokens (virtual-key 9), and a press is hit-tested at its own position so a click still lands after Windows has sent `WM_MOUSELEAVE` for the tracked cursor.
+- **Tests:** `tests/test_ui_focus.py` (6 cases) covers headless traversal and previous-handle returns, a posted click in a real window, the label read back from the MSAA child window, the oversized-label refusal, and two wasm cases asserting one `announce` op per focus change including a scripted click.
+- **Full suite:** 939 passed, 1 skipped, 1 xfailed in 472.62 s, exit 0.
