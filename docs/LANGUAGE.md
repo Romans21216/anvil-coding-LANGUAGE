@@ -241,3 +241,13 @@ Static types, dynamically sized arrays, structures, modules/imports, general ass
 
 
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Selective imports use `include fn(move) - "lib/player.ANVL"`, with `call fn(move - player, 10)` and optional `as alias` for same-basename files. Private helper functions and state stay with their source module. Package registries and separate object linking remain unfinished.
+
+### Textures on 3D shapes
+
+`display cube(x, y, z, size) -texture(handle)` maps a loaded BMP across each
+face. Texture coordinates run 0..1 per face, so the whole image appears on every
+face; `-texture` combines with `-rotate` and `-rgb` (the colour still drives the
+flat fallback when the shape is clipped by the near plane). Sampling is
+perspective-correct nearest-neighbour on the C backend. There is no mip
+chain yet, so a checkered texture seen edge-on shows moiré; the wasm backend
+refuses `-texture` rather than drawing it untextured.

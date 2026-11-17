@@ -3,6 +3,7 @@
 #include "anvil_projection.h"
 
 #include <math.h>
+#include <dwmapi.h>
 #include <mmsystem.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -15,6 +16,7 @@
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "winmm.lib")
+#pragma comment(lib, "dwmapi.lib")
 
 enum {
   ANVIL_WIDTH = 960,
@@ -87,6 +89,8 @@ typedef struct {
   int tint_r, tint_g, tint_b;
   int flip_x, flip_y;
 } AnvilImage;
+
+static AnvilImage *anvil_image_from_handle(double handle);
 
 static HWND anvil_window;
 static LONG anvil_window_saved_style;
@@ -332,6 +336,83 @@ static void anvil_triangle_lit(AnvilProjected p[3], uint32_t base,
   anvil_triangle(p[0], p[1], p[2], anvil_color(r, g, b), alpha);
 }
 
+/* Textured variant: same barycentric rasteriser and depth buffer, with a
+   nearest-neighbour texel lookup. Affine mapping (no perspective correction),
+   which is fine for the flat quads the primitives produce. */
+static AnvilImage *anvil_texture_image;
+static int anvil_texture_handle_bits;
+
+double anvil_texture(double handle) {
+  AnvilImage *image = anvil_image_from_handle(handle);
+  anvil_texture_image = image && image->pixels ? image : NULL;
+  return anvil_texture_image ? 1.0 : 0.0;
+}
+
+static void anvil_triangle_textured(AnvilProjected p[3], double uv[3][2],
+                                    double brightness, int alpha) {
+  AnvilImage *texture = anvil_texture_image;
+  if (!texture || !texture->pixels) {
+    return;
+  }
+  double area =
+      (p[1].x - p[0].x) * (p[2].y - p[0].y) - (p[1].y - p[0].y) * (p[2].x - p[0].x);
+  if (!isfinite(area) || fabs(area) < 1e-8)
+    return;
+  double left = fmin(p[0].x, fmin(p[1].x, p[2].x));
+  double right = fmax(p[0].x, fmax(p[1].x, p[2].x));
+  double top = fmin(p[0].y, fmin(p[1].y, p[2].y));
+  double bottom = fmax(p[0].y, fmax(p[1].y, p[2].y));
+  if (right < 0.0 || bottom < 0.0 || left >= ANVIL_WIDTH || top >= ANVIL_HEIGHT)
+    return;
+  int minx = left <= 0.0 ? 0 : (int)floor(left);
+  int maxx = right >= ANVIL_WIDTH - 1 ? ANVIL_WIDTH - 1 : (int)ceil(right);
+  int miny = top <= 0.0 ? 0 : (int)floor(top);
+  int maxy = bottom >= ANVIL_HEIGHT - 1 ? ANVIL_HEIGHT - 1 : (int)ceil(bottom);
+  for (int y = miny; y <= maxy; ++y)
+    for (int x = minx; x <= maxx; ++x) {
+      double px = x + 0.5, py = y + 0.5;
+      double w0 = ((p[1].x - px) * (p[2].y - py) - (p[1].y - py) * (p[2].x - px)) / area;
+      double w1 = ((p[2].x - px) * (p[0].y - py) - (p[2].y - py) * (p[0].x - px)) / area;
+      double w2 = 1.0 - w0 - w1;
+      if (w0 < 0 || w1 < 0 || w2 < 0)
+        continue;
+      double z = w0 * p[0].depth + w1 * p[1].depth + w2 * p[2].depth;
+      size_t index = (size_t)y * ANVIL_WIDTH + (size_t)x;
+      if (!(z < anvil_depth_buffer[index]))
+        continue;
+      /* Perspective-correct: interpolate u/z and 1/z, then divide, otherwise
+         textures on faces seen at an angle compress towards the horizon. */
+      double i0 = 1.0 / p[0].depth, i1 = 1.0 / p[1].depth, i2 = 1.0 / p[2].depth;
+      double inverse = w0 * i0 + w1 * i1 + w2 * i2;
+      if (!(inverse > 1e-9))
+        continue;
+      double u = (w0 * uv[0][0] * i0 + w1 * uv[1][0] * i1 +
+                  w2 * uv[2][0] * i2) /
+                 inverse;
+      double v = (w0 * uv[0][1] * i0 + w1 * uv[1][1] * i1 +
+                  w2 * uv[2][1] * i2) /
+                 inverse;
+      u -= floor(u);
+      v = 1.0 - v;
+      v -= floor(v);
+      int tx = (int)(u * texture->width);
+      int ty = (int)(v * texture->height);
+      if (tx < 0) tx = 0;
+      if (ty < 0) ty = 0;
+      if (tx >= texture->width) tx = texture->width - 1;
+      if (ty >= texture->height) ty = texture->height - 1;
+      uint32_t texel = texture->pixels[(size_t)ty * (size_t)texture->width + (size_t)tx];
+      unsigned int ta = (texel >> 24) & 255u;
+      if (ta == 0)
+        continue;
+      int r = (int)(((texel >> 16) & 255u) * brightness);
+      int g = (int)(((texel >> 8) & 255u) * brightness);
+      int b = (int)((texel & 255u) * brightness);
+      anvil_depth_buffer[index] = z;
+      anvil_pixel(x, y, anvil_color(r, g, b), (int)(ta * alpha / 255));
+    }
+}
+
 void anvil_set_scene3d(int enabled) { anvil_scene_is_3d = enabled != 0; }
 void anvil_camera_perspective(double x, double y, double z) {
   anvil_camera_x = x;
@@ -500,6 +581,24 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
             count = 0;
             break;
           }
+      }
+      static const double quad_uv[4][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+      static const int uv_order[2][3] = {{0, 1, 2}, {0, 2, 3}};
+      if (count == 3 && anvil_texture_image) {
+        double uv[3][2] = {{
+                               quad_uv[uv_order[t][0]][0],
+                               quad_uv[uv_order[t][0]][1],
+                           },
+                           {
+                               quad_uv[uv_order[t][1]][0],
+                               quad_uv[uv_order[t][1]][1],
+                           },
+                           {
+                               quad_uv[uv_order[t][2]][0],
+                               quad_uv[uv_order[t][2]][1],
+                           }};
+        anvil_triangle_textured(projected, uv, brightness, a);
+        continue;
       }
       for (int i = 1; i + 1 < count; ++i) {
         AnvilProjected clipped_triangle[3] = {projected[0], projected[i],
@@ -2450,6 +2549,92 @@ double anvil_physics_step(void) {
   return (double)contact_count;
 }
 
+/* Double buffering for the window: the frame is composed in a memory DC and
+   blitted in one operation, so the black background never reaches the screen
+   between the fill and the scaled image. Without this, every WM_PAINT painted
+   black first and the frame visibly flashed at 60 Hz. */
+static HDC anvil_paint_dc;
+static HBITMAP anvil_paint_bitmap;
+static HGDIOBJ anvil_paint_previous;
+static int anvil_paint_width, anvil_paint_height;
+
+static int anvil_paint_buffer(HDC dc, int width, int height) {
+  if (width <= 0 || height <= 0)
+    return 0;
+  if (anvil_paint_dc && anvil_paint_width == width &&
+      anvil_paint_height == height)
+    return 1;
+  if (anvil_paint_dc) {
+    SelectObject(anvil_paint_dc, anvil_paint_previous);
+    DeleteObject(anvil_paint_bitmap);
+    DeleteDC(anvil_paint_dc);
+    anvil_paint_dc = NULL;
+  }
+  anvil_paint_dc = CreateCompatibleDC(dc);
+  if (!anvil_paint_dc)
+    return 0;
+  anvil_paint_bitmap = CreateCompatibleBitmap(dc, width, height);
+  if (!anvil_paint_bitmap) {
+    DeleteDC(anvil_paint_dc);
+    anvil_paint_dc = NULL;
+    return 0;
+  }
+  anvil_paint_previous = SelectObject(anvil_paint_dc, anvil_paint_bitmap);
+  anvil_paint_width = width;
+  anvil_paint_height = height;
+  return 1;
+}
+
+static void anvil_paint_release(void) {
+  if (!anvil_paint_dc)
+    return;
+  SelectObject(anvil_paint_dc, anvil_paint_previous);
+  DeleteObject(anvil_paint_bitmap);
+  DeleteDC(anvil_paint_dc);
+  anvil_paint_dc = NULL;
+  anvil_paint_bitmap = NULL;
+  anvil_paint_width = anvil_paint_height = 0;
+}
+
+/* Present the frame straight to the window DC. Going through
+   InvalidateRect + UpdateWindow forced a WM_PAINT per frame, which repainted
+   the black background and re-scaled the image inside the paint handler; at
+   60 Hz that repaint churn is what read as flicker. WM_PAINT is still handled
+   for occlusion, resize and the first frame. */
+static int anvil_present_full_fill = 1;
+
+static void anvil_present_window(void) {
+  if (!anvil_window || !anvil_pixels || IsIconic(anvil_window))
+    return;
+  RECT client;
+  if (!GetClientRect(anvil_window, &client))
+    return;
+  int width = client.right - client.left, height = client.bottom - client.top;
+  AnvilViewport viewport;
+  if (!anvil_compute_viewport(width, height, ANVIL_WIDTH, ANVIL_HEIGHT,
+                              &viewport))
+    return;
+  HDC dc = GetDC(anvil_window);
+  if (!dc)
+    return;
+  if (anvil_paint_buffer(dc, width, height)) {
+    if (anvil_present_full_fill) {
+      RECT full = {0, 0, width, height};
+      FillRect(anvil_paint_dc, &full, (HBRUSH)GetStockObject(BLACK_BRUSH));
+      anvil_present_full_fill = 0;
+    }
+    StretchDIBits(anvil_paint_dc, viewport.x, viewport.y, viewport.width,
+                  viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT, anvil_pixels,
+                  &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
+    BitBlt(dc, 0, 0, width, height, anvil_paint_dc, 0, 0, SRCCOPY);
+  } else {
+    StretchDIBits(dc, viewport.x, viewport.y, viewport.width, viewport.height, 0,
+                  0, ANVIL_WIDTH, ANVIL_HEIGHT, anvil_pixels,
+                  &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
+  }
+  ReleaseDC(anvil_window, dc);
+}
+
 static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
                                           WPARAM wparam, LPARAM lparam) {
   switch (message) {
@@ -2457,6 +2642,7 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     DestroyWindow(window);
     return 0;
   case WM_DESTROY:
+    anvil_paint_release();
     anvil_running = 0;
     anvil_window = NULL;
     PostQuitMessage(0);
@@ -2464,6 +2650,8 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
   case WM_ERASEBKGND:
     return 1;
   case WM_SIZE:
+    anvil_present_full_fill = 1;
+    anvil_paint_release();
     InvalidateRect(window, NULL, FALSE);
     break;
   case WM_MOUSEMOVE: {
@@ -2532,16 +2720,29 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     HDC dc = BeginPaint(window, &ps);
     RECT client;
     if (GetClientRect(window, &client)) {
-      FillRect(dc, &client, (HBRUSH)GetStockObject(BLACK_BRUSH));
+      int width = client.right - client.left, height = client.bottom - client.top;
       AnvilViewport viewport;
-      if (anvil_pixels &&
-          anvil_compute_viewport(client.right - client.left,
-                                 client.bottom - client.top, ANVIL_WIDTH,
-                                 ANVIL_HEIGHT, &viewport)) {
-        StretchDIBits(dc, viewport.x, viewport.y, viewport.width,
-                      viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
-                      anvil_pixels, &anvil_bitmap_info, DIB_RGB_COLORS,
-                      SRCCOPY);
+      int have_viewport =
+          anvil_pixels && anvil_compute_viewport(width, height, ANVIL_WIDTH,
+                                                 ANVIL_HEIGHT, &viewport);
+      if (anvil_paint_buffer(dc, width, height)) {
+        HBRUSH black = (HBRUSH)GetStockObject(BLACK_BRUSH);
+        RECT full = {0, 0, width, height};
+        FillRect(anvil_paint_dc, &full, black);
+        if (have_viewport)
+          StretchDIBits(anvil_paint_dc, viewport.x, viewport.y, viewport.width,
+                        viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
+                        anvil_pixels, &anvil_bitmap_info, DIB_RGB_COLORS,
+                        SRCCOPY);
+        BitBlt(dc, 0, 0, width, height, anvil_paint_dc, 0, 0, SRCCOPY);
+      } else {
+        /* No double buffer available: paint directly rather than not at all. */
+        FillRect(dc, &client, (HBRUSH)GetStockObject(BLACK_BRUSH));
+        if (have_viewport)
+          StretchDIBits(dc, viewport.x, viewport.y, viewport.width,
+                        viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
+                        anvil_pixels, &anvil_bitmap_info, DIB_RGB_COLORS,
+                        SRCCOPY);
       }
     }
     EndPaint(window, &ps);
@@ -4144,6 +4345,10 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
         (double)anvil_clock_frequency.QuadPart;
     accumulator += frame_elapsed;
     LARGE_INTEGER phase_start, phase_update_end, phase_render_end, phase_present_end;
+    /* Wait for the compositor before touching the frame: pacing here keeps
+       the blit in step with the monitor and leaves frame_present() reporting
+       the actual present cost rather than the wait. */
+    DwmFlush();
     QueryPerformanceCounter(&phase_start);
     int update_count = 0;
     while (accumulator >= step_seconds) {
@@ -4175,8 +4380,7 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
       anvil_mouse_wheel_delta = 0.0;
     }
     QueryPerformanceCounter(&phase_render_end);
-    InvalidateRect(anvil_window, NULL, FALSE);
-    UpdateWindow(anvil_window);
+    anvil_present_window();
     QueryPerformanceCounter(&phase_present_end);
     anvil_frame_tick_seconds =
         (double)(phase_update_end.QuadPart - phase_start.QuadPart) /

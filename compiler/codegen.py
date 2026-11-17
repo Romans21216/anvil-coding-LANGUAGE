@@ -103,6 +103,27 @@ def say_string(raw: str) -> str:
     )
 
 
+
+def _mask_string_literals(text: str) -> str:
+    """Blank out quoted text so statement modifiers are not found inside strings."""
+    out = list(text)
+    in_string = False
+    escaped = False
+    for index, character in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            out[index] = " "
+        elif character == '"':
+            in_string = True
+            out[index] = " "
+    return "".join(out)
+
+
 def emit_display(
     path: pathlib.Path,
     node: Node,
@@ -133,6 +154,19 @@ def emit_display(
         if len(loc) != 2:
             raise CompileError(f"{path}:{node.line}: -l expects x,y")
         raw = raw.replace(lm.group(0), "")
+    texture = None
+    masked = _mask_string_literals(raw)
+    tm = re.search(r"-texture\(((?:[^()]|\([^()]*\))*)\)", masked)
+    if tm:
+        texture = expr(
+            path,
+            node.line,
+            raw[tm.start(1):tm.end(1)],
+            functions,
+            scope=scope,
+            arrays=arrays,
+        )
+        raw = raw[:tm.start()] + raw[tm.end():]
     call = re.fullmatch(
         r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?",
         raw.strip(),
@@ -160,7 +194,13 @@ def emit_display(
     values = [expr(path, node.line, item, functions, expected, scope) for item in args]
     tail = ", ".join(color)
     if shape == "cube" and len(values) == 4:
-        return f"{ind}anvil_cube({', '.join(values)}, {', '.join(rot)}, {tail});"
+        draw = f"{ind}anvil_cube({', '.join(values)}, {', '.join(rot)}, {tail});"
+        if texture is not None:
+            return (
+                f"{ind}anvil_texture({texture}); {draw.strip()} "
+                f"anvil_texture(0);"
+            )
+        return draw
     if shape == "sphere" and len(values) == 4:
         return f"{ind}anvil_sphere({', '.join(values)}, {tail});"
     if shape == "ray_sphere" and len(values) == 4:

@@ -68,6 +68,7 @@ double anvil_image_load(const char *path);
 double anvil_image_width(double handle);
 double anvil_image_height(double handle);
 double anvil_image_pixel(double handle, double x, double y);
+double anvil_texture(double handle);
 double anvil_image_destroy(double handle);
 double anvil_image_draw(double handle, double x, double y);
 double anvil_image_draw_scaled(double handle, double x, double y, double width,

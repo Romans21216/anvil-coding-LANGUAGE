@@ -166,6 +166,7 @@ def build_c(
             "-lgdi32",
             "-luser32",
             "-lws2_32",
+            "-ldwmapi",
         ]
         if release:
             args += ["-O3", "-DNDEBUG", "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections"]

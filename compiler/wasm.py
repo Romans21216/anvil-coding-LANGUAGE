@@ -680,6 +680,13 @@ def validate(
             f"{source_path}:{line}: display {match.group(1)}(...) is not available "
             "in the wasm backend yet"
         )
+    match = re.search(r"-texture\(", text)
+    if match:
+        line = text.count("\n", 0, match.start()) + 1
+        raise CompileError(
+            f"{source_path}:{line}: the -texture modifier is not available in "
+            "the wasm backend yet"
+        )
     match = ENGINE_STATEMENT.search(text)
     if match:
         line = text.count("\n", 0, match.start()) + 1
