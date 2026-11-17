@@ -6,6 +6,7 @@
 scene 2d
 clear rgba(10, 12, 18, 255)
 set var(caption) = "Anvil wraps this caption inside a 360 pixel column and keeps the whole words intact."
+set var(cjk) = "日本語のテキストは空白を持たないので、文字の境界で折り返します。"
 set var(width) = 0.0
 
 fn(draw)
@@ -15,4 +16,7 @@ fn(draw)
   display text("measured width of the unwrapped string") -l(40, 168) -rgb(150, 170, 200)
   display rect(40, 196, compute(var(width) * 0.5), 8) -rgb(120, 200, 150)
   display text("half-width bar") -l(40, 214) -rgb(120, 200, 150)
+  display rect(40, 260, 360, 120) -rgba(28, 40, 62, 255)
+  display text(var(cjk)) -l(56, 276) -wrap(328) -rgb(226, 236, 250)
+  display text("héllo → 日本語 ✓  the same panel, no spaces") -l(40, 396) -rgb(150, 170, 200)
 end

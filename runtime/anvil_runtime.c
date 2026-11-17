@@ -877,42 +877,96 @@ static int anvil_text_height(void) {
 }
 
 static HFONT anvil_text_font(int height) {
-  return CreateFontA(height, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+  /* A wide font with DEFAULT_CHARSET lets GDI font-link a fallback face for
+     scripts Segoe UI does not cover, so a CJK or Cyrillic line still draws
+     instead of turning into boxes. */
+  return CreateFontW(height, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
                      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                     CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
+                     CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+                     L"Segoe UI");
 }
 
-void anvil_text(double x, double y, const char *text, int r, int g, int b,
-                int a) {
-  if (!anvil_memory_dc || !text)
-    return;
+/* Anvil strings are UTF-8; GDI's text API is UTF-16. Every draw and every
+   measurement converts through this one buffer, and a malformed byte becomes
+   U+FFFD instead of swallowing the rest of the line. */
+enum { ANVIL_TEXT_WIDE_CAP = 1024 };
+static wchar_t anvil_text_wide[ANVIL_TEXT_WIDE_CAP];
+
+static const wchar_t *anvil_text_utf16(const char *text) {
+  int out = 0;
+  const unsigned char *p = (const unsigned char *)text;
+  while (*p && out < ANVIL_TEXT_WIDE_CAP - 2) {
+    unsigned int code = *p++;
+    if (code < 0x80u) {
+      anvil_text_wide[out++] = (wchar_t)code;
+    } else if ((code & 0xE0u) == 0xC0u && (p[0] & 0xC0u) == 0x80u) {
+      anvil_text_wide[out++] =
+          (wchar_t)(((code & 0x1Fu) << 6) | (p[0] & 0x3Fu));
+      p += 1;
+    } else if ((code & 0xF0u) == 0xE0u && (p[0] & 0xC0u) == 0x80u &&
+               (p[1] & 0xC0u) == 0x80u) {
+      anvil_text_wide[out++] = (wchar_t)(((code & 0x0Fu) << 12) |
+                                         ((p[0] & 0x3Fu) << 6) |
+                                         (p[1] & 0x3Fu));
+      p += 2;
+    } else if ((code & 0xF8u) == 0xF0u && (p[0] & 0xC0u) == 0x80u &&
+               (p[1] & 0xC0u) == 0x80u && (p[2] & 0xC0u) == 0x80u) {
+      unsigned int point = ((code & 0x07u) << 18) | ((p[0] & 0x3Fu) << 12) |
+                           ((p[1] & 0x3Fu) << 6) | (p[2] & 0x3Fu);
+      p += 3;
+      if (point >= 0x10000u && point <= 0x10FFFFu) {
+        point -= 0x10000u;
+        anvil_text_wide[out++] = (wchar_t)(0xD800u + (point >> 10));
+        anvil_text_wide[out++] = (wchar_t)(0xDC00u + (point & 0x3FFu));
+      } else {
+        anvil_text_wide[out++] = (wchar_t)0xFFFD;
+      }
+    } else {
+      anvil_text_wide[out++] = (wchar_t)0xFFFD;
+    }
+  }
+  anvil_text_wide[out] = 0;
+  return anvil_text_wide;
+}
+
+static void anvil_text_wide_out(double x, double y, const wchar_t *text,
+                                int r, int g, int b) {
   anvil_camera2d_point(&x, &y);
   int height = anvil_text_height();
   SetBkMode(anvil_memory_dc, TRANSPARENT);
   SetTextColor(anvil_memory_dc, RGB(r, g, b));
   HFONT font = anvil_text_font(height);
   HGDIOBJ old = SelectObject(anvil_memory_dc, font);
-  TextOutA(anvil_memory_dc, (int)x, (int)y, text, (int)strlen(text));
+  TextOutW(anvil_memory_dc, (int)x, (int)y, text, (int)wcslen(text));
   SelectObject(anvil_memory_dc, old);
   DeleteObject(font);
+}
+
+void anvil_text(double x, double y, const char *text, int r, int g, int b,
+                int a) {
+  if (!anvil_memory_dc || !text)
+    return;
+  anvil_text_wide_out(x, y, anvil_text_utf16(text), r, g, b);
   (void)a;
 }
 
 double anvil_text_width(const char *text) {
   if (!anvil_memory_dc || !text)
     return 0.0;
+  const wchar_t *wide = anvil_text_utf16(text);
   HFONT font = anvil_text_font(anvil_text_height());
   HGDIOBJ old = SelectObject(anvil_memory_dc, font);
   SIZE size = {0, 0};
-  GetTextExtentPoint32A(anvil_memory_dc, text, (int)strlen(text), &size);
+  GetTextExtentPoint32W(anvil_memory_dc, wide, (int)wcslen(wide), &size);
   SelectObject(anvil_memory_dc, old);
   DeleteObject(font);
   return (double)size.cx;
 }
 
 /* Greedy word wrap: fill each line with as many whole words as fit inside
-   max_width, measured with the same font the text is drawn with. A single word
-   wider than the limit is drawn anyway rather than being dropped. */
+   max_width, measured with the same font the text is drawn with. A word wider
+   than the whole limit is broken at the last character that fits, which is what
+   lets CJK text (no spaces) and long tokens wrap instead of overflowing. */
 void anvil_text_wrap(double x, double y, double max_width, const char *text,
                      int r, int g, int b, int a) {
   if (!anvil_memory_dc || !text)
@@ -924,8 +978,11 @@ void anvil_text_wrap(double x, double y, double max_width, const char *text,
   int height = anvil_text_height();
   HFONT font = anvil_text_font(height);
   HGDIOBJ old = SelectObject(anvil_memory_dc, font);
-  size_t length = strlen(text);
-  char line[1024];
+  /* Convert once and split on UTF-16 code units, so a multi-byte character
+     can never be cut in half at a line break. */
+  const wchar_t *source = anvil_text_utf16(text);
+  size_t length = wcslen(source);
+  wchar_t line[ANVIL_TEXT_WIDE_CAP];
   size_t at = 0;
   double line_y = y;
   while (at < length) {
@@ -933,23 +990,35 @@ void anvil_text_wrap(double x, double y, double max_width, const char *text,
     size_t scan = at;
     while (scan < length) {
       size_t word_end = scan;
-      while (word_end < length && text[word_end] != ' ')
+      while (word_end < length && source[word_end] != L' ')
         ++word_end;
-      size_t candidate_end = word_end;
-      size_t count = candidate_end - at;
-      if (count >= sizeof(line)) {
-        candidate_end = at + sizeof(line) - 1;
-        count = candidate_end - at;
-      }
-      memcpy(line, text + at, count);
+      size_t count = word_end - at;
+      if (count >= ANVIL_TEXT_WIDE_CAP - 1)
+        count = ANVIL_TEXT_WIDE_CAP - 1;
+      memcpy(line, source + at, count * sizeof(wchar_t));
       line[count] = 0;
       SIZE size = {0, 0};
-      GetTextExtentPoint32A(anvil_memory_dc, line, (int)count, &size);
-      if ((double)size.cx > max_width && best > at)
+      GetTextExtentPoint32W(anvil_memory_dc, line, (int)count, &size);
+      if ((double)size.cx > max_width) {
+        if (best > at)
+          break;
+        /* The first word alone is wider than the limit. Break it at the last
+           character that fits so a long token or a run of CJK text still wraps
+           instead of running off the panel. */
+        size_t fit = 0;
+        for (size_t take = 1; take <= count; ++take) {
+          SIZE part = {0, 0};
+          GetTextExtentPoint32W(anvil_memory_dc, line, (int)take, &part);
+          if ((double)part.cx > max_width)
+            break;
+          fit = take;
+        }
+        best = at + (fit ? fit : 1);
         break;
-      best = candidate_end;
+      }
+      best = word_end;
       scan = word_end;
-      while (scan < length && text[scan] == ' ')
+      while (scan < length && source[scan] == L' ')
         ++scan;
       if (scan >= length) {
         best = length;
@@ -959,21 +1028,21 @@ void anvil_text_wrap(double x, double y, double max_width, const char *text,
     if (best <= at)
       best = length;
     size_t count = best - at;
-    if (count >= sizeof(line))
-      count = sizeof(line) - 1;
-    memcpy(line, text + at, count);
+    if (count >= ANVIL_TEXT_WIDE_CAP - 1)
+      count = ANVIL_TEXT_WIDE_CAP - 1;
+    memcpy(line, source + at, count * sizeof(wchar_t));
     line[count] = 0;
-    size_t drawn = strlen(line);
-    while (drawn > 0 && line[drawn - 1] == ' ')
+    size_t drawn = wcslen(line);
+    while (drawn > 0 && line[drawn - 1] == L' ')
       line[--drawn] = 0;
     SelectObject(anvil_memory_dc, old);
     DeleteObject(font);
-    anvil_text(x, line_y, line, r, g, b, a);
+    anvil_text_wide_out(x, line_y, line, r, g, b);
     font = anvil_text_font(height);
     old = SelectObject(anvil_memory_dc, font);
     line_y += (double)height * 1.35;
     at = best;
-    while (at < length && text[at] == ' ')
+    while (at < length && source[at] == L' ')
       ++at;
   }
   SelectObject(anvil_memory_dc, old);

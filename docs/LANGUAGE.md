@@ -219,11 +219,20 @@ The window itself can be controlled from the game. `window_on_top(1)` keeps it a
 
 `display text("...") -l(x, y) -wrap(width)` breaks the string into lines that fit
 inside `width` pixels, measured with the same font that is drawn, and advances
-each line by 1.35x the glyph height. Wrapping happens on spaces; a single word
-wider than the limit is drawn anyway rather than being dropped. `text_width("...")`
-returns the pixel width of a string in the current font, which is what a HUD
-needs to centre a label or draw a background box that fits. Both are C-backend
-only; the wasm backend refuses them with a located message.
+each line by 1.35x the glyph height. Wrapping happens on spaces, and a word
+wider than the whole limit is broken at the last character that fits so a long
+token or a run of CJK text (which has no spaces) still wraps instead of
+overflowing the panel. `text_width("...")` returns the pixel width of a string
+in the current font, which is what a HUD needs to centre a label or draw a
+background box that fits. Both are C-backend only; the wasm backend refuses
+them with a located message.
+
+Text is UTF-8 in the source and is drawn through GDI's wide API, so an accented
+letter, an arrow, Japanese characters or a check mark all render as real
+glyphs; Windows font linking picks a fallback face for scripts Segoe UI does
+not cover. Measurement uses the same conversion, so `text_width` and the drawn
+line always agree. `examples/text_wrap_demo.ANVL` shows both a wrapped English
+caption and a wrapped Japanese one.
 
 ### Capturing the frame
 
