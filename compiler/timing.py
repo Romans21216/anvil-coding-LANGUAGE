@@ -8,10 +8,11 @@ the sum of the phases, so nothing is hidden in an unmarked gap.
 
 from __future__ import annotations
 
-import sys
 import json
 import pathlib
 import platform
+import sys
+import tracemalloc
 import time
 
 
@@ -20,9 +21,13 @@ class Timings:
         self.enabled = enabled
         self.json_path = json_path
         self.capture_enabled = enabled or json_path is not None
+        self._owns_trace = json_path is not None and not tracemalloc.is_tracing()
+        if self._owns_trace:
+            tracemalloc.start()
         self._started = time.perf_counter() if self.capture_enabled else 0.0
         self._marks: list[tuple[str, float]] = []
         self.metadata: dict = {}
+        self._peak_bytes: int | None = None
 
     def mark(self, phase: str) -> None:
         """Close the current phase and start the next one."""
@@ -40,6 +45,12 @@ class Timings:
             {"name": phase, "value": round(seconds * 1000.0, 3), "unit": "ms"}
             for phase, seconds in self._marks
         ]
+        try:
+            from compiler import gltf
+
+            asset_import_ms = round(gltf.import_time_seconds() * 1000.0, 3)
+        except ImportError:
+            asset_import_ms = 0.0
         return {
             "schema": "anvil.build-profile",
             "version": 1,
@@ -49,12 +60,16 @@ class Timings:
                 "processor": platform.processor() or None,
             },
             "phases": durations,
+            "asset_import": {"value": asset_import_ms, "unit": "ms", "source": "glTF model importer"},
             "total": {
                 "value": round(sum(seconds for _, seconds in self._marks) * 1000.0, 3),
                 "unit": "ms",
             },
             "artifacts": dict(self.metadata),
-            "memory": {"peak_bytes": None, "measurement": "not available in compiler process"},
+            "memory": {
+                "peak_bytes": self._peak_bytes,
+                "measurement": "Python allocations traced by tracemalloc",
+            },
         }
 
     @staticmethod
@@ -74,6 +89,10 @@ class Timings:
             parts.append(f"total {self._milliseconds(total)} ms")
             print("timings: " + ", ".join(parts), file=target)
         if self.json_path is not None:
+            if tracemalloc.is_tracing():
+                self._peak_bytes = tracemalloc.get_traced_memory()[1]
+            if self._owns_trace:
+                tracemalloc.stop()
             self.json_path.parent.mkdir(parents=True, exist_ok=True)
             self.json_path.write_text(
                 json.dumps(self._profile(), indent=2) + "\n", encoding="utf-8"

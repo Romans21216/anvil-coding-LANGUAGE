@@ -8,11 +8,14 @@ import pathlib
 import re
 import sys
 import tempfile
+import time
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from compiler.timing import Timings  # noqa: E402
+from compiler import gltf  # noqa: E402
 
 LINE = re.compile(r"^timings: (?P<phases>.+)$")
 
@@ -89,7 +92,22 @@ class TimingTests(unittest.TestCase):
         self.assertEqual([phase["name"] for phase in report["phases"]], ["read", "parse"])
         self.assertTrue(all(phase["unit"] == "ms" for phase in report["phases"]))
         self.assertEqual(report["artifacts"], {"backend": "c", "source_bytes": 23})
-        self.assertEqual(report["memory"]["peak_bytes"], None)
+        self.assertGreater(report["memory"]["peak_bytes"], 0)
+        self.assertEqual(
+            report["memory"]["measurement"], "Python allocations traced by tracemalloc"
+        )
+        self.assertEqual(report["asset_import"]["unit"], "ms")
+
+    def test_asset_import_time_is_captured_only_when_enabled(self) -> None:
+        gltf.reset_import_time()
+        gltf.measure_import_time(False)
+        with mock.patch.object(gltf, "_ensure_model", side_effect=lambda *_: time.sleep(0.01)):
+            gltf.ensure_model("unused.gltf", pathlib.Path("."))
+            self.assertEqual(gltf.import_time_seconds(), 0.0)
+            gltf.measure_import_time(True)
+            gltf.ensure_model("unused.gltf", pathlib.Path("."))
+        gltf.measure_import_time(False)
+        self.assertGreater(gltf.import_time_seconds(), 0.0)
 
     def test_disabled_timing_without_json_does_not_start_a_clock(self) -> None:
         self.assertEqual(Timings(False)._started, 0.0)  # noqa: SLF001

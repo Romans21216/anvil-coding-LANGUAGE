@@ -154,8 +154,7 @@ preflight diagnostic because the compiler cannot determine which file to check.
 `anvil.runtime-profile` record with per-scene work and present percentiles,
 sample/run counts, warmup frames, bucket resolution, applicable budgets and
 machine environment. This captures steady-state frame work separately from
-present cost; compiler phase timings and process memory remain in their existing
-tools and reports.
+present cost; compiler phase and Python allocation profiles use `--profile-json`.
 
 | flag | effect |
 |---|---|
