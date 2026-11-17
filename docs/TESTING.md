@@ -114,6 +114,9 @@ remote desktop can prevent window creation:
   glyphs (36 px vs 64 px; ANSI mojibake would be roughly 72 and 96), checks the
   drawn ink covers the measured width, and wraps 24 unspaced CJK characters at
   160 px to prove each of the three lines carries ink.
+- `test_window_scale` — compares `dpi_scale()` with the DPI Windows reports for
+  the real window, then watches the client area go 960x600 -> 480x300 ->
+  960x600 as `window_scale` is called from the frame loop.
 - `test_parallax` — clamps the factor and returns the previous value, then pans
   the camera 100 px and proves with captured pixels that a factor-1 layer
   lands at x=0 and a 0.5 layer at x=50.

@@ -96,6 +96,10 @@ static HWND anvil_window;
 static LONG anvil_window_saved_style;
 static RECT anvil_window_saved_rect;
 static int anvil_window_is_fullscreen;
+/* Display scaling: the framebuffer stays 960x600 and is letterboxed, but the
+   window is sized so it looks the same physical size at any monitor DPI. */
+static double anvil_dpi_factor = 1.0;
+static double anvil_window_scale_factor = 1.0;
 static HDC anvil_memory_dc;
 /* Two framebuffers: the program draws into the back one while the front one is
    on screen, and they swap at present, so no frame is ever shown half-drawn. */
@@ -5119,6 +5123,28 @@ double anvil_window_fullscreen(double on) {
   return 1.0;
 }
 
+double anvil_dpi_scale(void) { return anvil_dpi_factor; }
+
+/* Resize the window's client area to 960x600 times `factor`, keeping the
+   framebuffer letterboxed inside it. Returns the previous scale. */
+double anvil_window_scale(double factor) {
+  double previous = anvil_window_scale_factor;
+  if (!isfinite(factor))
+    return previous;
+  double clamped = factor < 0.25 ? 0.25 : factor > 4.0 ? 4.0 : factor;
+  anvil_window_scale_factor = clamped;
+  if (anvil_window && !anvil_window_is_fullscreen) {
+    RECT rect = {0, 0, (LONG)lrint((double)ANVIL_WIDTH * clamped),
+                 (LONG)lrint((double)ANVIL_HEIGHT * clamped)};
+    AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
+    SetWindowPos(anvil_window, NULL, 0, 0, rect.right - rect.left,
+                 rect.bottom - rect.top,
+                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    InvalidateRect(anvil_window, NULL, FALSE);
+  }
+  return previous;
+}
+
 void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   HINSTANCE instance = GetModuleHandleA(NULL);
   WNDCLASSEXA wc;
@@ -5131,7 +5157,33 @@ void anvil_run(AnvilCallback update, AnvilCallback draw, const char *title) {
   wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
   wc.lpszClassName = "AnvilNativeGameWindow";
   RegisterClassExA(&wc);
-  RECT rect = {0, 0, ANVIL_WIDTH, ANVIL_HEIGHT};
+  /* Ask for per-monitor DPI awareness before any window exists; without it
+     Windows bitmap-stretches the whole window on a scaled display. The
+     context entry point is looked up so the build still starts on systems
+     that predate it. */
+  {
+    typedef BOOL(WINAPI * AnvilDpiContext)(void *);
+    HMODULE user32 = GetModuleHandleA("user32.dll");
+    AnvilDpiContext set_context =
+        user32 ? (AnvilDpiContext)(void *)GetProcAddress(
+                     user32, "SetProcessDpiAwarenessContext")
+               : NULL;
+    if (set_context)
+      set_context((void *)-4); /* PER_MONITOR_AWARE_V2 */
+    else
+      SetProcessDPIAware();
+  }
+  {
+    HDC screen = GetDC(NULL);
+    int dpi = screen ? GetDeviceCaps(screen, LOGPIXELSX) : 96;
+    if (screen)
+      ReleaseDC(NULL, screen);
+    if (dpi > 0)
+      anvil_dpi_factor = (double)dpi / 96.0;
+  }
+  anvil_window_scale_factor = anvil_dpi_factor;
+  RECT rect = {0, 0, (LONG)lrint((double)ANVIL_WIDTH * anvil_window_scale_factor),
+               (LONG)lrint((double)ANVIL_HEIGHT * anvil_window_scale_factor)};
   AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
   anvil_window = CreateWindowExA(
       0, wc.lpszClassName, title ? title : "Anvil Game", WS_OVERLAPPEDWINDOW,

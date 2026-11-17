@@ -198,6 +198,8 @@ double anvil_window_on_top(double on);
 double anvil_window_fullscreen(double on);
 double anvil_camera2d(double x, double y, double zoom);
 double anvil_parallax(double factor);
+double anvil_dpi_scale(void);
+double anvil_window_scale(double factor);
 void anvil_seed(unsigned long long seed);
 void anvil_wait(double seconds);
 void anvil_press_enter(void);

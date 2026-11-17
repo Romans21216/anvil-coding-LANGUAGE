@@ -116,6 +116,8 @@ RUNTIME_C_NAMES = {
     "anvil_camera_perspective",
     "anvil_camera2d",
     "anvil_parallax",
+    "anvil_dpi_scale",
+    "anvil_window_scale",
     "anvil_camera_angle",
     "anvil_mesh_culled",
     "anvil_mesh_drawn",

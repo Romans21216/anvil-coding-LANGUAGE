@@ -163,6 +163,8 @@ async function main() {
   expect('set ok = tilemap_solid(map, 3, 1)', 'tilemap_solid', 'support.function.anvil');
   expect('set ok = tilemap_animate(map, 16, 2, 0.8)', 'tilemap_animate', 'support.function.anvil');
   expect('set p = parallax(0.35)', 'parallax', 'support.function.anvil');
+  expect('say dpi_scale()', 'dpi_scale', 'support.function.anvil');
+  expect('set prev = window_scale(2)', 'window_scale', 'support.function.anvil');
   expect('set var(ok) = shadow(1)', 'shadow', 'support.function.anvil');
   expect('set var(size) = 1.8', '1.8', 'constant.numeric.float.anvil');
   expect('set var(size) = 18', '18', 'constant.numeric.integer.anvil');
