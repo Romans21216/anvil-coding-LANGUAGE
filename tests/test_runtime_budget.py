@@ -9,7 +9,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TOOL = ROOT / "tools" / "bench_runtime.py"
-SCENES = ("idle_2d", "overdraw_2d", "text_ui", "particles_2d", "cubes_3d")
+sys.path.insert(0, str(ROOT / "tools"))
+from bench_runtime import SCENES  # noqa: E402  (the single list of scenes)
 
 
 class RuntimeBudgetTests(unittest.TestCase):

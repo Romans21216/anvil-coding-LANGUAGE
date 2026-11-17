@@ -109,6 +109,16 @@
         "measured_present_p50_ms": 0.38,
         "measured_present_p95_ms": 4.38,
         "measured_max_ms": 0.55
+      },
+      "tilemap_large": {
+        "work_p50_ms": 0.5,
+        "work_p95_ms": 2.0,
+        "present_p95_ms": 10.95,
+        "measured_work_p50_ms": 0.12,
+        "measured_work_p95_ms": 0.12,
+        "measured_present_p50_ms": 1.62,
+        "measured_present_p95_ms": 4.38,
+        "measured_max_ms": 0.26
       }
     }
   }

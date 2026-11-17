@@ -1691,7 +1691,7 @@ double anvil_image_draw_rotated(double handle, double cx, double cy, double angl
    per map, so an unused slot costs nothing. */
 enum {
   ANVIL_TILEMAPS = 16,
-  ANVIL_TILEMAP_MAX = 128,
+  ANVIL_TILEMAP_MAX = 512,
   ANVIL_TILEMAP_EMPTY = -1
 };
 
@@ -1763,7 +1763,7 @@ double anvil_tilemap_new(double image_handle, double tile_w, double tile_h,
   if (!isfinite(columns) || !isfinite(rows) || floor(columns) != columns ||
       floor(rows) != rows || columns < 1.0 || rows < 1.0 ||
       columns > (double)ANVIL_TILEMAP_MAX || rows > (double)ANVIL_TILEMAP_MAX) {
-    anvil_tilemap_error_text = "the map must be 1..128 cells on each side";
+    anvil_tilemap_error_text = "the map must be 1..512 cells on each side";
     return 0.0;
   }
   int slot = -1;
@@ -2075,8 +2075,45 @@ double anvil_tilemap_draw(double handle, double x, double y, double scale) {
     return 0.0;
   double step_x = (double)map->tile_w * scale;
   double step_y = (double)map->tile_h * scale;
-  for (int row = 0; row < map->rows; ++row) {
-    for (int column = 0; column < map->columns; ++column) {
+  /* Only walk the cells that can reach the framebuffer. The visible world
+     rectangle follows from the camera (pan scaled by the parallax factor) and
+     the zoom, so the cost of a draw is the size of the viewport, not of the
+     map: a 512x512 world costs the same as a 20x12 one. */
+  double zoom = anvil_camera2d_zoom > 0.0 ? anvil_camera2d_zoom : 1.0;
+  double view_left = anvil_camera2d_x * anvil_parallax_factor;
+  double view_top = anvil_camera2d_y * anvil_parallax_factor;
+  double view_right = view_left + (double)ANVIL_WIDTH / zoom;
+  double view_bottom = view_top + (double)ANVIL_HEIGHT / zoom;
+  double first_column = floor((view_left - x) / step_x);
+  double last_column = floor((view_right - x) / step_x);
+  double first_row = floor((view_top - y) / step_y);
+  double last_row = floor((view_bottom - y) / step_y);
+  /* Clamp in the double domain before the cast: a wild camera pan or a tiny
+     scale could otherwise overflow int. */
+  if (!(first_column > -1.0))
+    first_column = -1.0;
+  if (!(first_row > -1.0))
+    first_row = -1.0;
+  if (!(last_column < (double)map->columns))
+    last_column = (double)map->columns;
+  if (!(last_row < (double)map->rows))
+    last_row = (double)map->rows;
+  int column_start = (int)first_column;
+  int column_end = (int)last_column;
+  int row_start = (int)first_row;
+  int row_end = (int)last_row;
+  if (column_start < 0)
+    column_start = 0;
+  if (row_start < 0)
+    row_start = 0;
+  if (column_end > map->columns - 1)
+    column_end = map->columns - 1;
+  if (row_end > map->rows - 1)
+    row_end = map->rows - 1;
+  if (column_start > column_end || row_start > row_end)
+    return 1.0;
+  for (int row = row_start; row <= row_end; ++row) {
+    for (int column = column_start; column <= column_end; ++column) {
       int tile = map->cells[(size_t)row * (size_t)map->columns + (size_t)column];
       if (tile < 0 || tile >= map->tiles)
         continue;
@@ -2086,14 +2123,6 @@ double anvil_tilemap_draw(double handle, double x, double y, double scale) {
         continue;
       double dx = x + (double)column * step_x;
       double dy = y + (double)row * step_y;
-      /* Cull cells that cannot touch the framebuffer after the camera. */
-      double sx = dx, sy = dy;
-      anvil_camera2d_point(&sx, &sy);
-      double cw = step_x * anvil_camera2d_zoom;
-      double ch = step_y * anvil_camera2d_zoom;
-      if (sx + cw <= 0.0 || sy + ch <= 0.0 || sx >= (double)ANVIL_WIDTH ||
-          sy >= (double)ANVIL_HEIGHT)
-        continue;
       double source_x = (double)((tile % map->tiles_per_row) * map->tile_w);
       double source_y = (double)((tile / map->tiles_per_row) * map->tile_h);
       if (anvil_sprite_batch_on) {

@@ -153,6 +153,21 @@ SCENES = {
             "end",
         )
     ),
+    "tilemap_large": "\n".join(
+        (
+            "scene 2d",
+            "clear rgba(10, 12, 18, 255)",
+            'set var(sheet) = image_load("tiles.bmp")',
+            "set var(map) = tilemap_new(var(sheet), 8, 8, 512, 512)",
+            "set var(ok) = tilemap_fill(var(map), -1)",
+            "set var(ok) = tilemap_area(var(map), 1, 0, 0, 4, 4)",
+            "set var(ok) = tilemap_area(var(map), 2, 200, 300, 40, 40)",
+            "",
+            "fn(draw)",
+            "  set var(drawn) = tilemap_draw(var(map), 0, 0, 1)",
+            "end",
+        )
+    ),
     "cubes_3d": "\n".join(
         (
             "scene 3d",
@@ -179,11 +194,39 @@ def program(scene: str) -> str:
     return "language version 1\n" + scene + "\n" + TIMING
 
 
+
+def write_tileset(path):
+    """An 8x8 grid of 8 px solid tiles, matching the tilemap bench scenes."""
+    import struct
+
+    tile, columns, rows = 8, 8, 8
+    width, height = tile * columns, tile * rows
+    colours = [(200, 60, 60), (60, 180, 90), (70, 110, 220), (220, 200, 80)]
+    palette = [colours[(x + y) % len(colours)] for y in range(rows) for x in range(columns)]
+    body = bytearray()
+    for y in range(height - 1, -1, -1):
+        for x in range(width):
+            r, g, b = palette[(y // tile) * columns + (x // tile)]
+            body += bytes((b, g, r, 255))
+    header = bytearray(54)
+    header[0:2] = b"BM"
+    struct.pack_into("<I", header, 2, 54 + len(body))
+    struct.pack_into("<I", header, 10, 54)
+    struct.pack_into("<I", header, 14, 40)
+    struct.pack_into("<i", header, 18, width)
+    struct.pack_into("<i", header, 22, height)
+    struct.pack_into("<H", header, 26, 1)
+    struct.pack_into("<H", header, 28, 32)
+    struct.pack_into("<I", header, 34, len(body))
+    path.write_bytes(bytes(header) + bytes(body))
+
+
 def measure(name: str, runs: int) -> dict[str, float]:
     source_text = program(SCENES[name])
     results = []
     with tempfile.TemporaryDirectory() as temp:
         root = pathlib.Path(temp)
+        write_tileset(root / "tiles.bmp")
         source = root / f"{name}.ANVL"
         source.write_text(source_text, encoding="utf-8")
         executable = root / f"{name}.exe"

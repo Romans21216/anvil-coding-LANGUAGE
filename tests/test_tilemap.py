@@ -307,6 +307,57 @@ ANIMATED_DRAW_PROGRAM = "\n".join(
     )
 )
 
+LARGE_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        '  set var(sheet) = image_load("tiles.bmp")',
+        "  set var(big) = tilemap_new(var(sheet), 8, 8, 512, 512)",
+        "  say tilemap_columns(var(big))",
+        "  say tilemap_rows(var(big))",
+        "  say tilemap_set(var(big), 511, 511, 3)",
+        "  say tilemap_get(var(big), 511, 511)",
+        "  say tilemap_new(var(sheet), 8, 8, 513, 512)",
+        "  say tilemap_free(var(big))",
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+LARGE_DRAW_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "clear rgba(0, 0, 0, 255)",
+        'set var(sheet) = image_load("tiles.bmp")',
+        "set var(map) = tilemap_new(var(sheet), 8, 8, 512, 512)",
+        "set var(ok) = tilemap_fill(var(map), -1)",
+        "set var(ok) = tilemap_set(var(map), 0, 0, 1)",
+        "set var(ok) = tilemap_set(var(map), 400, 400, 2)",
+        "set var(frame) = 0",
+        "set var(near) = -1",
+        "set var(far) = -1",
+        "",
+        "fn(draw)",
+        "  add var(frame) 1",
+        "  set var(drawn) = tilemap_draw(var(map), 0, 0, 8)",
+        "  if var(frame) = 5",
+        "    set var(cap) = frame_capture()",
+        "    set var(near) = image_pixel(var(cap), 8, 8)",
+        "  end",
+        "  if var(frame) = 7",
+        "    set var(p) = camera2d(25600, 25600, 1)",
+        "  end",
+        "  if var(frame) = 9",
+        "    set var(cap2) = frame_capture()",
+        "    set var(far) = image_pixel(var(cap2), 8, 8)",
+        '    say "near " & var(near)',
+        '    say "far " & var(far)',
+        "  end",
+        "end",
+        "",
+    )
+)
+
 class TilemapDrawTests(unittest.TestCase):
     def test_cells_land_on_the_expected_pixels(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -439,6 +490,55 @@ class TilemapAnimationTests(unittest.TestCase):
             self.assertEqual(values["early"] & 0xFFFFFF, WHITE)
             # Frame 75 is past one second: frame 1 wraps to tile 0, red.
             self.assertEqual(values["late"] & 0xFFFFFF, RED)
+
+
+
+class TilemapLargeMapTests(unittest.TestCase):
+    def test_a_512_cell_map_is_accepted_and_513_is_not(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            executable = build(root, LARGE_PROGRAM, "large")
+            run = subprocess.run(
+                [str(executable)], cwd=root, capture_output=True, text=True, timeout=90
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(
+                run.stdout.splitlines(),
+                ["512", "512", "1", "3", "0", "1"],
+            )
+
+    def test_drawing_follows_the_camera_into_a_far_corner(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            executable = build(root, LARGE_DRAW_PROGRAM, "largedraw")
+            process = subprocess.Popen(
+                [str(executable)],
+                cwd=root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            lines: list[str] = []
+            assert process.stdout is not None
+            deadline = time.monotonic() + 45
+            try:
+                for line in process.stdout:
+                    lines.append(line.rstrip("\r\n"))
+                    if line.startswith("far") or time.monotonic() > deadline:
+                        break
+            finally:
+                process.kill()
+                process.wait(timeout=30)
+            values: dict[str, int] = {}
+            for line in lines:
+                key, _, value = line.partition(" ")
+                if key in ("near", "far"):
+                    values[key] = int(float(value))
+            self.assertEqual(sorted(values), ["far", "near"], lines)
+            # Cell (0,0) is green; cell (400,400) is blue and only visible once
+            # the camera pans to the cell (8 px tiles at 8x = 64 px cells).
+            self.assertEqual(values["near"] & 0xFFFFFF, GREEN)
+            self.assertEqual(values["far"] & 0xFFFFFF, BLUE)
 
 
 
