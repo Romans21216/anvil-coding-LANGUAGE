@@ -979,3 +979,11 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **New counter:** `memory_gpu()` reports the compositor-visible subset — the two DIB sections at 4,608,000 bytes — and is the measured answer to 8.15's "GPU VRAM beyond the backbuffer": rendering is CPU-side, so there is nothing else. The browser reports 0 for both because the page owns the canvas.
 - **Budgets:** `tools/mem_budgets.json` and `tests/test_memory_budget.py` re-baseline `video_bytes` to 9,216,000, and `tests/test_memory_builtins.py` asserts both counters.
 - **Full suite:** 951 passed, 1 skipped, 1 xfailed in 480.41 s, exit 0.
+
+## Batch 101 — audio and network memory scenes (8.15)
+
+- **Audio scene:** four 1.5 s sources loaded and three played: 1,152,000 decoded bytes, 13.0 MB run peak, with an `audio_bytes` budget as well as the working-set budget; the byte count is unchanged by playback because decoding happens once at load.
+- **Network scene:** a UDP host counting 200 datagrams fed by the harness: 5.6 MB run peak. The figure covers the process only — socket buffers live in the kernel — and the evidence row says so.
+- **Budgets:** `tools/mem_budgets.json` and `--check` now cover nine scenes and still report "memory budgets hold".
+- **Tests:** `tests/test_memory_budget.py` (6 cases) adds the audio byte counts, the network completion, and the two scenes in the budget-coverage check.
+- **Full suite:** 953 passed, 1 skipped, 1 xfailed in 506.25 s, exit 0.
