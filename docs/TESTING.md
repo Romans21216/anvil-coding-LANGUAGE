@@ -135,6 +135,9 @@ remote desktop can prevent window creation:
   drawn ink bounds across poses: translation moves it by half the key at 0.5 s,
   rotation changes the silhouette, STEP holds the left key until 1.0 s, the clip
   wraps at its length, and the static/wasm refusals name the source line.
+- `test_asset_paths` — a path built from a variable loads on the C backend (image and sound),
+  and the browser build reports "only literal ..." for image, sound and music instead of
+  failing silently.
 - `test_tan` — builds the same `tan` program for the C and wasm backends and compares their
   printed lines byte for byte over straight angles, a large angle, the `tan = sin/cos`
   identity and a scaled known value; the native backend must refuse `tan` with a located
