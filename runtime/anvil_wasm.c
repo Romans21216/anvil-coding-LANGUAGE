@@ -2312,6 +2312,92 @@ static int anvil_finite_bits(unsigned long long bits) {
 
 const char *anvil_save_error(void) { return anvil_save_error_text; }
 
+/* The version lives under one reserved key beside the slots. Slot names cannot
+   start with a dot, so ".version" is not reachable as a slot. */
+static int anvil_save_version_key(char *out, int capacity) {
+  int index = 0;
+  for (const char *c = anvil_project_name; *c; ++c) {
+    if (index >= capacity - 12)
+      return 0;
+    out[index++] = *c;
+  }
+  const char *suffix = "/.version";
+  for (const char *c = suffix; *c; ++c)
+    out[index++] = *c;
+  out[index] = '\0';
+  return 1;
+}
+
+double anvil_save_version(void) {
+  char key[160];
+  if (!anvil_save_version_key(key, (int)sizeof(key))) {
+    anvil_save_error_text = "the save folder is too long";
+    return 0.0;
+  }
+  char payload[32];
+  int length = anvil_host_save_read(key, payload, (int)sizeof(payload) - 1);
+  if (length < 0) {
+    anvil_save_error_text = ""; /* no version yet is a first run */
+    return 0.0;
+  }
+  if (length > (int)sizeof(payload) - 1)
+    length = (int)sizeof(payload) - 1;
+  payload[length] = '\0';
+  double value = 0.0;
+  int digits = 0;
+  for (int i = 0; i < length; ++i) {
+    char c = payload[i];
+    if (c < '0' || c > '9') {
+      anvil_save_error_text = "the save version file is not readable";
+      return 0.0;
+    }
+    value = value * 10.0 + (double)(c - '0');
+    if (value > 1000000.0) {
+      anvil_save_error_text = "the save version file is not readable";
+      return 0.0;
+    }
+    ++digits;
+  }
+  if (!digits) {
+    anvil_save_error_text = "the save version file is not readable";
+    return 0.0;
+  }
+  anvil_save_error_text = "";
+  return value;
+}
+
+double anvil_save_set_version(double version) {
+  double previous = anvil_save_version();
+  if (!anvil_wasm_finite(version) || version < 0.0 || version > 1000000.0 ||
+      floor(version) != version) {
+    anvil_save_error_text =
+        "the save version must be a whole number from 0 to 1000000";
+    return previous;
+  }
+  char key[160];
+  if (!anvil_save_version_key(key, (int)sizeof(key))) {
+    anvil_save_error_text = "the save folder is too long";
+    return previous;
+  }
+  char reversed[16];
+  int count = 0;
+  unsigned long long whole = (unsigned long long)version;
+  if (whole == 0)
+    reversed[count++] = '0';
+  while (whole) {
+    reversed[count++] = (char)('0' + (int)(whole % 10));
+    whole /= 10;
+  }
+  char payload[24];
+  int index = 0;
+  while (count)
+    payload[index++] = reversed[--count];
+  payload[index] = '\0';
+  anvil_host_save_write(key, payload);
+  anvil_save_error_text = "";
+  return previous;
+}
+
 double anvil_save_number(const char *slot, double value) {
   char key[160];
   if (!anvil_save_key(slot, key, (int)sizeof(key)))
@@ -2343,6 +2429,10 @@ double anvil_load_number(const char *slot) {
   if (length > (int)sizeof(payload) - 1)
     length = (int)sizeof(payload) - 1;
   payload[length] = '\0';
+  if (length > 0 && payload[0] > '2') {
+    anvil_save_error_text = "the save was written by a newer Anvil version";
+    return 0.0;
+  }
   if (length == 0 || (payload[0] != '1' && payload[0] != '2')) {
     anvil_save_error_text = "the save is not a readable Anvil save";
     return 0.0;
@@ -2416,6 +2506,10 @@ const char *anvil_load_text(const char *slot) {
   if (length > (int)sizeof(payload) - 1)
     length = (int)sizeof(payload) - 1;
   payload[length] = '\0';
+  if (length > 0 && payload[0] > '2') {
+    anvil_save_error_text = "the save was written by a newer Anvil version";
+    return buffer;
+  }
   if (length == 0 || (payload[0] != '1' && payload[0] != '2')) {
     anvil_save_error_text = "the save is not a readable Anvil save";
     return buffer;

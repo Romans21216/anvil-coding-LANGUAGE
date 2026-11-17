@@ -164,6 +164,8 @@ ALLOWED_BUILTINS = {
     "scene_changing",
     "scene_changed",
     "scene_progress",
+    "save_version",
+    "save_set_version",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)

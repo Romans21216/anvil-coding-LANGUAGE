@@ -166,6 +166,8 @@ const char *anvil_load_text(const char *slot);
 double anvil_save_exists(const char *slot);
 double anvil_save_delete(const char *slot);
 const char *anvil_save_error(void);
+double anvil_save_version(void);
+double anvil_save_set_version(double version);
 
 /* Text helpers, matching the C runtime's clamped slice semantics. */
 char *anvil_text_lower(const char *source);

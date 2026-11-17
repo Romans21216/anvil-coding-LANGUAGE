@@ -214,6 +214,8 @@ BUILTINS = {
     "scene_changing": (0, 0),
     "scene_changed": (0, 0),
     "scene_progress": (0, 0),
+    "save_version": (0, 0),
+    "save_set_version": (1, 1),
     "receive": (0, 0),
     "body_create": (4, 4),
     "body_create_box": (5, 5),
@@ -371,6 +373,8 @@ BUILTIN_C_NAMES = {
     "scene_changing": "anvil_scene_changing",
     "scene_changed": "anvil_scene_changed",
     "scene_progress": "anvil_scene_progress",
+    "save_version": "anvil_save_version",
+    "save_set_version": "anvil_save_set_version",
     "receive": "anvil_net_receive",
     "buffer": "anvil_buffer",
     "text_width": "anvil_text_width",
@@ -513,6 +517,7 @@ BUILTIN_ARG_KINDS = {
     "ui_focus_at": ("number", "number"),
     "ui_accessible": ("number",),
     "scene_change": ("string", "number"),
+    "save_set_version": ("number",),
 }
 
 # Loads take the Anvil source site as extra arguments so memory_report() can

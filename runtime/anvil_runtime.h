@@ -135,6 +135,8 @@ double anvil_image_draw_region(double handle, double sx, double sy, double sw,
 double anvil_image_tint(double handle, double r, double g, double b);
 double anvil_image_flip(double handle, double x, double y);
 const char *anvil_save_error(void);
+double anvil_save_version(void);
+double anvil_save_set_version(double version);
 void anvil_set_project(const char *name);
 double anvil_save_number(const char *slot, double value);
 double anvil_load_number(const char *slot);

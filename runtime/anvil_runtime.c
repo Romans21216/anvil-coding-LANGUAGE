@@ -4660,6 +4660,112 @@ static int anvil_save_path(const char *slot, const char *extension,
   return 1;
 }
 
+/* The save format version lives once per project, beside the slots, so a game
+   can migrate an old layout: `save_version()` reports what is on disk and
+   `save_set_version` records the layout this build writes. Slot names cannot
+   start with a dot, so the version file can never collide with a slot. */
+enum { ANVIL_SAVE_VERSION_LIMIT = 1000000 };
+
+static int anvil_save_version_path(char *destination, size_t capacity) {
+  char root[MAX_PATH];
+  if (!anvil_save_root(root, sizeof(root))) {
+    anvil_save_error_text = "the save folder is too long";
+    return 0;
+  }
+  int written =
+      _snprintf_s(destination, capacity, _TRUNCATE, "%s\\.version", root);
+  if (written <= 0) {
+    anvil_save_error_text = "the save path is too long";
+    return 0;
+  }
+  if (!anvil_save_make_dirs(root)) {
+    anvil_save_error_text = "the save folder could not be created";
+    return 0;
+  }
+  return 1;
+}
+
+double anvil_save_version(void) {
+  char path[MAX_PATH];
+  if (!anvil_save_version_path(path, sizeof(path)))
+    return 0.0;
+  FILE *file = fopen(path, "rb");
+  if (!file) {
+    /* No version file yet is a first run, not an error. */
+    anvil_save_error_text = "";
+    return 0.0;
+  }
+  char text[32];
+  size_t got = fread(text, 1, sizeof(text) - 1, file);
+  fclose(file);
+  if (got == 0 || got >= sizeof(text) - 1) {
+    anvil_save_error_text = "the save version file is not readable";
+    return 0.0;
+  }
+  double value = 0.0;
+  int digits = 0;
+  for (size_t i = 0; i < got; ++i) {
+    char c = text[i];
+    if (c == '\r' || c == '\n' || c == ' ' || c == '\t')
+      continue; /* keep an edited file usable */
+    if (c < '0' || c > '9') {
+      anvil_save_error_text = "the save version file is not readable";
+      return 0.0;
+    }
+    value = value * 10.0 + (double)(c - '0');
+    if (value > (double)ANVIL_SAVE_VERSION_LIMIT) {
+      anvil_save_error_text = "the save version file is not readable";
+      return 0.0;
+    }
+    ++digits;
+  }
+  if (!digits) {
+    anvil_save_error_text = "the save version file is not readable";
+    return 0.0;
+  }
+  return value;
+}
+
+/* Returns the version that was stored before the call. */
+double anvil_save_set_version(double version) {
+  double previous = anvil_save_version();
+  if (!isfinite(version) || version < 0.0 ||
+      version > (double)ANVIL_SAVE_VERSION_LIMIT || floor(version) != version) {
+    anvil_save_error_text =
+        "the save version must be a whole number from 0 to 1000000";
+    return previous;
+  }
+  char path[MAX_PATH];
+  if (!anvil_save_version_path(path, sizeof(path)))
+    return previous;
+  char temporary[MAX_PATH];
+  int written =
+      _snprintf_s(temporary, sizeof(temporary), _TRUNCATE, "%s.tmp", path);
+  if (written <= 0) {
+    anvil_save_error_text = "the save path is too long";
+    return previous;
+  }
+  FILE *file = fopen(temporary, "wb");
+  if (!file) {
+    anvil_save_error_text = "the save version could not be opened for writing";
+    return previous;
+  }
+  int ok = fprintf(file, "%.0f", version) > 0;
+  ok = (fclose(file) == 0) && ok;
+  if (!ok) {
+    DeleteFileA(temporary);
+    anvil_save_error_text = "the save version could not be written";
+    return previous;
+  }
+  if (!MoveFileExA(temporary, path, MOVEFILE_REPLACE_EXISTING)) {
+    DeleteFileA(temporary);
+    anvil_save_error_text = "the save version could not replace the previous file";
+    return previous;
+  }
+  anvil_save_error_text = "";
+  return previous;
+}
+
 static int anvil_save_write(const char *slot, unsigned char type,
                             const void *payload, size_t bytes) {
   char path[MAX_PATH];
@@ -4709,9 +4815,22 @@ static int anvil_save_read(const char *slot, unsigned char expected,
     return 0;
   }
   unsigned char header[9];
-  int ok = fread(header, 1, sizeof(header), file) == sizeof(header) &&
-           memcmp(header, ANVIL_SAVE_MAGIC, sizeof(ANVIL_SAVE_MAGIC)) == 0;
-  if (!ok) {
+  if (fread(header, 1, sizeof(header), file) != sizeof(header)) {
+    fclose(file);
+    anvil_save_error_text = "the save is not a readable Anvil save";
+    return 0;
+  }
+  if (memcmp(header, ANVIL_SAVE_MAGIC, 7) == 0 &&
+      header[7] != ANVIL_SAVE_MAGIC[7]) {
+    /* Same family, different format generation: say which way round, so a
+       player is not told their save is corrupt when it is simply newer. */
+    fclose(file);
+    anvil_save_error_text = header[7] > ANVIL_SAVE_MAGIC[7]
+                                ? "the save needs a newer Anvil version"
+                                : "the save uses an older Anvil format";
+    return 0;
+  }
+  if (memcmp(header, ANVIL_SAVE_MAGIC, sizeof(ANVIL_SAVE_MAGIC)) != 0) {
     fclose(file);
     anvil_save_error_text = "the save is not a readable Anvil save";
     return 0;

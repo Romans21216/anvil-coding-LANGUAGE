@@ -268,5 +268,150 @@ class SaveSlotValidationTests(unittest.TestCase):
             )
 
 
+
+class SaveVersionTests(unittest.TestCase):
+    """The per-project format version a game migrates an old save with."""
+
+    def test_the_version_round_trips_and_returns_the_previous_value(self) -> None:
+        source = (
+            "fn(main)\n"
+            "  say save_version()\n"
+            "  say save_set_version(3)\n"
+            "  say save_version()\n"
+            "  say save_set_version(1)\n"
+            "end\ncall fn(main)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            saves = root / "saves"
+            result = run_program(compile_program(root, source), saves)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(lines_of(result), ["0", "0", "3", "3"])
+            # The setter returns what was stored before the call; the file holds
+            # the last value written.
+            self.assertEqual((saves / ".version").read_bytes(), b"1")
+
+    def test_the_version_persists_across_runs(self) -> None:
+        writer = (
+            "fn(main)\n"
+            "  say save_set_version(4)\n"
+            "end\ncall fn(main)\n"
+        )
+        reader = "fn(main)\n  say save_version()\nend\ncall fn(main)\n"
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            saves = root / "saves"
+            first = run_program(compile_program(root, writer), saves)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            second = run_program(compile_program(root, reader), saves)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(lines_of(second), ["4"])
+
+    def test_invalid_versions_are_refused(self) -> None:
+        source = (
+            "fn(main)\n"
+            "  say save_set_version(2)\n"
+            "  say save_set_version(-2)\n"
+            "  say save_error()\n"
+            "  say save_set_version(2.5)\n"
+            "  say save_error()\n"
+            "  say save_set_version(1000001)\n"
+            "  say save_error()\n"
+            "  say save_version()\n"
+            "end\ncall fn(main)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            result = run_program(compile_program(root, source), root / "saves")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            lines_of(result),
+            [
+                "0",
+                "2",
+                "the save version must be a whole number from 0 to 1000000",
+                "2",
+                "the save version must be a whole number from 0 to 1000000",
+                "2",
+                "the save version must be a whole number from 0 to 1000000",
+                "2",
+            ],
+        )
+
+    def test_a_newer_save_format_names_the_problem(self) -> None:
+        source = (
+            "fn(main)\n"
+            '  say load_number("future")\n'
+            "  say save_error()\n"
+            "end\ncall fn(main)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            saves = root / "saves"
+            saves.mkdir()
+            (saves / "future.sav").write_bytes(b"ANVSAVE2" + bytes([1]) + b"\x00" * 8)
+            result = run_program(compile_program(root, source), saves)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            lines_of(result), ["0", "the save needs a newer Anvil version"]
+        )
+
+    @unittest.skipUnless(
+        all(__import__("shutil").which(tool) for tool in ("clang", "node", "wasm-ld")),
+        "clang, wasm-ld and node are required",
+    )
+    def test_the_wasm_target_keeps_the_version_too(self) -> None:
+        compiler = pathlib.Path(__file__).resolve().parents[1] / "compiler" / "anvil.py"
+        host = pathlib.Path(__file__).resolve().parents[1] / "tools" / "wasm_host.mjs"
+        program = (
+            "fn(main)\n"
+            "  say save_version()\n"
+            "  say save_set_version(6)\n"
+            "  say save_version()\n"
+            "  say save_set_version(-1)\n"
+            "  say save_error()\n"
+            "end\ncall fn(main)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            source = root / "version.ANVL"
+            source.write_text(program, encoding="utf-8")
+            out = root / "version.wasm"
+            build = subprocess.run(
+                [
+                    sys.executable,
+                    str(compiler),
+                    str(source),
+                    "--backend",
+                    "wasm",
+                    "-o",
+                    str(out),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            self.assertEqual(build.returncode, 0, build.stderr)
+            store = root / "saves.json"
+            run = subprocess.run(
+                ["node", str(host), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env={**os.environ, "ANVIL_SAVE_FILE": str(store)},
+            )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(
+            run.stdout.replace("\r\n", "\n").splitlines(),
+            [
+                "0",
+                "0",
+                "6",
+                "6",
+                "the save version must be a whole number from 0 to 1000000",
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
