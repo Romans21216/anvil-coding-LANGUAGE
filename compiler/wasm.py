@@ -850,6 +850,12 @@ def validate(
     if text is None:
         text = pathlib.Path(source_path).read_text(encoding="utf-8")
     for match in DISPLAY_STATEMENT.finditer(text):
+        if match.group(1) == "ray_triangle":
+            line = text.count("\n", 0, match.start()) + 1
+            raise CompileError(
+                f"{source_path}:{line}: display ray_triangle(...) is not available "
+                "in the wasm backend yet"
+            )
         if match.group(1) == "ray_sphere":
             scene = SCENE_STATEMENT.search(text)
             if scene is None or scene.group(1) != "3d":

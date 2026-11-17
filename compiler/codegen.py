@@ -180,7 +180,7 @@ def emit_display(
         )
         raw = raw[:wm.start()] + raw[wm.end():]
     call = re.fullmatch(
-        r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?",
+        r"(cube|sphere|ray_sphere|ray_triangle|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?",
         raw.strip(),
     )
     if not call:
@@ -217,6 +217,8 @@ def emit_display(
         return f"{ind}anvil_sphere({', '.join(values)}, {tail});"
     if shape == "ray_sphere" and len(values) == 4:
         return f"{ind}anvil_trace_sphere({', '.join(values)}, {tail});"
+    if shape == "ray_triangle" and len(values) == 9:
+        return f"{ind}anvil_trace_triangle({', '.join(values)}, {tail});"
     if shape == "plane" and len(values) == 5:
         return f"{ind}anvil_plane({', '.join(values)}, {tail});"
     if shape == "rect" and len(values) == 4:
@@ -610,7 +612,10 @@ def emit_nodes(
             out.append(f"{indent}anvil_clear({', '.join(lower(n, x) for x in args)});")
         elif n.kind == "display":
             statement = emit_display(path, n, indent, functions, scope, arrays)
-            if "anvil_trace_sphere(" not in statement:
+            if (
+                "anvil_trace_sphere(" not in statement
+                and "anvil_trace_triangle(" not in statement
+            ):
                 out.append(f"{indent}anvil_trace_finish();")
             out.append(statement)
         elif n.kind == "seed":

@@ -210,6 +210,29 @@ def ray_sphere_scene(columns: int, rows: int) -> str:
     )
 
 
+def ray_triangle_scene(count: int) -> str:
+    """Build fixed world-space triangles for ray-hit measurements."""
+    lines = [
+        "scene 3d",
+        "camera perspective 0 0 12",
+        "camera fov(70)",
+        "clear rgba(11, 16, 27, 255)",
+        "",
+        "fn(draw)",
+    ]
+    for index in range(count):
+        x = (index % 8) * 0.7 - min(count, 8) * 0.35
+        y = (index // 8) * 0.7 - max(0, (count - 1) // 8) * 0.35
+        lines.append(
+            f"  display ray_triangle({x:g}, {y:g}, -1, "
+            f"{x + 0.6:g}, {y:g}, -1, {x:g}, {y + 0.6:g}, -1) "
+            "-rgb(255, 150, 64)"
+        )
+    lines.append("  display ray_sphere(0, 0, 0, 0.45) -rgb(172, 106, 255)")
+    lines.append("end")
+    return "\n".join(lines)
+
+
 SCENES.update(
     {
         "ray_spheres_1": ray_sphere_scene(1, 1),
@@ -219,6 +242,8 @@ SCENES.update(
         "ray_spheres_40": ray_sphere_scene(8, 5),
         "ray_spheres_40_step2": "set var(previous_step) = ray_resolution(2)\n" + ray_sphere_scene(8, 5),
         "ray_spheres_40_samples4": "set var(previous_samples) = ray_samples(4)\n" + ray_sphere_scene(8, 5),
+        "ray_triangles_8": ray_triangle_scene(8),
+        "ray_triangles_40": ray_triangle_scene(40),
     }
 )
 

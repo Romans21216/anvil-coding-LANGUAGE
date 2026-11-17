@@ -84,6 +84,7 @@ display_call     = "rect(", expression, ",", expression, ",", expression, ",", e
                  | "cube(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "sphere(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "ray_sphere(", expression, ",", expression, ",", expression, ",", expression, ")"
+                 | "ray_triangle(", expression, ",", expression, ",", expression, ",", expression, ",", expression, ",", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "plane(", expression, ",", expression, ",", expression, ",", expression, ",", expression, ")" ;
 display_style    = "-rgb(", expression, ",", expression, ",", expression, ")"
                  | "-rgba(", expression, ",", expression, ",", expression, ",", expression, ")"

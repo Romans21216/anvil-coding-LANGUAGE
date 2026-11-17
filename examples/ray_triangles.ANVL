@@ -1,0 +1,11 @@
+language version 1
+scene 3d
+camera perspective 0 0 12
+camera fov(70)
+clear rgba(11, 16, 27, 255)
+
+fn(draw)
+  display ray_triangle(-2, -1, -1, 0, -1, -1, -1, 1, -1) -rgb(255, 150, 64)
+  display ray_triangle(0, -1, -2, 2, -1, -2, 1, 1, -2) -rgb(80, 185, 255)
+  display ray_sphere(0, -0.2, 0, 0.45) -rgb(172, 106, 255)
+end

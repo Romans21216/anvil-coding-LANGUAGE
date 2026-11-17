@@ -189,6 +189,26 @@
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.38,
         "measured_max_ms": 71.21
+      },
+      "ray_triangles_8": {
+        "work_p50_ms": 2.8,
+        "work_p95_ms": 3.45,
+        "present_p95_ms": 3.0,
+        "measured_work_p50_ms": 1.12,
+        "measured_work_p95_ms": 1.38,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 0.12,
+        "measured_max_ms": 1.4
+      },
+      "ray_triangles_40": {
+        "work_p50_ms": 32.2,
+        "work_p95_ms": 33.45,
+        "present_p95_ms": 3.0,
+        "measured_work_p50_ms": 12.88,
+        "measured_work_p95_ms": 13.38,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 0.12,
+        "measured_max_ms": 13.42
       }
     }
   }
