@@ -23,6 +23,8 @@ BVH CPU ray tracing is the only implemented ray-tracing backend. DXR and Embree 
 
 `ray_backend("bvh")` selects the ray-tracing backend at runtime, and `ray_backend_available("dxr")` checks whether a named backend is available. Both return numeric `1` or `0`. A failed selection keeps the current backend and prints a diagnostic. This build implements only `bvh`; DXR and Embree currently return unavailable.
 
+`ray_resolution(step)` sets the CPU tracer's pixel step from 1 to 8 and returns the previous step; invalid values return `0` without changing it. Step 1 (the default) traces every pixel. Larger steps trace fewer rays and fill pixel blocks, trading image detail for lower render cost. WebAssembly does not support this control because its ray spheres use tessellation.
+
 Mouse input is available as `mouse_x()`, `mouse_y()`, `mouse_pressed("left"|"right"|"middle")`, `mouse_held(...)`, and `mouse_wheel()`. Pointer coordinates map through the centered aspect-preserving viewport to the virtual 960×600 framebuffer; a pointer in letterbox space returns `-1`. Button edges and wheel detents are consumed at fixed-update boundaries. `examples/mouse_input.ANVL` shows a click counter and cursor marker.
 
 2D image sprites use `image_load(path)`, `image_width(handle)`, `image_height(handle)`, `image_draw(handle,x,y)`, `image_draw_scaled(handle,x,y,width,height)`, and `image_destroy(handle)`. This runtime currently decodes uncompressed 24-bit or 32-bit BMP files and uses nearest-neighbor scaling with alpha blending. See [image resource constraints and return values](../LANGUAGE.md#drawing-and-input) and `examples/image_sprite.ANVL`.

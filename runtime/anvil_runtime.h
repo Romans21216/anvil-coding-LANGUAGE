@@ -177,6 +177,7 @@ void anvil_trace_sphere(double x, double y, double z, double radius, int r,
 void anvil_trace_finish(void);
 int anvil_ray_backend(const char *name);
 int anvil_ray_backend_available(const char *name);
+double anvil_ray_resolution(double step);
 void anvil_clear(int r, int g, int b, int a);
 void anvil_rect(double x, double y, double w, double h, int r, int g, int b,
                 int a);

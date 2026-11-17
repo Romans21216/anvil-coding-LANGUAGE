@@ -223,6 +223,7 @@ static int anvil_trace_sphere_count;
 static AnvilBvhNode anvil_trace_bvh[ANVIL_TRACE_SPHERES * 2];
 static int anvil_trace_bvh_count;
 static int anvil_active_ray_backend = ANVIL_RAY_BACKEND_BVH;
+static int anvil_ray_pixel_step = 1;
 static unsigned int anvil_ray_backend_warnings;
 static double anvil_delta_seconds = 1.0 / 60.0;
 static double anvil_frame_tick_seconds, anvil_frame_render_seconds,
@@ -3393,6 +3394,14 @@ int anvil_ray_backend_available(const char *name) {
   return anvil_ray_backend_id(name) == ANVIL_RAY_BACKEND_BVH;
 }
 
+double anvil_ray_resolution(double step) {
+  if (!isfinite(step) || step < 1.0 || step > 8.0 || floor(step) != step)
+    return 0.0;
+  int previous = anvil_ray_pixel_step;
+  anvil_ray_pixel_step = (int)step;
+  return (double)previous;
+}
+
 int anvil_ray_backend(const char *name) {
   int requested = anvil_ray_backend_id(name);
   if (requested == ANVIL_RAY_BACKEND_BVH) {
@@ -3617,10 +3626,17 @@ void anvil_trace_finish(void) {
                                      ANVIL_WIDTH, ANVIL_HEIGHT, &bounds))
       continue;
 
-    for (int py = bounds.min_y; py <= bounds.max_y; ++py) {
-      double vertical = (ANVIL_HEIGHT * 0.54 - (py + 0.5)) / anvil_camera_focal;
-      for (int px = bounds.min_x; px <= bounds.max_x; ++px) {
-        double horizontal = (px + 0.5 - ANVIL_WIDTH * 0.5) / anvil_camera_focal;
+    int step = anvil_ray_pixel_step;
+    int first_y = (bounds.min_y / step) * step;
+    int first_x = (bounds.min_x / step) * step;
+    for (int py = first_y; py <= bounds.max_y; py += step) {
+      int sample_y = py + step / 2;
+      if (sample_y >= ANVIL_HEIGHT) sample_y = ANVIL_HEIGHT - 1;
+      double vertical = (ANVIL_HEIGHT * 0.54 - (sample_y + 0.5)) / anvil_camera_focal;
+      for (int px = first_x; px <= bounds.max_x; px += step) {
+        int sample_x = px + step / 2;
+        if (sample_x >= ANVIL_WIDTH) sample_x = ANVIL_WIDTH - 1;
+        double horizontal = (sample_x + 0.5 - ANVIL_WIDTH * 0.5) / anvil_camera_focal;
         AnvilVec3 direction = anvil_normalize(anvil_add(
             forward, anvil_add((AnvilVec3){right.x * horizontal,
                                            right.y * horizontal,
@@ -3658,10 +3674,14 @@ void anvil_trace_finish(void) {
         int blue = (int)(hit->b * brightness + 255.0 * specular);
         uint32_t color = anvil_color(red, green, blue);
         double pixel_depth = anvil_dot(anvil_sub(point, origin), forward);
-        size_t pixel = (size_t)py * ANVIL_WIDTH + (size_t)px;
-        if (pixel_depth < anvil_depth_buffer[pixel]) {
-          anvil_depth_buffer[pixel] = pixel_depth;
-          anvil_pixel(px, py, color, hit->a);
+        for (int fill_y = py; fill_y < py + step && fill_y < ANVIL_HEIGHT; ++fill_y) {
+          for (int fill_x = px; fill_x < px + step && fill_x < ANVIL_WIDTH; ++fill_x) {
+            size_t pixel = (size_t)fill_y * ANVIL_WIDTH + (size_t)fill_x;
+            if (pixel_depth < anvil_depth_buffer[pixel]) {
+              anvil_depth_buffer[pixel] = pixel_depth;
+              anvil_pixel(fill_x, fill_y, color, hit->a);
+            }
+          }
         }
       }
     }

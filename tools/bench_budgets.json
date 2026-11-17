@@ -169,6 +169,16 @@
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.38,
         "measured_max_ms": 17.91
+      },
+      "ray_spheres_40_step2": {
+        "work_p50_ms": 11.55,
+        "work_p95_ms": 12.8,
+        "present_p95_ms": 3.0,
+        "measured_work_p50_ms": 4.62,
+        "measured_work_p95_ms": 5.12,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 0.12,
+        "measured_max_ms": 5.29
       }
     }
   }

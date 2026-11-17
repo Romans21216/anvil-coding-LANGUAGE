@@ -237,6 +237,7 @@ BUILTINS = {
     "physics_step": (0, 0),
     "ray_backend": (1, 1),
     "ray_backend_available": (1, 1),
+    "ray_resolution": (1, 1),
     "buffer": (1, 1),
     "text_width": (1, 1),
     "memory_report": (0, 0),
@@ -462,6 +463,7 @@ BUILTIN_C_NAMES = {
     "physics_step": "anvil_physics_step",
     "ray_backend": "anvil_ray_backend",
     "ray_backend_available": "anvil_ray_backend_available",
+    "ray_resolution": "anvil_ray_resolution",
 }
 
 BUILTIN_TEXT_RETURNING = {
