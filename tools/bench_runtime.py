@@ -22,6 +22,8 @@ import statistics
 import subprocess
 import sys
 import tempfile
+import ctypes
+from ctypes import wintypes
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPILER = ROOT / "compiler" / "anvil.py"
@@ -390,7 +392,8 @@ def write_ray_morph_mesh(path):
         struct.pack("<3f", *point)
         for point in ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.8, 0.0))
     )
-    binary = positions + indices + deltas
+    # Keep the following float accessor aligned after the 16-bit indices.
+    binary = positions + indices + b"\0\0" + deltas
     document = {
         "asset": {"version": "2.0"},
         "scene": 0,
@@ -409,7 +412,7 @@ def write_ray_morph_mesh(path):
         "bufferViews": [
             {"buffer": 0, "byteOffset": 0, "byteLength": len(positions)},
             {"buffer": 0, "byteOffset": len(positions), "byteLength": len(indices)},
-            {"buffer": 0, "byteOffset": len(positions) + len(indices), "byteLength": len(deltas)},
+            {"buffer": 0, "byteOffset": len(positions) + len(indices) + 2, "byteLength": len(deltas)},
         ],
         "buffers": [{"byteLength": len(binary)}],
     }
@@ -431,7 +434,8 @@ def write_ray_animated_mesh(path):
     indices = struct.pack("<3H", 0, 1, 2)
     times = struct.pack("<2f", 0, 1)
     translations = struct.pack("<6f", 0, 0, 0, 2, 0, 0)
-    binary = positions + indices + times + translations
+    # The 16-bit index payload ends at byte 42; align following float accessors.
+    binary = positions + indices + b"\0\0" + times + translations
     document = {
         "asset": {"version": "2.0"},
         "scene": 0,
@@ -448,8 +452,8 @@ def write_ray_animated_mesh(path):
         "bufferViews": [
             {"buffer": 0, "byteOffset": 0, "byteLength": len(positions)},
             {"buffer": 0, "byteOffset": 36, "byteLength": len(indices)},
-            {"buffer": 0, "byteOffset": 42, "byteLength": len(times)},
-            {"buffer": 0, "byteOffset": 50, "byteLength": len(translations)},
+            {"buffer": 0, "byteOffset": 44, "byteLength": len(times)},
+            {"buffer": 0, "byteOffset": 52, "byteLength": len(translations)},
         ],
         "animations": [{
             "channels": [{"sampler": 0, "target": {"node": 0, "path": "translation"}}],
@@ -467,7 +471,38 @@ def write_ray_animated_mesh(path):
     path.write_bytes(glb)
 
 
-def measure(name: str, runs: int) -> dict[str, float]:
+def peak_working_set_bytes(process: subprocess.Popen) -> int | None:
+    """Read Windows' per-process high-water working set from its process handle."""
+    if sys.platform != "win32":
+        return None
+
+    class ProcessMemoryCounters(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t),
+            ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t),
+            ("PeakPagefileUsage", ctypes.c_size_t),
+            ("PrivateUsage", ctypes.c_size_t),
+        ]
+
+    counters = ProcessMemoryCounters()
+    counters.cb = ctypes.sizeof(counters)
+    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+    query = psapi.GetProcessMemoryInfo
+    query.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessMemoryCounters), wintypes.DWORD]
+    query.restype = wintypes.BOOL
+    if not query(wintypes.HANDLE(process._handle), ctypes.byref(counters), counters.cb):
+        return None
+    return int(counters.PeakWorkingSetSize)
+
+
+def measure(name: str, runs: int) -> dict[str, float | int | None]:
     source_text = program(SCENES[name])
     results = []
     with tempfile.TemporaryDirectory() as temp:
@@ -491,22 +526,29 @@ def measure(name: str, runs: int) -> dict[str, float]:
         if build.returncode != 0:
             raise SystemExit(f"build failed for {name}:\n{build.stderr}")
         for _ in range(runs):
-            run = subprocess.run(
+            process = subprocess.Popen(
                 [str(executable)],
                 cwd=root,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=RUN_TIMEOUT,
             )
-            if run.returncode != 0:
-                raise SystemExit(f"{name} exited {run.returncode}:\n{run.stderr}")
+            try:
+                stdout, stderr = process.communicate(timeout=RUN_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout, stderr = process.communicate()
+                raise SystemExit(f"{name} timed out after {RUN_TIMEOUT}s:\n{stderr}")
+            peak_memory = peak_working_set_bytes(process)
+            if process.returncode != 0:
+                raise SystemExit(f"{name} exited {process.returncode}:\n{stderr}")
             numbers = [
                 float(line)
-                for line in run.stdout.splitlines()
+                for line in stdout.splitlines()
                 if line.strip() and line.replace(".", "", 1).replace("-", "", 1).isdigit()
             ]
             if len(numbers) < 5:
-                raise SystemExit(f"{name} did not report five numbers:\n{run.stdout}")
+                raise SystemExit(f"{name} did not report five numbers:\n{stdout}")
             results.append(
                 {
                     "work_p50": numbers[-5],
@@ -514,14 +556,17 @@ def measure(name: str, runs: int) -> dict[str, float]:
                     "present_p50": numbers[-3],
                     "present_p95": numbers[-2],
                     "max": numbers[-1],
+                    "peak_working_set_bytes": peak_memory,
                 }
             )
+    memory_samples = [r["peak_working_set_bytes"] for r in results if r["peak_working_set_bytes"] is not None]
     return {
         "work_p50_ms": round(statistics.median(r["work_p50"] for r in results), 2),
         "work_p95_ms": round(statistics.median(r["work_p95"] for r in results), 2),
         "present_p50_ms": round(statistics.median(r["present_p50"] for r in results), 2),
         "present_p95_ms": round(statistics.median(r["present_p95"] for r in results), 2),
         "max_ms": round(min(r["max"] for r in results), 2),
+        "peak_working_set_bytes": max(memory_samples) if memory_samples else None,
     }
 
 
@@ -540,7 +585,7 @@ def main(argv: list[str] | None = None) -> int:
 
     names = args.scene or sorted(SCENES)
     budgets = load_budgets().get("runtime", {}).get("scenes", {})
-    measured: dict[str, dict[str, float]] = {}
+    measured: dict[str, dict[str, float | int | None]] = {}
     failures: list[str] = []
 
     print(
@@ -570,6 +615,12 @@ def main(argv: list[str] | None = None) -> int:
                     failures.append(
                         f"{name} {key} {stats[key]:.2f} > budget {budget[key]:.2f}"
                     )
+            memory = stats["peak_working_set_bytes"]
+            memory_budget = budget.get("budget_peak_working_set_bytes")
+            if memory is not None and memory_budget is not None and memory > memory_budget:
+                failures.append(
+                    f"{name} peak working set {memory} > budget {memory_budget} bytes"
+                )
 
     if args.json:
         report = {
@@ -590,7 +641,10 @@ def main(argv: list[str] | None = None) -> int:
             },
             "scenes": {
                 name: {
-                    "measurements": {key: {"value": value, "unit": "ms"} for key, value in stats.items()},
+                    "measurements": {
+                        key: {"value": value, "unit": "bytes" if key.endswith("_bytes") else "ms"}
+                        for key, value in stats.items()
+                    },
                     "budget": budgets.get(name),
                 }
                 for name, stats in measured.items()
@@ -617,6 +671,12 @@ def main(argv: list[str] | None = None) -> int:
                 "measured_present_p50_ms": stats["present_p50_ms"],
                 "measured_present_p95_ms": stats["present_p95_ms"],
                 "measured_max_ms": stats["max_ms"],
+                "peak_working_set_bytes": stats["peak_working_set_bytes"],
+                "budget_peak_working_set_bytes": (
+                    int(stats["peak_working_set_bytes"] * 1.5)
+                    if stats["peak_working_set_bytes"] is not None
+                    else None
+                ),
             }
         BUDGETS.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
         print(f"wrote runtime budgets to {BUDGETS.relative_to(ROOT)}")

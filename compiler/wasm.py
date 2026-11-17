@@ -19,12 +19,55 @@ import pathlib
 import re
 import shutil
 import subprocess
+import time
+from functools import wraps
 
 from compiler.builtin_usage import used_builtins
 from compiler.codegen import emit_c
 from compiler.common import CompileError, c_name
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+_asset_import_seconds = 0.0
+_measure_asset_imports = False
+_toolchain_peak_working_set_bytes: int | None = None
+_toolchain_process_tree_peak_working_set_bytes: int | None = None
+
+
+def measure_asset_imports(enabled: bool, *, reset: bool = False) -> None:
+    global _asset_import_seconds, _measure_asset_imports
+    global _toolchain_peak_working_set_bytes, _toolchain_process_tree_peak_working_set_bytes
+    _measure_asset_imports = enabled
+    if reset:
+        _asset_import_seconds = 0.0
+        _toolchain_peak_working_set_bytes = None
+        _toolchain_process_tree_peak_working_set_bytes = None
+
+
+def asset_import_time_seconds() -> float:
+    return _asset_import_seconds
+
+
+def toolchain_peak_working_set_bytes() -> int | None:
+    return _toolchain_peak_working_set_bytes
+
+
+def toolchain_process_tree_peak_working_set_bytes() -> int | None:
+    return _toolchain_process_tree_peak_working_set_bytes
+
+
+def _timed_asset_import(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        global _asset_import_seconds
+        if not _measure_asset_imports:
+            return function(*args, **kwargs)
+        started = time.perf_counter()
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _asset_import_seconds += time.perf_counter() - started
+    return wrapped
 
 ALLOWED_BUILTINS = {
     "abs",
@@ -1053,6 +1096,7 @@ def _bmp_pixels(path: pathlib.Path) -> tuple[int, int, list[int]]:
     return width, rows, pixels
 
 
+@_timed_asset_import
 def bake_images(source_path: pathlib.Path, text: str) -> str:
     """Bake literal image_load() BMPs into C arrays the runtime can serve."""
     images: dict[str, tuple[int, int, list[int]]] = {}
@@ -1159,6 +1203,7 @@ def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
     return channels, rate, frames, samples
 
 
+@_timed_asset_import
 def bake_music(source_path: pathlib.Path, text: str) -> str:
     """Bake the single literal music_load() track into a C array."""
     match = MUSIC_LOAD.search(text)
@@ -1205,6 +1250,7 @@ def bake_music(source_path: pathlib.Path, text: str) -> str:
     return "\n".join(chunks)
 
 
+@_timed_asset_import
 def bake_sounds(source_path: pathlib.Path, text: str) -> str:
     """Bake literal sound_load() WAVs into C arrays the runtime can serve."""
     sounds: dict[str, tuple[int, int, int, list[int]]] = {}
@@ -1274,7 +1320,9 @@ def build(
     fixed_hz: int,
     project_name: str,
     emit_c_path: pathlib.Path | None = None,
+    phase_callback=None,
 ) -> None:
+    global _toolchain_peak_working_set_bytes, _toolchain_process_tree_peak_working_set_bytes
     validate(source_path, functions, top)
     generated = emit_c(
         source_path,
@@ -1291,6 +1339,8 @@ def build(
     generated += bake_images(source_path, source_text)
     generated += bake_sounds(source_path, source_text)
     generated += bake_music(source_path, source_text)
+    if phase_callback is not None:
+        phase_callback("generated")
     source_map = {
         c_name(name): {"name": name, "line": node.line}
         for name, node in functions.items()
@@ -1298,6 +1348,8 @@ def build(
     if emit_c_path is not None:
         emit_c_path.parent.mkdir(parents=True, exist_ok=True)
         emit_c_path.write_text(generated, encoding="utf-8")
+        if phase_callback is not None:
+            phase_callback("emitted")
         return
     clang = _find_tool("clang")
     if clang is None:
@@ -1310,6 +1362,8 @@ def build(
     cache.mkdir(exist_ok=True)
     c_path = cache / (out.stem + ".wasm.c")
     c_path.write_text(generated, encoding="utf-8")
+    if phase_callback is not None:
+        phase_callback("before_link")
     command = [
         clang,
         "--target=wasm32-unknown-unknown",
@@ -1324,10 +1378,31 @@ def build(
         str(c_path),
         str(ROOT / "runtime" / "anvil_wasm.c"),
     ]
-    result = subprocess.run(command, capture_output=True, text=True)
-    if result.returncode != 0:
+    if _measure_asset_imports:
+        from tempfile import TemporaryFile
+
+        from compiler.process_memory import (
+            peak_working_set_bytes,
+            sample_process_tree_peak_working_set_bytes,
+        )
+
+        with TemporaryFile() as stdout_file, TemporaryFile() as stderr_file:
+            process = subprocess.Popen(command, stdout=stdout_file, stderr=stderr_file)
+            _toolchain_process_tree_peak_working_set_bytes = (
+                sample_process_tree_peak_working_set_bytes(process)
+            )
+            returncode = process.wait()
+            _toolchain_peak_working_set_bytes = peak_working_set_bytes(process._handle)
+            stdout_file.seek(0)
+            stderr_file.seek(0)
+            stdout = stdout_file.read().decode("utf-8", errors="replace")
+            stderr = stderr_file.read().decode("utf-8", errors="replace")
+    else:
+        result = subprocess.run(command, capture_output=True, text=True)
+        stdout, stderr, returncode = result.stdout, result.stderr, result.returncode
+    if returncode != 0:
         raise CompileError(
-            "wasm build failed:\n" + (result.stderr or result.stdout).strip()
+            "wasm build failed:\n" + (stderr or stdout).strip()
         )
     page = out.with_suffix(".html")
     page.write_text(
@@ -1339,3 +1414,5 @@ def build(
     out.with_suffix(".map.json").write_text(
         json.dumps(source_map, indent=2) + "\n", encoding="utf-8"
     )
+    if phase_callback is not None:
+        phase_callback("linked")

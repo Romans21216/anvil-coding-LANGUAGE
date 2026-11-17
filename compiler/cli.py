@@ -16,7 +16,7 @@ from compiler.build import build_c, find_compiler
 from compiler.codegen import emit_c
 from compiler.common import CompileError
 from compiler.diagnostics import render, render_editor
-from compiler.timing import Timings
+from compiler.timing import DISABLED_TIMINGS, Timings
 from compiler.native_codegen import NativeCodegen
 from compiler.parser import parse
 
@@ -613,6 +613,14 @@ def main() -> int:
     if args.format or args.format_check:
         return lifecycle.format_file(args.source, args.format_check)
     try:
+        # Clear profiling state before every invocation, including non-WASM
+        # backends, so resident compiler callers cannot inherit old counters.
+        from compiler import gltf as profile_gltf
+        from compiler import wasm as profile_wasm
+
+        profile_gltf.reset_import_time()
+        profile_gltf.measure_import_time(args.profile_json is not None)
+        profile_wasm.measure_asset_imports(False, reset=True)
         source_path = args.source
         include_root = None
         fixed_hz = 60
@@ -696,7 +704,11 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: entry must resolve inside the project folder"
                 ) from exc
-        timings = Timings(args.timings, args.profile_json)
+        timings = (
+            Timings(args.timings, args.profile_json)
+            if args.timings or args.profile_json is not None
+            else DISABLED_TIMINGS
+        )
         try:
             size = source_path.stat().st_size
             if size > SOURCE_LIMIT_BYTES:
@@ -725,6 +737,8 @@ def main() -> int:
             build_state="not_built",
             generated_kind=None,
         )
+        if args.backend == "wasm":
+            profile_wasm.measure_asset_imports(args.profile_json is not None, reset=True)
         funcs, top, variables, arrays = parse(source_path, source, include_root=include_root)
         timings.mark("parse")
         for provided in extension_api.anvil_sources():
@@ -803,6 +817,17 @@ def main() -> int:
                 raise CompileError("--package does not apply to the wasm backend")
             out = args.output or source_path.with_suffix(".wasm")
             emit_path = args.emit_c or args.generated_c
+
+            def wasm_timing_boundary(boundary: str) -> None:
+                if boundary == "generated":
+                    timings.mark("generate")
+                elif boundary == "emitted":
+                    timings.mark("write_generated")
+                elif boundary == "before_link":
+                    timings.mark("prepare_toolchain")
+                elif boundary == "linked":
+                    timings.mark("toolchain_link")
+
             wasm_backend.build(
                 source_path,
                 funcs,
@@ -813,8 +838,8 @@ def main() -> int:
                 fixed_hz,
                 project_name,
                 emit_c_path=pathlib.Path(emit_path) if emit_path else None,
+                phase_callback=wasm_timing_boundary,
             )
-            timings.mark("build")
             generated_c = (
                 pathlib.Path(emit_path)
                 if emit_path
@@ -997,3 +1022,11 @@ def main() -> int:
         printer = render_editor if args.diagnostics == "editor" else render
         print(printer(str(e)), file=sys.stderr)
         return 1
+    finally:
+        # Import clocks are module-scoped because import helpers live in other
+        # compiler modules. Always stop them on success, early return or error.
+        from compiler import gltf as profile_gltf
+        from compiler import wasm as profile_wasm
+
+        profile_gltf.measure_import_time(False)
+        profile_wasm.measure_asset_imports(False)

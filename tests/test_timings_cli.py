@@ -8,7 +8,9 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPILER = ROOT / "compiler" / "anvil.py"
@@ -83,6 +85,59 @@ class TimingsCliTests(unittest.TestCase):
             [phase["name"] for phase in report["phases"]],
             ["read", "parse", "generate"],
         )
+
+    def test_profile_json_distinguishes_cold_compile_and_warm_cache_hit(self) -> None:
+        output = self.root / "cached.exe"
+        cold_profile = self.root / "cold.json"
+        warm_profile = self.root / "warm.json"
+        cold = run(
+            [str(self.source), "-o", str(output), "--profile-json", str(cold_profile)]
+        )
+        if cold.returncode != 0 and "No C compiler found" in cold.stderr:
+            self.skipTest("MSVC is not available")
+        self.assertEqual(cold.returncode, 0, cold.stdout + cold.stderr)
+        warm = run(
+            [str(self.source), "-o", str(output), "--profile-json", str(warm_profile)]
+        )
+        self.assertEqual(warm.returncode, 0, warm.stdout + warm.stderr)
+        cold_report = json.loads(cold_profile.read_text(encoding="utf-8"))
+        warm_report = json.loads(warm_profile.read_text(encoding="utf-8"))
+        self.assertEqual(cold_report["artifacts"]["build_state"], "cold_compile")
+        self.assertEqual(warm_report["artifacts"]["build_state"], "warm_cache_hit")
+        self.assertGreater(cold_report["artifacts"]["output_bytes"], 0)
+        self.assertGreater(warm_report["artifacts"]["output_bytes"], 0)
+        for report in (cold_report, warm_report):
+            self.assertEqual(
+                [phase["name"] for phase in report["phases"]],
+                ["read", "parse", "generate", "build"],
+            )
+
+    def test_wasm_asset_import_timing_does_not_leak_into_following_c_profile(self) -> None:
+        from compiler import cli, wasm
+
+        wasm_profile = self.root / "wasm.json"
+        c_profile = self.root / "c.json"
+
+        def fake_wasm_build(*_args, **_kwargs):
+            wasm._timed_asset_import(lambda: time.sleep(0.02))()
+
+        with mock.patch.object(wasm, "build", side_effect=fake_wasm_build):
+            with mock.patch.object(
+                sys, "argv",
+                [str(COMPILER), str(self.source), "--backend", "wasm", "-o",
+                 str(self.root / "out.wasm"), "--profile-json", str(wasm_profile)],
+            ):
+                self.assertEqual(cli.main(), 0)
+            wasm_report = json.loads(wasm_profile.read_text(encoding="utf-8"))
+            self.assertGreater(wasm_report["asset_import"]["value"], 0)
+
+            with mock.patch.object(
+                sys, "argv",
+                [str(COMPILER), str(self.source), "--check", "--profile-json", str(c_profile)],
+            ):
+                self.assertEqual(cli.main(), 0)
+        c_report = json.loads(c_profile.read_text(encoding="utf-8"))
+        self.assertEqual(c_report["asset_import"]["value"], 0)
 
 
 if __name__ == "__main__":

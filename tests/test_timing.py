@@ -9,6 +9,7 @@ import re
 import sys
 import tempfile
 import time
+import tracemalloc
 import unittest
 from unittest import mock
 
@@ -93,10 +94,33 @@ class TimingTests(unittest.TestCase):
         self.assertTrue(all(phase["unit"] == "ms" for phase in report["phases"]))
         self.assertEqual(report["artifacts"], {"backend": "c", "source_bytes": 23})
         self.assertGreater(report["memory"]["peak_bytes"], 0)
+        if sys.platform == "win32":
+            self.assertGreater(report["memory"]["peak_working_set_bytes"], 0)
         self.assertEqual(
             report["memory"]["measurement"], "Python allocations traced by tracemalloc"
         )
         self.assertEqual(report["asset_import"]["unit"], "ms")
+
+    def test_json_profile_uses_invocation_peak_when_tracing_is_already_active(self) -> None:
+        if tracemalloc.is_tracing():
+            self.skipTest("test requires ownership of the process tracing session")
+        tracemalloc.start()
+        try:
+            old_peak = bytearray(2_000_000)
+            del old_peak
+            with tempfile.TemporaryDirectory() as temporary:
+                path = pathlib.Path(temporary) / "profile.json"
+                timings = Timings(False, path)
+                invocation_allocation = bytearray(32_000)
+                del invocation_allocation
+                timings.mark("build")
+                timings.report()
+                report = json.loads(path.read_text(encoding="utf-8"))
+            self.assertTrue(tracemalloc.is_tracing())
+            self.assertGreater(report["memory"]["peak_bytes"], 0)
+            self.assertLess(report["memory"]["peak_bytes"], 1_000_000)
+        finally:
+            tracemalloc.stop()
 
     def test_asset_import_time_is_captured_only_when_enabled(self) -> None:
         gltf.reset_import_time()
@@ -110,7 +134,11 @@ class TimingTests(unittest.TestCase):
         self.assertGreater(gltf.import_time_seconds(), 0.0)
 
     def test_disabled_timing_without_json_does_not_start_a_clock(self) -> None:
-        self.assertEqual(Timings(False)._started, 0.0)  # noqa: SLF001
+        with mock.patch("compiler.timing.tracemalloc.start", side_effect=AssertionError):
+            timings = Timings(False)
+        self.assertEqual(timings._started, 0.0)  # noqa: SLF001
+        self.assertFalse(timings.capture_enabled)
+        self.assertFalse(timings._owns_trace)  # noqa: SLF001
 
 
 if __name__ == "__main__":

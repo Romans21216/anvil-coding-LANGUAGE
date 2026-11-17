@@ -70,7 +70,7 @@ the build cache.
 
 `--timings` reports each phase separately so a slow step is identifiable: a cold C build on this machine measured about 0.4-0.6 s depending on load (parse and generate are ~3 ms each; the rest is `cl.exe`), while a cache hit replaces the build with a ~0.11-0.18 s copy plus the dependency-sidecar digests. The build phase was 1,597 ms before the Visual Studio environment was cached: `VsDevCmd.bat -arch=x64` costs 1.3-1.7 s and is now run once per toolset, with the captured environment reused for later builds. Published ceilings for compile time and executable size live in `tools/bench_budgets.json` and are enforced by `python tools/bench_anvil.py --check`.
 
-`--profile-json <path>` writes a versioned `anvil.build-profile` JSON record with phase durations, platform metadata, and source/generated/output byte counts. Its `artifacts.build_state` distinguishes check-only, C-only emission, native output, cold compile, and warm cache hit. Peak Python allocation memory is measured with `tracemalloc` and recorded in bytes; native allocations from external compiler processes are not included.
+`--profile-json <path>` writes a versioned `anvil.build-profile` JSON record with phase durations, platform metadata, and source/generated/output byte counts. Its `artifacts.build_state` distinguishes check-only, C-only emission, native output, cold compile, and warm cache hit. Peak Python allocation memory is measured with `tracemalloc`. On Windows the profile also reports the Python process and direct clang child high-water working sets, plus a sampled combined working set for the clang process tree. Sampling can miss a descendant shorter-lived than the interval; all child-process fields are null off Windows. A separate cumulative `asset_import` metric measures glTF resolution and decoding, plus WASM BMP/WAV baking. It is not added to wall-clock phase totals because that work occurs inside those phases.
 
 The cache key covers the generated C, every runtime source and header, the compiler
 Python sources, the **contents** of `cl.exe`, the contents of the `link.exe` beside it,
@@ -153,8 +153,17 @@ preflight diagnostic because the compiler cannot determine which file to check.
 `python tools/bench_runtime.py --json profile.json` writes a versioned
 `anvil.runtime-profile` record with per-scene work and present percentiles,
 sample/run counts, warmup frames, bucket resolution, applicable budgets and
-machine environment. This captures steady-state frame work separately from
+machine environment. On Windows, it also records per-process peak working set
+in bytes. This captures steady-state frame work separately from
 present cost; compiler phase and Python allocation profiles use `--profile-json`.
+Run `python tools/bench_build_profiles.py --check` to enforce compiler-profile
+budgets for a tiny program, a BMP/WAV-heavy program, and a 3D glTF model. Use
+`--write-budgets` to record a new local baseline with headroom. These cases do a
+full WASM build and enforce generation, asset import, toolchain/link, peak
+Python allocation, and artifact-size measurements.
+Run `python tools/bench_profile_overhead.py --check` to measure the disabled
+timing-hook overhead in paired in-process compile/import runs; detailed JSON
+allocation tracing remains off during this measurement.
 
 | flag | effect |
 |---|---|

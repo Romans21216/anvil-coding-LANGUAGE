@@ -26,6 +26,7 @@ import json
 import math
 import pathlib
 import struct
+import time
 
 MAX_TRIANGLES = 200_000
 # The C runtime keeps one clip clock per model in ANVIL_MODEL_STATES slots; a
@@ -1098,8 +1099,27 @@ def load_animated(path: pathlib.Path) -> dict:
 # ---- Compiler integration -------------------------------------------------
 
 _registry: dict[str, tuple[str, int, list[float], tuple[float, float, float, float]]] = {}
+_import_seconds = 0.0
+_measure_import_time = False
+
+
 def reset() -> None:
     _registry.clear()
+
+
+def reset_import_time() -> None:
+    global _import_seconds
+    _import_seconds = 0.0
+
+
+def measure_import_time(enabled: bool) -> None:
+    global _measure_import_time
+    _measure_import_time = enabled
+
+
+def import_time_seconds() -> float:
+    """Return cumulative time spent resolving and decoding model assets."""
+    return _import_seconds
 
 
 def _resolve(asset: str, source_path: pathlib.Path) -> pathlib.Path:
@@ -1171,6 +1191,17 @@ def _skinned_bounds(vertices: list[float]) -> tuple[float, float, float, float]:
 
 
 def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
+    global _import_seconds
+    if not _measure_import_time:
+        return _ensure_model(asset, source_path)
+    started = time.perf_counter()
+    try:
+        return _ensure_model(asset, source_path)
+    finally:
+        _import_seconds += time.perf_counter() - started
+
+
+def _ensure_model(asset: str, source_path: pathlib.Path) -> dict:
     """Register a model and return everything code generation needs.
 
     The returned dict always has symbol/count/bounds/id; an animated model also

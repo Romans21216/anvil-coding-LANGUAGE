@@ -82,6 +82,10 @@ class RuntimeBudgetTests(unittest.TestCase):
             metric = report["scenes"]["idle_2d"]["measurements"]["work_p50_ms"]
             self.assertEqual(metric["unit"], "ms")
             self.assertGreaterEqual(metric["value"], 0)
+            memory = report["scenes"]["idle_2d"]["measurements"]["peak_working_set_bytes"]
+            self.assertEqual(memory["unit"], "bytes")
+            if sys.platform == "win32":
+                self.assertGreater(memory["value"], 0)
 
 
 if __name__ == "__main__":

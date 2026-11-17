@@ -73,12 +73,14 @@
       "idle_2d": {
         "work_p50_ms": 0.5,
         "work_p95_ms": 2.0,
-        "present_p95_ms": 10.3,
+        "present_p95_ms": 3.0,
         "measured_work_p50_ms": 0.12,
         "measured_work_p95_ms": 0.12,
-        "measured_present_p50_ms": 0.38,
-        "measured_present_p95_ms": 4.12,
-        "measured_max_ms": 0.25
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 0.12,
+        "measured_max_ms": 0.24,
+        "peak_working_set_bytes": 21606400,
+        "budget_peak_working_set_bytes": 32409600
       },
       "overdraw_2d": {
         "work_p50_ms": 9.05,
@@ -113,12 +115,14 @@
       "tilemap_large": {
         "work_p50_ms": 0.5,
         "work_p95_ms": 2.0,
-        "present_p95_ms": 10.95,
+        "present_p95_ms": 3.45,
         "measured_work_p50_ms": 0.12,
         "measured_work_p95_ms": 0.12,
-        "measured_present_p50_ms": 1.62,
-        "measured_present_p95_ms": 4.38,
-        "measured_max_ms": 0.26
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 1.38,
+        "measured_max_ms": 0.28,
+        "peak_working_set_bytes": 22691840,
+        "budget_peak_working_set_bytes": 34037760
       },
       "ray_spheres_1": {
         "work_p50_ms": 0.95,
@@ -218,7 +222,9 @@
         "measured_work_p95_ms": 8.12,
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.12,
-        "measured_max_ms": 8.31
+        "measured_max_ms": 8.43,
+        "peak_working_set_bytes": 21798912,
+        "budget_peak_working_set_bytes": 32698368
       },
       "ray_mesh_morph": {
         "work_p50_ms": 27.2,
@@ -239,6 +245,69 @@
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.12,
         "measured_max_ms": 3.57
+      }
+    }
+  },
+  "build_profiles": {
+    "runs": 3,
+    "multiplier": 5.0,
+    "cases": {
+      "tiny": {
+        "total_ms": 578,
+        "toolchain_link_ms": 552,
+        "asset_import_ms": 0,
+        "peak_bytes": 1184963,
+        "peak_working_set_bytes": 27435008,
+        "child_peak_working_set_bytes": 15085568,
+        "toolchain_process_tree_peak_working_set_bytes": 80146432,
+        "source_bytes": 45,
+        "generated_bytes": 936,
+        "output_bytes": 9272,
+        "budget_total_ms": 2890,
+        "budget_asset_import_ms": 2,
+        "budget_toolchain_link_ms": 2760,
+        "budget_peak_bytes": 5924815,
+        "budget_peak_working_set_bytes": 137175040,
+        "budget_child_peak_working_set_bytes": 75427840,
+        "budget_toolchain_process_tree_peak_working_set_bytes": 400732160
+      },
+      "asset_heavy": {
+        "total_ms": 680,
+        "toolchain_link_ms": 574,
+        "asset_import_ms": 67,
+        "peak_bytes": 1282471,
+        "peak_working_set_bytes": 27291648,
+        "child_peak_working_set_bytes": 15097856,
+        "toolchain_process_tree_peak_working_set_bytes": 80162816,
+        "source_bytes": 181,
+        "generated_bytes": 67491,
+        "output_bytes": 31916,
+        "budget_total_ms": 3400,
+        "budget_asset_import_ms": 335,
+        "budget_toolchain_link_ms": 2870,
+        "budget_peak_bytes": 6412355,
+        "budget_peak_working_set_bytes": 136458240,
+        "budget_child_peak_working_set_bytes": 75489280,
+        "budget_toolchain_process_tree_peak_working_set_bytes": 400814080
+      },
+      "3d_model": {
+        "total_ms": 829,
+        "toolchain_link_ms": 637,
+        "asset_import_ms": 145,
+        "peak_bytes": 2527634,
+        "peak_working_set_bytes": 33120256,
+        "child_peak_working_set_bytes": 15081472,
+        "toolchain_process_tree_peak_working_set_bytes": 80068608,
+        "source_bytes": 112,
+        "generated_bytes": 145171,
+        "output_bytes": 124149,
+        "budget_total_ms": 4145,
+        "budget_asset_import_ms": 725,
+        "budget_toolchain_link_ms": 3185,
+        "budget_peak_bytes": 12638170,
+        "budget_peak_working_set_bytes": 165601280,
+        "budget_child_peak_working_set_bytes": 75407360,
+        "budget_toolchain_process_tree_peak_working_set_bytes": 400343040
       }
     }
   }
