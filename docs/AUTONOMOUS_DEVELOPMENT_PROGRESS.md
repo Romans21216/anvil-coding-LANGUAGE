@@ -1545,3 +1545,151 @@ run 70 create/destroy reuse cycles and verify stale morph calls return 0, stale
 draw calls return 0, and fresh handles remain functional.
 
 Validation: `python -m py_compile compiler/expressions.py compiler/wasm.py`; `python -m pytest tests/test_gltf_morph.py tests/test_wasm.py::WasmModelTests::test_instance_morph_draws_use_independent_generation_checked_handles tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_independent_morph_instances_render_distinct_c_and_wasm_poses tests/test_wasm_docs.py -q` — 17 passed in 21.38 s. Scoped `git diff --check` passed. Documentation updated in MODELS, LANGUAGE_SPEC and WASM. No issue tracker item was closed.
+
+8.172 FINISH MORPH HANDLE VALIDATION AND RECHECK THE COMBINED SUITES (2026-11-17)
+
+Addressed the two follow-up instance-handle findings. `model_instance_morph` now
+accepts its target index as a double and rejects fractional, negative, out-of-range
+and non-finite values before conversion in both runtimes; invalid calls leave the
+instance unchanged. Added C and wasm runtime regressions for invalid indices and
+for a subsequent valid update. Added a boundary arithmetic test that reads both
+runtime limits, proves all 64 handles at the configured maximum generation are
+within the signed-int lookup range and decode to their original slots, and checks
+that the next generation exceeds the ceiling and is retired by both runtimes.
+
+The stricter P8-165 alignment rules exposed malformed built-in fixtures:
+`examples/ray_mesh_morph.glb` and `examples/ray_mesh_animated.glb` placed FLOAT
+accessors at byte offset 42. Inserted the required two bytes of padding and
+updated their bufferView offsets and GLB lengths. The ray-mesh render regression
+passes. Stabilized the Windows C screenshot helper so it waits for varied rendered
+pixels across consecutive captures instead of accepting the blank startup frame;
+the full browser parity suite passes after this change.
+
+Validation: the combined glTF/wasm/model-browser suites passed: 117 tests in
+145.67 s. After the index-signature and boundary test changes,
+`python -m pytest tests/test_gltf_morph.py::GltfMorphTests::test_instance_generation_ceiling_keeps_every_issued_handle_decodable tests/test_gltf_morph.py::GltfMorphTests::test_instance_handles_reject_stale_values_after_reuse tests/test_wasm.py::WasmModelTests::test_instance_morph_draws_use_independent_generation_checked_handles -q`
+passed (3 tests, 1.87 s). The full browser parity suite passed (10 tests, 46.48 s).
+No issue tracker items were closed.
+
+8.173 SEED AND EXERCISE MORPH GENERATION CEILING IN BOTH RUNTIMES (2026-11-17)
+
+Closed the remaining P8-169-2 verification gap. Added isolated native harnesses
+that compile the actual model-instance lifecycle functions extracted from the C
+and WASM runtime sources. Each seeds slots 0–62 as occupied and slot 63 at the
+maximum permitted generation, then creates and validates the last legal handle,
+destroys it and confirms retirement and stale-handle rejection. Each also seeds
+slot 63 above the generation ceiling while the other slots are occupied and
+confirms creation retires the slot and returns 0 rather than issuing an
+undecodable handle. No test-only hooks or production runtime changes were needed.
+
+Validation: `python -m pytest tests/test_gltf_morph.py::GltfMorphTests::test_generation_ceiling_through_c_runtime_lifecycle tests/test_gltf_morph.py::GltfMorphTests::test_generation_ceiling_through_wasm_runtime_lifecycle -q` — 2 passed in 0.42 s. Scoped `git diff --check -- tests/test_gltf_morph.py` passed. No issue tracker item was closed.
+
+8.174 EXERCISE NON-FINITE MORPH INDICES IN THE RUNTIME HARNESS (2026-11-17)
+
+Extended the C and WASM runtime lifecycle harnesses with direct `NaN`, infinity,
+fractional, negative and out-of-range morph-index calls at the generation
+boundary. They verify each invalid index returns 0 and leaves the independently
+stored morph weight unchanged after a valid write. This supplies direct runtime
+coverage for the non-finite values that cannot be expressed as ordinary Anvil
+numeric literals; the existing compiled-program tests continue to cover the
+source-level cases.
+
+Validation: `python -m pytest tests/test_gltf_morph.py::GltfMorphTests::test_generation_ceiling_through_c_runtime_lifecycle tests/test_gltf_morph.py::GltfMorphTests::test_generation_ceiling_through_wasm_runtime_lifecycle -q` — 2 passed in 1.23 s. `python -m py_compile tests/test_gltf_morph.py` and scoped `git diff --check` passed.
+
+8.175 ADD NO-LINK PROJECT VERIFICATION COMMAND (2026-11-17)
+
+Implemented `anvil verify <source.ANVL|project.ANVLproj>` with text output and a
+versioned JSON form (`--format json`). It parses source and project manifest,
+uses the compiler's reachable-function graph to inspect only literal BMP/WAV/
+glTF asset calls in reachable code, ignores comments and dead functions, and
+validates through the existing BMP, WAV and glTF importers. Independent asset
+failures are aggregated with source path, line, and asset path. Project-declared
+assets resolve from the manifest directory and are constrained to the project
+root. When assets pass, C lowering is also run in memory; no executable or
+intermediate output is written.
+
+Validation: `python -m pytest tests/test_verify.py -q` — 4 passed in 0.83 s.
+Fixtures cover missing and malformed BMP, malformed WAV and glTF, aggregation,
+comment/dead-code filtering, missing manifest entry, nested project entry with a
+manifest-root declared asset, versioned JSON, stable failure status, and absence
+of executable output. `python -m py_compile compiler/verify.py compiler/cli.py
+tests/test_verify.py` and scoped `git diff --check` passed. Full manifest option
+parity and non-literal/dynamic asset paths remain outside this first acceptance
+slice; no issue tracker items were closed.
+
+8.176 HANDLE DYNAMIC PATHS AND VERIFY MANIFEST-ROOT RESOLUTION (2026-11-17)
+
+Tightened the new `anvil verify` preflight after reviewing cases beyond the first
+acceptance fixtures. It now reports every reachable non-literal asset path as
+unverifiable instead of silently skipping it or treating the first string in a
+constructed expression as the full path. Repeated dynamic calls retain their
+own source locations. Manifest name, engine and asset options are validated
+against project compilation rules, and declared assets are checked relative to
+the manifest directory with project-root containment, including when the entry
+source is nested.
+
+Validation: `python -m pytest tests/test_verify.py tests/test_commands.py -q` —
+16 passed in 6.50 s. Coverage includes variable and concatenated asset paths,
+comment/dead-code filtering, aggregated malformed/missing assets, malformed
+manifest entry, nested entry asset resolution and no-link behavior. Python
+compile checks and scoped `git diff --check` passed.
+
+8.177 COVER EVERY GLTF MODEL API IN PREFLIGHT DISCOVERY (2026-11-17)
+
+A source-to-implementation audit found `model_animate`,
+`model_animation_length` and `model_instance_destroy` were missing from the
+verifier's explicit asset-call inventory. Added those APIs, consolidated the
+model-call set used for glTF validation, and added a regression asserting the
+scanner inventory exactly matches every current compiler model API. This keeps
+bad assets from being reduced to a first code-generation error and preserves
+independent failure aggregation for these operations.
+
+Validation: `python -m pytest tests/test_verify.py tests/test_commands.py -q` —
+17 passed in 6.54 s. Python compile checks and scoped `git diff --check` passed.
+
+8.178 ASSERT PROJECT MANIFEST VALIDATION PARITY (2026-11-17)
+
+Added a regression that runs invalid project manifests through both `anvil
+verify` and the existing project `--check` command. The cases cover invalid project
+name type, out-of-range fixed_hz, unknown engine setting, malformed assets.files,
+entry escape from the project root and an unsupported root setting. Both paths
+reject every case; `verify` returns its single versioned JSON diagnostic without
+writing an executable. The runtime audit also confirmed the reachable-asset
+inventory covers all model builtins, including animation and instance lifecycle
+calls, so malformed models from those APIs remain eligible for aggregation.
+
+Validation: `python -m pytest tests/test_verify.py tests/test_commands.py -q` —
+18 passed in 7.70 s. Python compile checks and scoped `git diff --check` passed.
+
+8.179 VERIFY CONCISE TEXT ERROR AGGREGATION (2026-11-17)
+
+Extended the multi-asset failure case to run in text mode as well as versioned
+JSON. It asserts one concise stderr line per independent BMP/WAV/glTF failure,
+no stdout on failure, a stable nonzero exit, and no generated executable.
+
+Validation: `python -m pytest tests/test_verify.py tests/test_commands.py -q` —
+18 passed in 7.73 s. `python -m py_compile compiler/verify.py compiler/cli.py
+tests/test_verify.py` and scoped `git diff --check` passed.
+
+8.180 VERIFY LOWERING DIAGNOSTICS AND RECHECK THE PREFLIGHT (2026-11-17)
+
+Added a no-link regression for a source program that passes parsing and has no
+asset failures but fails C expression lowering. `verify --format json` returns a
+source-located diagnostic and does not create an executable. This confirms the
+success path performs semantic lowering in memory and does not report `ok` based
+only on syntax and asset checks.
+
+Validation: `python -m pytest tests/test_verify.py tests/test_commands.py -q` —
+19 passed in 8.33 s. Python compile checks and scoped `git diff --check` passed.
+
+8.181 EXPORT VERSIONED RUNTIME FRAME PROFILES (2026-11-17)
+
+Added `python tools/bench_runtime.py --json <path>` to write a stable
+`anvil.runtime-profile` JSON document. The versioned record includes platform,
+Python and processor metadata; run count; warmup/sample frames; bucket resolution;
+per-scene work and present percentiles with explicit millisecond units; and the
+applicable frame budgets. The report preserves the existing separation between
+scene work and present cost. Compile phase, asset import and peak-memory
+consolidation from P8-166-F2 remain open.
+
+Validation: `python -m pytest tests/test_runtime_budget.py::RuntimeBudgetTests::test_runtime_profile_json_is_versioned_and_describes_sampling -q` — 1 passed in 4.19 s. Python compile checks and scoped `git diff --check` passed.

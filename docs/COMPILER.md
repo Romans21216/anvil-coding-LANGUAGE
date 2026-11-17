@@ -140,6 +140,21 @@ must have that runtime, so it stays opt-in. Release builds also pass `/Gy` with
 
 ## Command line
 
+`anvil verify <source.ANVL|project.ANVLproj>` validates the source and project
+manifest, checks supported literal assets reachable from the program entry
+points, and runs C lowering validation without linking or writing an executable.
+It reports independent asset failures together. Add `--format json` for a
+versioned JSON object (`version: 1`) with `ok` and a `diagnostics` array.
+Reachable asset calls whose path is computed dynamically receive an explicit
+preflight diagnostic because the compiler cannot determine which file to check.
+
+`python tools/bench_runtime.py --json profile.json` writes a versioned
+`anvil.runtime-profile` record with per-scene work and present percentiles,
+sample/run counts, warmup frames, bucket resolution, applicable budgets and
+machine environment. This captures steady-state frame work separately from
+present cost; compiler phase timings and process memory remain in their existing
+tools and reports.
+
 | flag | effect |
 |---|---|
 | `--backend c\|native` | pick the C toolchain (default) or the Anvil-owned x64 PE backend |

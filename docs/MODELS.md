@@ -180,7 +180,9 @@ set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
   supports unskinned models with morph targets, including animated models. Each
   handle owns only its overrides; untouched targets keep each group's glTF
   defaults. The morph setter returns the previous value for the first geometry
-  group's target. Store the returned handle in a variable before drawing it.
+  group's target. Its index must be an integer naming a present target; an
+  invalid index or non-finite weight returns 0 and leaves the state unchanged.
+  Store the returned handle in a variable before drawing it.
 - `model_instance_destroy(path, handle)` releases a handle and returns 1, or 0
   for a stale or mismatched handle. The runtime keeps 64 live handles and uses
   generation-checked reuse, so destroyed handles cannot affect later instances.

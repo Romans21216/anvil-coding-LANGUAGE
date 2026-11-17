@@ -56,6 +56,7 @@ enum { ANVIL_TRACE_SPHERES = 40, ANVIL_TRACE_TRIANGLES = 40,
 #define ANVIL_MORPH_TARGETS 8
 #define ANVIL_MODEL_INSTANCES 64
 #define ANVIL_MODEL_INSTANCE_GENERATION_MAX 33554430
+#define ANVIL_MODEL_INSTANCE_HANDLE_MAX 2147483647.0
 static const double ANVIL_NEAR_DEPTH = 0.08;
 enum {
   ANVIL_RAY_BACKEND_BVH,
@@ -1293,7 +1294,8 @@ static AnvilModelInstance anvil_model_instances[ANVIL_MODEL_INSTANCES];
 
 static AnvilModelInstance *anvil_model_instance_lookup(double handle,
                                                         int model_id) {
-  if (!isfinite(handle) || handle < 1.0 || handle > 2147483647.0 ||
+  if (!isfinite(handle) || handle < 1.0 ||
+      handle > ANVIL_MODEL_INSTANCE_HANDLE_MAX ||
       floor(handle) != handle)
     return NULL;
   uint32_t token = (uint32_t)handle - 1u;
@@ -1314,11 +1316,17 @@ double anvil_model_instance_create(int model_id, int morph_count) {
     AnvilModelInstance *instance = &anvil_model_instances[slot];
     if (instance->active || instance->retired)
       continue;
+    double handle =
+        (double)instance->generation * ANVIL_MODEL_INSTANCES + slot + 1.0;
+    if (handle > ANVIL_MODEL_INSTANCE_HANDLE_MAX) {
+      instance->retired = 1;
+      continue;
+    }
     instance->active = 1;
     instance->model_id = model_id;
     memset(instance->values, 0, sizeof(instance->values));
     memset(instance->overridden, 0, sizeof(instance->overridden));
-    return (double)instance->generation * ANVIL_MODEL_INSTANCES + slot + 1.0;
+    return handle;
   }
   return 0.0;
 }
@@ -1350,19 +1358,21 @@ const double *anvil_model_instance_morph_weights(double handle, int model_id,
              : defaults;
 }
 
-double anvil_model_instance_morph(double handle, int model_id, int index,
+double anvil_model_instance_morph(double handle, int model_id, double index,
                                   double weight, const double *defaults,
                                   int morph_count) {
   AnvilModelInstance *instance = anvil_model_instance_lookup(handle, model_id);
-  if (!instance || !defaults || index < 0 || index >= morph_count ||
+  if (!instance || !defaults || !isfinite(index) || index < 0.0 ||
+      index >= morph_count || floor(index) != index ||
       morph_count <= 0 || morph_count > ANVIL_MORPH_TARGETS ||
       !isfinite(weight))
     return 0.0;
-  double previous = instance->overridden[index]
-                        ? instance->values[index]
-                        : defaults[index];
-  instance->values[index] = weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
-  instance->overridden[index] = 1;
+  int target = (int)index;
+  double previous = instance->overridden[target]
+                        ? instance->values[target]
+                        : defaults[target];
+  instance->values[target] = weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
+  instance->overridden[target] = 1;
   return previous;
 }
 
@@ -1370,7 +1380,7 @@ static AnvilModelInstance *anvil_model_instance_from_state_id(int id) {
   if (id >= 0)
     return NULL;
   double handle = (double)(-(int64_t)id);
-  if (handle > 2147483647.0)
+  if (handle > ANVIL_MODEL_INSTANCE_HANDLE_MAX)
     return NULL;
   uint32_t token = (uint32_t)handle - 1u;
   unsigned slot = token % ANVIL_MODEL_INSTANCES;

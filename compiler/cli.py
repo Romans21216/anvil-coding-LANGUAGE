@@ -389,6 +389,17 @@ def _package_after_build(
 
 
 def main() -> int:
+    if sys.argv[1:2] == ["verify"]:
+        verify_parser = argparse.ArgumentParser(
+            description="Validate Anvil source, project settings and reachable assets without linking."
+        )
+        verify_parser.add_argument("_command", choices=("verify",))
+        verify_parser.add_argument("source", type=pathlib.Path)
+        verify_parser.add_argument("--format", choices=("text", "json"), default="text")
+        verify_args = verify_parser.parse_args()
+        from compiler.verify import main as verify_main
+
+        return verify_main(verify_args.source, verify_args.format)
     ap = argparse.ArgumentParser(
         description=(
             "Compile Anvil source or a project to a native executable with the selected backend."

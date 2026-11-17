@@ -87,18 +87,32 @@ def _native_rgba(executable: pathlib.Path) -> bytes:
             raise AssertionError("C model window did not open")
         reader.force_client_size(960, 600)
         deadline = time.monotonic() + 8
+        previous: bytes | None = None
+        stable = 0
         while time.monotonic() < deadline:
             width, height, pixels = reader.grab(0, 0, 960, 600)
-            visible = any(
+            visible_pixels = sum(
                 pixels[offset] > 2 or pixels[offset + 1] > 2 or pixels[offset + 2] > 2
                 for offset in range(0, len(pixels), 4)
             )
-            if visible:
+            sampled_tones = {
+                pixels[offset : offset + 3]
+                for offset in range(0, len(pixels), 16)
+            }
+            ready = visible_pixels > 100 and len(sampled_tones) > 1
+            if ready and pixels == previous:
+                stable += 1
+            elif ready:
+                stable = 0
+            else:
+                stable = 0
+            if ready and stable >= 1:
                 # GDI's 32-bit DIB is BGRA; Chrome ImageData is RGBA.
                 rgba = bytearray(pixels)
                 for offset in range(0, len(rgba), 4):
                     rgba[offset], rgba[offset + 2] = rgba[offset + 2], rgba[offset]
                 return bytes(rgba)
+            previous = pixels if ready else None
             time.sleep(0.05)
         raise AssertionError("C model produced no visible pixels")
     finally:

@@ -253,7 +253,7 @@ int anvil_model_instance_valid(double handle, int model_id);
 const double *anvil_model_instance_morph_weights(double handle, int model_id,
                                                   const double *defaults,
                                                   int morph_count);
-double anvil_model_instance_morph(double handle, int model_id, int index,
+double anvil_model_instance_morph(double handle, int model_id, double index,
                                   double weight, const double *defaults,
                                   int morph_count);
 double anvil_mesh_draw_morphed(const double *data, int triangle_count,

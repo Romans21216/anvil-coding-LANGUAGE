@@ -1260,6 +1260,48 @@ from test_gltf_skins import write_skinned_model  # noqa: E402
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmModelTests(unittest.TestCase):
+    def test_instance_capacity_matches_c_and_recovers_after_destroy(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_morph_model(root, "instance.gltf")
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "fn(draw)",
+                    '  set var(first) = model_instance("instance.gltf")',
+                    "  set var(failures) = 0",
+                    "  for local(i) = 0 to 62",
+                    '    set var(handle) = model_instance("instance.gltf")',
+                    "    if var(handle) = 0",
+                    "      add var(failures) 1",
+                    "    end",
+                    "  end",
+                    '  set var(overflow) = model_instance("instance.gltf")',
+                    '  set var(released) = model_instance_destroy("instance.gltf", var(first))',
+                    '  set var(replacement) = model_instance("instance.gltf")',
+                    '  say "capacity " & var(failures) & "," & var(overflow) & "," & var(released) & "," & var(replacement)',
+                    '  say "old " & model_instance_morph("instance.gltf", var(first), 0, 1)',
+                    '  say "new " & model_instance_morph("instance.gltf", var(replacement), 0, 1)',
+                    '  say "done"',
+                    "end",
+                    "",
+                )
+            )
+            result, output = build(root, program, "instance_capacity")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(output)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+        lines = run.stdout.strip().splitlines()
+        self.assertIn("capacity 0,0,1,65", lines)
+        self.assertIn("old 0", lines)
+        self.assertIn("new 0", lines)
+
     def test_instance_morph_draws_use_independent_generation_checked_handles(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
@@ -1283,7 +1325,12 @@ class WasmModelTests(unittest.TestCase):
                     '  set var(pb) = model_instance_morph("instance.gltf", var(b), 0, 0)',
                     '  set var(da) = model_draw_instance("instance.gltf", var(a), -2, 0, 0, 1, 0, 0, 0)',
                     '  set var(db) = model_draw_instance("instance.gltf", var(b), 2, 0, 0, 1, 0, 0, 0)',
+                    '  set var(fractional) = model_instance_morph("instance.gltf", var(b), 0.5, 1)',
+                    '  set var(negative) = model_instance_morph("instance.gltf", var(b), -1, 1)',
+                    '  set var(outside) = model_instance_morph("instance.gltf", var(b), 1, 1)',
+                    '  set var(valid_previous) = model_instance_morph("instance.gltf", var(b), 0, 1)',
                     '  say "weights " & var(pb) & "," & model_instance_morph("instance.gltf", var(a), 0, 0) & "," & var(stale) & "," & var(stale_draw)',
+                    '  say "indices " & var(fractional) & "," & var(negative) & "," & var(outside) & "," & var(valid_previous)',
                     "end",
                     "",
                 )
@@ -1305,6 +1352,7 @@ class WasmModelTests(unittest.TestCase):
             self.assertEqual(run.returncode, 0, run.stderr)
             lines = run.stdout.strip().splitlines()
             self.assertIn("weights 0,1,0,0", lines)
+            self.assertIn("indices 0,0,0,0", lines)
             records = json.loads(lines[-1])
             triangles = [record for record in records if record[0] == "triangles"]
             self.assertEqual(len(triangles), 1)

@@ -12,9 +12,12 @@ from __future__ import annotations
 import json
 import math
 import pathlib
+import re
+import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -227,6 +230,174 @@ def run_headless(case: unittest.TestCase, root: pathlib.Path, program: str) -> s
 
 
 class GltfMorphTests(unittest.TestCase):
+    def test_generation_ceiling_through_c_runtime_lifecycle(self) -> None:
+        clang = shutil.which("clang")
+        if not clang:
+            self.skipTest("clang is required for the isolated runtime harness")
+        runtime = (ROOT / "runtime" / "anvil_runtime.c").read_text(encoding="utf-8")
+        start = runtime.index("static double anvil_morph_values[")
+        end = runtime.index("static AnvilModelInstance *anvil_model_instance_from_state_id", start)
+        block = runtime[start:end]
+        defines = "#define ANVIL_MODEL_STATES 32\n" + "\n".join(
+            line for line in runtime.splitlines()
+            if line.startswith("#define ANVIL_MODEL_INSTANCES ")
+            or line.startswith("#define ANVIL_MODEL_INSTANCE_GENERATION_MAX ")
+            or line.startswith("#define ANVIL_MODEL_INSTANCE_HANDLE_MAX ")
+            or line.startswith("#define ANVIL_MORPH_TARGETS ")
+        )
+        harness = r'''#include <math.h>
+#include <stdint.h>
+#include <string.h>
+''' + defines + "\n" + block + r'''
+int main(void) {
+  AnvilModelInstance *last = &anvil_model_instances[ANVIL_MODEL_INSTANCES - 1];
+  for (unsigned i = 0; i < ANVIL_MODEL_INSTANCES - 1; ++i) {
+    anvil_model_instances[i].active = 1;
+    anvil_model_instances[i].model_id = 0;
+  }
+  last->generation = ANVIL_MODEL_INSTANCE_GENERATION_MAX;
+  double h = anvil_model_instance_create(0, 1);
+  if (h != (double)ANVIL_MODEL_INSTANCE_GENERATION_MAX * ANVIL_MODEL_INSTANCES + ANVIL_MODEL_INSTANCES) return 1;
+  if (h > ANVIL_MODEL_INSTANCE_HANDLE_MAX || !anvil_model_instance_valid(h, 0)) return 2;
+  double defaults[1] = {0.25};
+  if (anvil_model_instance_morph(h, 0, 0.0, 0.75, defaults, 1) != 0.25) return 7;
+  if (anvil_model_instance_morph(h, 0, NAN, 0.0, defaults, 1) != 0.0) return 8;
+  if (anvil_model_instance_morph(h, 0, INFINITY, 0.0, defaults, 1) != 0.0) return 9;
+  if (anvil_model_instance_morph(h, 0, 0.5, 0.0, defaults, 1) != 0.0) return 10;
+  if (anvil_model_instance_morph(h, 0, -1.0, 0.0, defaults, 1) != 0.0) return 11;
+  if (anvil_model_instance_morph(h, 0, 1.0, 0.0, defaults, 1) != 0.0) return 12;
+  if (anvil_model_instance_morph_weights(h, 0, defaults, 1)[0] != 0.75) return 13;
+  if (anvil_model_instance_destroy(h, 0) != 1.0 || !last->retired) return 3;
+  if (anvil_model_instance_valid(h, 0)) return 4;
+  anvil_model_instances[0].active = 0;
+  double recovered = anvil_model_instance_create(0, 1);
+  if (recovered != 1.0 || !anvil_model_instance_valid(recovered, 0)) return 5;
+  last->generation = ANVIL_MODEL_INSTANCE_GENERATION_MAX + 1u;
+  last->retired = 0;
+  last->active = 0;
+  double after_ceiling = anvil_model_instance_create(0, 1);
+  if (last->active || !last->retired || after_ceiling != 0.0) return 6;
+  return 0;
+}
+'''
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            source = root / "boundary.c"
+            executable = root / "boundary.exe"
+            source.write_text(harness, encoding="utf-8")
+            compiled = subprocess.run([clang, str(source), "-o", str(executable)], capture_output=True, text=True, timeout=60)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            run = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(run.returncode, 0, f"runtime boundary harness returned {run.returncode}")
+
+    def test_generation_ceiling_through_wasm_runtime_lifecycle(self) -> None:
+        clang = shutil.which("clang")
+        if not clang:
+            self.skipTest("clang is required for the isolated runtime harness")
+        runtime = (ROOT / "runtime" / "anvil_wasm.c").read_text(encoding="utf-8")
+        defs_start = runtime.index("#define ANVIL_WASM_MODEL_STATES")
+        defs_end = runtime.index("#define ANVIL_WASM_MODEL_NODES", defs_start)
+        defines = "\n".join(
+            line for line in runtime[defs_start:defs_end].splitlines()
+            if line.startswith("#define ANVIL_WASM_MODEL_")
+            or line.startswith("#define ANVIL_WASM_MORPH_TARGETS ")
+            or line.startswith("#define ANVIL_WASM_INSTANCE_")
+        ) + "\n"
+        start = runtime.index("static AnvilWasmModelInstance *anvil_wasm_instance_lookup")
+        end = runtime.index("static AnvilWasmModelInstance *anvil_wasm_instance_from_state_id", start)
+        block = runtime[start:end]
+        harness = r'''#include <math.h>
+#include <stdint.h>
+#include <string.h>
+typedef struct {
+  int model_id;
+  unsigned generation;
+  int active, retired;
+  double values[8];
+  unsigned char overridden[8];
+} AnvilWasmModelInstance;
+static AnvilWasmModelInstance anvil_wasm_model_instances[64];
+static int anvil_wasm_finite(double x) { return isfinite(x); }
+''' + defines + block + r'''
+int main(void) {
+  AnvilWasmModelInstance *last = &anvil_wasm_model_instances[ANVIL_WASM_MODEL_INSTANCES - 1];
+  for (unsigned i = 0; i < ANVIL_WASM_MODEL_INSTANCES - 1; ++i) {
+    anvil_wasm_model_instances[i].active = 1;
+    anvil_wasm_model_instances[i].model_id = 0;
+  }
+  last->generation = ANVIL_WASM_INSTANCE_GENERATION_MAX;
+  double h = anvil_model_instance_create(0, 1);
+  if (h != (double)ANVIL_WASM_INSTANCE_GENERATION_MAX * ANVIL_WASM_MODEL_INSTANCES + ANVIL_WASM_MODEL_INSTANCES) return 1;
+  if (h > ANVIL_WASM_INSTANCE_HANDLE_MAX || !anvil_model_instance_valid(h, 0)) return 2;
+  double defaults[1] = {0.25};
+  if (anvil_model_instance_morph(h, 0, 0.0, 0.75, defaults, 1) != 0.25) return 7;
+  if (anvil_model_instance_morph(h, 0, NAN, 0.0, defaults, 1) != 0.0) return 8;
+  if (anvil_model_instance_morph(h, 0, INFINITY, 0.0, defaults, 1) != 0.0) return 9;
+  if (anvil_model_instance_morph(h, 0, 0.5, 0.0, defaults, 1) != 0.0) return 10;
+  if (anvil_model_instance_morph(h, 0, -1.0, 0.0, defaults, 1) != 0.0) return 11;
+  if (anvil_model_instance_morph(h, 0, 1.0, 0.0, defaults, 1) != 0.0) return 12;
+  if (anvil_model_instance_morph_weights(h, 0, defaults, 1)[0] != 0.75) return 13;
+  if (anvil_model_instance_destroy(h, 0) != 1.0 || !last->retired) return 3;
+  if (anvil_model_instance_valid(h, 0)) return 4;
+  anvil_wasm_model_instances[0].active = 0;
+  double recovered = anvil_model_instance_create(0, 1);
+  if (recovered != 1.0 || !anvil_model_instance_valid(recovered, 0)) return 5;
+  last->generation = ANVIL_WASM_INSTANCE_GENERATION_MAX + 1u;
+  last->retired = 0;
+  last->active = 0;
+  double after_ceiling = anvil_model_instance_create(0, 1);
+  if (last->active || !last->retired || after_ceiling != 0.0) return 6;
+  return 0;
+}
+'''
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            source = root / "boundary.c"
+            executable = root / "boundary.exe"
+            source.write_text(harness, encoding="utf-8")
+            compiled = subprocess.run([clang, str(source), "-o", str(executable)], capture_output=True, text=True, timeout=60)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            run = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(run.returncode, 0, f"runtime boundary harness returned {run.returncode}")
+
+    def test_instance_generation_ceiling_keeps_every_issued_handle_decodable(self) -> None:
+        c_runtime = (ROOT / "runtime" / "anvil_runtime.c").read_text(encoding="utf-8")
+        wasm_runtime = (ROOT / "runtime" / "anvil_wasm.c").read_text(encoding="utf-8")
+
+        def value(source: str, name: str) -> int:
+            match = re.search(rf"#define {name} (\d+)", source)
+            self.assertIsNotNone(match, name)
+            return int(match.group(1))
+
+        slots = value(c_runtime, "ANVIL_MODEL_INSTANCES")
+        generation_max = value(c_runtime, "ANVIL_MODEL_INSTANCE_GENERATION_MAX")
+        handle_max = value(c_runtime, "ANVIL_MODEL_INSTANCE_HANDLE_MAX")
+        self.assertEqual(value(wasm_runtime, "ANVIL_WASM_MODEL_INSTANCES"), slots)
+        self.assertEqual(
+            value(wasm_runtime, "ANVIL_WASM_INSTANCE_GENERATION_MAX"),
+            generation_max,
+        )
+        self.assertEqual(value(wasm_runtime, "ANVIL_WASM_INSTANCE_HANDLE_MAX"), handle_max)
+        issued = [generation_max * slots + slot + 1 for slot in range(slots)]
+        self.assertLessEqual(max(issued), handle_max)
+        for slot, handle in enumerate(issued):
+            token = handle - 1
+            self.assertEqual(token % slots, slot)
+            self.assertEqual(token // slots, generation_max)
+        self.assertGreater((generation_max + 1) * slots + slots, handle_max)
+        self.assertIn("instance->generation >= ANVIL_MODEL_INSTANCE_GENERATION_MAX", c_runtime)
+        self.assertIn("instance->generation >= ANVIL_WASM_INSTANCE_GENERATION_MAX", wasm_runtime)
+        self.assertRegex(
+            c_runtime,
+            r"if\s*\(handle > ANVIL_MODEL_INSTANCE_HANDLE_MAX\)\s*\{\s*"
+            r"instance->retired = 1;\s*continue;\s*\}\s*instance->active = 1;",
+        )
+        self.assertRegex(
+            wasm_runtime,
+            r"if\s*\(handle > ANVIL_WASM_INSTANCE_HANDLE_MAX\)\s*\{\s*"
+            r"instance->retired = 1;\s*continue;\s*\}\s*instance->active = 1;",
+        )
+
     def test_instance_morph_weights_are_isolated_between_draws(self) -> None:
         with tempfile_dir() as root:
             write_morph_model(root, "instance.gltf")
@@ -281,7 +452,12 @@ class GltfMorphTests(unittest.TestCase):
                     '  set var(live) = model_instance_morph("instance.gltf", var(new), 0, 1)',
                     '  set var(stale_draw) = model_draw_instance("instance.gltf", var(old), 0, 0, 0, 1, 0, 0, 0)',
                     '  set var(live_draw) = model_draw_instance("instance.gltf", var(new), 0, 0, 0, 1, 0, 0, 0)',
+                    '  set var(fractional) = model_instance_morph("instance.gltf", var(new), 0.5, 0)',
+                    '  set var(negative) = model_instance_morph("instance.gltf", var(new), -1, 0)',
+                    '  set var(outside) = model_instance_morph("instance.gltf", var(new), 1, 0)',
+                    '  set var(valid_previous) = model_instance_morph("instance.gltf", var(new), 0, 0)',
                     '  say "state " & var(destroyed) & "," & var(stale) & "," & var(live) & "," & var(stale_draw) & "," & var(live_draw)',
+                    '  say "indices " & var(fractional) & "," & var(negative) & "," & var(outside) & "," & var(valid_previous)',
                     '  say "done"',
                     "end",
                     "",
@@ -289,6 +465,38 @@ class GltfMorphTests(unittest.TestCase):
             )
             output = run_poses(self, root, program)
         self.assertIn("state 1,0,0,0,1", output)
+        self.assertIn("indices 0,0,0,1", output)
+
+    def test_instance_capacity_returns_zero_and_recovers_after_destroy(self) -> None:
+        with tempfile_dir() as root:
+            write_morph_model(root, "instance.gltf")
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "fn(draw)",
+                    '  set var(first) = model_instance("instance.gltf")',
+                    "  set var(failures) = 0",
+                    "  for local(i) = 0 to 62",
+                    '    set var(handle) = model_instance("instance.gltf")',
+                    "    if var(handle) = 0",
+                    "      add var(failures) 1",
+                    "    end",
+                    "  end",
+                    '  set var(overflow) = model_instance("instance.gltf")',
+                    '  set var(released) = model_instance_destroy("instance.gltf", var(first))',
+                    '  set var(replacement) = model_instance("instance.gltf")',
+                    '  say "capacity " & var(failures) & "," & var(overflow) & "," & var(released) & "," & var(replacement)',
+                    '  say "old " & model_instance_morph("instance.gltf", var(first), 0, 1)',
+                    '  say "new " & model_instance_morph("instance.gltf", var(replacement), 0, 1)',
+                    '  say "done"',
+                    "end",
+                    "",
+                )
+            )
+            output = run_poses(self, root, program)
+        self.assertIn("capacity 0,0,1,65", output)
+        self.assertIn("old 0", output)
+        self.assertIn("new 0", output)
 
     def test_instance_draw_requires_a_stored_handle(self) -> None:
         with tempfile_dir() as root:

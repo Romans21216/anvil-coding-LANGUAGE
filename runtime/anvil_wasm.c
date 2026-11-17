@@ -69,6 +69,7 @@ static int anvil_wasm_ray_mesh_triangles_frame;
 #define ANVIL_WASM_MORPH_TARGETS 8
 #define ANVIL_WASM_MODEL_INSTANCES 64
 #define ANVIL_WASM_INSTANCE_GENERATION_MAX 33554430
+#define ANVIL_WASM_INSTANCE_HANDLE_MAX 2147483647.0
 static double anvil_wasm_morph_values[ANVIL_WASM_MODEL_STATES]
                                           [ANVIL_WASM_MORPH_TARGETS];
 static unsigned char anvil_wasm_morph_ready[ANVIL_WASM_MODEL_STATES];
@@ -1918,7 +1919,8 @@ double anvil_model_morph(int id, int index, double weight,
 
 static AnvilWasmModelInstance *anvil_wasm_instance_lookup(double handle,
                                                            int model_id) {
-  if (!anvil_wasm_finite(handle) || handle < 1.0 || handle > 2147483647.0 ||
+  if (!anvil_wasm_finite(handle) || handle < 1.0 ||
+      handle > ANVIL_WASM_INSTANCE_HANDLE_MAX ||
       (double)(int)handle != handle)
     return NULL;
   unsigned token = (unsigned)handle - 1u;
@@ -1939,13 +1941,20 @@ double anvil_model_instance_create(int model_id, int morph_count) {
     AnvilWasmModelInstance *instance = &anvil_wasm_model_instances[slot];
     if (instance->active || instance->retired)
       continue;
+    double handle = (double)instance->generation *
+                        ANVIL_WASM_MODEL_INSTANCES +
+                    slot + 1.0;
+    if (handle > ANVIL_WASM_INSTANCE_HANDLE_MAX) {
+      instance->retired = 1;
+      continue;
+    }
     instance->active = 1;
     instance->model_id = model_id;
     for (int i = 0; i < ANVIL_WASM_MORPH_TARGETS; ++i) {
       instance->values[i] = 0.0;
       instance->overridden[i] = 0;
     }
-    return (double)instance->generation * ANVIL_WASM_MODEL_INSTANCES + slot + 1.0;
+    return handle;
   }
   return 0.0;
 }
@@ -1977,19 +1986,21 @@ const double *anvil_model_instance_morph_weights(double handle, int model_id,
              : defaults;
 }
 
-double anvil_model_instance_morph(double handle, int model_id, int index,
+double anvil_model_instance_morph(double handle, int model_id, double index,
                                   double weight, const double *defaults,
                                   int morph_count) {
   AnvilWasmModelInstance *instance = anvil_wasm_instance_lookup(handle, model_id);
-  if (!instance || !defaults || index < 0 || index >= morph_count ||
+  if (!instance || !defaults || !anvil_wasm_finite(index) || index < 0.0 ||
+      index >= morph_count || (double)(int)index != index ||
       morph_count <= 0 || morph_count > ANVIL_WASM_MORPH_TARGETS ||
       !anvil_wasm_finite(weight))
     return 0.0;
-  double previous = instance->overridden[index]
-                        ? instance->values[index]
-                        : defaults[index];
-  instance->values[index] = weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
-  instance->overridden[index] = 1;
+  int target = (int)index;
+  double previous = instance->overridden[target]
+                        ? instance->values[target]
+                        : defaults[target];
+  instance->values[target] = weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
+  instance->overridden[target] = 1;
   return previous;
 }
 
