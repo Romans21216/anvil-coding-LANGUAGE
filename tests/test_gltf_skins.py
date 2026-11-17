@@ -222,7 +222,7 @@ class GltfSkinTests(unittest.TestCase):
         self.assertIn("a skinned primitive needs WEIGHTS_0", combined)
         self.assertIn(":3:", combined)
 
-    def test_the_wasm_backend_refuses_a_skinned_model(self) -> None:
+    def test_wasm_draws_skinned_models_and_locates_ray_mesh_refusal(self) -> None:
         with tempfile_dir() as root:
             write_skinned_model(root, "skin.gltf")
             source = root / "wasm.ANVL"
@@ -247,9 +247,32 @@ class GltfSkinTests(unittest.TestCase):
                 text=True,
                 timeout=300,
             )
-        self.assertNotEqual(build.returncode, 0)
-        combined = build.stdout + build.stderr
-        self.assertIn("skinned models are not available in the wasm backend yet", combined)
+            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+            source.write_text(
+                "scene 3d\n"
+                "fn(draw)\n"
+                '  set var(ok) = ray_mesh("skin.gltf", 0, 0, 0, 1, 0, 0, 0)\n'
+                "end\n",
+                encoding="utf-8",
+            )
+            ray_build = subprocess.run(
+                [
+                    sys.executable,
+                    str(COMPILER),
+                    str(source),
+                    "--backend",
+                    "wasm",
+                    "-o",
+                    str(root / "ray.wasm"),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        self.assertNotEqual(ray_build.returncode, 0)
+        combined = ray_build.stdout + ray_build.stderr
+        self.assertIn("ray_mesh(...) does not support skinned models", combined)
+        self.assertIn(":3:", combined)
 
 
 if __name__ == "__main__":

@@ -121,7 +121,10 @@ try {
       let binary = '';
       for (let start = 0; start < packed.length; start += 8192)
         binary += String.fromCharCode(...packed.subarray(start, start + 8192));
-      return { width: 960, height: 600, mask: btoa(binary) };
+      let rgbaBinary = '';
+      for (let start = 0; start < pixels.length; start += 8192)
+        rgbaBinary += String.fromCharCode(...pixels.subarray(start, start + 8192));
+      return { width: 960, height: 600, mask: btoa(binary), rgba: btoa(rgbaBinary) };
     })()` ,
     returnByValue: true,
   });

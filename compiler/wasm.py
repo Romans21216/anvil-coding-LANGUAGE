@@ -100,6 +100,9 @@ ALLOWED_BUILTINS = {
     "sound_destroy",
     "sound_error",
     "camera_angle",
+    "light",
+    "light_ambient",
+    "light_intensity",
     "model_draw",
     "model_animate",
     "model_animation_length",
@@ -929,8 +932,8 @@ def validate(
             "the wasm backend yet"
         )
     # The wasm model paths share the depth-tested triangle renderer. Static
-    # models, morph groups and animated node poses are baked before submission;
-    # skinning and textured materials still need separate runtime paths.
+    # models, morph groups, animated node poses and skinned vertex influences
+    # are baked before submission; textured materials still need a separate path.
     model_calls = re.compile(
         r'\b(model_draw|ray_mesh)\s*\(\s*"((?:[^"\\]|\\.)*)"'
     )
@@ -956,11 +959,11 @@ def validate(
         # Static morph targets are supported by both model_draw and ray_mesh;
         # animated node groups use the same baked data and the runtime pose
         # evaluator; both lowerings submit their effective weights per group.
-        if model.get("skinned"):
+        if model.get("skinned") and is_ray_mesh:
             line = text.count("\n", 0, match.start()) + 1
             raise CompileError(
-                f"{source_path}:{line}: skinned models are not available in the "
-                "wasm backend yet (the browser bakes a static pose)"
+                f"{source_path}:{line}: ray_mesh(...) does not support skinned "
+                "models in the wasm backend; use model_draw(...)"
             )
     used = used_builtins(functions, top)
     for name in used:

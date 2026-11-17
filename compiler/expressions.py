@@ -862,8 +862,8 @@ class ExpressionParser:
         elif kind == "word" and value in KEY_CODES:
             left = ("ANVIL_KEY_" + value, "number")
         elif kind == "word" and value in ("model_draw", "ray_mesh"):
-            # glTF assets become static arrays; either the raster or ray
-            # runtime consumes that data with a per-instance transform.
+            # glTF assets become baked arrays; wasm preflights each model submission
+            # against its shared per-frame triangle budget.
             self.expect("(")
             literal = self.require_string(self.parse())
             try:

@@ -703,9 +703,7 @@ double anvil_light_intensity(double level) {
 
 /* Lit fraction for a face normal; two-sided faces (models) light from either
    side, the primitives do not. */
-static double anvil_light_level(AnvilVec3 normal, int two_sided) {
-  AnvilVec3 light = anvil_normalize(anvil_light_direction);
-  double facing = anvil_dot(normal, light);
+static double anvil_light_level_from_facing(double facing, int two_sided) {
   if (two_sided)
     facing = fabs(facing);
   if (!(facing > 0.0))
@@ -714,6 +712,11 @@ static double anvil_light_level(AnvilVec3 normal, int two_sided) {
                  (1.0 - anvil_light_ambient_value) *
                      anvil_light_intensity_value * facing;
   return level < 0.0 ? 0.0 : level > 1.0 ? 1.0 : level;
+}
+
+static double anvil_light_level(AnvilVec3 normal, int two_sided) {
+  AnvilVec3 light = anvil_normalize(anvil_light_direction);
+  return anvil_light_level_from_facing(anvil_dot(normal, light), two_sided);
 }
 
 void anvil_cube(double x, double y, double z, double size, double rx, double ry,
@@ -1432,11 +1435,10 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
 
   AnvilVec3 right, up, forward;
   anvil_camera_basis(&right, &up, &forward);
-  AnvilVec3 world_light = anvil_normalize((AnvilVec3){-.4, .7, .6});
+  AnvilVec3 world_light = anvil_normalize(anvil_light_direction);
   AnvilCameraVertex light = {anvil_dot(world_light, right),
                              anvil_dot(world_light, up),
                              anvil_dot(world_light, forward)};
-  const double ambient = 0.2;
   for (int py = bounds.min_y; py <= bounds.max_y; ++py)
     for (int px = bounds.min_x; px <= bounds.max_x; ++px) {
       double ray_x = (px + 0.5 - ANVIL_WIDTH * 0.5) / anvil_camera_focal;
@@ -1447,11 +1449,10 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
               camera_center, radius, ray_x, ray_y, ANVIL_NEAR_DEPTH, &depth,
               &nx, &ny, &nz, &near_cap))
         continue;
-      double shade = ambient +
-                     (1.0 - ambient) *
-                         fmax(0.0, nx * light.x + ny * light.y + nz * light.depth);
+      double facing = nx * light.x + ny * light.y + nz * light.depth;
       if (near_cap)
-        shade = ambient + (1.0 - ambient) * fmax(0.0, -light.depth);
+        facing = -light.depth;
+      double shade = anvil_light_level_from_facing(facing, 0);
       uint32_t color = anvil_color((int)(r * shade), (int)(g * shade),
                                    (int)(b * shade));
       size_t index = (size_t)py * ANVIL_WIDTH + (size_t)px;

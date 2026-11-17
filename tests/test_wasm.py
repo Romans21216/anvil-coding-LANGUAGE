@@ -1169,6 +1169,31 @@ _THREE_D_PROGRAM = "\n".join(
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmScene3DTests(unittest.TestCase):
+    def test_lighting_builtins_validate_and_return_previous_values(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "fn(update)",
+                    "  say light(0, 0, 1)",
+                    "  say light(0, 0, 0)",
+                    "  say light_ambient(0.1)",
+                    "  say light_intensity(0.5)",
+                    "end",
+                    "fn(main)",
+                    "end",
+                    "fn(draw)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = run_wasm(out)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines()[:4], ["1", "0", "0.28", "1"])
+
     def test_cube_and_plane_emit_sorted_triangles(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
@@ -1226,10 +1251,70 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from test_gltf_model import write_quad  # noqa: E402
 from test_gltf_morph import write_morph_glb, write_morph_model  # noqa: E402
 from test_gltf_ray_mesh import write_animated_morph_glb  # noqa: E402
+from test_gltf_skins import write_skinned_model  # noqa: E402
 
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmModelTests(unittest.TestCase):
+    def test_skinned_model_draw_samples_joint_animation_and_weights(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+
+            def capture(
+                name: str,
+                *,
+                animation_time: float | None,
+                weights: tuple[float, float] = (1.0, 0.0),
+                joints: int = 1,
+            ) -> list:
+                model_dir = root / name
+                model_dir.mkdir()
+                model = f"{name}.gltf"
+                asset = f"{name}/{model}"
+                write_skinned_model(
+                    model_dir, model, weights=weights, with_clip=animation_time is not None,
+                    joints=joints,
+                )
+                statements = [
+                    "scene 3d",
+                    "camera perspective 0 0 12",
+                    "fn(draw)",
+                ]
+                if animation_time is not None:
+                    statements.append(
+                        f'  set var(t) = model_animate("{asset}", {animation_time})'
+                    )
+                statements.extend(
+                    (
+                        f'  set var(ok) = model_draw("{asset}", 0, 0, 0, 1, 0, 0, 0)',
+                        "end",
+                        "",
+                    )
+                )
+                result, out = build(root, "\n".join(statements), f"{name}.ANVL")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                run = subprocess.run(
+                    ["node", str(HOST), "--record", str(out)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                records = json.loads(run.stdout.strip().splitlines()[-1])
+                return next(record for record in records if record[0] == "triangles")
+
+            bind_pose = capture("bind_pose", animation_time=None)
+            fully_weighted = capture("full_weight", animation_time=0.5)
+            half_weighted = capture(
+                "half_weight", animation_time=0.5, weights=(0.5, 0.5), joints=2
+            )
+
+        full_shift = fully_weighted[2] - bind_pose[2]
+        half_shift = half_weighted[2] - bind_pose[2]
+        self.assertGreater(full_shift, 30, (bind_pose, fully_weighted))
+        self.assertAlmostEqual(half_shift / full_shift, 0.5, delta=0.12)
+
     def test_animated_morphed_ray_mesh_applies_all_pose_controls(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
@@ -1446,6 +1531,80 @@ class WasmModelTests(unittest.TestCase):
             records = json.loads(lines[-1])
             triangles = [record for record in records if record[0] == "triangles"]
             self.assertEqual([record[1] for record in triangles], [16384, 16384])
+
+    def test_model_draw_has_a_shared_per_frame_triangle_budget(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 6",
+                    "set var(ok) = 0",
+                    "fn(draw)",
+                    "  for local(i) = 1 to 8193",
+                    '    set var(ok) = model_draw("quad.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "  end",
+                    "  say var(ok)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program, "model_draw_budget")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "2"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertEqual(lines[:2], ["0", "0"], "the over-budget draw is refused per frame")
+            records = json.loads(lines[-1])
+            triangles = [record for record in records if record[0] == "triangles"]
+            self.assertEqual([record[1] for record in triangles], [16384, 16384])
+
+    def test_model_draw_budget_is_shared_with_ray_mesh_and_morph_draw(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+            write_morph_model(root, "morph.gltf")
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 6",
+                    "set var(a) = 0",
+                    "set var(b) = 0",
+                    "set var(c) = 0",
+                    "fn(draw)",
+                    "  for local(i) = 1 to 8192",
+                    '    set var(a) = model_draw("quad.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "  end",
+                    '  set var(b) = ray_mesh("quad.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    '  set var(c) = model_draw("morph.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "  say var(b)",
+                    "  say var(c)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program, "shared_model_budget")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertEqual(lines[:2], ["0", "0"], "both ray and morph draw are refused over the budget")
+            records = json.loads(lines[-1])
+            triangles = [record for record in records if record[0] == "triangles"]
+            self.assertEqual(triangles[0][1], 16384, "rejected calls leave the exact submitted cap unchanged")
 
     def test_a_gltf_model_is_baked_and_drawn(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -2053,7 +2212,7 @@ class WasmScreenFadeTests(unittest.TestCase):
 
 _PAGE_SAVE_PROGRAM = "\n".join(
     (
-        "fn(main)",
+        "fn(update)",
         '  say save_number("hp", 42)',
         '  say load_number("hp")',
         '  say save_text("name", "Ada")',

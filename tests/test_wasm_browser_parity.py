@@ -1,4 +1,4 @@
-"""Cross-renderer silhouette parity for the static wasm model path."""
+"""C/Chrome color, camera, lighting and depth parity for the wasm renderer."""
 
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ NEEDS_BROWSER = sys.platform == "win32" and CHROME.is_file() and shutil.which("n
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from test_gltf_morph import write_morph_model  # noqa: E402
 from test_gltf_ray_mesh import write_animated_morph_glb  # noqa: E402
+from test_gltf_model import write_quad  # noqa: E402
+from test_gltf_skins import write_skinned_model  # noqa: E402
 from test_sprite_draw import WindowReader  # noqa: E402
 
 
@@ -49,10 +51,11 @@ def _animated_program() -> str:
     return "\n".join(
         (
             "scene 3d",
-            "camera perspective 0 0 12",
-            "camera fov(70)",
+            "camera perspective 1 1 12",
+            "camera fov(58)",
             "clear rgba(0, 0, 0, 255)",
             "fn(draw)",
+            "  set var(camera_ok) = camera_angle(-8, 6)",
             '  set var(t) = model_animate("animated_morph.glb", 0.5)',
             '  set var(weight) = model_morph("animated_morph.glb", 0, 1)',
             '  set var(ok) = ray_mesh("animated_morph.glb", 0, 0, 0, 1, 0, 0, 0)',
@@ -73,7 +76,7 @@ def _compile(source: pathlib.Path, output: pathlib.Path, backend: str | None = N
         raise AssertionError(result.stdout + result.stderr)
 
 
-def _native_mask(executable: pathlib.Path) -> bytes:
+def _native_rgba(executable: pathlib.Path) -> bytes:
     process = subprocess.Popen([str(executable)], stdout=subprocess.DEVNULL)
     try:
         reader = WindowReader(process.pid)
@@ -83,15 +86,16 @@ def _native_mask(executable: pathlib.Path) -> bytes:
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline:
             width, height, pixels = reader.grab(0, 0, 960, 600)
-            mask = bytearray((width * height + 7) // 8)
-            visible = 0
-            for pixel in range(width * height):
-                offset = pixel * 4
-                if pixels[offset] > 2 or pixels[offset + 1] > 2 or pixels[offset + 2] > 2:
-                    mask[pixel >> 3] |= 1 << (pixel & 7)
-                    visible += 1
+            visible = any(
+                pixels[offset] > 2 or pixels[offset + 1] > 2 or pixels[offset + 2] > 2
+                for offset in range(0, len(pixels), 4)
+            )
             if visible:
-                return bytes(mask)
+                # GDI's 32-bit DIB is BGRA; Chrome ImageData is RGBA.
+                rgba = bytearray(pixels)
+                for offset in range(0, len(rgba), 4):
+                    rgba[offset], rgba[offset + 2] = rgba[offset + 2], rgba[offset]
+                return bytes(rgba)
             time.sleep(0.05)
         raise AssertionError("C model produced no visible pixels")
     finally:
@@ -133,14 +137,279 @@ class WasmBrowserParityTests(unittest.TestCase):
             self.assertEqual(browser.returncode, 0, browser.stderr)
             page = json.loads(browser.stdout.strip().splitlines()[-1])
             self.assertEqual((page["width"], page["height"]), (960, 600))
-            wasm_mask = base64.b64decode(page["mask"], validate=True)
-            c_mask = _native_mask(c_output)
+            wasm_mask = base64.b64decode(page["rgba"], validate=True)
+            c_mask = _native_rgba(c_output)
             self.assertEqual(len(c_mask), len(wasm_mask))
 
-        intersection = sum((left & right).bit_count() for left, right in zip(c_mask, wasm_mask))
-        union = sum((left | right).bit_count() for left, right in zip(c_mask, wasm_mask))
-        iou = intersection / union if union else 0.0
-        self.assertGreater(iou, 0.92, f"C/WASM visible-pixel IoU {iou:.4f}")
+        self.assertGreater(self._silhouette_iou(c_mask, wasm_mask), 0.92)
+        metrics = self._color_metrics(c_mask, wasm_mask)
+        self.assertLess(metrics["mae_visible_pixels"], 10.0, metrics)
+        self.assertGreater(metrics["within_16_visible"], 0.90, metrics)
+
+    def test_custom_model_lighting_matches_c_color_and_rejects_zero_direction(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            c_dir = root / "c"
+            wasm_dir = root / "wasm"
+            c_dir.mkdir()
+            wasm_dir.mkdir()
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 1 1 12",
+                    "camera fov(58)",
+                    "clear rgba(0, 0, 0, 255)",
+                    "fn(draw)",
+                    "  set var(camera_ok) = camera_angle(-8, 6)",
+                    "  set var(light_ok) = light(0, 0, 1)",
+                    "  set var(zero_ok) = light(0, 0, 0)",
+                    "  set var(old_ambient) = light_ambient(0.1)",
+                    "  set var(old_intensity) = light_intensity(0.5)",
+                    '  set var(weight) = model_morph("morph.gltf", 0, 0.5)',
+                    '  set var(ok) = model_draw("morph.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "end",
+                    "",
+                )
+            )
+            for directory in (c_dir, wasm_dir):
+                write_morph_model(directory, "morph.gltf", defaults=(0.0,))
+                (directory / "program.ANVL").write_text(program, encoding="utf-8")
+            c_output = c_dir / "program.exe"
+            _compile(c_dir / "program.ANVL", c_output)
+            wasm_output = wasm_dir / "program.wasm"
+            _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+            browser = subprocess.run(
+                ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={**os.environ, "CHROME_PATH": str(CHROME)},
+            )
+            self.assertEqual(browser.returncode, 0, browser.stderr)
+            page = json.loads(browser.stdout.strip().splitlines()[-1])
+            c_rgba = _native_rgba(c_output)
+            wasm_rgba = base64.b64decode(page["rgba"], validate=True)
+            self.assertEqual(len(c_rgba), len(wasm_rgba))
+        self.assertGreater(self._silhouette_iou(c_rgba, wasm_rgba), 0.92)
+        metrics = self._color_metrics(c_rgba, wasm_rgba)
+        self.assertLess(metrics["mae_visible_pixels"], 10.0, metrics)
+
+    def test_primitive_lighting_matches_c_one_sided_shading(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            c_dir = root / "c"
+            wasm_dir = root / "wasm"
+            c_dir.mkdir()
+            wasm_dir.mkdir()
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 12",
+                    "camera fov(70)",
+                    "clear rgba(0, 0, 0, 255)",
+                    "fn(draw)",
+                    "  set var(light_ok) = light(0, 0, -1)",
+                    "  set var(ambient_old) = light_ambient(0.1)",
+                    "  set var(intensity_old) = light_intensity(1)",
+                    "  display cube(-2, 0, 0, 2) -rgb(200, 60, 60)",
+                    "  display sphere(2, 0, 0, 1) -rgb(200, 60, 60)",
+                    "end",
+                    "",
+                )
+            )
+            for directory in (c_dir, wasm_dir):
+                (directory / "program.ANVL").write_text(program, encoding="utf-8")
+            c_output = c_dir / "program.exe"
+            _compile(c_dir / "program.ANVL", c_output)
+            wasm_output = wasm_dir / "program.wasm"
+            _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+            browser = subprocess.run(
+                ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={**os.environ, "CHROME_PATH": str(CHROME)},
+            )
+            self.assertEqual(browser.returncode, 0, browser.stderr)
+            page = json.loads(browser.stdout.strip().splitlines()[-1])
+            c_rgba = _native_rgba(c_output)
+            wasm_rgba = base64.b64decode(page["rgba"], validate=True)
+            self.assertEqual(len(c_rgba), len(wasm_rgba))
+        self.assertGreater(self._silhouette_iou(c_rgba, wasm_rgba), 0.90)
+        metrics = self._color_metrics(c_rgba, wasm_rgba)
+        self.assertLess(metrics["mae_visible_pixels"], 20.0, metrics)
+        self.assertGreater(metrics["within_32_visible"], 0.90, metrics)
+
+    def test_intersecting_primitive_depth_order_matches_c(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            captures: dict[tuple[str, str], bytes] = {}
+            for order in ((0, 1), (1, 0)):
+                c_dir = root / f"c_{order[0]}_{order[1]}"
+                wasm_dir = root / f"wasm_{order[0]}_{order[1]}"
+                c_dir.mkdir()
+                wasm_dir.mkdir()
+                cubes = (
+                    "display cube(0, 0, 0, 3) -rgb(200, 35, 25) -rotate(0, 0, 23)",
+                    "display cube(0.1, 0, 0, 3) -rgb(20, 55, 210) -rotate(0, 37, 0)",
+                )
+                program = "\n".join(
+                    (
+                        "scene 3d",
+                        "camera perspective 0 0 12",
+                        "camera fov(70)",
+                        "clear rgba(0, 0, 0, 255)",
+                        "fn(draw)",
+                        "  set var(flat) = light_ambient(1)",
+                        f"  {cubes[order[0]]}",
+                        f"  {cubes[order[1]]}",
+                        "end",
+                        "",
+                    )
+                )
+                for directory in (c_dir, wasm_dir):
+                    (directory / "program.ANVL").write_text(program, encoding="utf-8")
+                c_output = c_dir / "program.exe"
+                _compile(c_dir / "program.ANVL", c_output)
+                wasm_output = wasm_dir / "program.wasm"
+                _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+                browser = subprocess.run(
+                    ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    env={**os.environ, "CHROME_PATH": str(CHROME)},
+                )
+                self.assertEqual(browser.returncode, 0, browser.stderr)
+                page = json.loads(browser.stdout.strip().splitlines()[-1])
+                captures[("C", str(order))] = _native_rgba(c_output)
+                captures[("wasm", str(order))] = base64.b64decode(
+                    page["rgba"], validate=True
+                )
+
+        c_far_near = captures[("C", str((0, 1)))]
+        c_near_far = captures[("C", str((1, 0)))]
+        wasm_far_near = captures[("wasm", str((0, 1)))]
+        wasm_near_far = captures[("wasm", str((1, 0)))]
+        for c_image, wasm_image in (
+            (c_far_near, wasm_far_near),
+            (c_near_far, wasm_near_far),
+        ):
+            self.assertGreater(self._silhouette_iou(c_image, wasm_image), 0.92)
+            metrics = self._color_metrics(c_image, wasm_image)
+            self.assertLess(metrics["mae_visible_pixels"], 8.0, metrics)
+        self.assertLess(
+            self._color_metrics(c_far_near, c_near_far)["mae_all_pixels"], 0.5
+        )
+        self.assertLess(
+            self._color_metrics(wasm_far_near, wasm_near_far)["mae_all_pixels"], 0.5
+        )
+
+    def test_intersecting_model_depth_order_matches_c(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            captures: dict[tuple[str, str], bytes] = {}
+            for order in ((0, 1), (1, 0)):
+                c_dir = root / f"model_c_{order[0]}_{order[1]}"
+                wasm_dir = root / f"model_wasm_{order[0]}_{order[1]}"
+                c_dir.mkdir()
+                wasm_dir.mkdir()
+                for directory in (c_dir, wasm_dir):
+                    write_quad(directory, "red.gltf", (1.0, 0.0, 0.0))
+                    write_quad(directory, "blue.gltf", (0.0, 0.0, 1.0))
+                models = (
+                    'model_draw("red.gltf", 0, 0, 0, 2, 0, -35, 0)',
+                    'model_draw("blue.gltf", 0, 0, 0, 2, 0, 35, 0)',
+                )
+                program = "\n".join(
+                    (
+                        "scene 3d",
+                        "camera perspective 0 0 12",
+                        "camera fov(70)",
+                        "clear rgba(0, 0, 0, 255)",
+                        "fn(draw)",
+                        "  set var(flat) = light_ambient(1)",
+                        f"  set var(first) = {models[order[0]]}",
+                        f"  set var(second) = {models[order[1]]}",
+                        "end",
+                        "",
+                    )
+                )
+                for directory in (c_dir, wasm_dir):
+                    (directory / "program.ANVL").write_text(program, encoding="utf-8")
+                c_output = c_dir / "program.exe"
+                _compile(c_dir / "program.ANVL", c_output)
+                wasm_output = wasm_dir / "program.wasm"
+                _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+                browser = subprocess.run(
+                    ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    env={**os.environ, "CHROME_PATH": str(CHROME)},
+                )
+                self.assertEqual(browser.returncode, 0, browser.stderr)
+                page = json.loads(browser.stdout.strip().splitlines()[-1])
+                captures[("C", str(order))] = _native_rgba(c_output)
+                captures[("wasm", str(order))] = base64.b64decode(
+                    page["rgba"], validate=True
+                )
+
+        c_first = captures[("C", str((0, 1)))]
+        c_second = captures[("C", str((1, 0)))]
+        wasm_first = captures[("wasm", str((0, 1)))]
+        wasm_second = captures[("wasm", str((1, 0)))]
+        for c_image, wasm_image in ((c_first, wasm_first), (c_second, wasm_second)):
+            self.assertGreater(self._silhouette_iou(c_image, wasm_image), 0.90)
+            metrics = self._color_metrics(c_image, wasm_image)
+            self.assertLess(metrics["mae_visible_pixels"], 10.0, metrics)
+            self.assertGreater(metrics["within_16_visible"], 0.90, metrics)
+        self.assertLess(self._color_metrics(c_first, c_second)["mae_all_pixels"], 0.5)
+        self.assertLess(self._color_metrics(wasm_first, wasm_second)["mae_all_pixels"], 0.5)
+
+    def test_animated_skinned_model_draw_matches_c(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            c_dir = root / "c"
+            wasm_dir = root / "wasm"
+            c_dir.mkdir()
+            wasm_dir.mkdir()
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 12",
+                    "camera fov(70)",
+                    "clear rgba(0, 0, 0, 255)",
+                    "fn(draw)",
+                    '  set var(t) = model_animate("skin.gltf", 0.5)',
+                    '  set var(ok) = model_draw("skin.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "end",
+                    "",
+                )
+            )
+            for directory in (c_dir, wasm_dir):
+                write_skinned_model(directory, "skin.gltf")
+                (directory / "program.ANVL").write_text(program, encoding="utf-8")
+            c_output = c_dir / "program.exe"
+            _compile(c_dir / "program.ANVL", c_output)
+            wasm_output = wasm_dir / "program.wasm"
+            _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+            browser = subprocess.run(
+                ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={**os.environ, "CHROME_PATH": str(CHROME)},
+            )
+            self.assertEqual(browser.returncode, 0, browser.stderr)
+            page = json.loads(browser.stdout.strip().splitlines()[-1])
+            c_rgba = _native_rgba(c_output)
+            wasm_rgba = base64.b64decode(page["rgba"], validate=True)
+            self.assertEqual(len(c_rgba), len(wasm_rgba))
+        self.assertGreater(self._silhouette_iou(c_rgba, wasm_rgba), 0.88)
+        metrics = self._color_metrics(c_rgba, wasm_rgba)
+        self.assertLess(metrics["mae_visible_pixels"], 20.0, metrics)
+        self.assertGreater(metrics["within_32_visible"], 0.88, metrics)
 
     def test_animated_morphed_ray_mesh_matches_c_silhouette(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -168,14 +437,56 @@ class WasmBrowserParityTests(unittest.TestCase):
             )
             self.assertEqual(browser.returncode, 0, browser.stderr)
             page = json.loads(browser.stdout.strip().splitlines()[-1])
-            wasm_mask = base64.b64decode(page["mask"], validate=True)
-            c_mask = _native_mask(c_output)
+            wasm_mask = base64.b64decode(page["rgba"], validate=True)
+            c_mask = _native_rgba(c_output)
             self.assertEqual(len(c_mask), len(wasm_mask))
 
-        intersection = sum((left & right).bit_count() for left, right in zip(c_mask, wasm_mask))
-        union = sum((left | right).bit_count() for left, right in zip(c_mask, wasm_mask))
-        iou = intersection / union if union else 0.0
-        self.assertGreater(iou, 0.92, f"animated C/WASM silhouette IoU {iou:.4f}")
+        self.assertGreater(self._silhouette_iou(c_mask, wasm_mask), 0.92)
+        metrics = self._color_metrics(c_mask, wasm_mask)
+        self.assertLess(metrics["mae_visible_pixels"], 25.0, metrics)
+        self.assertGreater(metrics["within_32_visible"], 0.90, metrics)
+
+    @staticmethod
+    def _silhouette_iou(c_rgba: bytes, wasm_rgba: bytes) -> float:
+        intersection = union = 0
+        for offset in range(0, len(c_rgba), 4):
+            c_visible = max(c_rgba[offset : offset + 3]) > 2
+            wasm_visible = max(wasm_rgba[offset : offset + 3]) > 2
+            intersection += c_visible and wasm_visible
+            union += c_visible or wasm_visible
+        return intersection / union if union else 0.0
+
+    @staticmethod
+    def _color_metrics(c_rgba: bytes, wasm_rgba: bytes) -> dict[str, float]:
+        absolute_error = visible_error = 0
+        exact = visible_exact = within_16 = within_32 = 0
+        visible_count = 0
+        pixel_count = len(c_rgba) // 4
+        for offset in range(0, len(c_rgba), 4):
+            c_pixel = c_rgba[offset : offset + 4]
+            wasm_pixel = wasm_rgba[offset : offset + 4]
+            same = c_pixel == wasm_pixel
+            exact += same
+            c_visible = max(c_pixel[:3]) > 2
+            wasm_visible = max(wasm_pixel[:3]) > 2
+            if c_visible or wasm_visible:
+                visible_count += 1
+                visible_exact += same
+                errors = [abs(a - b) for a, b in zip(c_pixel[:3], wasm_pixel[:3])]
+                visible_error += sum(errors)
+                within_16 += max(errors) <= 16
+                within_32 += max(errors) <= 32
+            absolute_error += sum(abs(a - b) for a, b in zip(c_pixel[:3], wasm_pixel[:3]))
+        return {
+            "mae_all_pixels": absolute_error / (pixel_count * 3),
+            "mae_visible_pixels": visible_error / (max(visible_count, 1) * 3),
+            "exact_all_pixels": exact / pixel_count,
+            "exact_visible_pixels": visible_exact / max(visible_count, 1),
+            "visible_pixels": visible_count,
+            "within_16_visible": within_16 / max(visible_count, 1),
+            "within_32_visible": within_32 / max(visible_count, 1),
+        }
+
 
 
 if __name__ == "__main__":
