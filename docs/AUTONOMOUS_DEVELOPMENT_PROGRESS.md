@@ -987,3 +987,10 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Budgets:** `tools/mem_budgets.json` and `--check` now cover nine scenes and still report "memory budgets hold".
 - **Tests:** `tests/test_memory_budget.py` (6 cases) adds the audio byte counts, the network completion, and the two scenes in the budget-coverage check.
 - **Full suite:** 953 passed, 1 skipped, 1 xfailed in 506.25 s, exit 0.
+
+## Batch 102 — computed asset paths, measured (8.12)
+
+- **Finding:** "non-literal asset paths" was listed as a browser gap but was neither tested nor documented. On the C backend a computed path loads normally; in the browser build the runtime already returns 0 with an "only literal ..." reason for images, sounds and music.
+- **Tests:** `tests/test_asset_paths.py` (3 cases) covers the C load of an 8x8 BMP and a WAV through a computed name, and the two browser refusals — including the music message, which no document had mentioned.
+- **Evidence:** the 8.12 gap now lists IndexedDB, instruction-level source maps, `ray_sphere` and true streaming music, and says the real limitation is that the browser cannot resolve a path it did not see at build time.
+- **Full suite:** 956 passed, 1 skipped, 1 xfailed in 488.13 s, exit 0.
