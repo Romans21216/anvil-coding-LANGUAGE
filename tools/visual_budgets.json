@@ -1,0 +1,18 @@
+{
+  "first_world": {
+    "distinct_colours": 3251,
+    "non_background": 0.0944
+  },
+  "particles": {
+    "distinct_colours": 109,
+    "non_background": 0.2287
+  },
+  "physics_boxes": {
+    "distinct_colours": 83,
+    "non_background": 0.0621
+  },
+  "sprite_transform": {
+    "distinct_colours": 84,
+    "non_background": 0.371
+  }
+}

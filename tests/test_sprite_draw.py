@@ -271,6 +271,13 @@ class WindowReader:
         finally:
             self.user32.ReleaseDC(self.hwnd, dc)
 
+    def client_rect(self) -> tuple[int, int, int, int]:
+        """Client-area bounds as (0, 0, width, height), the coordinates grab() uses."""
+        rect = wintypes.RECT()
+        if not self.user32.GetClientRect(self.hwnd, ctypes.byref(rect)):
+            raise AssertionError("GetClientRect failed")
+        return 0, 0, rect.right - rect.left, rect.bottom - rect.top
+
     def grab(
         self, left: int, top: int, right: int, bottom: int
     ) -> tuple[int, int, bytes]:

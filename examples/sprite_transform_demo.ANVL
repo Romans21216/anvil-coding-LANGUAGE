@@ -20,7 +20,7 @@ fn(draw)
     set var(flip) = 1 - var(flip)
   end
   set var(warm) = image_tint(var(sprite), 255, 180, 140)
-  set var(big) = image_draw_rotated(var(sprite), 480, 320, var(angle), 0.5)
+  set var(big) = image_draw_rotated(var(sprite), 480, 320, var(angle), 6.0)
   set var(plain) = image_tint(var(sprite), 255, 255, 255)
   set var(small) = image_draw_scaled(var(sprite), 110, 400, 140, 140)
   display text("small: scaled + flip") -l(90, 560) -rgb(120, 220, 180)
