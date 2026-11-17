@@ -68,7 +68,7 @@ static int anvil_wasm_ray_mesh_triangles_frame;
 #define ANVIL_WASM_MODEL_STATES 32
 #define ANVIL_WASM_MORPH_TARGETS 8
 #define ANVIL_WASM_MODEL_INSTANCES 64
-#define ANVIL_WASM_INSTANCE_GENERATION_MAX 33554431
+#define ANVIL_WASM_INSTANCE_GENERATION_MAX 33554430
 static double anvil_wasm_morph_values[ANVIL_WASM_MODEL_STATES]
                                           [ANVIL_WASM_MORPH_TARGETS];
 static unsigned char anvil_wasm_morph_ready[ANVIL_WASM_MODEL_STATES];
