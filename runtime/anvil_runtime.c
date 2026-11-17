@@ -845,29 +845,119 @@ void anvil_plane(double x, double y, double z, double width, double depth,
   (void)base;
 }
 
-void anvil_text(double x, double y, const char *text, int r, int g, int b,
-                int a) {
-  if (!anvil_memory_dc || !text)
-    return;
-  anvil_camera2d_point(&x, &y);
-  /* Glyphs scale with the 2D camera so world-space labels grow with zoom.
-     20 px is the original size, and the clamp keeps GDI inside sane limits. */
+/* Glyphs scale with the 2D camera so world-space labels grow with zoom. 20 px
+   is the original size, and the clamp keeps GDI inside sane limits. */
+static int anvil_text_height(void) {
   int height = (int)lrint(20.0 * anvil_camera2d_zoom);
   if (height < 6)
     height = 6;
   if (height > 720)
     height = 720;
+  return height;
+}
+
+static HFONT anvil_text_font(int height) {
+  return CreateFontA(height, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                     DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                     CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
+}
+
+void anvil_text(double x, double y, const char *text, int r, int g, int b,
+                int a) {
+  if (!anvil_memory_dc || !text)
+    return;
+  anvil_camera2d_point(&x, &y);
+  int height = anvil_text_height();
   SetBkMode(anvil_memory_dc, TRANSPARENT);
   SetTextColor(anvil_memory_dc, RGB(r, g, b));
-  HFONT font =
-      CreateFontA(height, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-                  DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                  CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Segoe UI");
+  HFONT font = anvil_text_font(height);
   HGDIOBJ old = SelectObject(anvil_memory_dc, font);
   TextOutA(anvil_memory_dc, (int)x, (int)y, text, (int)strlen(text));
   SelectObject(anvil_memory_dc, old);
   DeleteObject(font);
   (void)a;
+}
+
+double anvil_text_width(const char *text) {
+  if (!anvil_memory_dc || !text)
+    return 0.0;
+  HFONT font = anvil_text_font(anvil_text_height());
+  HGDIOBJ old = SelectObject(anvil_memory_dc, font);
+  SIZE size = {0, 0};
+  GetTextExtentPoint32A(anvil_memory_dc, text, (int)strlen(text), &size);
+  SelectObject(anvil_memory_dc, old);
+  DeleteObject(font);
+  return (double)size.cx;
+}
+
+/* Greedy word wrap: fill each line with as many whole words as fit inside
+   max_width, measured with the same font the text is drawn with. A single word
+   wider than the limit is drawn anyway rather than being dropped. */
+void anvil_text_wrap(double x, double y, double max_width, const char *text,
+                     int r, int g, int b, int a) {
+  if (!anvil_memory_dc || !text)
+    return;
+  if (!(max_width > 0.0) || !isfinite(max_width)) {
+    anvil_text(x, y, text, r, g, b, a);
+    return;
+  }
+  int height = anvil_text_height();
+  HFONT font = anvil_text_font(height);
+  HGDIOBJ old = SelectObject(anvil_memory_dc, font);
+  size_t length = strlen(text);
+  char line[1024];
+  size_t at = 0;
+  double line_y = y;
+  while (at < length) {
+    size_t best = at;
+    size_t scan = at;
+    while (scan < length) {
+      size_t word_end = scan;
+      while (word_end < length && text[word_end] != ' ')
+        ++word_end;
+      size_t candidate_end = word_end;
+      size_t count = candidate_end - at;
+      if (count >= sizeof(line)) {
+        candidate_end = at + sizeof(line) - 1;
+        count = candidate_end - at;
+      }
+      memcpy(line, text + at, count);
+      line[count] = 0;
+      SIZE size = {0, 0};
+      GetTextExtentPoint32A(anvil_memory_dc, line, (int)count, &size);
+      if ((double)size.cx > max_width && best > at)
+        break;
+      best = candidate_end;
+      scan = word_end;
+      while (scan < length && text[scan] == ' ')
+        ++scan;
+      if (scan >= length) {
+        best = length;
+        break;
+      }
+    }
+    if (best <= at)
+      best = length;
+    size_t count = best - at;
+    if (count >= sizeof(line))
+      count = sizeof(line) - 1;
+    memcpy(line, text + at, count);
+    line[count] = 0;
+    size_t drawn = strlen(line);
+    while (drawn > 0 && line[drawn - 1] == ' ')
+      line[--drawn] = 0;
+    SelectObject(anvil_memory_dc, old);
+    DeleteObject(font);
+    anvil_text(x, line_y, line, r, g, b, a);
+    font = anvil_text_font(height);
+    old = SelectObject(anvil_memory_dc, font);
+    line_y += (double)height * 1.35;
+    at = best;
+    while (at < length && text[at] == ' ')
+      ++at;
+  }
+  SelectObject(anvil_memory_dc, old);
+  DeleteObject(font);
 }
 void anvil_text_number(double x, double y, const char *format, double value,
                        int r, int g, int b, int a) {

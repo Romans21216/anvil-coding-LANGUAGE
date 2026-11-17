@@ -215,6 +215,16 @@ Implemented draw commands are `rect`, `circle`, `line`, `text`, `cube`, `sphere`
 
 The window itself can be controlled from the game. `window_on_top(1)` keeps it above other applications and `window_on_top(0)` returns it to normal, so a game can float over the editor while it is being written and go behind other programs afterwards. `window_fullscreen(1)` switches to borderless fullscreen on the current monitor and `window_fullscreen(0)` restores the previous window style and position. Both return `1` on success and `0` when no window exists yet, and both work as a statement or inside an expression. They are C-backend only; the native backend reports a located "not available" diagnostic. `examples/window_controls.ANVL` toggles both with F and T.
 
+### Laying out text
+
+`display text("...") -l(x, y) -wrap(width)` breaks the string into lines that fit
+inside `width` pixels, measured with the same font that is drawn, and advances
+each line by 1.35x the glyph height. Wrapping happens on spaces; a single word
+wider than the limit is drawn anyway rather than being dropped. `text_width("...")`
+returns the pixel width of a string in the current font, which is what a HUD
+needs to centre a label or draw a background box that fits. Both are C-backend
+only; the wasm backend refuses them with a located message.
+
 ### Capturing the frame
 
 `frame_capture()` copies the frame drawn so far into a new image and returns its

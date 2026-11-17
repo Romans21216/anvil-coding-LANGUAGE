@@ -167,6 +167,18 @@ def emit_display(
             arrays=arrays,
         )
         raw = raw[:tm.start()] + raw[tm.end():]
+    wrap = None
+    wm = re.search(r"-wrap\(((?:[^()]|\([^()]*\))*)\)", masked)
+    if wm:
+        wrap = expr(
+            path,
+            node.line,
+            raw[wm.start(1):wm.end(1)],
+            functions,
+            scope=scope,
+            arrays=arrays,
+        )
+        raw = raw[:wm.start()] + raw[wm.end():]
     call = re.fullmatch(
         r"(cube|sphere|ray_sphere|plane|rect|circle|line|text)\((.*)\)(?:\s+[0-9]+)?",
         raw.strip(),
@@ -215,6 +227,11 @@ def emit_display(
         thick = values[4] if len(values) == 5 else "1.0"
         return f"{ind}anvil_line({', '.join(values[:4])}, {tail}, {thick});"
     if shape == "text" and loc and len(values) == 1:
+        if wrap is not None:
+            return (
+                f"{ind}anvil_text_wrap({loc[0]}, {loc[1]}, {wrap}, "
+                f"{values[0]}, {tail});"
+            )
         return f"{ind}anvil_text({', '.join(loc)}, {values[0]}, {tail});"
     raise CompileError(f"{path}:{node.line}: invalid arguments for display {shape}")
 

@@ -134,6 +134,8 @@ RUNTIME_C_NAMES = {
     "anvil_sphere",
     "anvil_plane",
     "anvil_text",
+    "anvil_text_width",
+    "anvil_text_wrap",
     "anvil_text_number",
     "anvil_time",
     "anvil_frame_tick",

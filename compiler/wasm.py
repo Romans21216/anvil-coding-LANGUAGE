@@ -691,6 +691,20 @@ def validate(
             f"{source_path}:{line}: 'frame_capture' is not available in the wasm "
             "backend yet (the canvas cannot be read back synchronously)"
         )
+    match = re.search(r"-wrap\(", text)
+    if match:
+        line = text.count("\n", 0, match.start()) + 1
+        raise CompileError(
+            f"{source_path}:{line}: the -wrap modifier is not available in the "
+            "wasm backend yet"
+        )
+    match = re.search(r"\btext_width\s*\(", text)
+    if match:
+        line = text.count("\n", 0, match.start()) + 1
+        raise CompileError(
+            f"{source_path}:{line}: 'text_width' is not available in the wasm "
+            "backend yet"
+        )
     match = re.search(r"-texture\(", text)
     if match:
         line = text.count("\n", 0, match.start()) + 1

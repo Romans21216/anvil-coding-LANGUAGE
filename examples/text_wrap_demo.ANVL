@@ -1,0 +1,18 @@
+# Text layout: -wrap(width) breaks a caption at measured word boundaries, and
+# text_width() reports the pixel width of a string in the current font, so the
+# panel behind it can be sized to fit.
+# Run from the repository root:
+#   python compiler/anvil.py examples/text_wrap_demo.ANVL --run
+scene 2d
+clear rgba(10, 12, 18, 255)
+set var(caption) = "Anvil wraps this caption inside a 360 pixel column and keeps the whole words intact."
+set var(width) = 0.0
+
+fn(draw)
+  set var(width) = text_width(var(caption))
+  display rect(40, 40, 360, 96) -rgba(28, 40, 62, 255)
+  display text(var(caption)) -l(56, 56) -wrap(328) -rgb(226, 236, 250)
+  display text("measured width of the unwrapped string") -l(40, 168) -rgb(150, 170, 200)
+  display rect(40, 196, compute(var(width) * 0.5), 8) -rgb(120, 200, 150)
+  display text("half-width bar") -l(40, 214) -rgb(120, 200, 150)
+end

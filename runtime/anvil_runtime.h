@@ -155,6 +155,9 @@ void anvil_plane(double x, double y, double z, double width, double depth,
                  int r, int g, int b, int a);
 void anvil_text(double x, double y, const char *text, int r, int g, int b,
                 int a);
+double anvil_text_width(const char *text);
+void anvil_text_wrap(double x, double y, double max_width, const char *text,
+                     int r, int g, int b, int a);
 void anvil_text_number(double x, double y, const char *format, double value,
                        int r, int g, int b, int a);
 double anvil_time(void);
