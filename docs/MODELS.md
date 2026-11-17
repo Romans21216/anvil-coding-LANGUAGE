@@ -6,9 +6,11 @@ as `cube`.
 
 The model is not loaded at runtime. The compiler reads the file while building,
 applies node transforms, bakes one flat colour per triangle and emits a static
-`double` array into the generated C. Nothing is parsed at startup and the model
-does not have to ship beside the executable (the source `.gltf` must still exist
-to rebuild). Paths are resolved relative to the main `.ANVL` file.
+`double` array into the generated C. Baked values use 17 significant decimal
+digits so geometry and bounds round-trip the imported binary64 values. Nothing
+is parsed at startup and the model does not have to ship beside the executable
+(the source `.gltf` must still exist to rebuild). Paths are resolved relative to
+the main `.ANVL` file.
 
 ```anvil
 scene 3d
@@ -51,6 +53,11 @@ Each triangle is flat-shaded with the scene light, so curved models show facets.
 Colours from glTF are linear; Anvil multiplies them by 255 without a colour
 transform, so a `baseColorFactor` of `[1, 0, 0, 1]` renders as red but is not
 gamma-managed.
+
+The scene light is controlled by `light(x,y,z)`, `light_ambient(level)` and
+`light_intensity(level)` on the C and wasm backends. Model triangles are
+two-sided. The wasm renderer uses the same ambient-plus-directional shading
+formula as C; browser fixtures cover custom lighting and color output.
 
 ## Error messages
 
@@ -103,9 +110,11 @@ set var(ok) = model_draw("walk.gltf", 0, 0, 0, 1, 0, 0, 0)
   because they never read a clock.
 - Animated models skip the bounding-sphere culling test and overhead shadows;
   the whole hierarchy is drawn every frame.
-- The browser backend bakes world-space triangles and has no pose code, so
-  Wasm samples unskinned animated models in `model_draw` and `ray_mesh` using
-  the WebGL depth-tested triangle path. Skinned wasm models remain unsupported.
+- Wasm samples unskinned animated models in `model_draw` and `ray_mesh` using
+  the WebGL depth-tested triangle path. Wasm `model_draw` also supports one skin
+  with up to 64 joints and four influences per vertex, using the first animation
+  clip or bind pose; skinned `ray_mesh` is unsupported. Skin draws skip culling
+  and overhead shadows.
 
 `tests/test_gltf_animation.py` measures ink bounds: a translation track moves
 the triangle by the expected amount at half a second and a quarter of the way,
@@ -135,15 +144,16 @@ draw path has no morph input, so accepting it would render the base shape and
 quietly drop the targets.
 
 A skinned model shares the animation clock: `model_animate(path, seconds)`
-drives its joint channels, and `model_draw` poses it. With no clip it draws at
-its bind pose, so a static character rig needs no animation call. A vertex whose
+drives its joint channels, and C and wasm `model_draw` pose it. Wasm samples the
+first clip and draws the bind pose when no clip exists. Neither C nor wasm
+`ray_mesh` supports skinning; wasm `ray_mesh` reports a source-located diagnostic. A vertex whose
 four weights are all zero keeps its mesh-space position rather than collapsing
 to the origin.
 
 `tests/test_gltf_skins.py` measures ink: a fully weighted joint moves the mesh
 by the joint's animated translation, a 50/50 blend between a moving joint and a
-static one lands half way, a clip-less rig draws at rest, and the malformed and
-wasm cases are refused with the source line.
+static one lands half way, a clip-less rig draws at rest, and malformed inputs plus the unsupported wasm `ray_mesh` case report the source
+line. Browser parity compares a 50/50 animated skinned joint blend in `model_draw` against C with an offset, 58-degree, yawed and pitched camera plus custom light direction, ambient floor and intensity, while the skinned instance is translated, scaled and rotated.
 
 ## Morph targets
 
@@ -163,6 +173,20 @@ set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
   override for that model asset and returns the previous value from its first
   geometry group, so a caller can restore it. A non-finite weight leaves the
   stored value alone.
+- For independently deforming copies, create a handle with
+  `model_instance(path)`, set weights with
+  `model_instance_morph(path, handle, index, weight)`, and draw that copy with
+  `model_draw_instance(path, handle, x, y, z, scale, rx, ry, rz)`. The draw API
+  supports unskinned models with morph targets, including animated models. Each
+  handle owns only its overrides; untouched targets keep each group's glTF
+  defaults. The morph setter returns the previous value for the first geometry
+  group's target. Store the returned handle in a variable before drawing it.
+- `model_instance_destroy(path, handle)` releases a handle and returns 1, or 0
+  for a stale or mismatched handle. The runtime keeps 64 live handles and uses
+  generation-checked reuse, so destroyed handles cannot affect later instances.
+  Creation returns 0 when the bounded table is full. C and wasm share these
+  semantics. Existing `model_morph` and `model_draw` retain their asset-wide
+  behavior.
 - The weights start at the mesh's `weights` array the first time the model is
   drawn or a weight is set (so setting one weight before the first draw keeps
   the rest at their defaults), and stay per model for the life of the process.
@@ -170,13 +194,17 @@ set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
   table; registering a stateful asset beyond that limit is refused at compile
   time.
 - Blending is additive on the vertex position before scale/rotate/translate;
-  vertex colour does not animate. Morphing draws skip culling because the
-  rest-pose bounding sphere may not contain every weighted pose.
+  vertex colour does not animate. Static morph draws use per-geometry
+  conservative bounds that cover default weights and every supported 0–1
+  override, so fully offscreen groups can be culled without clipping a deformed
+  pose. Animated and skinned draws bypass culling; wasm also bypasses this cull
+  when shadows are enabled.
 - C supports morph targets on static models and on animated, unskinned models;
   morph targets combined with skinning remain unsupported. Wasm
   `model_draw` and `ray_mesh` support static and animated unskinned morphs
-  with per-group defaults and `model_morph` overrides. Skinned wasm models
-  remain unsupported.
+  with per-group defaults and `model_morph` overrides. Skinned wasm
+  `model_draw` is supported; skinned `ray_mesh` remains unsupported. Both model APIs share the wasm 16,384-triangle frame
+  budget, with over-budget calls rejected before drawing.
 
 `tests/test_gltf_morph.py` measures ink: weight 1 moves the triangle the whole
 delta, 0.5 moves it half way, a mesh default of 1.0 is applied on the first

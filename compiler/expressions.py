@@ -274,10 +274,14 @@ BUILTINS = {
     "window_scale": (1, 1),
     "camera_angle": (2, 2),
     "model_draw": (8, 8),
+    "model_draw_instance": (9, 9),
     "ray_mesh": (8, 8),
     "model_animate": (2, 2),
     "model_animation_length": (1, 1),
     "model_morph": (3, 3),
+    "model_instance": (1, 1),
+    "model_instance_destroy": (2, 2),
+    "model_instance_morph": (4, 4),
     "particle_emit": (9, 9),
     "particle_count": (0, 0),
     "particle_clear": (0, 0),
@@ -861,9 +865,9 @@ class ExpressionParser:
             )
         elif kind == "word" and value in KEY_CODES:
             left = ("ANVIL_KEY_" + value, "number")
-        elif kind == "word" and value in ("model_draw", "ray_mesh"):
-            # glTF assets become static arrays; either the raster or ray
-            # runtime consumes that data with a per-instance transform.
+        elif kind == "word" and value in ("model_draw", "ray_mesh", "model_draw_instance"):
+            # glTF assets become baked arrays; wasm preflights each model submission
+            # against its shared per-frame triangle budget.
             self.expect("(")
             literal = self.require_string(self.parse())
             try:
@@ -878,6 +882,22 @@ class ExpressionParser:
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             symbol, count, bounds = model["symbol"], model["count"], model["bounds"]
+            instance_handle = None
+            state_id = str(model["id"])
+            if value == "model_draw_instance":
+                if model.get("skinned") or not model.get("morph_count"):
+                    raise CompileError(
+                        f"{self.path}:{self.line}: model_draw_instance requires an "
+                        "unskinned model with morph targets"
+                    )
+                self.expect(",")
+                instance_handle = self.require_number(self.parse())
+                if re.search(r"\banvil_[A-Za-z0-9_]+\s*\(", instance_handle):
+                    raise CompileError(
+                        f"{self.path}:{self.line}: store a model instance handle "
+                        "in a variable before drawing it"
+                    )
+                state_id = f"(-(int)({instance_handle}))"
             if value == "ray_mesh" and model.get("skinned"):
                 raise CompileError(
                     f"{self.path}:{self.line}: ray_mesh does not support skinned "
@@ -889,6 +909,15 @@ class ExpressionParser:
                 mesh_args.append(self.require_number(self.parse()))
             self.expect(")")
             placement = ", ".join(mesh_args)
+            morph_weights = (
+                f"anvil_model_instance_morph_weights({instance_handle}, "
+                f"{model['id']}, (const double *){symbol}_morph_default, "
+                f"{model.get('morph_count', 0)})"
+                if instance_handle is not None
+                else f"anvil_model_morph_weights({model['id']}, "
+                     f"(const double *){symbol}_morph_default, "
+                     f"{model.get('morph_count', 0)})"
+            )
             if value == "ray_mesh":
                 if model.get("animated"):
                     call = (
@@ -907,9 +936,7 @@ class ExpressionParser:
                         + (
                             f"(const double *){symbol}_morph, "
                             f"(const double *){symbol}_morph_default, "
-                            f"anvil_model_morph_weights({model['id']}, "
-                            f"(const double *){symbol}_morph_default, "
-                            f"{model['morph_count']}), {model['id']}, "
+                            f"{morph_weights}, {state_id}, "
                             f"{model['morph_count']}, "
                             if model.get("morph_count")
                             else "NULL, NULL, NULL, -1, 0, "
@@ -923,10 +950,9 @@ class ExpressionParser:
                         f"{count}, (const double *){symbol}_morph, "
                         f"(const int *){symbol}_morph_groups, "
                         f"{len(model['morph_groups']) // 2}, "
+                        f"(const double *){symbol}_morph_bounds, "
                         f"(const double *){symbol}_morph_default, "
-                        f"anvil_model_morph_weights({model['id']}, "
-                        f"(const double *){symbol}_morph_default, {morph_count}), "
-                        f"{model['id']}, {morph_count}, "
+                        f"{morph_weights}, {state_id}, {morph_count}, "
                         + ", ".join(f"{item:.6g}" for item in bounds)
                         + f", {placement})"
                     )
@@ -953,10 +979,9 @@ class ExpressionParser:
                     f"(const double *){symbol}_morph, "
                     f"(const int *){symbol}_morph_groups, "
                     f"{len(model['morph_groups']) // 2}, "
+                    f"(const double *){symbol}_morph_bounds, "
                     f"(const double *){symbol}_morph_default, "
-                    f"anvil_model_morph_weights({model['id']}, "
-                    f"(const double *){symbol}_morph_default, "
-                    f"{model['morph_count']}), {model['id']}, "
+                    f"{morph_weights}, {state_id}, "
                     f"{model['morph_count']}, "
                     f"{placement})"
                 )
@@ -974,9 +999,7 @@ class ExpressionParser:
                     + (
                         f"(const double *){symbol}_morph, "
                         f"(const double *){symbol}_morph_default, "
-                        f"anvil_model_morph_weights({model['id']}, "
-                        f"(const double *){symbol}_morph_default, "
-                        f"{model['morph_count']}), {model['id']}, "
+                        f"{morph_weights}, {state_id}, "
                         f"{model['morph_count']}, "
                         if model.get("morph_count")
                         else "NULL, NULL, NULL, -1, 0, "
@@ -991,6 +1014,57 @@ class ExpressionParser:
                     + placement
                     + ")"
                 )
+            if instance_handle is not None:
+                call = (
+                    f"(anvil_model_instance_valid({instance_handle}, {model['id']}) "
+                    f"? ({call}) : 0.0)"
+                )
+            left = (self.checked_number(call), "number")
+        elif kind == "word" and value in (
+            "model_instance", "model_instance_destroy", "model_instance_morph"
+        ):
+            self.expect("(")
+            literal = self.require_string(self.parse())
+            try:
+                asset = json.loads(literal)
+            except ValueError:
+                raise CompileError(
+                    f"{self.path}:{self.line}: {value} needs a string literal path"
+                ) from None
+            from compiler import gltf
+            try:
+                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+            except gltf.ModelError as error:
+                raise CompileError(f"{self.path}:{self.line}: {error}") from None
+            if not model.get("morph_count"):
+                raise CompileError(
+                    f"{self.path}:{self.line}: the model has no morph targets"
+                )
+            if value == "model_instance":
+                self.expect(")")
+                call = (
+                    f"anvil_model_instance_create({model['id']}, "
+                    f"{model['morph_count']})"
+                )
+            else:
+                self.expect(",")
+                handle = self.require_number(self.parse())
+                if value == "model_instance_destroy":
+                    self.expect(")")
+                    call = (
+                        f"anvil_model_instance_destroy({handle}, {model['id']})"
+                    )
+                else:
+                    self.expect(",")
+                    index = self.require_number(self.parse())
+                    self.expect(",")
+                    weight = self.require_number(self.parse())
+                    self.expect(")")
+                    call = (
+                        f"anvil_model_instance_morph({handle}, {model['id']}, "
+                        f"{index}, {weight}, (const double *)"
+                        f"{model['symbol']}_morph_default, {model['morph_count']})"
+                    )
             left = (self.checked_number(call), "number")
         elif kind == "word" and value == "model_animate":
             # Literal-path lowering, like model_draw: the clip index and its

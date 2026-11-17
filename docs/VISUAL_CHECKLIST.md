@@ -51,10 +51,9 @@ Then open the PNGs and walk this list.
 - The sprite demo originally drew its "large copy" at scale 0.5 on a 32x32
   asset — a 16-pixel speck in a 960x600 window. Caught by reviewing the
   screenshot, fixed to scale 6.
-- The examples load assets with repository-root-relative paths
-  (`examples/assets/...`), so they must run with the repository as the working
-  directory. The capture tool does; `--run` from another directory will not
-  find the assets. A future asset-root fallback is the general fix.
+- The examples load assets relative to their source/project directory. `--run`
+  now uses that directory even when invoked from another caller directory; the
+  starter sprite asset load is covered by `tests/test_commands.py`.
 
 The latest screenshot review found the starter world objects partly clipped at
 the bottom because its level camera looked above the ground plane. The sample

@@ -1173,6 +1173,375 @@ Validation: this follow-up did not run the new regression or other tests. The pr
 
 8.136 ANIMATED MORPHED MODELS ON THE WASM RASTER PATH
 
-The wasm model path now samples the first glTF animation clip and composes node TRS animation with morph deltas/defaults for both `model_draw` and `ray_mesh`. Animated ray-mesh submissions share the existing 16,384-triangle per-frame budget; static or animated `model_draw` remains outside that budget. Skinned models remain unsupported. `docs/WASM.md` now reflects those limits and the cross-renderer test fixtures.
+The wasm model path now samples the first glTF animation clip and composes node TRS animation with morph deltas/defaults for both `model_draw` and `ray_mesh`. Animated `ray_mesh` and static or animated `model_draw` all share the existing 16,384-triangle per-frame budget. Skinned models remain unsupported. `docs/WASM.md` now reflects those limits and the cross-renderer test fixtures.
 
 Validation: this audit inspected the importer/runtime lowering, Node draw-stream tests, and the C/Chrome mask test, but did not run tests or the browser harness. The progress ledger's prior static-only wasm results do not verify this animated addition.
+
+
+8.137 VERIFY ANIMATED WASM MORPH PATH AND C/CHROME MASK PARITY (2026-11-17)
+
+Completed the animated unskinned wasm path for `model_draw` and `ray_mesh`: first-clip translation/rotation/scale channels with LINEAR/STEP sampling, clip-time wrapping, and morph defaults/overrides blended before node transforms. Both APIs now use a shared 16,384-triangle per-frame budget. Added Windows C/Chrome silhouette-mask comparison for a combined animated+morphed mesh and updated the model, language, engine, compiler and wasm docs to retain the skinned limitation and clarify the remaining full color/depth parity gap.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py -q` — 60 passed in 47.57 s, including 2 Chromium/C silhouette comparisons. `node --check tools/capture_wasm_mask.mjs`, `node --check tools/bench_wasm_ray_spheres.mjs`, and `git diff --check` passed.
+
+P8-119-F1 remains partial: skinned wasm, full camera/lighting/depth-intersection parity, and broader ray workload benchmarks remain open. Static and animated+morphed RGBA parity now has measured visible-pixel tolerances; details are in `docs/WASM.md` and `docs/PART8_EVIDENCE.md`. Changes remain uncommitted and unpublished; `.scratch/` remains untouched.
+
+
+8.138 BOUND TOTAL WASM MODEL TRIANGLES PER FRAME (2026-11-17)
+
+P8-126-2 is fixed in the current worktree. Static and animated `model_draw`, static/morphed/animated `ray_mesh`, and static morph draws now consume one shared 16,384-triangle per-frame budget. Every model submission preflights its full triangle count before emission; over-budget calls return 0 and leave the existing draw stream intact. The counter resets at the outer Anvil frame boundary. The existing `ray_mesh` cap is retained and generalized to model submissions.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py -q` — 62 passed in 47.54 s, including model budget boundary/reset and 2 C/Chromium silhouette comparisons; see 8.139 for the later RGBA thresholds. `node --check` for the browser mask and ray benchmark scripts and `git diff --check` pass. Chrome 157 / SwiftShader benchmark rerun: p95/max frame 4.6/5.5 ms (1 sphere), 5.0/5.8 ms (8), 6.1/12.2 ms (32); peak heap 5.1/18.3/66.1 MiB. Ray-mesh depth order and model/ray-mesh morph pixel checks passed, and all published budgets passed.
+
+
+8.139 MEASURE C/CHROMIUM WASM MODEL COLOR PARITY (2026-11-17)
+
+Extended the C/Win32 and wasm/Chrome comparison to capture RGBA frames alongside silhouette masks. The static morph fixture requires silhouette IoU >0.92, visible-pixel mean RGB error <10/255 and >90% of visible pixels within 16 channel levels. The animated+morphed ray-mesh fixture requires IoU >0.92, mean RGB error <25/255 and >90% of visible pixels within 32 channel levels. Both thresholds pass on this Windows/Chrome/SwiftShader setup. The broader parity gap now specifically covers additional cameras, lighting, depth intersections and skinning instead of claiming no color evidence.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_import_bounds.py -q` — 70 passed in 52.47 s. Captured RGBA comparisons pass both fixtures; `git diff --check` and both Node syntax checks pass. These two fixtures are measured baselines, not proof across the full 3D feature matrix.
+
+8.140 IMPLEMENT WASM SCENE LIGHTING CONTROLS (2026-11-17)
+
+The wasm renderer now honors `light(x,y,z)`, `light_ambient(level)` and `light_intensity(level)` using the C runtime defaults, validation, clamping, previous-value returns and shared directional shading formula. Added a Node regression for accepted/rejected light vectors and setter return values, plus a C/Chrome RGBA fixture with custom lighting. Updated the wasm guide, model shading notes and language specification; the parity guide now distinguishes the added lighting case from remaining camera/depth coverage.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_import_bounds.py -q` — 72 passed in 56.02 s, including three browser RGBA comparisons. `git diff --check` passes. This covers tested wasm lighting calls and fixtures, not all camera angles, primitive lighting combinations or intersecting geometry. Work remains uncommitted and unpublished; `.scratch/` remains untouched.
+
+8.141 EXTEND WASM LIGHTING PARITY TO AN ANGLED CAMERA (2026-11-17)
+
+Expanded the custom-light C/Chrome color fixture to use a translated camera, 58-degree field of view, and nonzero yaw/pitch while retaining the invalid zero-light check and custom ambient/intensity settings. This verifies the new wasm shading controls in a second, oblique camera configuration with the model translated in view.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_import_bounds.py -q` — 72 passed in 61.24 s, including all three C/Chrome RGBA fixtures. The focused angled-camera comparison also passed independently. Remaining parity work includes further camera positions, primitive combinations, depth intersections and skinning. Work remains uncommitted and unpublished; `.scratch/` remains untouched.
+
+8.142 RECONCILE WASM PRIMITIVE LIGHTING WITH C (2026-11-17)
+
+C/Chrome testing exposed a real lighting mismatch hidden by the wasm shader's absolute dot product: four wasm cube face windings opposed C, and primitives were shaded two-sided instead of one-sided. The wasm cube now follows C's outward face winding; the shared wasm triangle shader applies one-sided lighting to primitives and two-sided lighting to imported models. The C sphere's per-pixel path now uses the shared scene light, ambient and intensity controls rather than private fixed values. Added a backlit cube and sphere C/Chrome RGBA comparison and clarified the wasm shading documentation.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_import_bounds.py tests/test_lighting.py -q` — 75 passed in 62.90 s; the focused browser parity and C lighting tests also passed (11 tests). `git diff --check` passes. Additional camera configurations and crossing-depth C/Chrome parity remain open. Changes are uncommitted and unpublished; `.scratch/` remains untouched.
+
+8.143 VERIFY C/CHROME DEPTH PARITY ON INTERSECTING GEOMETRY (2026-11-17)
+
+Added a browser parity fixture with two rotated cubes whose surfaces cross in view. It captures both far/near submission orders on C and Chrome, checks C/Chrome silhouettes and color with RGBA-normalized captures, and requires each renderer's image to remain order-independent. This closes the fixture gap for crossing depth, while leaving broader scenes and additional shape combinations open. The C capture helper now converts GDI's BGRA byte order to RGBA before applying pixel thresholds, so non-gray comparisons are meaningful.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_import_bounds.py tests/test_lighting.py -q` — 76 passed in 67.67 s. Focused primitive-lighting, oblique-camera, and crossing-depth browser checks passed; `git diff --check` passed. Additional camera matrices, non-cube intersections and skinning remain open. Changes remain uncommitted and unpublished; `.scratch/` remains untouched.
+
+8.144 VERIFY C/CHROME INTERSECTING GLTF DEPTH PARITY (2026-11-17)
+
+Added a model-level crossing-depth browser fixture: two tilted, differently colored GLTF quads intersect in view and are submitted through `model_draw` in both orders. The C/Win32 and Chrome RGBA captures meet the silhouette, visible-color-error and within-16-level thresholds in each order; each renderer is also order-independent. The C fixture helper's BGRA-to-RGBA normalization is used so red/blue differences are measured correctly. This verifies the wasm model raster path at an actual geometry crossing, in addition to the primitive crossing test.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_import_bounds.py tests/test_lighting.py -q` — 77 passed in 79.13 s, including four C/Chrome browser parity fixtures. The model crossing-depth fixture passed independently. `git diff --check` passes. Skinned models and the full camera/depth workload matrix remain open; changes remain uncommitted and unpublished, and `.scratch/` remains untouched.
+
+8.145 EXERCISE ANIMATED MORPHED MESHES FROM AN OBLIQUE CAMERA (2026-11-17)
+
+Moved the animated+morphed `ray_mesh` C/Chrome RGBA fixture to an offset camera with a 58-degree field of view and nonzero yaw/pitch. The fixture still meets its silhouette and visible-color tolerances, so node animation and morph evaluation are now compared from an oblique view rather than only the baseline camera. Updated the wasm guide to state which camera configuration is covered.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py tests/test_wasm_docs.py -q` — 8 passed in 31.14 s. The oblique animated/morph browser fixture passed independently; `git diff --check` passes. More camera positions, skinned models and broader browser workload parity remain open. Changes remain uncommitted and unpublished; `.scratch/` remains untouched.
+
+8.145 REMOVE DOUBLE ACCOUNTING FROM STATIC WASM RAY-MESHES
+
+The shared wasm model triangle budget revealed a counter mismatch: unmorphed `ray_mesh` goes through `anvil_mesh_draw()`, which accounts submitted triangles, and `anvil_trace_mesh()` was adding the same count again. This limited that path to roughly half of the documented budget. Removed the wrapper's duplicate increment and corrected the per-frame regression to expect 16,384 submitted triangles before the next call is rejected. The test was not run in this audit; the budget correction remains unverified here.
+
+
+8.147 VERIFY THE SHARED WASM MODEL TRIANGLE BUDGET (2026-11-17)
+
+Ran the corrected static `ray_mesh` budget regression as part of the focused wasm suite. The test now confirms 16,384 triangles are accepted, the next quad is rejected as a whole, and accounting resets for a new frame. This verifies the correction described in 8.146 and resolves that regression gap.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_skins.py -q` — 74 passed in 85.77 s; a follow-up docs check passed (2 tests). `git diff --check` passes. The implementation batch was committed as `0b6a74e`; documentation corrections were committed as `4415d21` and `983d81c`, and all three were fast-forward-published to the task branch. `origin/main` remains `118b0f5`. The implementation ledger reports the focused tests passing; this audit did not rerun them. `.scratch/` remains untouched.
+
+
+8.148 ADD WASM SKINNED MODEL_DRAW SUPPORT (2026-11-17)
+
+Wasm now accepts one-skin models through `model_draw`, supports up to 64 joints and four normalized vertex influences, evaluates the first animation clip, and draws bind pose when no clip exists. The runtime transforms vertices with `nodeWorld * inverseBind`, shares the model triangle budget, and skips culling and overhead shadows like C's skinned draw path. Skinned `ray_mesh` remains a located unsupported case. Added Node pose/weight tests and a C/Chrome animated-skin pixel comparison. Updated the model, wasm, engine, language and implementation contract docs.
+
+Validation: the focused suite passed 74 tests, including bind pose, animated full-weight and half-weight blending, source-located `ray_mesh` refusal, and animated skinned model C/Chrome parity. Browser parity is covered by the available Windows/Chrome fixture. `git diff --check` passes. Broader cameras, skinned ray tracing, and skin-plus-morph remain outside this support slice. The implementation batch was committed as `0b6a74e`; documentation corrections were committed as `4415d21` and `983d81c`, and all three were fast-forward-published to the task branch. `origin/main` remains `118b0f5`. The implementation ledger reports the focused tests passing; this audit did not rerun them. `.scratch/` remains untouched.
+
+
+8.149 CHECK SKINNED MODEL PARITY FROM AN OBLIQUE CAMERA (2026-11-17)
+
+Expanded the animated skinned `model_draw` C/Chrome fixture to use an offset camera, 58-degree field of view, and nonzero yaw and pitch. The joint-animated shape still meets the existing silhouette and color thresholds, extending camera coverage for the new skin path. The broader model/camera matrix remains open.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_skinned_model_draw_matches_c -q` — 1 passed in 3.80 s. `git diff --check` passes. This change remains uncommitted and unpublished; `.scratch/` remains untouched.
+
+
+8.150 COMPARE A BLENDED SKIN POSE ACROSS BACKENDS (2026-11-17)
+
+Strengthened the oblique C/Chrome skin fixture to use two joints with 50/50 vertex weights, one animated and one stationary. This checks the rasterized blended result across both backends rather than only a fully weighted joint. The existing comparison thresholds still pass.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_skinned_model_draw_matches_c -q` — 1 passed in 3.75 s. `git diff --check` passes. Broader skin inputs and camera coverage remain open; work is uncommitted and unpublished, and `.scratch/` remains untouched.
+
+
+8.151 CHECK SKIN SHADING WITH CUSTOM WASM LIGHTING (2026-11-17)
+
+The oblique half-weight skin parity fixture now sets a non-default light direction, ambient floor and intensity before drawing. This covers joint blending, camera transformation and shared model shading controls in one browser comparison.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_skinned_model_draw_matches_c -q` — 1 passed in 7.16 s. `git diff --check` passes. Wider camera/light/depth combinations remain open; work remains uncommitted and unpublished, and `.scratch/` remains untouched.
+
+
+8.152 VERIFY THE WASM SKINNED DRAW BUDGET (2026-11-17)
+
+Added an exact shared-budget test for skinned `model_draw`: 16,384 one-triangle submissions are accepted, the next submission is rejected, and the next frame receives a fresh budget. This closes the direct budget-coverage gap introduced when skinned draws were added. The wasm guide and Part Eight evidence now explicitly include skinned submissions in the shared cap.
+
+Validation: `python -m pytest tests/test_wasm.py::WasmModelTests::test_skinned_model_draw_obeys_the_shared_triangle_budget -q` — 1 passed in 1.60 s. `git diff --check` passes. The full roadmap remains active; broader camera/depth parity and unsupported skinned `ray_mesh` remain open.
+
+
+8.153 COMPARE PLACED SKINNED MODELS ACROSS BACKENDS (2026-11-17)
+
+Extended the oblique C/Chrome skin fixture with nonzero translation, non-unit scale, and rotation on all three axes. The comparison still passes with the animated half-weight joint blend and custom lighting, exercising the full skin-to-placement transform chain.
+
+Validation: the focused skin browser test passed independently (1 passed in 3.86 s). Final focused verification: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_skins.py -q` — 75 passed in 85.87 s. `git diff --check` passes. Wider model/depth scenarios remain open; this change is local and unpublished.
+
+
+8.154 VERIFY CROSSING DEPTH WITH ANIMATED SKINNING (2026-11-17)
+
+Added a C/Chrome comparison where an animated 50/50 skinned triangle crosses a rotated static GLTF quad. The fixture renders both submission orders, verifies each backend is order-independent, and checks silhouette plus visible color agreement across C and wasm/Chrome. The skinned depth case now has direct evidence; broader camera/depth matrices remain open.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_skins.py -q` — 76 passed in 96.85 s, including the new two-order browser fixture. `git diff --check` passes. `.scratch/` remains untouched.
+
+
+8.155 ADD CONSERVATIVE MORPH-GROUP CULLING FOR WASM (2026-11-17)
+
+Wasm static morph draws and ray meshes now use conservative per-geometry
+bounding spheres that cover every vertex at both the glTF default weights and
+all supported 0–1 target overrides. The runtime uses these envelopes before
+emitting triangles, retains the shared budget for visible groups only, and
+bypasses culling when shadows are enabled. The C model path accepts the same
+group-bound data and culls individual morph groups. Updated model and wasm
+references; replaced a stale test that still expected wasm morph models to be
+rejected.
+
+Validation: the browser exact-RGBA regression covers the full nine-pose grid
+for two targets and the Node test verifies that offscreen groups submit zero
+triangles. `node tools/bench_wasm_morph_culling.mjs` measured 1,000 offscreen
+instances with 16 triangles each on Chrome 157 / SwiftShader, Ryzen 7 9800X3D:
+max trial p95 was 0.2 ms with culling and 8.3 ms without (97.6% lower); maximum
+sampled frames were 0.3 ms and 13.5 ms. This is headless software-renderer
+evidence for this workload only. Validation: `python -m pytest
+tests/test_gltf_morph.py tests/test_wasm.py tests/test_wasm_docs.py
+tests/test_wasm_browser_parity.py -q` — 83 passed in 99.30 s. `node --check`
+passes for both wasm benchmark/capture scripts, and `git diff --check` passes.
+Benchmark data is written under `%TEMP%`; `.scratch/` stays outside the tracked
+diff.
+
+
+8.156 VERIFY THE MORPH STATE LIMIT AND SHARED WASM MODEL BUDGET (2026-11-17)
+
+Rechecked the stale Part Eight statuses against the current source and regressions.
+The 33rd morph asset is rejected with a source-located error, while in-range C
+and wasm morph defaults/overrides work. The shared wasm model budget covers
+exact-limit acceptance, atomic overflow rejection, cross-path accounting and
+frame reset. The 1,000-call / 16-triangle benchmark from 8.155 exercises 16,000
+model triangles in the uncullled path and records p95/max frame time.
+
+Validation: `python -m pytest
+tests/test_gltf_import_bounds.py::GltfImportBoundsTests::test_a_morphing_model_past_the_runtime_state_slots_is_refused
+tests/test_gltf_morph.py
+tests/test_wasm.py::WasmModelTests::test_static_ray_mesh_has_a_per_frame_triangle_budget
+tests/test_wasm.py::WasmModelTests::test_model_draw_has_a_shared_per_frame_triangle_budget
+tests/test_wasm.py::WasmModelTests::test_skinned_model_draw_obeys_the_shared_triangle_budget
+tests/test_wasm.py::WasmModelTests::test_morphed_model_draw_applies_static_defaults_and_override
+tests/test_wasm.py::WasmModelTests::test_morphed_ray_mesh_preserves_group_defaults_and_global_override -q`
+— 16 passed in 18.50 s. P8-126-1 and P8-126-2 are marked resolved in the desktop
+roadmap. Independent morph state for repeated instances (P8-126-F1) remains the
+next open item in this local slice.
+
+
+8.157 PRESERVE GLTF MODEL ARRAY PRECISION (2026-11-17)
+
+Changed `compiler/gltf.py::_double_array()` from six significant digits to 17,
+which round-trips finite binary64 values used in baked geometry, morph deltas,
+animation arrays and conservative bounds. Added a regression that imports
+float32 GLTF coordinates at high precision and small/large magnitudes, parses
+the generated C literals, and compares them exactly with the importer output.
+Updated the model guide and marked P8-52-3 resolved in the desktop roadmap.
+
+Validation: `python -m pytest tests/test_gltf_model.py tests/test_gltf_animation.py
+tests/test_gltf_morph.py tests/test_gltf_import_bounds.py
+tests/test_wasm.py::WasmModelTests::test_morphed_model_culls_only_groups_outside_all_supported_poses
+tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_morph_culling_matches_unculled_pixels_for_all_weight_combinations -q`
+— 36 passed in 33.91 s. The suite also exposed a stale wasm animation test that
+still expected the now-supported backend to reject animated models; it now
+asserts successful compilation. C/Chrome morph culling parity and import
+precision cases passed.
+
+
+8.158 BOUND GLTF ACCESSORS TO DECLARED PARENT RANGES (2026-11-17)
+
+`compiler/gltf.py::_accessor` now checks referenced indices and declared byte lengths,
+validates offsets, positive counts, component alignment and stride rules, and ensures
+each accessor's last element fits inside its bufferView. It rejects a backing buffer
+shorter than its declared length and views extending beyond that declaration.
+Malformed imports continue through the compiler's source-located diagnostic path.
+Updated animation, morph and skin fixtures to include required alignment padding.
+
+Validation: `python -m pytest tests/test_gltf_import_bounds.py tests/test_gltf_model.py
+tests/test_gltf_animation.py tests/test_gltf_morph.py tests/test_gltf_skins.py -q`
+— 40 passed in 35.03 s. Bounds regressions prove deterministic source-located errors
+and no executable for adjacent-view overrun, truncated declared buffer, misalignment,
+invalid stride and zero count. P8-52-1 is resolved.
+
+
+8.159 ROUTE MALFORMED GLTF STRUCTURES THROUGH COMPILE DIAGNOSTICS (2026-11-17)
+
+Added shared glTF container validation for root, arrays, nested object shapes and
+scene/node/mesh/skin/accessor/material/animation references before traversal. A
+loader boundary also converts remaining malformed-structure indexing and value
+conversion exceptions into `ModelError`; model lowering reports it at the source
+call location. Regressions cover malformed roots and collections, out-of-range
+references, invalid transforms, animation samplers and skin joints.
+
+Validation: the completed focused loader run recorded in entry 8.160 passes 43
+tests, including all malformed-structure regressions. CLI cases assert a located
+diagnostic, no traceback and no executable. P8-52-2 is resolved.
+
+
+8.160 DISCOVER GLTF ASSETS FROM REACHABLE PARSED EXPRESSIONS (2026-11-17)
+
+Removed raw-text regex model prescanning. Reachable expression lowering now
+registers model assets; model arrays are inserted into generated C after reachable
+function bodies and setup expressions have been lowered. This prevents text in
+comments, string literals and unreachable functions from causing asset loads while
+preserving located errors for actual reachable model calls.
+
+Validation: `python -m pytest tests/test_gltf_import_bounds.py tests/test_gltf_model.py
+tests/test_gltf_animation.py tests/test_gltf_morph.py tests/test_gltf_skins.py -q`
+— 43 passed in 37.43 s. This includes malformed-input located CLI checks,
+comment/string/dead-function asset-discovery coverage, model precision, animated
+and skinned model compilation, morph behavior, and the reachable missing-asset
+diagnostic. P8-52-4 is resolved.
+
+
+8.161 VERIFY WASM INPUT RELEASE AND MODEL TRIANGLE BUDGET (2026-11-17)
+
+Revalidated two stale open items against the current worktree. The wasm host
+releases held input on blur and hidden-tab transitions; tests prove the held and
+pressed states clear and a subsequent key press is fresh (P8-62-1). Static
+unmorphed `ray_mesh` now charges its submissions once through `anvil_mesh_draw`;
+its two-frame test accepts 16,384 triangles, rejects the next quad and confirms
+frame reset. Shared `model_draw` and mixed-path tests preserve the same limit
+(P8-145-1 / P8-126-2).
+
+Validation: `python -m pytest
+tests/test_wasm.py::WasmFocusReleaseTests
+tests/test_wasm.py::WasmModelTests::test_static_ray_mesh_has_a_per_frame_triangle_budget
+tests/test_wasm.py::WasmModelTests::test_model_draw_has_a_shared_per_frame_triangle_budget
+tests/test_wasm.py::WasmModelTests::test_model_draw_budget_is_shared_with_ray_mesh_and_morph_draw -q`
+— 5 passed in 3.58 s. P8-62-1 and P8-145-1 are resolved in the current local
+worktree; no GitHub issue was closed. P8-62-2 large-angle wasm reduction remains
+open.
+
+
+8.162 VERIFY LARGE-ANGLE WASM TRIG RANGE AND RECORD ITS DOMAIN (2026-11-17)
+
+Rechecked the double-double WASM angle reducer against native C libm at magnitudes
+from 1e3 through 1e20 radians, including values beyond 2^52 turns. Inputs above
+the documented 1e20 limit use phase zero in WASM (`sin`/`tan`=0, `cos`=1); the
+negative out-of-domain case verifies the same contract. The language specification
+now states this backend-specific limit and behavior. P8-62-2 is resolved for the
+documented bounded domain.
+
+Validation: `python -m pytest
+tests/test_wasm.py::WasmAngleMagnitudeTests::test_reduction_holds_past_two_to_the_fifty_second_turns
+tests/test_wasm.py::WasmFocusReleaseTests
+tests/test_wasm.py::WasmModelTests::test_static_ray_mesh_has_a_per_frame_triangle_budget
+tests/test_wasm.py::WasmModelTests::test_model_draw_has_a_shared_per_frame_triangle_budget
+tests/test_wasm.py::WasmModelTests::test_model_draw_budget_is_shared_with_ray_mesh_and_morph_draw -q`
+— 6 passed in 11.35 s. Angle pairs through 1e20 remain within 0.01 in the
+1,000,000-scaled output comparison with C; ±1e21 return the documented phase-zero
+values.
+
+
+8.163 VERIFY ANIMATED RAY-MESH POSE SNAPSHOTS AND MORPH CONTROLS (2026-11-17)
+
+Verified the animated ray-mesh fixes against the prior P8-113 review. Each queued
+animated submission owns copied posed vertices and BVH data, so a later submission
+of the same asset at another clip time cannot overwrite it (P8-113-1). The animated
+ray lowering also supplies morph deltas, group defaults and current overrides, so
+animation and morph controls compose instead of silently dropping morph weights
+(P8-113-2).
+
+Validation: `python -m pytest
+tests/test_gltf_ray_mesh.py::AnimatedRayMeshTests::test_same_asset_pose_is_snapshotted_per_queued_instance
+tests/test_gltf_ray_mesh.py::AnimatedRayMeshTests::test_animated_morph_model_draw_supports_all_pose_controls
+tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_morphed_ray_mesh_matches_c_silhouette -q`
+— 3 passed in 12.76 s. The first measures both poses in one deferred render; the
+second isolates animation-only, morph-only and combined changes; the third compares
+the combined output between C and Chrome/WASM. P8-113-1/2 are resolved in the
+current worktree.
+
+
+8.164 REVERIFY SAVE, TANGENT, MEMORY-BENCHMARK AND WASM-DOC FINDINGS (2026-11-17)
+
+Revalidated the older P8-109/110 findings against the current source. C and WASM
+reject malformed save-version whitespace consistently; WASM tangent parity holds
+near the tested poles; IndexedDB migration copies three adjacent legacy slots and
+cleans up their old keys; and the WASM limits docs match the capability sections.
+Strengthened the network-memory benchmark tests to prove timeout and missing
+completion output cannot be reported as valid results.
+
+Validation: `python -m pytest
+tests/test_saves.py::SaveVersionTests::test_malformed_version_whitespace_is_rejected
+tests/test_saves.py::SaveVersionTests::test_wasm_rejects_the_same_malformed_version
+tests/test_tan.py::TanParityTests::test_tan_is_identical_on_c_and_wasm
+tests/test_wasm.py::WasmPageSaveTests::test_indexeddb_migration_copies_adjacent_legacy_slots
+tests/test_wasm_docs.py::WasmDocsTests::test_limits_do_not_contradict_capability_sections
+tests/test_memory_budget.py::MemoryBudgetTests::test_the_network_scene_runs_with_a_peer
+tests/test_memory_budget.py::MemoryBudgetTests::test_run_timeout_is_not_reported_as_a_memory_measurement
+tests/test_memory_budget.py::MemoryBudgetTests::test_incomplete_network_output_is_not_accepted -q`
+— 8 passed in 7.78 s. P8-109-1/2/3 and P8-110-1/3 are resolved in the current
+worktree; no issue tracker items were closed.
+
+
+8.165 RUN PROGRAMS FROM THEIR PROJECT OR SOURCE DIRECTORY (2026-11-17)
+
+`--run` now launches native, C and WASM programs with `cwd` set to the project
+manifest directory or, for a standalone source, the source file's directory. The
+executable and wasm module paths are resolved before the child process changes
+directories. Updated bundled examples to use asset paths relative to their source
+directory and documented the run-root rule.
+
+Validation: `python -m pytest tests/test_commands.py::RunCommandTests -q` — 4
+passed in 1.67 s before the final expanded external-directory case. The expanded
+`test_run_resolves_relative_assets_from_source_folder` then passed independently
+(1 passed in 2.42 s), loading a BMP from both a standalone source and a manifest
+project with a nested entry while invoked from an unrelated caller directory. It
+also verifies the native `--run` launch and relative output path. P8-87-1 is resolved.
+
+8.166 COMPLETE GLTF STRIDE AND NORMALIZATION VALIDATION (2026-11-17)
+
+Closed the P8-165 gaps in glTF accessor validation. Defined byteStride values
+must be 4-byte aligned, at most 252 bytes, no larger than their bufferView, and
+used only for vertex attributes (including morph POSITION data). Accessor
+normalized metadata must be a JSON boolean; true is limited to BYTE, UNSIGNED_BYTE,
+SHORT and UNSIGNED_SHORT, and is rejected for JOINTS_0. Added source-located
+compile regressions asserting malformed files produce no executable, including
+6-byte/oversized/non-vertex strides, string normalized values, normalized FLOAT
+and UNSIGNED_INT, and normalized joint indices.
+
+Validation: `python -m pytest tests/test_gltf_import_bounds.py tests/test_gltf_model.py
+tests/test_gltf_animation.py tests/test_gltf_morph.py tests/test_gltf_skins.py -q`
+— 44 passed in 49.46 s. `git diff --check -- compiler/gltf.py
+tests/test_gltf_import_bounds.py` passed (Git reported its existing LF-to-CRLF
+normalization notice for the test file). P8-165-1/2 are resolved locally; no
+issue tracker items were closed. P8-126-F1 and P8-103-2 remain open.
+
+8.167 ADD GENERATION-SAFE PER-INSTANCE MORPH CONTROLS (2026-11-17)
+
+Resolved P8-126-F1 locally. Added `model_instance(path)`,
+`model_instance_morph(path,handle,index,weight)`,
+`model_draw_instance(path,handle,x,y,z,scale,rx,ry,rz)`, and
+`model_instance_destroy(path,handle)`. Instance handles are tied to one compiled
+morph asset, use a bounded 64-slot C/wasm table, and advance a generation on
+destroy; exhausted generations retire a slot instead of allowing stale-handle
+aliasing. Stale or asset-mismatched handles cannot change weights or draw. The
+existing asset-wide `model_morph` / `model_draw` behavior remains available.
+Instance draws support static and animated unskinned morph assets; skinned or
+non-morph assets receive a located compile error. Draw handles must be stored in
+a variable, avoiding duplicate evaluation of a possibly stateful expression.
+
+Acceptance evidence: the C/Chrome parity regression renders two copies of one
+asset in the same frame with different weights, swaps which handle is deformed,
+proves the pixel silhouettes change on both backends, and checks C/WASM
+silhouette agreement for each assignment. C and Node/WASM lifecycle tests each
+run 70 create/destroy reuse cycles and verify stale morph calls return 0, stale
+draw calls return 0, and fresh handles remain functional.
+
+Validation: `python -m py_compile compiler/expressions.py compiler/wasm.py`; `python -m pytest tests/test_gltf_morph.py tests/test_wasm.py::WasmModelTests::test_instance_morph_draws_use_independent_generation_checked_handles tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_independent_morph_instances_render_distinct_c_and_wasm_poses tests/test_wasm_docs.py -q` — 17 passed in 21.38 s. Scoped `git diff --check` passed. Documentation updated in MODELS, LANGUAGE_SPEC and WASM. No issue tracker item was closed.

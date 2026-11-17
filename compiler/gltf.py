@@ -21,10 +21,10 @@ textures and sparse accessors.
 from __future__ import annotations
 
 import base64
+import functools
 import json
 import math
 import pathlib
-import re
 import struct
 
 MAX_TRIANGLES = 200_000
@@ -47,6 +47,20 @@ DEFAULT_COLOR = (204, 204, 217)
 
 class ModelError(Exception):
     pass
+
+
+def _translate_malformed_structure(loader):
+    """Keep malformed JSON failures inside the importer's diagnostic contract."""
+    @functools.wraps(loader)
+    def wrapped(*args, **kwargs):
+        try:
+            return loader(*args, **kwargs)
+        except ModelError:
+            raise
+        except (KeyError, IndexError, TypeError, ValueError, OverflowError) as error:
+            raise ModelError(f"malformed glTF structure: {error}") from None
+
+    return wrapped
 
 
 def _buffer_bytes(
@@ -74,28 +88,105 @@ def _buffer_bytes(
 
 
 def _accessor(
-    document: dict, index: int, base_dir: pathlib.Path, binary: bytes | None = None
+    document: dict, index: int, base_dir: pathlib.Path, binary: bytes | None = None,
+    *, vertex_attribute: bool = False, semantic: str | None = None,
 ) -> list[tuple]:
-    accessor = document["accessors"][index]
+    accessors = document.get("accessors")
+    if (
+        not isinstance(accessors, list)
+        or not isinstance(index, int)
+        or isinstance(index, bool)
+        or index < 0
+        or index >= len(accessors)
+        or not isinstance(accessors[index], dict)
+    ):
+        raise ModelError("an accessor index is out of range")
+    accessor = accessors[index]
     if accessor.get("sparse"):
         raise ModelError("sparse accessors are not supported")
-    view = document["bufferViews"][accessor["bufferView"]]
-    buffer = _buffer_bytes(document, view["buffer"], base_dir, binary)
-    component = accessor["componentType"]
+    views = document.get("bufferViews")
+    view_index = accessor.get("bufferView")
+    if (
+        not isinstance(views, list)
+        or not isinstance(view_index, int)
+        or isinstance(view_index, bool)
+        or view_index < 0
+        or view_index >= len(views)
+        or not isinstance(views[view_index], dict)
+    ):
+        raise ModelError("an accessor bufferView index is out of range")
+    view = views[view_index]
+    buffers = document.get("buffers")
+    buffer_index = view.get("buffer")
+    if (
+        not isinstance(buffers, list)
+        or not isinstance(buffer_index, int)
+        or isinstance(buffer_index, bool)
+        or buffer_index < 0
+        or buffer_index >= len(buffers)
+        or not isinstance(buffers[buffer_index], dict)
+    ):
+        raise ModelError("a bufferView buffer index is out of range")
+
+    def nonnegative_integer(value, label: str, *, positive: bool = False) -> int:
+        minimum = 1 if positive else 0
+        if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+            qualifier = "positive " if positive else "non-negative "
+            raise ModelError(f"{label} must be a {qualifier}integer")
+        return value
+
+    buffer_spec = buffers[buffer_index]
+    declared_buffer_length = nonnegative_integer(
+        buffer_spec.get("byteLength"), "a buffer byteLength", positive=True
+    )
+    view_offset = nonnegative_integer(view.get("byteOffset", 0), "a bufferView byteOffset")
+    view_length = nonnegative_integer(view.get("byteLength"), "a bufferView byteLength", positive=True)
+    if view_offset + view_length > declared_buffer_length:
+        raise ModelError("a bufferView reads past its declared buffer")
+    buffer = _buffer_bytes(document, buffer_index, base_dir, binary)
+    if len(buffer) < declared_buffer_length:
+        raise ModelError("a buffer is shorter than its declared byteLength")
+
+    component = accessor.get("componentType")
     if component not in COMPONENTS:
         raise ModelError(f"unsupported accessor component type {component}")
     fmt, size, scale = COMPONENTS[component]
-    width = TYPE_SIZE[accessor["type"]]
-    stride = view.get("byteStride", size * width)
-    offset = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
-    count = accessor["count"]
+    accessor_type = accessor.get("type")
+    if accessor_type not in TYPE_SIZE:
+        raise ModelError(f"unsupported accessor type {accessor_type}")
+    width = TYPE_SIZE[accessor_type]
+    element_size = size * width
+    accessor_offset = nonnegative_integer(
+        accessor.get("byteOffset", 0), "an accessor byteOffset"
+    )
+    count = nonnegative_integer(accessor.get("count"), "an accessor count", positive=True)
+    if "byteStride" in view:
+        if not vertex_attribute:
+            raise ModelError("byteStride is only valid for vertex attribute accessors")
+        stride = nonnegative_integer(view["byteStride"], "a bufferView byteStride", positive=True)
+        if stride < 4 or stride > 252 or stride % 4 or stride % size or stride > view_length:
+            raise ModelError("a bufferView byteStride must be 4-252 bytes, component-aligned, and no larger than its bufferView")
+    else:
+        stride = element_size
+    if stride < element_size or stride % size:
+        raise ModelError("a bufferView byteStride is smaller than or misaligned for its accessor")
+    if view_offset % size or accessor_offset % size:
+        raise ModelError("an accessor is not aligned to its component size")
+    if accessor_offset + (count - 1) * stride + element_size > view_length:
+        raise ModelError("an accessor reads past its declared bufferView")
+    offset = view_offset + accessor_offset
+    normalized = accessor.get("normalized", False)
+    if not isinstance(normalized, bool):
+        raise ModelError("an accessor normalized value must be a boolean")
+    if normalized and component not in (5120, 5121, 5122, 5123):
+        raise ModelError("normalized is only valid for BYTE, UNSIGNED_BYTE, SHORT, or UNSIGNED_SHORT accessors")
+    if normalized and semantic == "JOINTS_0":
+        raise ModelError("JOINTS_0 accessors cannot be normalized")
     values = []
     for i in range(count):
         base = offset + i * stride
-        if base + size * width > len(buffer):
-            raise ModelError("an accessor reads past the end of its buffer")
         row = struct.unpack_from("<" + fmt * width, buffer, base)
-        if accessor.get("normalized") and scale != 1.0:
+        if normalized and scale != 1.0:
             row = tuple(value / scale for value in row)
         values.append(row)
     return values
@@ -192,7 +283,7 @@ def _primitive(
     attributes = primitive.get("attributes", {})
     if "POSITION" not in attributes:
         raise ModelError("a primitive has no POSITION attribute")
-    positions = _accessor(document, attributes["POSITION"], base_dir, binary)
+    positions = _accessor(document, attributes["POSITION"], base_dir, binary, vertex_attribute=True, semantic="POSITION")
     if attributes.get("POSITION") is not None and len(positions) and len(positions[0]) != 3:
         raise ModelError("POSITION must be a VEC3 accessor")
     if any(not math.isfinite(float(value)) for row in positions for value in row):
@@ -207,7 +298,7 @@ def _primitive(
 
     colours = None
     if "COLOR_0" in attributes:
-        raw = _accessor(document, attributes["COLOR_0"], base_dir, binary)
+        raw = _accessor(document, attributes["COLOR_0"], base_dir, binary, vertex_attribute=True, semantic="COLOR_0")
         colours = [tuple(max(0, min(255, int(round(v * 255.0)))) for v in row[:3]) for row in raw]
     fallback = _material_colour(document, primitive)
 
@@ -216,7 +307,7 @@ def _primitive(
     for target in targets:
         if "POSITION" not in target:
             raise ModelError("a morph target needs a POSITION delta")
-        raw = _accessor(document, target["POSITION"], base_dir, binary)
+        raw = _accessor(document, target["POSITION"], base_dir, binary, vertex_attribute=True, semantic="POSITION")
         if any(not math.isfinite(float(value)) for row in raw for value in row):
             raise ModelError("a morph target contains a non-finite value")
         # Only the linear part of the world matrix applies to a delta; the
@@ -275,6 +366,7 @@ def _container(path: pathlib.Path) -> tuple[dict, bytes | None]:
             document = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, ValueError) as error:
             raise ModelError(f"{path.name} is not valid glTF JSON: {error}") from error
+        _validate_document(document, path.name)
         return document, None
     if suffix != ".glb":
         raise ModelError("only .gltf and .glb models are supported")
@@ -304,7 +396,144 @@ def _container(path: pathlib.Path) -> tuple[dict, bytes | None]:
             binary = payload
     if document is None:
         raise ModelError("the GLB file has no JSON chunk")
+    _validate_document(document, path.name)
     return document, binary
+
+
+def _validate_document(document: object, name: str) -> None:
+    """Reject malformed structural JSON before loaders traverse its graph."""
+    if not isinstance(document, dict):
+        raise ModelError(f"{name} root must be a JSON object")
+    asset = document.get("asset")
+    if not isinstance(asset, dict) or not isinstance(asset.get("version"), str):
+        raise ModelError(f"{name} has no valid glTF 'asset' block")
+
+    def array(key: str, required: bool = False) -> list:
+        value = document.get(key, [] if not required else None)
+        if not isinstance(value, list):
+            raise ModelError(f"glTF {key} must be an array")
+        return value
+
+    buffers = array("buffers")
+    views = array("bufferViews")
+    accessors = array("accessors")
+    meshes = array("meshes")
+    nodes = array("nodes")
+    scenes = array("scenes")
+    skins = array("skins")
+    animations = array("animations")
+    for index, value in enumerate(buffers):
+        if not isinstance(value, dict):
+            raise ModelError(f"glTF buffer {index} must be an object")
+    for index, view in enumerate(views):
+        if not isinstance(view, dict):
+            raise ModelError(f"glTF bufferView {index} must be an object")
+        buffer_index = view.get("buffer")
+        if not isinstance(buffer_index, int) or isinstance(buffer_index, bool) or not 0 <= buffer_index < len(buffers):
+            raise ModelError(f"glTF bufferView {index} references an invalid buffer")
+    for index, accessor in enumerate(accessors):
+        if not isinstance(accessor, dict):
+            raise ModelError(f"glTF accessor {index} must be an object")
+        view_index = accessor.get("bufferView")
+        if view_index is not None and (
+            not isinstance(view_index, int) or isinstance(view_index, bool)
+            or not 0 <= view_index < len(views)
+        ):
+            raise ModelError(f"glTF accessor {index} references an invalid bufferView")
+    for index, mesh in enumerate(meshes):
+        if not isinstance(mesh, dict):
+            raise ModelError(f"glTF mesh {index} must be an object")
+        primitives = mesh.get("primitives", [])
+        if not isinstance(primitives, list):
+            raise ModelError(f"glTF mesh {index} primitives must be an array")
+        for primitive in primitives:
+            if not isinstance(primitive, dict):
+                raise ModelError(f"glTF mesh {index} primitive must be an object")
+            attributes = primitive.get("attributes", {})
+            targets = primitive.get("targets", [])
+            if not isinstance(attributes, dict) or not isinstance(targets, list):
+                raise ModelError("glTF primitive attributes and targets must be objects/arrays")
+            for accessor_index in list(attributes.values()) + ([primitive["indices"]] if "indices" in primitive else []):
+                if not isinstance(accessor_index, int) or isinstance(accessor_index, bool) or not 0 <= accessor_index < len(accessors):
+                    raise ModelError("glTF primitive references an invalid accessor")
+            material_index = primitive.get("material")
+            if material_index is not None:
+                materials = array("materials")
+                if not isinstance(material_index, int) or isinstance(material_index, bool) or not 0 <= material_index < len(materials):
+                    raise ModelError("glTF primitive references an invalid material")
+            if any(not isinstance(target, dict) for target in targets):
+                raise ModelError("glTF morph targets must be objects")
+            for target in targets:
+                for accessor_index in target.values():
+                    if not isinstance(accessor_index, int) or isinstance(accessor_index, bool) or not 0 <= accessor_index < len(accessors):
+                        raise ModelError("glTF morph target references an invalid accessor")
+    for index, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            raise ModelError(f"glTF node {index} must be an object")
+        for key in ("children",):
+            if key in node and not isinstance(node[key], list):
+                raise ModelError(f"glTF node {index} {key} must be an array")
+        children = node.get("children", [])
+        if any(not isinstance(child, int) or isinstance(child, bool) or not 0 <= child < len(nodes) for child in children):
+            raise ModelError("a node index is out of range")
+        if "mesh" in node and (
+            not isinstance(node["mesh"], int) or isinstance(node["mesh"], bool)
+            or not 0 <= node["mesh"] < len(meshes)
+        ):
+            raise ModelError("a mesh index is out of range")
+        if "skin" in node and (
+            not isinstance(node["skin"], int) or isinstance(node["skin"], bool)
+            or not 0 <= node["skin"] < len(skins)
+        ):
+            raise ModelError("a node references an invalid skin")
+    for index, scene in enumerate(scenes):
+        if not isinstance(scene, dict) or not isinstance(scene.get("nodes", []), list):
+            raise ModelError(f"glTF scene {index} must be an object with a node array")
+        if any(
+            not isinstance(node, int) or isinstance(node, bool) or not 0 <= node < len(nodes)
+            for node in scene.get("nodes", [])
+        ):
+            raise ModelError("a scene node index is out of range")
+    if scenes:
+        scene_index = document.get("scene", 0)
+        if not isinstance(scene_index, int) or isinstance(scene_index, bool) or not 0 <= scene_index < len(scenes):
+            raise ModelError("the scene index is out of range")
+    for index, skin in enumerate(skins):
+        if not isinstance(skin, dict) or not isinstance(skin.get("joints", []), list):
+            raise ModelError(f"glTF skin {index} must be an object with a joint array")
+        if any(not isinstance(node, int) or isinstance(node, bool) or not 0 <= node < len(nodes) for node in skin.get("joints", [])):
+            raise ModelError("a skin joint is not a node")
+        if "inverseBindMatrices" in skin:
+            accessor_index = skin["inverseBindMatrices"]
+            if not isinstance(accessor_index, int) or isinstance(accessor_index, bool) or not 0 <= accessor_index < len(accessors):
+                raise ModelError("a skin references an invalid inverse bind accessor")
+    for index, animation in enumerate(animations):
+        if not isinstance(animation, dict):
+            raise ModelError(f"glTF animation {index} must be an object")
+        for key in ("samplers", "channels"):
+            if key in animation and not isinstance(animation[key], list):
+                raise ModelError(f"glTF animation {index} {key} must be an array")
+        samplers = animation.get("samplers", [])
+        channels = animation.get("channels", [])
+        for sampler in samplers:
+            if not isinstance(sampler, dict):
+                raise ModelError("glTF animation sampler must be an object")
+            for key in ("input", "output"):
+                accessor_index = sampler.get(key)
+                if not isinstance(accessor_index, int) or isinstance(accessor_index, bool) or not 0 <= accessor_index < len(accessors):
+                    raise ModelError("glTF animation sampler references an invalid accessor")
+        for channel in channels:
+            if not isinstance(channel, dict) or not isinstance(channel.get("target", {}), dict):
+                raise ModelError("glTF animation channel target must be an object")
+            sampler_index = channel.get("sampler")
+            if not isinstance(sampler_index, int) or isinstance(sampler_index, bool) or not 0 <= sampler_index < len(samplers):
+                raise ModelError("glTF animation channel references an invalid sampler")
+            target = channel.get("target", {})
+            if "node" in target and (
+                not isinstance(target["node"], int) or isinstance(target["node"], bool)
+                or not 0 <= target["node"] < len(nodes)
+            ):
+                raise ModelError("an animation targets a node that does not exist")
 
 
 MAX_MORPH_TARGETS = 8
@@ -400,6 +629,7 @@ def _static_document(path: pathlib.Path) -> tuple[dict, bytes | None]:
     return document, binary
 
 
+@_translate_malformed_structure
 def load_triangles(path: pathlib.Path) -> list[float]:
     document, binary = _static_document(path)
     triangles, _ = _static_walk(document, binary, path.parent)
@@ -408,6 +638,7 @@ def load_triangles(path: pathlib.Path) -> list[float]:
     return triangles
 
 
+@_translate_malformed_structure
 def load_morphed(path: pathlib.Path) -> dict:
     """Bake a static model with morph target deltas.
 
@@ -431,12 +662,44 @@ def load_morphed(path: pathlib.Path) -> dict:
         raise ModelError("every primitive must use the same morph target count")
     if targets > MAX_MORPH_TARGETS:
         raise ModelError(f"a model may use at most {MAX_MORPH_TARGETS} morph targets")
+    group_bounds: list[float] = []
+    for group, (first, count) in enumerate(
+        zip(morph_groups[::2], morph_groups[1::2])
+    ):
+        if count <= 0:
+            group_bounds.extend((0.0, 0.0, 0.0, 0.0))
+            continue
+        defaults = group_defaults[group]
+        lower = [math.inf, math.inf, math.inf]
+        upper = [-math.inf, -math.inf, -math.inf]
+        for triangle in range(first, first + count):
+            for corner in range(3):
+                vertex = triangle * 3 + corner
+                base = triangles[triangle * 12 + corner * 3 : triangle * 12 + corner * 3 + 3]
+                delta_start = vertex * targets * 3
+                for axis in range(3):
+                    low = high = base[axis]
+                    for target in range(targets):
+                        delta = morph[delta_start + target * 3 + axis]
+                        weight_low = min(0.0, 1.0, defaults[target])
+                        weight_high = max(0.0, 1.0, defaults[target])
+                        low += min(delta * weight_low, delta * weight_high)
+                        high += max(delta * weight_low, delta * weight_high)
+                    lower[axis] = min(lower[axis], low)
+                    upper[axis] = max(upper[axis], high)
+        centre = [(lower[axis] + upper[axis]) / 2.0 for axis in range(3)]
+        radius = math.sqrt(
+            sum(((upper[axis] - lower[axis]) / 2.0) ** 2 for axis in range(3))
+        )
+        radius += max(1.0, *(abs(value) for value in (*lower, *upper))) * 1e-9
+        group_bounds.extend((*centre, radius))
     return {
         "vertices": triangles,
         "morph": morph,
         "morph_count": targets,
         "morph_defaults": [weight for group in group_defaults for weight in group],
         "morph_groups": morph_groups,
+        "morph_group_bounds": group_bounds,
     }
 
 
@@ -579,6 +842,7 @@ def _clip(
     return tracks, times, values, length
 
 
+@_translate_malformed_structure
 def load_skinned(path: pathlib.Path) -> dict:
     """Bake a skinned model: skin joints, inverse bind matrices and weights.
 
@@ -676,16 +940,16 @@ def _skinned_primitive(
     for required in ("POSITION", "JOINTS_0", "WEIGHTS_0"):
         if required not in attributes:
             raise ModelError(f"a skinned primitive needs {required}")
-    positions = _accessor(document, attributes["POSITION"], base_dir, binary)
-    joints = _accessor(document, attributes["JOINTS_0"], base_dir, binary)
-    weights = _accessor(document, attributes["WEIGHTS_0"], base_dir, binary)
+    positions = _accessor(document, attributes["POSITION"], base_dir, binary, vertex_attribute=True, semantic="POSITION")
+    joints = _accessor(document, attributes["JOINTS_0"], base_dir, binary, vertex_attribute=True, semantic="JOINTS_0")
+    weights = _accessor(document, attributes["WEIGHTS_0"], base_dir, binary, vertex_attribute=True, semantic="WEIGHTS_0")
     if primitive.get("indices") is not None:
         indices = [int(row[0]) for row in _accessor(document, primitive["indices"], base_dir, binary)]
     else:
         indices = list(range(len(positions)))
     colours = None
     if "COLOR_0" in attributes:
-        raw = _accessor(document, attributes["COLOR_0"], base_dir, binary)
+        raw = _accessor(document, attributes["COLOR_0"], base_dir, binary, vertex_attribute=True, semantic="COLOR_0")
         colours = [tuple(max(0, min(255, int(round(v * 255.0)))) for v in row[:3]) for row in raw]
     fallback = _material_colour(document, primitive)
     out: list[float] = []
@@ -718,6 +982,7 @@ def _skinned_primitive(
     return out
 
 
+@_translate_malformed_structure
 def load_animated(path: pathlib.Path) -> dict:
     """Bake a model with its node hierarchy and one animation clip.
 
@@ -833,31 +1098,8 @@ def load_animated(path: pathlib.Path) -> dict:
 # ---- Compiler integration -------------------------------------------------
 
 _registry: dict[str, tuple[str, int, list[float], tuple[float, float, float, float]]] = {}
-_prescan: set[str] = set()
-PATTERN = re.compile(
-    r'\b(?:model_draw|ray_mesh|model_animate|model_animation_length|model_morph)\s*\(\s*"((?:[^"\\]|\\.)*)"'
-)
-
-
 def reset() -> None:
     _registry.clear()
-    _prescan.clear()
-
-
-def prescan(source_text: str, source_path: pathlib.Path) -> None:
-    """Register every literal model path before C emission starts."""
-    for match in PATTERN.finditer(source_text):
-        try:
-            asset = json.loads('"' + match.group(1) + '"')
-        except ValueError:
-            continue
-        try:
-            ensure_model(asset, source_path)
-        except ModelError:
-            # The lowering reports the model error at its source line; a
-            # prescan has no line to name.
-            continue
-        _prescan.add(str(_resolve(asset, source_path)))
 
 
 def _resolve(asset: str, source_path: pathlib.Path) -> pathlib.Path:
@@ -1000,7 +1242,10 @@ def _double_array(lines: list[str], symbol: str, values: list[float], per_line: 
     lines.append(f"static const double {symbol}[{len(values)}] = {{")
     for start in range(0, len(values), per_line):
         chunk = values[start : start + per_line]
-        lines.append("    " + ", ".join(f"{value:.6g}" for value in chunk) + ",")
+        # 17 significant decimal digits round-trip every finite binary64 value.
+        # These arrays include geometry and conservative culling bounds, so
+        # lossy formatting can change rendered positions or shrink a bound.
+        lines.append("    " + ", ".join(format(value, ".17g") for value in chunk) + ",")
     lines.append("};")
 
 
@@ -1055,6 +1300,7 @@ def definitions() -> list[str]:
             _double_array(lines, symbol, entry["data"], 12)
             _double_array(lines, symbol + "_morph", entry["morph"], 12)
             _int_array(lines, symbol + "_morph_groups", entry["morph_groups"], 12)
+            _double_array(lines, symbol + "_morph_bounds", entry["morph_group_bounds"], 4)
             _double_array(lines, symbol + "_morph_default", entry["morph_defaults"], 8)
         else:
             lines.append(f"/* model: {pathlib.Path(key).name}, {count} triangles */")
@@ -1064,5 +1310,5 @@ def definitions() -> list[str]:
 
 
 def late_models() -> list[str]:
-    """Models discovered during emission but not pre-scanned (unsupported)."""
-    return [key for key in _registry if key not in _prescan]
+    """Return models discovered while lowering reachable source expressions."""
+    return list(_registry)

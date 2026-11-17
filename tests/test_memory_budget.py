@@ -8,13 +8,48 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TOOL = ROOT / "tools" / "bench_memory.py"
 BUDGETS = ROOT / "tools" / "mem_budgets.json"
+sys.path.insert(0, str(ROOT / "tools"))
+import bench_memory  # noqa: E402
 
 
 class MemoryBudgetTests(unittest.TestCase):
+    def test_run_timeout_is_not_reported_as_a_memory_measurement(self) -> None:
+        class HangingProcess:
+            returncode = None
+
+            def poll(self):
+                return None
+
+            def kill(self):
+                self.returncode = -9
+
+            def communicate(self):
+                return "", ""
+
+        process = HangingProcess()
+        with mock.patch.object(bench_memory.subprocess, "Popen", return_value=process), \
+             mock.patch.object(bench_memory, "process_tree_bytes", return_value=1024), \
+             mock.patch.object(bench_memory, "RUN_SECONDS", 0):
+            with self.assertRaisesRegex(SystemExit, "runtime exceeded"):
+                bench_memory.measure_run("network", pathlib.Path.cwd(), pathlib.Path("unused.exe"))
+
+    def test_incomplete_network_output_is_not_accepted(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            executable = pathlib.Path(temp) / "network.exe"
+            build = {
+                "executable": str(executable), "compile_ms": 1.0,
+                "compile_peak_mb": 1.0, "generated_bytes": 1, "exe_bytes": 1,
+            }
+            with mock.patch.object(bench_memory, "measure_compile", return_value=build), \
+                 mock.patch.object(bench_memory, "measure_run", return_value={"stdout": "packets 198\n"}):
+                with self.assertRaisesRegex(SystemExit, "expected completion line"):
+                    bench_memory.measure("network")
+
     def test_one_scene_reports_compile_and_run_memory(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             report = pathlib.Path(temp) / "memory.json"

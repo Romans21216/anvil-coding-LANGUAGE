@@ -100,10 +100,17 @@ ALLOWED_BUILTINS = {
     "sound_destroy",
     "sound_error",
     "camera_angle",
+    "light",
+    "light_ambient",
+    "light_intensity",
     "model_draw",
+    "model_draw_instance",
     "model_animate",
     "model_animation_length",
     "model_morph",
+    "model_instance",
+    "model_instance_destroy",
+    "model_instance_morph",
     "ray_mesh",
     "mesh_drawn",
     "mesh_culled",
@@ -929,10 +936,10 @@ def validate(
             "the wasm backend yet"
         )
     # The wasm model paths share the depth-tested triangle renderer. Static
-    # models, morph groups and animated node poses are baked before submission;
-    # skinning and textured materials still need separate runtime paths.
+    # models, morph groups, animated node poses and skinned vertex influences
+    # are baked before submission; textured materials still need a separate path.
     model_calls = re.compile(
-        r'\b(model_draw|ray_mesh)\s*\(\s*"((?:[^"\\]|\\.)*)"'
+        r'\b(model_draw|model_draw_instance|ray_mesh)\s*\(\s*"((?:[^"\\]|\\.)*)"'
     )
     for match in model_calls.finditer(text):
         try:
@@ -940,6 +947,7 @@ def validate(
         except ValueError:
             continue
         is_ray_mesh = match.group(1) == "ray_mesh"
+        is_instance_draw = match.group(1) == "model_draw_instance"
         if is_ray_mesh:
             scene = SCENE_STATEMENT.search(text)
             if scene is None or scene.group(1) != "3d":
@@ -956,11 +964,17 @@ def validate(
         # Static morph targets are supported by both model_draw and ray_mesh;
         # animated node groups use the same baked data and the runtime pose
         # evaluator; both lowerings submit their effective weights per group.
-        if model.get("skinned"):
+        if model.get("skinned") and is_ray_mesh:
             line = text.count("\n", 0, match.start()) + 1
             raise CompileError(
-                f"{source_path}:{line}: skinned models are not available in the "
-                "wasm backend yet (the browser bakes a static pose)"
+                f"{source_path}:{line}: ray_mesh(...) does not support skinned "
+                "models in the wasm backend; use model_draw(...)"
+            )
+        if is_instance_draw and (model.get("skinned") or not model.get("morph_count")):
+            line = text.count("\n", 0, match.start()) + 1
+            raise CompileError(
+                f"{source_path}:{line}: model_draw_instance requires an unskinned "
+                "model with morph targets"
             )
     used = used_builtins(functions, top)
     for name in used:

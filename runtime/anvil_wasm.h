@@ -305,6 +305,9 @@ void anvil_set_scene3d(int enabled);
 void anvil_camera_perspective(double x, double y, double z);
 void anvil_camera_fov(double degrees);
 double anvil_camera_angle(double yaw, double pitch);
+double anvil_light(double x, double y, double z);
+double anvil_light_ambient(double level);
+double anvil_light_intensity(double level);
 void anvil_cube(double x, double y, double z, double size, double rx, double ry,
                 double rz, int r, int g, int b, int a);
 void anvil_plane(double x, double y, double z, double width, double depth,
@@ -319,7 +322,8 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
                        double z, double scale, double rx, double ry, double rz);
 double anvil_mesh_draw_morphed_groups(
     const double *data, int triangle_count, const double *morph_deltas,
-    const int *groups, int group_count, const double *group_defaults,
+    const int *groups, int group_count, const double *group_bounds,
+    const double *group_defaults,
     const double *current_weights, int model_id, int morph_count, double x,
     double y, double z, double scale, double rx, double ry, double rz);
 double anvil_model_animate(int id, double seconds);
@@ -332,6 +336,13 @@ double anvil_mesh_draw_animated(
     const double *group_defaults, const double *morph_weights, int model_id,
     int morph_count, double x, double y, double z, double scale, double rx,
     double ry, double rz);
+double anvil_mesh_draw_skinned(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *joint_nodes, int joint_count,
+    const double *bind, const double *times, const double *values,
+    const int *tracks, int track_count, double clip_length, double clip_time,
+    double x, double y, double z, double scale, double rx, double ry,
+    double rz);
 double anvil_trace_mesh(const double *data, int triangle_count, double cx,
                         double cy, double cz, double radius, double x, double y,
                         double z, double scale, double rx, double ry, double rz);
@@ -339,9 +350,19 @@ const double *anvil_model_morph_weights(int id, const double *defaults,
                                         int count);
 double anvil_model_morph(int id, int index, double weight,
                          const double *defaults, int count);
+double anvil_model_instance_create(int model_id, int morph_count);
+double anvil_model_instance_destroy(double handle, int model_id);
+int anvil_model_instance_valid(double handle, int model_id);
+const double *anvil_model_instance_morph_weights(double handle, int model_id,
+                                                  const double *defaults,
+                                                  int morph_count);
+double anvil_model_instance_morph(double handle, int model_id, int index,
+                                  double weight, const double *defaults,
+                                  int morph_count);
 double anvil_trace_mesh_morphed_groups(
     const double *data, int triangle_count, const double *morph_deltas,
-    const int *groups, int group_count, const double *group_defaults,
+    const int *groups, int group_count, const double *group_bounds,
+    const double *group_defaults,
     const double *current_weights, int model_id, int morph_count, double cx,
     double cy, double cz, double radius, double x, double y, double z,
     double scale, double rx, double ry, double rz);

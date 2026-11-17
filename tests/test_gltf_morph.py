@@ -10,6 +10,7 @@ place.
 from __future__ import annotations
 
 import json
+import math
 import pathlib
 import struct
 import subprocess
@@ -31,6 +32,8 @@ def write_morph_model(root: pathlib.Path, name: str, *, defaults: tuple[float, .
     blob = b""
     views = []
     for payload in (positions, indices, deltas):
+        if payload is deltas and len(blob) % 4:
+            blob += b"\0" * (-len(blob) % 4)
         views.append({"buffer": 0, "byteOffset": len(blob), "byteLength": len(payload)})
         blob += payload
     (root / "morph.bin").write_bytes(blob)
@@ -63,6 +66,65 @@ def write_morph_model(root: pathlib.Path, name: str, *, defaults: tuple[float, .
         ],
     }
     (root / name).write_text(json.dumps(document, indent=1), encoding="utf-8")
+
+
+def write_two_target_morph_model(
+    root: pathlib.Path,
+    name: str,
+    *,
+    defaults: tuple[float, float] = (0.0, 0.0),
+    group_translations: tuple[tuple[float, float, float], ...] = ((0.0, 0.0, 0.0),),
+    target_deltas: tuple[tuple[float, float, float], tuple[float, float, float]] = (
+        (-40.0, 0.0, 0.0),
+        (0.0, -40.0, 0.0),
+    ),
+) -> pathlib.Path:
+    positions = struct.pack("<9f", 0, 0, 0, 1, 0, 0, 0, 1, 0)
+    indices = struct.pack("<3H", 0, 1, 2)
+    delta_payloads = tuple(
+        struct.pack("<9f", *(list(delta) * 3)) for delta in target_deltas
+    )
+    payloads = (positions, indices, *delta_payloads)
+    blob = b""
+    views = []
+    for payload in payloads:
+        if payload in delta_payloads and len(blob) % 4:
+            blob += b"\0" * (-len(blob) % 4)
+        views.append({"buffer": 0, "byteOffset": len(blob), "byteLength": len(payload)})
+        blob += payload
+    (root / "two_morph.bin").write_bytes(blob)
+    nodes = [{"mesh": 0, "translation": list(value)} for value in group_translations]
+    document = {
+        "asset": {"version": "2.0"},
+        "scene": 0,
+        "scenes": [{"nodes": list(range(len(nodes)))}],
+        "nodes": nodes,
+        "meshes": [
+            {
+                "weights": list(defaults),
+                "primitives": [
+                    {
+                        "attributes": {"POSITION": 0},
+                        "indices": 1,
+                        "material": 0,
+                        "targets": [{"POSITION": 2}, {"POSITION": 3}],
+                    }
+                ],
+            }
+        ],
+        "materials": [{"pbrMetallicRoughness": {"baseColorFactor": [1, 1, 1, 1]}}],
+        "buffers": [{"uri": "two_morph.bin", "byteLength": len(blob)}],
+        "bufferViews": views,
+        "accessors": [
+            {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"},
+            {"bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR"},
+            {"bufferView": 2, "componentType": 5126, "count": 3, "type": "VEC3"},
+            {"bufferView": 3, "componentType": 5126, "count": 3, "type": "VEC3"},
+        ],
+    }
+    path = root / name
+    path.write_text(json.dumps(document, indent=1), encoding="utf-8")
+    return path
 
 
 def write_morph_glb(root: pathlib.Path, name: str, document: dict) -> pathlib.Path:
@@ -165,12 +227,125 @@ def run_headless(case: unittest.TestCase, root: pathlib.Path, program: str) -> s
 
 
 class GltfMorphTests(unittest.TestCase):
+    def test_instance_morph_weights_are_isolated_between_draws(self) -> None:
+        with tempfile_dir() as root:
+            write_morph_model(root, "instance.gltf")
+            program = "\n".join(
+                [
+                    "scene 3d",
+                    "",
+                ]
+                + [
+                    "fn(draw)",
+                    "  add var(n) 1",
+                    "  if var(n) = 1",
+                    '    set var(a) = model_instance("instance.gltf")',
+                    '    set var(b) = model_instance("instance.gltf")',
+                    "    clear rgba(0, 0, 0, 255)",
+                    '    set var(pa) = model_instance_morph("instance.gltf", var(a), 0, 1)',
+                    '    set var(pb) = model_instance_morph("instance.gltf", var(b), 0, 0)',
+                    '    say "prev_b " & var(pb)',
+                    '    set var(db) = model_draw_instance("instance.gltf", var(b), 0, 0, 0, 1, 0, 0, 0)',
+                    '    set var(da) = model_draw_instance("instance.gltf", var(a), 0, 0, 0, 1, 0, 0, 0)',
+                    '    say "draws " & var(da) & "," & var(db)',
+                    '    set var(pa) = model_instance_morph("instance.gltf", var(a), 0, 0)',
+                    '    say "prev_a " & var(pa)',
+                    '    say "done"',
+                    "  end",
+                    "end",
+                    "",
+                ]
+            )
+            output = run_poses(self, root, program)
+        self.assertIn("prev_b 0", output)
+        self.assertIn("prev_a 1", output)
+        self.assertIn("draws 1,1", output)
+
+
+    def test_instance_handles_reject_stale_values_after_reuse(self) -> None:
+        with tempfile_dir() as root:
+            write_morph_model(root, "instance.gltf")
+            program = "\n".join(
+                [
+                    "scene 3d",
+                    "",
+                    "fn(draw)",
+                    '  set var(old) = model_instance("instance.gltf")',
+                    '  set var(destroyed) = model_instance_destroy("instance.gltf", var(old))',
+                    "  for local(i) = 0 to 69",
+                    '    set var(new) = model_instance("instance.gltf")',
+                    '    set var(destroyed) = model_instance_destroy("instance.gltf", var(new))',
+                    "  end",
+                    '  set var(new) = model_instance("instance.gltf")',
+                    '  set var(stale) = model_instance_morph("instance.gltf", var(old), 0, 1)',
+                    '  set var(live) = model_instance_morph("instance.gltf", var(new), 0, 1)',
+                    '  set var(stale_draw) = model_draw_instance("instance.gltf", var(old), 0, 0, 0, 1, 0, 0, 0)',
+                    '  set var(live_draw) = model_draw_instance("instance.gltf", var(new), 0, 0, 0, 1, 0, 0, 0)',
+                    '  say "state " & var(destroyed) & "," & var(stale) & "," & var(live) & "," & var(stale_draw) & "," & var(live_draw)',
+                    '  say "done"',
+                    "end",
+                    "",
+                ]
+            )
+            output = run_poses(self, root, program)
+        self.assertIn("state 1,0,0,0,1", output)
+
+    def test_instance_draw_requires_a_stored_handle(self) -> None:
+        with tempfile_dir() as root:
+            write_morph_model(root, "instance.gltf")
+            source = root / "nested.ANVL"
+            source.write_text(
+                "scene 3d\n\nfn(draw)\n"
+                '  set var(d) = model_draw_instance("instance.gltf", '
+                'model_instance("instance.gltf"), 0, 0, 0, 1, 0, 0, 0)\n'
+                "end\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "-o", str(root / "nested.exe")],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("store a model instance handle in a variable", result.stderr)
+
+    def test_morph_group_bounds_cover_defaults_and_all_override_combinations(self) -> None:
+        with tempfile_dir() as root:
+            model = write_two_target_morph_model(
+                root, "two-target.gltf", defaults=(-0.5, 1.5)
+            )
+            baked = gltf.load_morphed(model)
+        cx, cy, cz, radius = baked["morph_group_bounds"]
+        vertices = baked["vertices"]
+        deltas = baked["morph"]
+        poses = [(-0.5, 1.5)] + [
+            (first, second)
+            for first in (0.0, 0.5, 1.0)
+            for second in (0.0, 0.5, 1.0)
+        ]
+        for weight0, weight1 in poses:
+            for vertex in range(3):
+                start = vertex * 6
+                point = tuple(
+                    vertices[vertex * 3 + axis]
+                    + deltas[start + axis] * weight0
+                    + deltas[start + 3 + axis] * weight1
+                    for axis in range(3)
+                )
+                distance = math.sqrt(
+                    (point[0] - cx) ** 2
+                    + (point[1] - cy) ** 2
+                    + (point[2] - cz) ** 2
+                )
+                self.assertLessEqual(distance, radius, (weight0, weight1, point, baked))
+
     def test_import_rejects_non_finite_morph_deltas(self) -> None:
         with tempfile_dir() as root:
             model = root / "non_finite.gltf"
             write_morph_model(root, model.name)
             binary = bytearray((root / "morph.bin").read_bytes())
-            struct.pack_into("<f", binary, 42, float("nan"))
+            struct.pack_into("<f", binary, 44, float("nan"))
             (root / "morph.bin").write_bytes(binary)
 
             with self.assertRaisesRegex(
@@ -374,7 +549,7 @@ class GltfMorphTests(unittest.TestCase):
         self.assertIn("the model has no morph targets", combined)
         self.assertIn(":2:", combined)
 
-    def test_the_wasm_backend_refuses_morph_targets(self) -> None:
+    def test_the_wasm_backend_accepts_morph_targets(self) -> None:
         with tempfile_dir() as root:
             write_morph_model(root, "morph.gltf")
             source = root / "wasm.ANVL"
@@ -399,9 +574,8 @@ class GltfMorphTests(unittest.TestCase):
                 text=True,
                 timeout=300,
             )
-        self.assertNotEqual(build.returncode, 0)
-        combined = build.stdout + build.stderr
-        self.assertIn("morph targets are not available in the wasm backend yet", combined)
+            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+            self.assertTrue((root / "morph.wasm").is_file())
 
 
 if __name__ == "__main__":

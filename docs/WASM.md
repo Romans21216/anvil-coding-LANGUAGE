@@ -63,7 +63,8 @@ Supported today:
   inclusive integer range like the C runtime)
 - `scene 2d` with `fn(draw)`, `clear`, and `display rect/circle/line/text`
 - `scene 3d` with `camera perspective`, `camera fov`, `camera_angle`,
-  `display cube/plane/sphere` and `model_draw` (glTF baked at build time)
+  `display cube/plane/sphere`, `model_draw` and lighting controls (glTF baked
+  at build time)
 - input and time: `time()`, `delta()`, `pressed(key)`, `held(key)`,
   `mouse_x()`, `mouse_y()`, `mouse_pressed(button)`, `mouse_held(button)`,
   `mouse_wheel()`
@@ -144,7 +145,15 @@ perspective x y z` sets the eye, `camera fov(degrees)` clamps to 20-120 and sets
 the focal length from the 960-pixel width, `camera_angle(yaw,pitch)` turns the
 view, and `display cube/plane/sphere` submit world-space triangles. Each
 triangle is rotated, translated, put in camera space with the C runtime's basis,
-projected, flat-shaded by a fixed directional light and handed to the host.
+projected, flat-shaded with the scene light and handed to the host. The
+`light(x,y,z)` vector points toward the light; zero and non-finite vectors are
+rejected, and valid vectors are normalized when shading. `light_ambient(level)`
+sets the 0–1 floor (default 0.28), and `light_intensity(level)` sets the 0–2
+scale for the lit part (default 1). Both setters return their previous value
+and ignore non-finite input. Shading is `ambient + (1 - ambient) * intensity *
+max(0, dot(normal, light))`, clamped to 0–1. Primitive triangles are one-sided;
+imported model triangles are two-sided. The C sphere's per-pixel shading and the
+wasm sphere's tessellated facets use the same scene-light settings.
 
 Shadows are the same overhead projection as the desktop runtime: `shadow(on)`,
 `shadow_height(y)` and `shadow_alpha(a)` flatten a cube's bottom face and every
@@ -157,16 +166,17 @@ Bounding-sphere culling is implemented for `model_draw`: a model is skipped when
 its whole sphere is behind the near plane or outside the screen, and
 `mesh_culled()` reports it.
 
-`model_draw` and static unskinned `ray_mesh` bake glTF triangles into the module:
-the runtime receives 12 doubles per triangle (three positions plus RGB), scales,
-rotates and translates them, then submits them through the same path as the
-primitives. In WebAssembly, `ray_mesh` is a depth-tested triangle submission, not
-the C runtime's software ray-tracing/BVH implementation. Its call returns 1 when
-accepted and 0 for invalid input or when it would exceed the 16,384 ray-mesh
-triangle frame budget. `model_draw` remains raster-submitted without that
-ray-mesh-specific budget. `mesh_drawn()` counts triangles from the most recent
-model submission; `mesh_culled()` reports whole-model frustum culling, and
-`mesh_culling(on)` controls that culling.
+`model_draw` and `ray_mesh` bake static or animated unskinned glTF triangles into
+the module and submit them through the depth-tested raster path. `model_draw` also
+supports one skin with up to 64 joints and four vertex influences; it samples the
+first animation clip or uses the bind pose when no clip exists. Skinned draws skip
+bounds culling and overhead shadows. In WebAssembly, `ray_mesh` is triangle
+submission, not the C runtime's software ray-tracing/BVH implementation, and
+skinned `ray_mesh` receives a located diagnostic. All wasm model submissions, including skinned `model_draw`, share a 16,384-triangle frame budget. Each call
+is checked as a whole and returns 0 without submitting geometry when the call
+would exceed the remaining budget. `mesh_drawn()` counts triangles from the most
+recent model submission; `mesh_culled()` reports whole-model frustum culling,
+and `mesh_culling(on)` controls that culling.
 
 The page renders triangles with WebGL into an offscreen 960x600 canvas and blits
 it onto the visible canvas at `present()`. The shader maps camera depth onto the
@@ -180,7 +190,7 @@ page opened with `?painter=1`. `?nosort=1` additionally skips the far-to-near
 sort, which is how the depth test is demonstrated — an unsorted painter shows
 the farther cube, WebGL shows the nearer one. 3D is still painted after any 2D
 drawing in the frame, and 2D primitives in a 3D scene are covered by the blit.
-Skinned models and textured geometry remain C-backend only. Unskinned animated
+Skinned `ray_mesh` is unsupported; textured geometry remains C-backend only. Unskinned animated
 `model_draw` and `ray_mesh` models support the first glTF clip with translation,
 rotation and scale tracks using LINEAR or STEP interpolation. `model_animate`
 sets a per-model clock; `model_animation_length` is baked as a compile-time
@@ -196,23 +206,44 @@ benchmark measured maximum p95 work of 4.6 ms for 1 sphere, 4.9 ms for 8, and
 The C backend still provides exact per-pixel sphere tracing; the browser path
 has polygonal silhouettes and facet lighting.
 
-`model_draw(...)` and `ray_mesh(...)` are supported in `scene 3d` for static or
-animated unskinned models, including morph targets. Per-group glTF defaults are
-preserved and `model_morph(path,index,weight)` overrides that target for every
+`model_draw(...)` and `ray_mesh(...)` are supported in `scene 3d` for static
+and animated unskinned models, including morph targets. Per-group glTF defaults
+are preserved and `model_morph(path,index,weight)` overrides that target for every
 group. Morph deltas are applied before the animated node transform and the
-placement transform; culling is skipped for animated or morphed models because
-the baked rest-pose bounds do not contain all poses. Both calls use the same
-WebGL depth-tested triangle path, which resolves overlapping mesh depth per
-pixel in the browser. `ray_mesh` has a shared 16,384-triangle frame budget for
-static and animated submissions. The Node and `?painter=1` fallbacks sort
+placement transform. Static morph groups use conservative bounds spanning
+defaults and all supported 0–1 overrides; animated models bypass culling. For
+separate morph states, use `model_instance(path)`,
+`model_instance_morph(path,handle,index,weight)`,
+`model_draw_instance(path,handle,x,y,z,scale,rx,ry,rz)` and
+`model_instance_destroy(path,handle)`. The 64 generation-checked handles are
+available in both C and wasm; each must match the asset path used to create it.
+All model draw calls use the same WebGL depth-tested triangle path, which resolves
+overlapping mesh depth per pixel in the browser. `model_draw` and `ray_mesh`
+share a 16,384-triangle frame budget across
+static and animated submissions; each call is accepted whole or rejected before
+triangle submission. The Node and `?painter=1` fallbacks sort
 triangles and can show intersections. The browser path has no mesh BVH or
-ray-traced shadows; skinned models remain a located unsupported case.
+ray-traced shadows; skinned `ray_mesh` remains a located unsupported case.
 
 `tests/test_wasm_browser_parity.py` renders a static morphing GLTF and an
 animated-morph ray mesh through the C/Win32 and wasm/Chrome paths, then compares
-visible-pixel masks. Each fixture requires silhouette IoU above 0.92. These
-fixtures do not establish full colour or shading parity, or parity across other
-cameras and depth cases.
+visible-pixel masks and RGBA output. Each fixture requires silhouette IoU above
+0.92; static visible-pixel mean RGB error is below 10/255, and animated+morphed
+error is below 25/255, with over 90% of visible pixels within 16 or 32 levels
+per channel, respectively. The additional model-lighting fixture uses a custom
+light, ambient and intensity setting with an oblique camera and verifies that a
+zero direction is rejected; its C/Chrome RGBA comparison also passes. A second
+primitive fixture checks one-sided cube shading and sphere lighting against C.
+An intersecting, rotated-cube fixture compares C and Chrome in both submission
+orders; each renderer's pixels remain order-independent and the C/Chrome color
+comparison passes. A second crossing-depth fixture draws two tilted GLTF quads
+through `model_draw` in both orders and also passes the C/Chrome RGBA thresholds.
+An animated half-weight skinned model crossing a rotated GLTF mesh is also
+compared in both submission orders; C and Chrome output is order-independent and
+meets the visible-pixel parity thresholds.
+The animated+morphed ray-mesh comparison uses an offset, oblique camera. These
+fixtures do not establish parity across every camera, lighting setting,
+primitive combination, or crossing-depth scene.
 
 ## Audio
 
@@ -361,9 +392,13 @@ identical.
   resolved by the browser build. 4-bit BMPs are supported.
 - 3D uses WebGL with a depth buffer when available; Node and `?painter=1` use
   painter sorting and can show intersection artifacts. The browser supports
-  static unskinned `model_draw` and `ray_mesh`, including morph targets, through
-  the depth-tested triangle path, plus overhead shadows and tessellated
-  `ray_sphere`. Skinned models and textured geometry remain unsupported in wasm.
+  static and animated unskinned `model_draw`, `model_draw_instance` and `ray_mesh`, including morph
+  targets through the depth-tested triangle path, plus overhead shadows and tessellated
+  `ray_sphere`; both model APIs share the 16,384-triangle frame budget.
+  Skinned `ray_mesh` and textured geometry remain unsupported in wasm; skinned
+  `model_draw` supports one skin with up to 64 joints. Static morph groups use
+  conservative per-group bounds spanning default weights and all 0–1 target
+  overrides, and skip fully offscreen groups when mesh culling is enabled.
 - `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
   same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the

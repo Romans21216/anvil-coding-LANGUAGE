@@ -1,8 +1,8 @@
-# Tilemap demo: a 20x12 island drawn from the 4x4 tileset in examples/assets/tiles.bmp.
+# Tilemap demo: a 20x12 island drawn from the 4x4 tileset in assets/tiles.bmp.
 # Each cell is 16x16 pixels in the sheet and drawn at 3x, so the map fills 960x576.
 scene 2d
 clear rgba(9, 12, 20, 255)
-set var(sheet) = image_load("examples/assets/tiles.bmp")
+set var(sheet) = image_load("assets/tiles.bmp")
 set var(map) = tilemap_new(var(sheet), 16, 16, 20, 12)
 
 # Water everywhere, then paint the island as clipped rectangles. Tile 2 is
