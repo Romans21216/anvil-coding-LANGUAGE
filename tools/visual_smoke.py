@@ -82,7 +82,9 @@ def measure(name: str, source: str, settle: float) -> dict[str, object]:
             raise SystemExit(f"{name}: build failed\n{build.stderr}")
         process = subprocess.Popen(
             [str(executable)],
-            cwd=ROOT,
+            # Match `anvil --run`: standalone examples resolve relative assets
+            # from the source file's directory, not the checkout root.
+            cwd=example.parent,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
