@@ -172,7 +172,7 @@ supports one skin with up to 64 joints and four vertex influences; it samples th
 first animation clip or uses the bind pose when no clip exists. Skinned draws skip
 bounds culling and overhead shadows. In WebAssembly, `ray_mesh` is triangle
 submission, not the C runtime's software ray-tracing/BVH implementation, and
-skinned `ray_mesh` receives a located diagnostic. Both model APIs share a 16,384-triangle frame budget. Each call
+skinned `ray_mesh` receives a located diagnostic. All wasm model submissions, including skinned `model_draw`, share a 16,384-triangle frame budget. Each call
 is checked as a whole and returns 0 without submitting geometry when the call
 would exceed the remaining budget. `mesh_drawn()` counts triangles from the most
 recent model submission; `mesh_culled()` reports whole-model frustum culling,

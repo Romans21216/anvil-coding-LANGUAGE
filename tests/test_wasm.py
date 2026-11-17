@@ -1256,6 +1256,42 @@ from test_gltf_skins import write_skinned_model  # noqa: E402
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmModelTests(unittest.TestCase):
+    def test_skinned_model_draw_obeys_the_shared_triangle_budget(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_skinned_model(root, "skin.gltf", with_clip=False)
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 12",
+                    "set var(ok) = 1",
+                    "fn(draw)",
+                    "  for local(i) = 1 to 16385",
+                    '    set var(ok) = model_draw("skin.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "  end",
+                    "  say var(ok)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program, "skinned_model_budget")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "2"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertEqual(
+                lines[:2], ["0", "0"], "the over-budget skinned draw is refused per frame"
+            )
+            records = json.loads(lines[-1])
+            triangles = [record for record in records if record[0] == "triangles"]
+            self.assertEqual([record[1] for record in triangles], [16384, 16384])
+
     def test_skinned_model_draw_samples_joint_animation_and_weights(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)

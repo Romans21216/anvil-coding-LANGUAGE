@@ -1274,3 +1274,10 @@ Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserPari
 The oblique half-weight skin parity fixture now sets a non-default light direction, ambient floor and intensity before drawing. This covers joint blending, camera transformation and shared model shading controls in one browser comparison.
 
 Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_skinned_model_draw_matches_c -q` — 1 passed in 7.16 s. `git diff --check` passes. Wider camera/light/depth combinations remain open; work remains uncommitted and unpublished, and `.scratch/` remains untouched.
+
+
+8.152 VERIFY THE WASM SKINNED DRAW BUDGET (2026-11-17)
+
+Added an exact shared-budget test for skinned `model_draw`: 16,384 one-triangle submissions are accepted, the next submission is rejected, and the next frame receives a fresh budget. This closes the direct budget-coverage gap introduced when skinned draws were added. The wasm guide and Part Eight evidence now explicitly include skinned submissions in the shared cap.
+
+Validation: `python -m pytest tests/test_wasm.py::WasmModelTests::test_skinned_model_draw_obeys_the_shared_triangle_budget -q` — 1 passed in 1.60 s. `git diff --check` passes. The full roadmap remains active; broader camera/depth parity and unsupported skinned `ray_mesh` remain open.
