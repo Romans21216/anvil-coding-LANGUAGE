@@ -253,8 +253,6 @@ static AnvilWasmSourceFrame
 static int anvil_source_stack_depth;
 
 static void anvil_runtime_error(const char *message) {
-  anvil_wasm_write(message, strlen(message));
-  anvil_wasm_write("\n", 1);
   anvil_host_runtime_error(message, anvil_current_function,
                            anvil_current_source_line);
   __builtin_trap();

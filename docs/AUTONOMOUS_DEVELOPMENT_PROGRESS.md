@@ -1054,3 +1054,9 @@ Focused ray-sphere, docs consistency and tangent tests: 5 passed. `git diff --ch
 8.118 DESKTOP VISUAL SMOKE FOLLOW-UP
 
 Ran `python tools/visual_smoke.py --check` after the renderer and sample changes: all seven captures passed at 960x600. Opened and inspected the seven PNGs. That review caught `first_world.ANVL` framing the ground scene too low; adding `camera_angle(0, -22)` now keeps the cube, ray spheres, regular sphere, and receding floor grid in frame. Refreshed `first_world.png` contains 3,223 colours and 15.3% non-background content; the gate passes. The remaining checklist asks for live ten-second flicker observation and keyboard/mouse control checks; those are not established by static captures.
+
+8.119 WASM STATEMENT-LEVEL RUNTIME LOCATIONS
+
+The wasm backend now emits a source-line marker before each Anvil statement. Runtime helpers track the active function and line through nested calls and report errors through a host callback; both the generated browser page and Node host show the offending statement, while raw traps retain the function-map fallback. The `chr(300)` regression checks line 6 in both hosts. A broader wasm/docs run initially exposed duplicate stdout output for runtime errors; removing the redundant write restored the existing output contract.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py -q` — 51 passed in 28.34 s; `git diff --check` passes. The 1/8/32 ray-sphere benchmark was rerun after source markers and stayed within all budgets; latest checked figures in the feature docs are p95 4.6/4.9/6.0 ms and heap peaks 4.7/17.0/72.6 MiB. Instruction-level debug mappings for arbitrary wasm PCs and true streaming music remain open under 8.12.

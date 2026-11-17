@@ -1512,6 +1512,7 @@ class WasmSourceMapTests(unittest.TestCase):
                 env={**os.environ, "ANVIL_WASM_FRAMES": "3"},
             )
             self.assertNotEqual(run.returncode, 0)
+            self.assertEqual(run.stdout, "")
             self.assertIn("Anvil runtime error in fn(update) at line 6", run.stderr)
             self.assertIn("Anvil chr out of range", run.stderr)
             page_run = subprocess.run(
@@ -1529,6 +1530,7 @@ class WasmSourceMapTests(unittest.TestCase):
             self.assertIn(
                 "Anvil runtime error in fn(update) at line 6", page_run.stderr
             )
+            self.assertEqual(page_run.stdout, "")
 
 
 
