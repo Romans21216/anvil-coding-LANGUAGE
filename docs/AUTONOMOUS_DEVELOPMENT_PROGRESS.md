@@ -1522,3 +1522,26 @@ tests/test_gltf_animation.py tests/test_gltf_morph.py tests/test_gltf_skins.py -
 tests/test_gltf_import_bounds.py` passed (Git reported its existing LF-to-CRLF
 normalization notice for the test file). P8-165-1/2 are resolved locally; no
 issue tracker items were closed. P8-126-F1 and P8-103-2 remain open.
+
+8.167 ADD GENERATION-SAFE PER-INSTANCE MORPH CONTROLS (2026-11-17)
+
+Resolved P8-126-F1 locally. Added `model_instance(path)`,
+`model_instance_morph(path,handle,index,weight)`,
+`model_draw_instance(path,handle,x,y,z,scale,rx,ry,rz)`, and
+`model_instance_destroy(path,handle)`. Instance handles are tied to one compiled
+morph asset, use a bounded 64-slot C/wasm table, and advance a generation on
+destroy; exhausted generations retire a slot instead of allowing stale-handle
+aliasing. Stale or asset-mismatched handles cannot change weights or draw. The
+existing asset-wide `model_morph` / `model_draw` behavior remains available.
+Instance draws support static and animated unskinned morph assets; skinned or
+non-morph assets receive a located compile error. Draw handles must be stored in
+a variable, avoiding duplicate evaluation of a possibly stateful expression.
+
+Acceptance evidence: the C/Chrome parity regression renders two copies of one
+asset in the same frame with different weights, swaps which handle is deformed,
+proves the pixel silhouettes change on both backends, and checks C/WASM
+silhouette agreement for each assignment. C and Node/WASM lifecycle tests each
+run 70 create/destroy reuse cycles and verify stale morph calls return 0, stale
+draw calls return 0, and fresh handles remain functional.
+
+Validation: `python -m py_compile compiler/expressions.py compiler/wasm.py`; `python -m pytest tests/test_gltf_morph.py tests/test_wasm.py::WasmModelTests::test_instance_morph_draws_use_independent_generation_checked_handles tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_independent_morph_instances_render_distinct_c_and_wasm_poses tests/test_wasm_docs.py -q` — 17 passed in 21.38 s. Scoped `git diff --check` passed. Documentation updated in MODELS, LANGUAGE_SPEC and WASM. No issue tracker item was closed.
