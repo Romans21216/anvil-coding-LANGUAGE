@@ -614,6 +614,16 @@ async function start() {
       if (keyCodes[event.code] !== undefined) return keyCodes[event.code];
       return event.keyCode || 0;
     };
+    // A keyup or mouseup that happens while another window has focus is never
+    // delivered here, so the module would keep the key held forever and the
+    // next press would not count as a fresh press. Releasing every input on
+    // focus loss and on a hidden tab makes the next press a clean press.
+    window.addEventListener("blur", () => {
+      if (app) app.exports.anvil_input_release();
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (app && document.hidden) app.exports.anvil_input_release();
+    });
     window.addEventListener("keydown", (event) => {
       if (!app) return;
       app.exports.anvil_key(keyCode(event), 1);

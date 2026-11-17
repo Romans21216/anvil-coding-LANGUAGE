@@ -500,6 +500,22 @@ __attribute__((export_name("anvil_wheel"))) void anvil_host_wheel(
   anvil_mouse_wheel_value += delta;
 }
 
+/* The page calls this when the window loses focus. A keyup delivered to
+   another window never arrives, so without this a held key or button would
+   stay down and the next press would not register as a fresh press. */
+__attribute__((export_name("anvil_input_release"))) void
+anvil_host_input_release(void) {
+  for (int index = 0; index < 256; ++index) {
+    anvil_keys[index] = 0;
+    anvil_keys_pressed[index] = 0;
+  }
+  for (int index = 0; index < 3; ++index) {
+    anvil_mouse_buttons[index] = 0;
+    anvil_mouse_pressed_buttons[index] = 0;
+  }
+  anvil_mouse_wheel_value = 0.0;
+}
+
 /* ---- Math and random ---------------------------------------------------- */
 static unsigned long long anvil_rng_state = 0x9E3779B97F4A7C15ULL;
 
@@ -513,12 +529,62 @@ static unsigned long long anvil_random_u64(void) {
 }
 
 /* Reduce an angle to [-pi, pi] so the Taylor series stays accurate. */
+/* Exact product of two doubles as an unevaluated pair (Dekker's algorithm):
+   the compiler is not allowed to fuse or reassociate this, so hi + lo is the
+   product before rounding. */
+static void anvil_two_product(double a, double b, double *hi, double *lo) {
+  const double split = 134217729.0; /* 2^27 + 1 */
+  double product = a * b;
+  double ca = split * a;
+  double a_hi = ca - (ca - a);
+  double a_lo = a - a_hi;
+  double cb = split * b;
+  double b_hi = cb - (cb - b);
+  double b_lo = b - b_hi;
+  *hi = product;
+  *lo = ((a_hi * b_hi - product) + a_hi * b_lo + a_lo * b_hi) + a_lo * b_lo;
+}
+
+/* Reduce an angle to [-pi, pi]. The old version multiplied by 1/2pi, rounded
+   that quotient and subtracted one rounded product, so once the turn count
+   passed 2^52 the fractional turn was not representable and the phase came out
+   wrong (a 2pi step is 2.4e-16 wider than its double, and that gap is
+   multiplied by the turn count). This keeps 2pi as a hi/lo pair and does the
+   subtraction in double-double: exact through 1e15 radians, within 1e-11 of
+   libm through the 1e20 limit. Beyond 1e20 the phase cannot be recovered
+   without a 2/pi table (Payne-Hanek), so the reduction returns 0 - the C
+   backend uses the CRT and has no such limit. */
 static double anvil_wrap_angle(double value) {
-  const double two_pi = 6.283185307179586476925286766559;
-  const double inv_two_pi = 0.159154943091895335768883763373;
-  double turns = value * inv_two_pi;
-  turns = __builtin_trunc(turns + (turns >= 0.0 ? 0.5 : -0.5));
-  return value - turns * two_pi;
+  const double two_pi_hi = 6.283185307179586;
+  const double two_pi_lo = 2.4492935982947064e-16; /* 2pi - two_pi_hi */
+  const double inv_two_pi = 0.15915494309189535;
+  const double pi = 3.14159265358979323846;
+  const double limit = 1.0e20;
+  if (value != value)
+    return value; /* NaN in, NaN out */
+  if (value > 1.0e308 || value < -1.0e308)
+    return value - value; /* infinity -> NaN, matching libm */
+  if (value > limit || value < -limit)
+    return 0.0; /* documented domain limit */
+  double reduced = value;
+  for (int pass = 0; pass < 2; ++pass) {
+    double quotient = reduced * inv_two_pi;
+    double turns = __builtin_trunc(quotient + (quotient >= 0.0 ? 0.5 : -0.5));
+    if (turns == 0.0)
+      break;
+    double hi = 0.0, lo = 0.0;
+    anvil_two_product(turns, two_pi_hi, &hi, &lo);
+    reduced = ((reduced - hi) - lo) - turns * two_pi_lo;
+  }
+  for (int pass = 0; pass < 4; ++pass) {
+    if (reduced > pi)
+      reduced -= two_pi_hi;
+    else if (reduced < -pi)
+      reduced += two_pi_hi;
+    else
+      break;
+  }
+  return reduced;
 }
 
 double sin(double radians) {

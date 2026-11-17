@@ -1546,5 +1546,153 @@ class WasmSceneModeTests(unittest.TestCase):
             self.assertIn(["scene_mode", 1], ops)
 
 
+_MAGNITUDE_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        '  set var(x) = number("1e3")',
+        "  say sin(var(x)) * 1000000",
+        "  say cos(var(x)) * 1000000",
+        '  set var(x) = number("1e6")',
+        "  say sin(var(x)) * 1000000",
+        "  say cos(var(x)) * 1000000",
+        '  set var(x) = number("1e12")',
+        "  say sin(var(x)) * 1000000",
+        "  say cos(var(x)) * 1000000",
+        '  set var(x) = number("1e15")',
+        "  say sin(var(x)) * 1000000",
+        "  say cos(var(x)) * 1000000",
+        '  set var(x) = number("1e17")',
+        "  say sin(var(x)) * 1000000",
+        "  say cos(var(x)) * 1000000",
+        '  set var(x) = number("1e20")',
+        "  say sin(var(x)) * 1000000",
+        "  say cos(var(x)) * 1000000",
+        '  set var(x) = number("1e300")',
+        "  say sin(var(x)) * 1000000",
+        "  say cos(var(x)) * 1000000",
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmAngleMagnitudeTests(unittest.TestCase):
+    def test_reduction_holds_past_two_to_the_fifty_second_turns(self) -> None:
+        """The old single-round subtraction lost the phase once the turn count
+        passed 2^52; the double-double reduction must still agree with libm."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _MAGNITUDE_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            values = run.stdout.replace("\r\n", "\n").splitlines()
+
+            executable = root / "program.exe"
+            compiled = subprocess.run(
+                [
+                    sys.executable,
+                    str(COMPILER),
+                    str(root / "program.ANVL"),
+                    "-o",
+                    str(executable),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            native = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(native.returncode, 0, native.stderr)
+            # 1e3 through 1e20 inclusive: six printed pairs, within 1e-8
+            # radians of libm (the last printed digit can move by one ulp
+            # because the Taylor series rounds differently from libm).
+            reference = native.stdout.replace("\r\n", "\n").splitlines()
+            for index, printed in enumerate(values[:12]):
+                self.assertAlmostEqual(
+                    float(printed), float(reference[index]), delta=0.01,
+                    msg=f"pair {index // 2} ({'sin' if index % 2 == 0 else 'cos'})",
+                )
+            # Past the documented limit the phase is not recoverable, so the
+            # reduction returns 0: sin reads 0 and cos reads 1.
+            self.assertEqual(values[12:], ["0", "1000000"])
+
+
+PAGE_HOST = ROOT / "tools" / "wasm_page.mjs"
+
+_INPUT_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "fn(update)",
+        "  say held(A)",
+        "  say pressed(A)",
+        "end",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmFocusReleaseTests(unittest.TestCase):
+    def run_page(self, root: pathlib.Path, actions: list) -> list[str]:
+        result, out = build(root, _INPUT_PROGRAM)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        page = out.with_suffix(".html")
+        run = subprocess.run(
+            ["node", str(PAGE_HOST), str(page), json.dumps(actions)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        return run.stdout.replace("\r\n", "\n").splitlines()
+
+    def test_a_blurred_window_releases_held_keys(self) -> None:
+        """A keyup delivered to another window never arrives; the page must
+        release what it thinks is held and the next press must count again."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            values = self.run_page(
+                pathlib.Path(temp),
+                [
+                    ["frame"],
+                    ["keydown", "KeyA"],
+                    ["frame"],
+                    ["blur"],
+                    ["frame"],
+                    ["frame"],
+                    ["keydown", "KeyA"],
+                    ["frame"],
+                ],
+            )
+        # (held, pressed): untouched, down, released by blur, still released,
+        # and a fresh press that proves the release was complete.
+        self.assertEqual(values, ["0", "0", "1", "1", "0", "0", "0", "0", "1", "1"])
+
+    def test_a_hidden_tab_releases_held_keys(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            values = self.run_page(
+                pathlib.Path(temp),
+                [
+                    ["keydown", "KeyA"],
+                    ["frame"],
+                    ["visibility", True],
+                    ["frame"],
+                    ["visibility", False],
+                    ["keydown", "KeyA"],
+                    ["frame"],
+                ],
+            )
+        self.assertEqual(values, ["1", "1", "0", "0", "1", "1"])
+
+
 if __name__ == "__main__":
     unittest.main()

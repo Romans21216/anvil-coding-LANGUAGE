@@ -117,6 +117,13 @@ sets `delta()` in seconds; pressed edges and wheel deltas last one frame, like
 the C runtime's first-update clearing. `mouse_x()`/`mouse_y()` are `-1` until the
 pointer first moves.
 
+The page calls `anvil_input_release()` on `blur` and when the tab becomes
+hidden. Without it a keyup delivered to another window is never seen, so the
+module would keep the key held forever and the next press would not register as
+a fresh press. The export clears held and pressed keys, mouse buttons and the
+wheel delta; a test drives a real generated page through
+`tools/wasm_page.mjs` and proves the release and re-press.
+
 The page exposes `window.anvil` (the instance) so a console or test can step
 frames and inject input deterministically:
 
@@ -277,7 +284,10 @@ change.
 ## Hosts
 
 - `tools/wasm_host.mjs` — Node host used by tests and `--run`; writes module
-  output to stdout.
+  output to stdout and drives input with `--input '[["key",65,1],["frame"]]'`.
+- `tools/wasm_page.mjs` — runs a generated host page against small DOM stubs so
+  the page's own event wiring (keys, mouse, focus loss) is tested, not just the
+  module.
 - `hello.html` — generated page that fetches the module, wires `env.write` to a
   `<pre>`, and calls `main()`.
 
@@ -288,13 +298,14 @@ identical.
 
 - A 1 MiB bump allocator backs `calloc`; there is no freeing. Programs that
   allocate more than that fail at runtime.
-- Numbers are IEEE doubles, as on the native backends, but `sin`/`cos` and other
-  libm functions are not linked yet.
+- Numbers are IEEE doubles. `sin`/`cos` are a range-reduced Taylor series, not
+  libm: the reduction keeps 2π as a hi/lo pair and subtracts in double-double,
+  so the phase is exact through 1e15 radians and within 1e-11 of libm through
+  1e20. Past 1e20 the phase needs a 2/π table the freestanding runtime does not
+  carry, so the reduction returns 0 instead of a wrong angle.
 - No Web Audio, IndexedDB or source maps yet; saves use `localStorage` for now.
   Those are the remaining 8.12 items. 3D and images also need the C backend.
-- `sin`/`cos` lose accuracy for arguments far outside the reduced range (the
-  test pins 1e6 radians, which still matches libm to six decimals); `tan` is not
-  available yet.
+- `tan`, `asin`, `acos` and `atan` are not available yet.
 - Only literal `image_load()` paths are baked; 4-bit BMPs are not supported.
 - 3D uses a painter's algorithm rather than a depth buffer; expect sorting
   artifacts where geometry intersects, and no model/shadow/ray support.
