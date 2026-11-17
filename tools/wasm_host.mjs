@@ -34,6 +34,8 @@ if (fs.existsSync(mapFile)) {
   try { sourceMap = JSON.parse(fs.readFileSync(mapFile, "utf8")); } catch (error) { sourceMap = {}; }
 }
 const describeError = (error) => {
+  const message = String((error && error.message) || error);
+  if (message.startsWith("Anvil runtime error in fn(")) return message;
   const stack = String((error && error.stack) || error);
   for (const line of stack.split("\n")) {
     for (const name of Object.keys(sourceMap)) {
@@ -68,6 +70,12 @@ const imports = {
       const chunk = Buffer.from(view);
       if (fd === 2) process.stderr.write(chunk);
       else process.stdout.write(chunk);
+    },
+    runtime_error(messagePointer, functionPointer, line) {
+      throw new Error(
+        "Anvil runtime error in fn(" + readCString(functionPointer) +
+        ") at line " + line + ": " + readCString(messagePointer)
+      );
     },
     clear(r, g, b, a) {
       ops.push(["clear", r, g, b, a]);

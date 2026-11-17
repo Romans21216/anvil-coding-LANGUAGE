@@ -54,7 +54,10 @@ Supported today:
   `number`, `ord`, `chr`
 - `noise` and `fbm` (same hash and gradient tables as the C runtime)
 - `floor`, `ceil`, `sqrt`, `abs`, `min`, `max`, `clamp`, `round`
-- `sin`, `cos` (range-reduced Taylor series, no libm) and `rnd` (xorshift64,
+- `sin`, `cos` (range-reduced Taylor series, no libm), `tan` (nearest-pi/2
+  double-double reduction for ordinary angles, reciprocal evaluation near
+  poles; extremely large finite inputs retain the angle reducer's 1e20 limit),
+  and `rnd` (xorshift64,
   inclusive integer range like the C runtime)
 - `scene 2d` with `fn(draw)`, `clear`, and `display rect/circle/line/text`
 - `scene 3d` with `camera perspective`, `camera fov`, `camera_angle`,
@@ -170,8 +173,17 @@ Two fallbacks still use the painter's algorithm: the Node host (no WebGL) and a
 page opened with `?painter=1`. `?nosort=1` additionally skips the far-to-near
 sort, which is how the depth test is demonstrated — an unsorted painter shows
 the farther cube, WebGL shows the nearer one. 3D is still painted after any 2D
-drawing in the frame, and 2D primitives in a 3D scene are covered by the blit. Skins, morph targets,
-textures and `ray_sphere` remain C-backend only.
+drawing in the frame, and 2D primitives in a 3D scene are covered by the blit.
+Skins, morph targets and textures remain C-backend only.
+
+`display ray_sphere(...)` is supported in `scene 3d` as a tessellated,
+per-vertex shaded approximation, with sphere-to-sphere shadow checks. Tessellation
+adapts to projected sphere size and shares a 16,384 candidate-triangle frame
+budget across the 32-sphere queue. On Chrome 157 / SwiftShader, the checked-in
+benchmark measured maximum p95 work of 4.6 ms for 1 sphere, 4.9 ms for 8, and
+6.0 ms for 32; the maximum sampled JS heap peaks were 4.7, 17.0 and 72.6 MiB.
+The C backend still provides exact per-pixel sphere tracing; the browser path
+has polygonal silhouettes and facet lighting.
 
 ## Audio
 
@@ -205,20 +217,18 @@ can assert the bake without an audio device.
 
 ## Diagnostics
 
-A wasm trap shows up in JavaScript as `RuntimeError: unreachable` with a stack of
-minified frame numbers. The compiler writes a source map next to the module
-(`program.map.json`) and embeds the same table in the host page, mapping each
-generated function (`anvil_update`) to its Anvil name and the line where the
-function is declared. Both hosts walk the stack until they find a mapped frame
-and report, for example:
+A wasm trap reports the active Anvil function and statement line. The generated
+C emits a source-line marker before each Anvil statement; runtime helpers keep
+that marker with the active function and pass it to the host when a runtime
+error occurs. Both the page and Node host report, for example:
 
 ```
-Anvil runtime error in fn(update) at line 4: RuntimeError: unreachable
+Anvil runtime error in fn(update) at line 6: Anvil chr out of range
 ```
 
-This is a function-level map, not instruction-level: it tells you which Anvil
-function trapped and where it starts, not the exact statement. Unmapped frames
-(runtime helpers such as `anvil_text_chr`) fall through to the raw stack.
+`program.map.json` retains the function-to-declaration map for raw traps and
+unmapped wasm frames. Statement-level locations cover Anvil runtime errors;
+they are not a DWARF debugger or a mapping for arbitrary machine instructions.
 
 ## Images
 
@@ -311,12 +321,19 @@ identical.
   so the phase is exact through 1e15 radians and within 1e-11 of libm through
   1e20. Past 1e20 the phase needs a 2/π table the freestanding runtime does not
   carry, so the reduction returns 0 instead of a wrong angle.
-- No Web Audio, IndexedDB or source maps yet; saves use `localStorage` for now.
-  Those are the remaining 8.12 items. 3D and images also need the C backend.
-- `tan`, `asin`, `acos` and `atan` are not available yet.
-- Only literal `image_load()` paths are baked; 4-bit BMPs are not supported.
-- 3D uses a painter's algorithm rather than a depth buffer; expect sorting
-  artifacts where geometry intersects, and no model/shadow/ray support.
+- `tan` follows the same finite-input convention as C: binary64 inputs near an
+  odd multiple of π/2 produce a large finite result; the nearest representable
+  value is not an exact mathematical pole.
+- Audio uses Web Audio; browser saves use IndexedDB when available and fall
+  back to `localStorage` when it is not. `tan` is available. IndexedDB, audio,
+  and trigonometry support do not imply full platform parity: instruction-level
+  source maps and true streaming music remain open browser-target work.
+- Only literal `image_load()` paths are baked; computed asset paths cannot be
+  resolved by the browser build. 4-bit BMPs are supported.
+- 3D uses WebGL with a depth buffer when available; Node and `?painter=1` use
+  painter sorting and can show intersection artifacts. The browser supports
+  static model loading, overhead shadows and tessellated `ray_sphere`; skeletal
+  animation, morph targets and textured geometry remain C-backend only.
 - `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
   same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the

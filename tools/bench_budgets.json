@@ -212,23 +212,33 @@
       },
       "ray_mesh_32x32": {
         "work_p50_ms": 19.7,
-        "work_p95_ms": 20.95,
+        "work_p95_ms": 20.3,
         "present_p95_ms": 3.0,
         "measured_work_p50_ms": 7.88,
-        "measured_work_p95_ms": 8.38,
+        "measured_work_p95_ms": 8.12,
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.12,
-        "measured_max_ms": 8.49
+        "measured_max_ms": 8.31
       },
       "ray_mesh_morph": {
-        "work_p50_ms": 23.45,
-        "work_p95_ms": 24.05,
+        "work_p50_ms": 27.2,
+        "work_p95_ms": 28.45,
         "present_p95_ms": 3.0,
-        "measured_work_p50_ms": 9.38,
-        "measured_work_p95_ms": 9.62,
+        "measured_work_p50_ms": 10.88,
+        "measured_work_p95_ms": 11.38,
         "measured_present_p50_ms": 0.12,
         "measured_present_p95_ms": 0.12,
-        "measured_max_ms": 9.76
+        "measured_max_ms": 11.38
+      },
+      "ray_mesh_animated": {
+        "work_p50_ms": 7.8,
+        "work_p95_ms": 8.45,
+        "present_p95_ms": 3.0,
+        "measured_work_p50_ms": 3.12,
+        "measured_work_p95_ms": 3.38,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 0.12,
+        "measured_max_ms": 3.57
       }
     }
   }

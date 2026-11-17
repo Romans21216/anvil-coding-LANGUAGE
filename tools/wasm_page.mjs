@@ -82,6 +82,64 @@ const document = {
   }),
   addEventListener: addListener(listeners),
 };
+const localStorage = {
+  store: new Map(Object.entries(JSON.parse(process.env.ANVIL_TEST_LOCAL_STORAGE || "{}"))),
+  get length() { return this.store.size; },
+  key(index) { return [...this.store.keys()][index] ?? null; },
+  getItem(key) {
+    return this.store.has(key) ? this.store.get(key) : null;
+  },
+  setItem(key, value) {
+    this.store.set(key, String(value));
+  },
+  removeItem(key) {
+    this.store.delete(key);
+  },
+};
+const indexedRows = new Map();
+const indexedDB = process.env.ANVIL_TEST_INDEXEDDB ? {
+  open() {
+    const request = {};
+    queueMicrotask(() => {
+      request.result = {
+        objectStoreNames: { contains: () => true },
+        transaction() {
+          const tx = {};
+          tx.objectStore = () => ({
+            openCursor() {
+              const cursorRequest = {};
+              const rows = [...indexedRows.entries()];
+              let index = 0;
+              const emit = () => {
+                const [key, value] = rows[index] || [];
+                cursorRequest.result = index < rows.length ? {
+                  key,
+                  value,
+                  continue() { index++; queueMicrotask(emit); },
+                } : null;
+                cursorRequest.onsuccess?.({ target: cursorRequest });
+              };
+              queueMicrotask(emit);
+              return cursorRequest;
+            },
+            put(value, key) {
+              indexedRows.set(key, value);
+              queueMicrotask(() => tx.oncomplete?.());
+            },
+            delete(key) {
+              indexedRows.delete(key);
+              queueMicrotask(() => tx.oncomplete?.());
+            },
+          });
+          return tx;
+        },
+      };
+      request.onsuccess?.();
+    });
+    return request;
+  },
+} : undefined;
+
 const sandbox = {
   console: {
     log: (...parts) => output.push(parts.join(" ")),
@@ -101,18 +159,8 @@ const sandbox = {
       return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     },
   }),
-  localStorage: {
-    store: new Map(),
-    getItem(key) {
-      return this.store.has(key) ? this.store.get(key) : null;
-    },
-    setItem(key, value) {
-      this.store.set(key, String(value));
-    },
-    removeItem(key) {
-      this.store.delete(key);
-    },
-  },
+  localStorage,
+  indexedDB,
   TextDecoder,
   TextEncoder,
   URLSearchParams,
@@ -185,6 +233,13 @@ for (const [action, value] of actions) {
 
 await tick();
 process.stdout.write(output.join(""));
+if (process.env.ANVIL_TEST_INDEXEDDB) {
+  process.stdout.write(JSON.stringify({
+    backend: sandbox.window.anvilSaveBackend,
+    indexed: Object.fromEntries(indexedRows),
+    local: Object.fromEntries(localStorage.store),
+  }) + "\n");
+}
 if (out.textContent) process.stderr.write(out.textContent + "\n");
 for (const line of errors) process.stderr.write(line + "\n");
 process.exit(errors.length ? 1 : 0);

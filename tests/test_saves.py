@@ -307,6 +307,53 @@ class SaveVersionTests(unittest.TestCase):
             self.assertEqual(second.returncode, 0, second.stderr)
             self.assertEqual(lines_of(second), ["4"])
 
+    def test_malformed_version_whitespace_is_rejected(self) -> None:
+        source = "fn(main)\n  say save_version()\n  say save_error()\nend\ncall fn(main)\n"
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            saves = root / "saves"
+            saves.mkdir()
+            (saves / ".version").write_bytes(b"1 2")
+            result = run_program(compile_program(root, source), saves)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            lines_of(result), ["0", "the save version file is not readable"]
+        )
+
+    @unittest.skipUnless(
+        all(__import__("shutil").which(tool) for tool in ("clang", "node", "wasm-ld")),
+        "clang, wasm-ld and node are required",
+    )
+    def test_wasm_rejects_the_same_malformed_version(self) -> None:
+        compiler = pathlib.Path(__file__).resolve().parents[1] / "compiler" / "anvil.py"
+        host = pathlib.Path(__file__).resolve().parents[1] / "tools" / "wasm_host.mjs"
+        source_text = "fn(main)\n  say save_version()\n  say save_error()\nend\ncall fn(main)\n"
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            source = root / "malformed.ANVL"
+            source.write_text(source_text, encoding="utf-8")
+            output = root / "malformed.wasm"
+            build = subprocess.run(
+                [sys.executable, str(compiler), str(source), "--backend", "wasm", "-o", str(output)],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            self.assertEqual(build.returncode, 0, build.stderr)
+            store = root / "saves.json"
+            store.write_text('{"Anvil_Game/.version":"1 2"}', encoding="utf-8")
+            run = subprocess.run(
+                ["node", str(host), str(output)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env={**os.environ, "ANVIL_SAVE_FILE": str(store)},
+            )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(
+            run.stdout.splitlines(), ["0", "the save version file is not readable"]
+        )
+
     def test_invalid_versions_are_refused(self) -> None:
         source = (
             "fn(main)\n"

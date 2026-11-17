@@ -56,6 +56,12 @@ Then open the PNGs and walk this list.
   directory. The capture tool does; `--run` from another directory will not
   find the assets. A future asset-root fallback is the general fix.
 
+The latest screenshot review found the starter world objects partly clipped at
+the bottom because its level camera looked above the ground plane. The sample
+now sets `camera_angle(0, -22)`; the refreshed capture frames the cube, three
+spheres and receding grid together. The automated smoke gate passes. A ten-
+second live flicker check and interactive control check still require a person.
+
 ## Automated review record (2026-11-17)
 
 python tools/visual_smoke.py --check passed for all seven captures at 960x600. Captures were reviewed for intended content, layout, clipping, and visible drawing artefacts. Keyboard/mouse interaction checks and watching each live scene for ten seconds were not exercised by this automated run; those remain manual checklist items.

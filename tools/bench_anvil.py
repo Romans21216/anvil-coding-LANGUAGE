@@ -173,9 +173,7 @@ def write_budgets(
 ) -> dict:
     """Measure this machine and publish budgets with headroom.
 
-    A budget is the measured median times a multiplier, rounded up. Three times
-    the median absorbs scheduler noise and a slower machine of the same class;
-    the source numbers stay in the JSON so a later reading can be compared.
+    A budget is the fastest measured compile time times a multiplier, rounded up. The benchmark uses the minimum across repeats to estimate intrinsic cost without scheduler delays; the source number and multiplier stay in the JSON so a later reading can be compared.
     """
     budgets: dict[str, dict[str, dict[str, float]]] = {}
     for name, source in CASES:

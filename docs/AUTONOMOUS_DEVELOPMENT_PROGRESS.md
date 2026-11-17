@@ -1027,3 +1027,30 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Capacity:** the desktop C runtime now accepts up to 40 traced spheres per frame, up from 32. The wasm path remains capped at 32 because it tessellates spheres into triangles.
 - **Performance decision:** the fixed 960×600 benchmark measures 36 spheres at 15.62 ms p95 and 40 at 17.62 ms p95. The 36-sphere scene stays under a 16.7 ms 60 Hz work interval; 40 is slightly above it, but remains within the enforced measured-work budget. The larger supported batch is retained and its cost is recorded in the capability matrix.
 - **Budgets:** `tools/bench_budgets.json` now covers 1/8/32/36/40 sphere cases with scene-work and presentation limits.
+8.114 ROADMAP SLICE — CLOSE MEMORY MEASUREMENT, SAVE VERSION PARITY AND WASM LIMITS
+
+Resolved three source-audit gaps. `tools/bench_memory.py` now treats runtime timeout and nonzero exit as failures, captures the network scene output, and requires the `packets 199` completion line before returning a measurement. The network memory test and `python tools/bench_memory.py --check --scene network` pass. `docs/WASM.md` now distinguishes IndexedDB support from its localStorage fallback, identifies remaining browser gaps, and removes stale `tan` and 4-bit BMP limitations; `tests/test_wasm_docs.py` guards against those contradictions. Save version parsing now uses digits only on C, matching wasm; regression tests seed `1 2` and verify both return the same unreadable-version error. Both backend tests pass.
+
+The wasm tangent approximation is now reduced by period into [-pi/2, pi/2] and switches to a reciprocal evaluation near poles. The parity test now probes both sides of several poles at 1e-8 offsets and passes against the C backend, including expected scaled values. Targeted new and adjusted checks pass; the full suite previously passed 961 tests, 1 skipped and 1 expected failure before these latest edits. `git diff --check` passes.
+
+Remaining roadmap audit items include IndexedDB migration ordering, explicit wasm ray-sphere depth ordering and measured browser ray workload, alongside the broader 3D and browser items.
+
+8.115 INDEXEDDB LEGACY SAVE MIGRATION
+
+The browser page now snapshots every `anvil:` localStorage key/value pair before changing storage. For each save absent from IndexedDB, it writes in a read/write transaction, waits for transaction completion, then removes the legacy key. Existing IndexedDB values continue to win on duplicate keys; failed writes leave the legacy key intact. A new IndexedDB test harness seeds three adjacent legacy slots, runs the generated page, reads all three through Anvil's save API, and asserts all values exist in IndexedDB with no legacy entries left. Focused combined suite: 77 passed in 62.18 seconds, including wasm, save, tangent, memory, documentation, and animated ray-mesh tests. `git diff --check` passes.
+
+8.116 WASM TANGENT POLE ACCURACY
+
+The first reciprocal tangent reduction still lost low-order bits when a near-pole angle was reduced through a rounded full-turn modulo. Replaced that path for ordinary angles (|x| < 1e6) with nearest-π/2 double-double reduction; odd half-turns use `-cot(delta)`, while even turns use `tan(delta)`. Large finite angles retain the established 1e20 angle-reducer limit. Tests compare C and wasm on both sides of three poles using 80-digit mpmath references evaluated at the exact binary64 inputs, scaled to expose approximately 1e-12 relative error, and check the nearest binary64 value to π/2 yields the same large finite result as C. The focused tangent and docs tests pass. `docs/WASM.md` now documents the reduction and pole convention.
+
+8.117 WASM RAY-SPHERE BROWSER COST AND DEPTH VERIFICATION
+
+Chromium proved the source-derived 32-sphere workload could exceed a 16.7 ms frame: the baseline p95 was 24.9 ms and JS heap peak was 141.9 MiB. The wasm path now chooses tessellation from projected sphere size and enforces a 16,384 candidate-triangle budget across each frame. A regression fills the 32-entry queue with large overlapping spheres and verifies the emitted batch stays under the cap; the existing shading regression still passes.
+
+Added `tools/bench_wasm_ray_spheres.mjs`, which builds 1/8/32-sphere wasm scenes, runs isolated headless Chrome pages using SwiftShader/WebGL, warms each for 45 frames, and measures three trials of 180 direct `anvil_frame` calls. It also records per-trial JS heap peaks and compares the pixel from overlapping near/far spheres with both submission orders. On Windows 11, Ryzen 7 9800X3D, Chrome 157 / SwiftShader, latest results: maximum trial p95 4.6/4.8/6.0 ms, max sampled heap 4.3/21.4/72.6 MiB, max frame 5.3/5.8/8.6 ms. Both orderings produced `[134, 28, 17, 255]`. All p95, max-frame and heap budgets passed. This is an isolated headless software-WebGL measurement, not an interactive GPU benchmark.
+
+Focused ray-sphere, docs consistency and tangent tests: 5 passed. `git diff --check` passed. The previous full suite (961 passed, 1 skipped, 1 xfailed) predates the latest tessellation change.
+
+8.118 DESKTOP VISUAL SMOKE FOLLOW-UP
+
+Ran `python tools/visual_smoke.py --check` after the renderer and sample changes: all seven captures passed at 960x600. Opened and inspected the seven PNGs. That review caught `first_world.ANVL` framing the ground scene too low; adding `camera_angle(0, -22)` now keeps the cube, ray spheres, regular sphere, and receding floor grid in frame. Refreshed `first_world.png` contains 3,223 colours and 15.3% non-background content; the gate passes. The remaining checklist asks for live ten-second flicker observation and keyboard/mouse control checks; those are not established by static captures.

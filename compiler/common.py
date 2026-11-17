@@ -244,6 +244,8 @@ RUNTIME_C_NAMES = {
     "anvil_ray_resolution",
     "anvil_ray_samples",
     "anvil_trace_mesh",
+    "anvil_trace_mesh_morphed",
+    "anvil_trace_mesh_animated",
     "anvil_body_create",
     "anvil_body_create_box",
     "anvil_body_destroy",

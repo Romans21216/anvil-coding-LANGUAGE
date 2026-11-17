@@ -208,6 +208,8 @@ const announceRegion = document.getElementById("announce");
 const utf8 = new TextDecoder();
 const sourceMap = __SOURCE_MAP__;
 const describeError = (error) => {
+  const message = String((error && error.message) || error);
+  if (message.startsWith("Anvil runtime error in fn(")) return message;
   const stack = String((error && error.stack) || error);
   for (const line of stack.split("\\n")) {
     for (const name of Object.keys(sourceMap)) {
@@ -484,12 +486,23 @@ async function start() {
       }
       // Carry over saves written by a build that used localStorage.
       try {
+        const legacy = [];
         for (let index = 0; index < localStorage.length; index++) {
           const key = localStorage.key(index);
-          if (!key || key.indexOf("anvil:") !== 0 || cache.has(key)) continue;
-          cache.set(key, localStorage.getItem(key));
+          if (key && key.indexOf("anvil:") === 0) {
+            legacy.push([key, localStorage.getItem(key)]);
+          }
+        }
+        for (const [key, value] of legacy) {
+          if (value === null || cache.has(key)) continue;
           const tx = db.transaction("saves", "readwrite");
-          tx.objectStore("saves").put(cache.get(key), key);
+          tx.objectStore("saves").put(value, key);
+          await new Promise((resolve, reject) => {
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error || new Error("migration aborted"));
+          });
+          cache.set(key, value);
           localStorage.removeItem(key);
         }
       } catch (error) {
@@ -536,6 +549,12 @@ async function start() {
         const text = utf8.decode(view);
         if (fd === 2) console.error(text);
         else console.log(text);
+      },
+      runtime_error(messagePointer, functionPointer, line) {
+        throw new Error(
+          "Anvil runtime error in fn(" + readCString(functionPointer) +
+          ") at line " + line + ": " + readCString(messagePointer)
+        );
       },
       clear(r, g, b, a) {
         context.fillStyle = rgba(r, g, b, a);

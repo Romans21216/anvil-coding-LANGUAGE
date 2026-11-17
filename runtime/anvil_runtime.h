@@ -187,6 +187,13 @@ double anvil_trace_mesh_morphed(
     int morph_count, double cx, double cy, double cz, double radius,
     double x, double y, double z, double scale, double rx, double ry,
     double rz);
+double anvil_trace_mesh_animated(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, const double *morph_deltas,
+    const double *morph_weights, int morph_count, double x, double y,
+    double z, double scale, double rx, double ry, double rz);
 void anvil_trace_finish(void);
 int anvil_ray_backend(const char *name);
 int anvil_ray_backend_available(const char *name);

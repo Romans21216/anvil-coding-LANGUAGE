@@ -230,6 +230,33 @@ class WasmCanvasTests(unittest.TestCase):
             self.assertGreater(batch[6], 20)
             self.assertGreater(batch[8], batch[7])
 
+    def test_ray_sphere_tessellation_obeys_frame_triangle_cap(self) -> None:
+        draw = [
+            "scene 3d",
+            "camera perspective 0 0 8",
+            "",
+            "fn(draw)",
+        ]
+        for _ in range(32):
+            draw.append("  display ray_sphere(0, 0, 0, 5) -rgb(210, 70, 40)")
+        draw += ["end", ""]
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, "\n".join(draw))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        ops = json.loads(run.stdout.strip().splitlines()[-1])
+        batch = next(op for op in ops if op[0] == "triangles")
+        self.assertGreater(batch[1], 0)
+        self.assertLessEqual(batch[1], 16384)
+
 
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
@@ -1485,8 +1512,23 @@ class WasmSourceMapTests(unittest.TestCase):
                 env={**os.environ, "ANVIL_WASM_FRAMES": "3"},
             )
             self.assertNotEqual(run.returncode, 0)
-            self.assertIn("Anvil runtime error in fn(update) at line 4", run.stderr)
+            self.assertIn("Anvil runtime error in fn(update) at line 6", run.stderr)
             self.assertIn("Anvil chr out of range", run.stderr)
+            page_run = subprocess.run(
+                [
+                    "node",
+                    str(PAGE_HOST),
+                    str(out.with_suffix(".html")),
+                    json.dumps([["frame"], ["frame"]]),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertNotEqual(page_run.returncode, 0)
+            self.assertIn(
+                "Anvil runtime error in fn(update) at line 6", page_run.stderr
+            )
 
 
 
@@ -1805,6 +1847,38 @@ class WasmPageSaveTests(unittest.TestCase):
             run.stdout.replace("\r\n", "\n").splitlines(),
             ["1", "42", "1", "Ada", "1", "0"],
         )
+
+    def test_indexeddb_migration_copies_adjacent_legacy_slots(self) -> None:
+        program = "fn(main)\n" + "".join(
+            f'  say load_number("slot{index}")\n' for index in range(3)
+        ) + "end\ncall fn(main)\n"
+        legacy = {
+            "anvil:Anvil_Game/slot0": "14045000000000000",
+            "anvil:Anvil_Game/slot1": "14045800000000000",
+            "anvil:Anvil_Game/slot2": "14046000000000000",
+        }
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, program)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(PAGE_HOST), str(out.with_suffix(".html")), "[[\"frame\"]]"],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                env={
+                    **os.environ,
+                    "ANVIL_TEST_INDEXEDDB": "1",
+                    "ANVIL_TEST_LOCAL_STORAGE": json.dumps(legacy),
+                },
+            )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        lines = run.stdout.replace("\r\n", "\n").splitlines()
+        self.assertEqual(lines[:3], ["42", "43", "44"])
+        state = json.loads(lines[-1])
+        self.assertEqual(state["backend"], "indexedDB")
+        self.assertEqual(state["indexed"], legacy)
+        self.assertEqual(state["local"], {})
 
 
 if __name__ == "__main__":

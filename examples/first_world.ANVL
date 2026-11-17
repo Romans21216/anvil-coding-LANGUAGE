@@ -2,6 +2,7 @@
 scene 3d
 camera perspective 0 3 8
 camera fov(70)
+set var(camera_set) = camera_angle(0, -22)
 camera control(4, 80)
 clear rgba(11, 16, 27, 255)
 

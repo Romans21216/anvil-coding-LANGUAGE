@@ -19,6 +19,8 @@ Screen-space `rect`, `circle`, `line`, and `text` commands can be mixed with `cu
 
 `display ray_triangle(x1,y1,z1,x2,y2,z2,x3,y3,z3)` adds a two-sided world-space triangle with closest-hit depth, diffuse/specular shading and hard shadows. Up to 40 triangles can be queued; sphere intersections use the BVH, while triangle intersections scan the bounded batch. The wasm backend refuses this primitive with a source-located error. Static morph-target models use the current `model_morph` weights in ray intersections.
 
+`ray_mesh("asset.glb",x,y,z,scale,rx,ry,rz)` traces imported static or animated meshes. Each animated instance snapshots its posed triangles and refits bounds for the current frame; `model_morph` weights apply to static meshes and are blended before node transforms on animated meshes. Skinned ray meshes remain unsupported, and wasm refuses `ray_mesh` with a source-located error.
+
 `display ray_sphere(x, y, z, radius) -rgb(r, g, b)` is the built-in ray-traced sphere draw function. It uses per-pixel CPU rays and a BVH for closest sphere and hard-shadow queries, with diffuse and specular lighting. A desktop C trace batch supports up to 40 spheres; WebAssembly uses a tessellated approximation capped at 32. Projection bounds use exact sphere tangent extents and are covered by a compiled C regression harness that samples off-axis and near-camera sphere surfaces.
 
 BVH CPU ray tracing is the only implemented ray-tracing backend. DXR and Embree are not implemented. Conventional rendering also has no GPU backend, window resizing, texture mapping, mesh import, or robust production clipping across all primitive paths.

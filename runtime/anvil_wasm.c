@@ -241,9 +241,22 @@ const char *anvil_format_number(double value) {
   return text;
 }
 
+static const char *anvil_current_function = "main";
+static int anvil_current_source_line = 1;
+#define ANVIL_WASM_SOURCE_STACK_MAX 1000
+typedef struct {
+  const char *function_name;
+  int line;
+} AnvilWasmSourceFrame;
+static AnvilWasmSourceFrame
+    anvil_source_stack[ANVIL_WASM_SOURCE_STACK_MAX];
+static int anvil_source_stack_depth;
+
 static void anvil_runtime_error(const char *message) {
   anvil_wasm_write(message, strlen(message));
   anvil_wasm_write("\n", 1);
+  anvil_host_runtime_error(message, anvil_current_function,
+                           anvil_current_source_line);
   __builtin_trap();
 }
 
@@ -276,11 +289,33 @@ void anvil_frame_enter(void) {
 
 void anvil_frame_leave(void) { anvil_frame_depth -= 1; }
 
-/* The compiler pushes an Anvil function name on every entry so the C runtime
-   can print an allocation's call chain. The browser bakes its loads at compile
-   time and has no memory_report(), so the names are accepted and dropped. */
-void anvil_call_enter(const char *name) { (void)name; }
-void anvil_call_leave(void) {}
+/* Keep the active Anvil statement as well as the call chain so a browser trap
+   can report the offending instruction line rather than only the function's
+   declaration line. */
+void anvil_wasm_source_line(int line) {
+  if (line > 0)
+    anvil_current_source_line = line;
+}
+
+void anvil_call_enter(const char *name) {
+  if (anvil_source_stack_depth < ANVIL_WASM_SOURCE_STACK_MAX) {
+    AnvilWasmSourceFrame *frame =
+        &anvil_source_stack[anvil_source_stack_depth++];
+    frame->function_name = anvil_current_function;
+    frame->line = anvil_current_source_line;
+  }
+  anvil_current_function = name ? name : "?";
+  anvil_current_source_line = 1;
+}
+
+void anvil_call_leave(void) {
+  if (anvil_source_stack_depth <= 0)
+    return;
+  const AnvilWasmSourceFrame *frame =
+      &anvil_source_stack[--anvil_source_stack_depth];
+  anvil_current_function = frame->function_name;
+  anvil_current_source_line = frame->line;
+}
 
 double anvil_array_get(const double *values, int size, double index,
                        const char *path, int line) {
@@ -627,10 +662,44 @@ double cos(double radians) {
   return sum;
 }
 
-/* tan as sin/cos: the same wrapped series the other two use, so the three
-   agree with each other by construction. */
+/* Tangent has period pi. Reduce into [-pi/2, pi/2], then use the reciprocal
+   identity near the poles so the denominator is evaluated close to zero,
+   where the wrapped Taylor series has its best relative accuracy. */
 double tan(double radians) {
-  double x = anvil_wrap_angle(radians);
+  const double half_pi = 1.57079632679489661923;
+  const double half_pi_lo = 6.123233995736766e-17;
+  double x;
+  double sign = 1.0;
+  int reciprocal = 0;
+  if (radians > -1.0e6 && radians < 1.0e6) {
+    /* For ordinary game angles, reduce against the nearest multiple of pi/2
+       using a double-double product. This retains the tiny distance to a pole
+       instead of first rounding it away in a full-angle modulo operation. */
+    const double inv_half_pi = 0.63661977236758134308;
+    double turns = __builtin_trunc(
+        radians * inv_half_pi + (radians >= 0.0 ? 0.5 : -0.5));
+    double pole_hi = 0.0, pole_lo = 0.0;
+    anvil_two_product(turns, half_pi, &pole_hi, &pole_lo);
+    x = ((radians - pole_hi) - pole_lo) - turns * half_pi_lo;
+    long long pole = (long long)turns;
+    if (pole % 2 != 0) {
+      reciprocal = 1;
+      sign = -1.0;
+    }
+  } else {
+    x = anvil_wrap_angle(radians);
+    double magnitude = x < 0.0 ? -x : x;
+    sign = x < 0.0 ? -1.0 : 1.0;
+    if (magnitude > half_pi) {
+      /* Keep the tiny signed distance to the pole directly. Subtracting pi
+         first would round that distance away before the reciprocal step. */
+      x = (half_pi - magnitude) + half_pi_lo;
+      reciprocal = 1;
+    } else if (magnitude > 0.78539816339744830962) {
+      x = (half_pi - magnitude) + half_pi_lo;
+      reciprocal = 1;
+    }
+  }
   double x2 = x * x;
   double sine_term = x, sine = x;
   for (int n = 1; n <= 9; ++n) {
@@ -642,7 +711,7 @@ double tan(double radians) {
     cosine_term *= -x2 / ((2.0 * n - 1.0) * (2.0 * n));
     cosine += cosine_term;
   }
-  return sine / cosine;
+  return reciprocal ? sign * cosine / sine : sine / cosine;
 }
 
 /* Inclusive integer range, matching the C runtime's anvil_rnd. */
@@ -876,6 +945,7 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
    to be shadowed by one drawn later - the C tracer works that way too, since
    it runs after the frame's own draws. */
 #define ANVIL_WASM_TRACE_MAX 32
+#define ANVIL_WASM_TRACE_TRIANGLE_BUDGET 16384
 typedef struct {
   AnvilWasmVec3 center;
   double radius;
@@ -989,10 +1059,47 @@ void anvil_wasm_trace_flush(void) {
   const AnvilWasmVec3 light =
       anvil_wasm_normalize((AnvilWasmVec3){-0.4, 0.75, 0.55});
   const AnvilWasmVec3 eye = {anvil_camera_x, anvil_camera_y, anvil_camera_z};
-  /* 36 x 54 gives a smooth silhouette at the fixed 960x600 canvas size. */
-  const int rings = 36, segments = 54;
+  int remaining_budget = ANVIL_WASM_TRACE_TRIANGLE_BUDGET;
   for (int index = 0; index < anvil_wasm_trace_count; ++index) {
     const AnvilWasmTraceSphere *sphere = &anvil_wasm_trace_spheres[index];
+    AnvilWasmVec3 camera_center = anvil_wasm_to_camera(sphere->center);
+    double nearest_z = camera_center.z - sphere->radius;
+    if (nearest_z < 0.05)
+      nearest_z = 0.05;
+    double projected_radius = sphere->radius * anvil_camera_focal / nearest_z;
+    if (projected_radius < 0.5)
+      projected_radius = 0.5;
+    /* For small angular steps, sagitta is approximately R*angle^2/2.
+       A 0.5 px silhouette error therefore gives this angular step without
+       requiring libm acos in the freestanding wasm runtime. */
+    double half_angle = 1.0 / __builtin_sqrt(projected_radius);
+    int rings = (int)(pi / (2.0 * half_angle) + 0.999999);
+    int segments = (int)(pi / half_angle + 0.999999);
+    if (rings < 6)
+      rings = 6;
+    if (rings > 36)
+      rings = 36;
+    if (segments < 8)
+      segments = 8;
+    if (segments > 54)
+      segments = 54;
+    int remaining_spheres = anvil_wasm_trace_count - index;
+    int sphere_budget = remaining_budget / remaining_spheres;
+    while (rings * segments * 2 > sphere_budget &&
+           (rings > 4 || segments > 8)) {
+      double ring_ratio = (double)rings / 36.0;
+      double segment_ratio = (double)segments / 54.0;
+      if (rings > 4 && (segments <= 8 || ring_ratio >= segment_ratio))
+        rings--;
+      else if (segments > 8)
+        segments--;
+    }
+    int sphere_triangles = rings * segments * 2;
+    if (sphere_triangles > sphere_budget) {
+      anvil_wasm_trace_count = 0;
+      return;
+    }
+    remaining_budget -= sphere_triangles;
     for (int ring = 0; ring < rings; ++ring) {
       double phi0 = pi * (double)ring / (double)rings;
       double phi1 = pi * (double)(ring + 1) / (double)rings;
@@ -2242,11 +2349,8 @@ double anvil_text_ord(const char *source) {
 
 char *anvil_text_chr(double code) {
   char *destination = anvil_text_buffer();
-  if (!(code == code) || code < 0.0 || code > 255.0) {
-    static const char message[] = "Anvil chr out of range\n";
-    anvil_host_write(2, message, (int)sizeof(message) - 1);
-    exit(1);
-  }
+  if (!(code == code) || code < 0.0 || code > 255.0)
+    anvil_runtime_error("Anvil chr out of range");
   destination[0] = (char)(int)code;
   destination[1] = '\0';
   return destination;

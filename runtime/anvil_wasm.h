@@ -79,6 +79,10 @@ void anvil_frame_enter(void);
 void anvil_frame_leave(void);
 void anvil_call_enter(const char *name);
 void anvil_call_leave(void);
+void anvil_wasm_source_line(int line);
+__attribute__((import_module("env"), import_name("runtime_error")))
+void anvil_host_runtime_error(const char *message, const char *function_name,
+                              int line);
 
 double anvil_array_get(const double *values, int size, double index,
                        const char *path, int line);

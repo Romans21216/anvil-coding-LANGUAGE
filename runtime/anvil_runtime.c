@@ -53,6 +53,7 @@ enum { ANVIL_TRACE_SPHERES = 40, ANVIL_TRACE_TRIANGLES = 40,
        ANVIL_TRACE_MESHES = 40, ANVIL_MESH_BVH_CACHE = 32,
        ANVIL_MESH_MAX_TRIANGLES = 200000 };
 #define ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES ((size_t)128 * 1024 * 1024)
+#define ANVIL_MORPH_TARGETS 8
 static const double ANVIL_NEAR_DEPTH = 0.08;
 enum {
   ANVIL_RAY_BACKEND_BVH,
@@ -82,6 +83,7 @@ typedef struct {
 } AnvilBvhNode;
 typedef struct {
   const double *data;
+  double *posed_data;
   const double *morph_deltas;
   const double *morph_defaults;
   int morph_count;
@@ -93,9 +95,11 @@ typedef struct {
 } AnvilMeshBvh;
 typedef struct {
   const AnvilMeshBvh *bvh;
+  AnvilMeshBvh animated_bvh;
   double cx, cy, cz, radius;
   double x, y, z, scale, rx, ry, rz;
   const double *morph_weights;
+  size_t transient_bytes;
 } AnvilTraceMesh;
 typedef struct {
   double x, y, depth;
@@ -251,7 +255,8 @@ static int anvil_trace_mesh_count;
 static AnvilMeshBvh anvil_mesh_bvh_cache[ANVIL_MESH_BVH_CACHE];
 static int anvil_mesh_bvh_cache_count;
 static size_t anvil_mesh_bvh_memory_bytes;
-static const AnvilMeshBvh *anvil_mesh_bvh_get(
+static size_t anvil_trace_mesh_transient_bytes;
+static AnvilMeshBvh *anvil_mesh_bvh_get(
     const double *data, int triangle_count, const double *morph_deltas,
     const double *morph_defaults, int morph_count);
 static AnvilBvhNode anvil_trace_bvh[ANVIL_TRACE_SPHERES * 2];
@@ -285,6 +290,20 @@ static AnvilPhysicsBody anvil_physics_bodies[ANVIL_PHYSICS_BODIES];
 static int anvil_physics_active_capacity = ANVIL_PHYSICS_BODIES;
 static double anvil_physics_gravity_x;
 static double anvil_physics_gravity_y = -9.81;
+
+static void anvil_trace_mesh_clear(void) {
+  for (int i = 0; i < anvil_trace_mesh_count; ++i) {
+    AnvilTraceMesh *mesh = &anvil_trace_meshes[i];
+    free(mesh->animated_bvh.nodes);
+    free(mesh->animated_bvh.indices);
+    free(mesh->animated_bvh.posed_data);
+    if (mesh->transient_bytes <= anvil_trace_mesh_transient_bytes)
+      anvil_trace_mesh_transient_bytes -= mesh->transient_bytes;
+    else
+      anvil_trace_mesh_transient_bytes = 0;
+  }
+  anvil_trace_mesh_count = 0;
+}
 
 static uint32_t anvil_color(int r, int g, int b) {
   if (r < 0)
@@ -320,6 +339,7 @@ static void anvil_pixel(int x, int y, uint32_t color, int alpha) {
 }
 
 static void anvil_clear_frame(void) {
+  anvil_trace_mesh_clear();
   anvil_trace_sphere_count = 0;
   anvil_trace_triangle_count = 0;
   anvil_trace_mesh_count = 0;
@@ -1228,7 +1248,6 @@ double anvil_mesh_draw_skinned(
 
 /* ---- Morph targets ------------------------------------------------------ */
 
-#define ANVIL_MORPH_TARGETS 8
 static double anvil_morph_values[ANVIL_MODEL_STATES][ANVIL_MORPH_TARGETS];
 static int anvil_morph_ready[ANVIL_MODEL_STATES];
 
@@ -3456,11 +3475,12 @@ static double anvil_trace_mesh_register(
       morph_count > 8 || (morph_count > 0 &&
                           (!morph_deltas || !morph_defaults || !morph_weights)))
     return 0.0;
-  const AnvilMeshBvh *bvh = anvil_mesh_bvh_get(
+  AnvilMeshBvh *bvh = anvil_mesh_bvh_get(
       data, triangle_count, morph_deltas, morph_defaults, morph_count);
   if (!bvh)
     return 0.0;
   AnvilTraceMesh *mesh = &anvil_trace_meshes[anvil_trace_mesh_count++];
+  memset(mesh, 0, sizeof(*mesh));
   mesh->bvh = bvh;
   mesh->cx = cx;
   mesh->cy = cy;
@@ -3764,17 +3784,16 @@ static void anvil_mesh_bvh_cleanup(void) {
   anvil_mesh_bvh_memory_bytes = 0;
 }
 
-static const AnvilMeshBvh *anvil_mesh_bvh_get(
+static AnvilMeshBvh *anvil_mesh_bvh_get(
     const double *data, int triangle_count, const double *morph_deltas,
     const double *morph_defaults, int morph_count) {
   for (int i = 0; i < anvil_mesh_bvh_cache_count; ++i)
-    if (anvil_mesh_bvh_cache[i].data == data)
-      return anvil_mesh_bvh_cache[i].triangle_count == triangle_count &&
-                     anvil_mesh_bvh_cache[i].morph_deltas == morph_deltas &&
-                     anvil_mesh_bvh_cache[i].morph_defaults == morph_defaults &&
-                     anvil_mesh_bvh_cache[i].morph_count == morph_count
-                 ? &anvil_mesh_bvh_cache[i]
-                 : NULL;
+    if (anvil_mesh_bvh_cache[i].data == data &&
+        anvil_mesh_bvh_cache[i].triangle_count == triangle_count &&
+        anvil_mesh_bvh_cache[i].morph_deltas == morph_deltas &&
+        anvil_mesh_bvh_cache[i].morph_defaults == morph_defaults &&
+        anvil_mesh_bvh_cache[i].morph_count == morph_count)
+      return &anvil_mesh_bvh_cache[i];
   if (anvil_mesh_bvh_cache_count >= ANVIL_MESH_BVH_CACHE)
     return NULL;
   size_t node_bytes = (size_t)triangle_count * 2 * sizeof(AnvilBvhNode);
@@ -3822,6 +3841,148 @@ static const AnvilMeshBvh *anvil_mesh_bvh_get(
   return bvh;
 }
 
+static void anvil_mesh_bvh_refit(AnvilMeshBvh *bvh, int node_index) {
+  AnvilBvhNode *node = &bvh->nodes[node_index];
+  node->minimum = (AnvilVec3){1.0e30, 1.0e30, 1.0e30};
+  node->maximum = (AnvilVec3){-1.0e30, -1.0e30, -1.0e30};
+  if (node->sphere >= 0) {
+    const double *p = bvh->data + (size_t)node->sphere * 12;
+    for (int vertex = 0; vertex < 3; ++vertex)
+      anvil_bvh_include(&node->minimum, &node->maximum,
+                        (AnvilVec3){p[vertex * 3], p[vertex * 3 + 1],
+                                    p[vertex * 3 + 2]});
+    return;
+  }
+  anvil_mesh_bvh_refit(bvh, node->left);
+  anvil_mesh_bvh_refit(bvh, node->right);
+  anvil_bvh_include(&node->minimum, &node->maximum,
+                    bvh->nodes[node->left].minimum);
+  anvil_bvh_include(&node->minimum, &node->maximum,
+                    bvh->nodes[node->left].maximum);
+  anvil_bvh_include(&node->minimum, &node->maximum,
+                    bvh->nodes[node->right].minimum);
+  anvil_bvh_include(&node->minimum, &node->maximum,
+                    bvh->nodes[node->right].maximum);
+}
+
+double anvil_trace_mesh_animated(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, const double *morph_deltas,
+    const double *morph_weights, int morph_count, double x, double y,
+    double z, double scale, double rx, double ry, double rz) {
+  if (!data || !groups || triangle_count <= 0 ||
+      triangle_count > ANVIL_MESH_MAX_TRIANGLES || group_count <= 0 ||
+      morph_count < 0 || morph_count > ANVIL_MORPH_TARGETS ||
+      (morph_count > 0 && (!morph_deltas || !morph_weights)) ||
+      anvil_trace_mesh_count >= ANVIL_TRACE_MESHES || !isfinite(x) ||
+      !isfinite(y) || !isfinite(z) || !isfinite(scale) || scale == 0.0 ||
+      !isfinite(rx) || !isfinite(ry) || !isfinite(rz) ||
+      !anvil_model_pose(nodes, node_count, parents, times, values, tracks,
+                        track_count, clip_length, clip_time))
+    return 0.0;
+  AnvilMeshBvh *bvh =
+      anvil_mesh_bvh_get(data, triangle_count, NULL, NULL, 0);
+  if (!bvh)
+    return 0.0;
+  for (int i = 0; i < group_count; ++i) {
+    const int *entry = groups + i * 3;
+    if (entry[0] < 0 || entry[0] >= node_count || entry[1] < 0 ||
+        entry[2] < 0 || entry[1] > triangle_count ||
+        entry[2] > triangle_count - entry[1])
+      return 0.0;
+  }
+  size_t node_bytes = (size_t)triangle_count * 2 * sizeof(AnvilBvhNode);
+  size_t index_bytes = (size_t)triangle_count * sizeof(int);
+  size_t pose_bytes = (size_t)triangle_count * 12 * sizeof(double);
+  size_t transient_bytes = node_bytes + index_bytes + pose_bytes;
+  if (anvil_mesh_bvh_memory_bytes > ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES ||
+      anvil_trace_mesh_transient_bytes >
+          ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES - anvil_mesh_bvh_memory_bytes ||
+      transient_bytes > ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES -
+                            anvil_mesh_bvh_memory_bytes -
+                                anvil_trace_mesh_transient_bytes)
+    return 0.0;
+  AnvilTraceMesh *mesh = &anvil_trace_meshes[anvil_trace_mesh_count++];
+  memset(mesh, 0, sizeof(*mesh));
+  mesh->animated_bvh = *bvh;
+  mesh->animated_bvh.nodes = (AnvilBvhNode *)malloc(
+      (size_t)triangle_count * 2 * sizeof(*mesh->animated_bvh.nodes));
+  mesh->animated_bvh.indices = (int *)malloc(
+      index_bytes);
+  mesh->animated_bvh.posed_data = (double *)malloc(
+      pose_bytes);
+  if (!mesh->animated_bvh.nodes || !mesh->animated_bvh.indices ||
+      !mesh->animated_bvh.posed_data) {
+    free(mesh->animated_bvh.nodes);
+    free(mesh->animated_bvh.indices);
+    free(mesh->animated_bvh.posed_data);
+    memset(mesh, 0, sizeof(*mesh));
+    --anvil_trace_mesh_count;
+    return 0.0;
+  }
+  memcpy(mesh->animated_bvh.nodes, bvh->nodes,
+         (size_t)bvh->node_count * sizeof(*bvh->nodes));
+  memcpy(mesh->animated_bvh.indices, bvh->indices,
+         (size_t)triangle_count * sizeof(*bvh->indices));
+  mesh->transient_bytes = transient_bytes;
+  anvil_trace_mesh_transient_bytes += transient_bytes;
+  mesh->animated_bvh.data = mesh->animated_bvh.posed_data;
+  bvh = &mesh->animated_bvh;
+  memcpy(bvh->posed_data, data,
+         (size_t)triangle_count * 12 * sizeof(*bvh->posed_data));
+  for (int group = 0; group < group_count; ++group) {
+    const int *entry = groups + group * 3;
+    int node = entry[0], first = entry[1], count = entry[2];
+    const double *matrix = anvil_model_world[node];
+    for (int triangle = first; triangle < first + count; ++triangle) {
+      const double *source = data + (size_t)triangle * 12;
+      double *posed = bvh->posed_data + (size_t)triangle * 12;
+      for (int vertex = 0; vertex < 3; ++vertex) {
+        double px = source[vertex * 3];
+        double py = source[vertex * 3 + 1];
+        double pz = source[vertex * 3 + 2];
+        if (morph_count > 0) {
+          size_t vertex_index = (size_t)triangle * 3 + (size_t)vertex;
+          for (int target = 0; target < morph_count; ++target) {
+            const double *delta = morph_deltas +
+                (vertex_index * (size_t)morph_count + (size_t)target) * 3;
+            px += delta[0] * morph_weights[target];
+            py += delta[1] * morph_weights[target];
+            pz += delta[2] * morph_weights[target];
+          }
+        }
+        anvil_mat_point(matrix, px, py, pz, posed + vertex * 3);
+      }
+      posed[9] = source[9];
+      posed[10] = source[10];
+      posed[11] = source[11];
+    }
+  }
+  bvh->data = bvh->posed_data;
+  anvil_mesh_bvh_refit(bvh, 0);
+  AnvilVec3 center = {
+      (bvh->nodes[0].minimum.x + bvh->nodes[0].maximum.x) * 0.5,
+      (bvh->nodes[0].minimum.y + bvh->nodes[0].maximum.y) * 0.5,
+      (bvh->nodes[0].minimum.z + bvh->nodes[0].maximum.z) * 0.5};
+  AnvilVec3 extent = anvil_sub(bvh->nodes[0].maximum, center);
+  mesh->bvh = bvh;
+  mesh->cx = center.x;
+  mesh->cy = center.y;
+  mesh->cz = center.z;
+  mesh->radius = sqrt(anvil_dot(extent, extent));
+  mesh->x = x;
+  mesh->y = y;
+  mesh->z = z;
+  mesh->scale = scale;
+  mesh->rx = rx;
+  mesh->ry = ry;
+  mesh->rz = rz;
+  mesh->morph_weights = NULL;
+  return 1.0;
+}
+
 static int anvil_mesh_bvh_trace_node(const AnvilMeshBvh *bvh, int node_index,
                                      AnvilVec3 origin, AnvilVec3 direction,
                                      double max_t, double near_t,
@@ -3853,7 +4014,7 @@ static int anvil_mesh_bvh_trace_node(const AnvilMeshBvh *bvh, int node_index,
     triangle.g = (int)p[10];
     triangle.b = (int)p[11];
     triangle.a = 255;
-    double t;
+    double t = 1.0e30;
     AnvilVec3 normal;
     if (anvil_ray_triangle_hit(origin, direction, &triangle, &t, &normal) &&
         t < max_t) {
@@ -4012,12 +4173,14 @@ void anvil_trace_finish(void) {
   if ((anvil_trace_sphere_count == 0 && anvil_trace_triangle_count == 0 &&
        anvil_trace_mesh_count == 0) ||
       !anvil_pixels || !anvil_depth_buffer ||
-      !anvil_scene_is_3d)
+      !anvil_scene_is_3d) {
+    anvil_trace_mesh_clear();
     return;
+  }
   if (anvil_active_ray_backend != ANVIL_RAY_BACKEND_BVH) {
     anvil_trace_sphere_count = 0;
     anvil_trace_triangle_count = 0;
-    anvil_trace_mesh_count = 0;
+    anvil_trace_mesh_clear();
     return;
   }
 
@@ -4347,7 +4510,7 @@ void anvil_trace_finish(void) {
   }
   anvil_trace_sphere_count = 0;
   anvil_trace_triangle_count = 0;
-  anvil_trace_mesh_count = 0;
+  anvil_trace_mesh_clear();
 }
 static double anvil_fade(double t) {
   return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
@@ -5414,8 +5577,6 @@ double anvil_save_version(void) {
   int digits = 0;
   for (size_t i = 0; i < got; ++i) {
     char c = text[i];
-    if (c == '\r' || c == '\n' || c == ' ' || c == '\t')
-      continue; /* keep an edited file usable */
     if (c < '0' || c > '9') {
       anvil_save_error_text = "the save version file is not readable";
       return 0.0;

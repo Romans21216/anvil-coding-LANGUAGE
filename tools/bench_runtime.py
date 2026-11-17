@@ -1,6 +1,6 @@
 """Runtime frame-time benchmarks with enforced budgets (Part 8, 8.15).
 
-Each scene is an ordinary Anvil program: 60 warm-up frames are skipped, then
+Each scene is an ordinary Anvil program: 30 warm-up frames are skipped, then
 120 frame times are bucketed at 0.25 ms resolution and reported as p50, p95
 and worst. Buckets avoid a runtime sort and keep the program small. The loop runs at a
 fixed 60 Hz, so one scene costs about (warm-up + samples) / 60 seconds.
@@ -264,6 +264,22 @@ def ray_mesh_morph_scene() -> str:
     )
 
 
+def ray_mesh_animated_scene() -> str:
+    return "\n".join(
+        (
+            "scene 3d",
+            "camera perspective 0 0 12",
+            "camera fov(70)",
+            "clear rgba(11, 16, 27, 255)",
+            "",
+            "fn(draw)",
+            '  set var(previous_time) = model_animate("anim.glb", time())',
+            '  set var(mesh_ok) = ray_mesh("anim.glb", -1, 0, -1, 3, 0, 0, 0)',
+            "end",
+        )
+    )
+
+
 SCENES.update(
     {
         "ray_spheres_1": ray_sphere_scene(1, 1),
@@ -277,6 +293,7 @@ SCENES.update(
         "ray_triangles_40": ray_triangle_scene(40),
         "ray_mesh_32x32": ray_mesh_scene(),
         "ray_mesh_morph": ray_mesh_morph_scene(),
+        "ray_mesh_animated": ray_mesh_animated_scene(),
     }
 )
 
@@ -405,6 +422,50 @@ def write_ray_morph_mesh(path):
     path.write_bytes(glb)
 
 
+def write_ray_animated_mesh(path):
+    """Write a GLB triangle with one animated node translation channel."""
+    import struct
+
+    positions = struct.pack("<9f", 0, 0, 0, 1, 0, 0, 0, 1, 0)
+    indices = struct.pack("<3H", 0, 1, 2)
+    times = struct.pack("<2f", 0, 1)
+    translations = struct.pack("<6f", 0, 0, 0, 2, 0, 0)
+    binary = positions + indices + times + translations
+    document = {
+        "asset": {"version": "2.0"},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0}],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "material": 0}]}],
+        "materials": [{"pbrMetallicRoughness": {"baseColorFactor": [1.0, 0.6, 0.2, 1.0]}}],
+        "accessors": [
+            {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]},
+            {"bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR"},
+            {"bufferView": 2, "componentType": 5126, "count": 2, "type": "SCALAR", "min": [0], "max": [1]},
+            {"bufferView": 3, "componentType": 5126, "count": 2, "type": "VEC3"},
+        ],
+        "bufferViews": [
+            {"buffer": 0, "byteOffset": 0, "byteLength": len(positions)},
+            {"buffer": 0, "byteOffset": 36, "byteLength": len(indices)},
+            {"buffer": 0, "byteOffset": 42, "byteLength": len(times)},
+            {"buffer": 0, "byteOffset": 50, "byteLength": len(translations)},
+        ],
+        "animations": [{
+            "channels": [{"sampler": 0, "target": {"node": 0, "path": "translation"}}],
+            "samplers": [{"input": 2, "output": 3, "interpolation": "LINEAR"}],
+        }],
+        "buffers": [{"byteLength": len(binary)}],
+    }
+    json_chunk = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    json_chunk += b" " * ((4 - len(json_chunk) % 4) % 4)
+    binary += bytes((4 - len(binary) % 4) % 4)
+    total = 12 + 8 + len(json_chunk) + 8 + len(binary)
+    glb = b"glTF" + struct.pack("<II", 2, total)
+    glb += struct.pack("<II", len(json_chunk), 0x4E4F534A) + json_chunk
+    glb += struct.pack("<II", len(binary), 0x004E4942) + binary
+    path.write_bytes(glb)
+
+
 def measure(name: str, runs: int) -> dict[str, float]:
     source_text = program(SCENES[name])
     results = []
@@ -415,6 +476,8 @@ def measure(name: str, runs: int) -> dict[str, float]:
             write_ray_mesh(root / "mesh.glb")
         if name == "ray_mesh_morph":
             write_ray_morph_mesh(root / "morph.glb")
+        if name == "ray_mesh_animated":
+            write_ray_animated_mesh(root / "anim.glb")
         source = root / f"{name}.ANVL"
         source.write_text(source_text, encoding="utf-8")
         executable = root / f"{name}.exe"

@@ -287,12 +287,20 @@ def measure_run(
     while process.poll() is None and time.perf_counter() - started < RUN_SECONDS:
         peak = max(peak, process_tree_bytes(process.pid))
         time.sleep(RUN_SAMPLE_SECONDS)
-    output = ""
-    if process.poll() is None:
+    timed_out = process.poll() is None
+    if timed_out:
         process.kill()
-    if capture and process.stdout is not None:
-        output = process.stdout.read()
-    process.wait()
+    output, error = process.communicate()
+    if timed_out:
+        raise SystemExit(
+            f"{name}: runtime exceeded {RUN_SECONDS:.1f}s and was terminated"
+        )
+    if process.returncode != 0:
+        detail = error.strip() if error else ""
+        raise SystemExit(
+            f"{name}: runtime exited with status {process.returncode}"
+            + (f": {detail}" if detail else "")
+        )
     result = {
         "run_ms": round((time.perf_counter() - started) * 1000.0, 1),
         "run_peak_mb": round(max(peak, 1) / MB, 1),
@@ -320,7 +328,7 @@ def measure(name: str) -> dict[str, float]:
             name,
             root,
             executable,
-            capture=name in (ASSET_SCENE, AUDIO_SCENE),
+            capture=name in (ASSET_SCENE, AUDIO_SCENE, NETWORK_SCENE),
             peer=NETWORK_PORT if name == NETWORK_SCENE else None,
         )
     if name == ASSET_SCENE:
@@ -347,6 +355,14 @@ def measure(name: str) -> dict[str, float]:
         run["audio_bytes"] = int(numbers[0])
         run["voices_active"] = int(numbers[1])
         run["audio_bytes_after_play"] = int(numbers[2])
+    elif name == NETWORK_SCENE:
+        output = run.pop("stdout", "")
+        expected = f"packets {NETWORK_PACKETS - 1}"
+        if expected not in output.splitlines():
+            raise SystemExit(
+                f"network: expected completion line {expected!r}; "
+                f"received output {output.splitlines()!r}"
+            )
     return {"scene": name, **build, **run}
 
 

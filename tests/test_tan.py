@@ -36,6 +36,15 @@ PROGRAM = "\n".join(
         "  say tan(1) - sin(1) / cos(1)",
         # A known value, so a wrong-but-consistent pair cannot pass.
         "  say round(tan(1) * 1000000)",
+        # Near three poles: scaling by the known distance from the pole should
+        # give +/-1. This catches a small cosine approximation residual taking
+        # over the denominator.
+        "  say round(tan(1.5707963167948966) * 0.00000001 * 1000000000000)",
+        "  say round(tan(1.5707963367948966) * 0.00000001 * 1000000000000)",
+        "  say round(tan(7.853981623974483) * 0.00000001 * 1000000000000)",
+        # The nearest binary64 value to pi/2 is not the mathematical pole; it
+        # must produce the same finite, large result as the C backend.
+        "  say tan(1.5707963267948966)",
         "end",
         "",
     )
@@ -90,12 +99,18 @@ class TanParityTests(unittest.TestCase):
         self.assertEqual(c_run.returncode, 0, c_run.stderr)
         self.assertEqual(wasm_run.returncode, 0, wasm_run.stderr)
         c_lines = lines(c_run.stdout)
-        self.assertEqual(len(c_lines), 11, c_lines)
+        self.assertEqual(len(c_lines), 15, c_lines)
         self.assertEqual(c_lines, lines(wasm_run.stdout))
         # Straight angles and the identity, independent of the parity check.
         self.assertEqual(c_lines[0], "0")
         self.assertEqual(c_lines[9], "0")  # tan(1) == sin(1)/cos(1)
         self.assertEqual(c_lines[10], "1557408")  # tan(1) * 1e6
+        # 80-digit mpmath references evaluated at the exact binary64 inputs,
+        # then rounded after scaling tan(x) by 1e-8 and 1e12.
+        self.assertEqual(
+            c_lines[11:14], ["999999999954", "-1000000012201", "999999975461"]
+        )
+        self.assertTrue(float(c_lines[14]) > 1.0e15, c_lines[14])
 
     def test_tan_is_refused_by_the_native_backend(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:

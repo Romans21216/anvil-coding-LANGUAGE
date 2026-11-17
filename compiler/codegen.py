@@ -267,6 +267,7 @@ def emit_nodes(
     scope: Node | None = None,
     arrays: dict[str, int] | None = None,
     loops: list[dict] | None = None,
+    track_source_lines: bool = False,
 ) -> list[str]:
     arrays = arrays or {}
     loops = loops if loops is not None else []
@@ -287,6 +288,8 @@ def emit_nodes(
     for n in nodes:
         path = n.source or original_path
         source_path = json.dumps(str(path))
+        if track_source_lines:
+            out.append(f"{indent}anvil_wasm_source_line({n.line});")
         if n.kind == "set":
             if n.string:
                 buffer = f"anvil_str_{c_name(n.name)}"
@@ -496,18 +499,23 @@ def emit_nodes(
                         scope,
                         arrays,
                         loops,
+                        track_source_lines,
                     )
                 )
                 continue
             out.append(f"{indent}if ({lower(n)} != 0.0) {{")
             out.extend(
-                emit_nodes(path, n.body, functions, indent + "    ", scope, arrays, loops)
+                emit_nodes(
+                    path, n.body, functions, indent + "    ", scope, arrays, loops,
+                    track_source_lines,
+                )
             )
             if n.otherwise:
                 out.append(f"{indent}}} else {{")
                 out.extend(
                     emit_nodes(
-                        path, n.otherwise, functions, indent + "    ", scope, arrays
+                        path, n.otherwise, functions, indent + "    ", scope, arrays,
+                        track_source_lines=track_source_lines,
                     )
                 )
             out.append(f"{indent}}}")
@@ -519,7 +527,10 @@ def emit_nodes(
             loops.append({})
             try:
                 out.extend(
-                    emit_nodes(path, n.body, functions, indent + "    ", scope, arrays, loops)
+                    emit_nodes(
+                        path, n.body, functions, indent + "    ", scope, arrays, loops,
+                        track_source_lines,
+                    )
                 )
             finally:
                 loops.pop()
@@ -556,7 +567,8 @@ def emit_nodes(
             try:
                 out.extend(
                     emit_nodes(
-                        path, n.body, functions, inner + "        ", scope, arrays, loops
+                        path, n.body, functions, inner + "        ", scope, arrays, loops,
+                        track_source_lines,
                     )
                 )
             finally:
@@ -837,7 +849,10 @@ def emit_c(
         previous_strings = set(STRING_VARIABLES)
         set_string_variables(previous_strings | text_params)
         try:
-            body = emit_nodes(path, fn.body, functions, "    ", fn, arrays)
+            body = emit_nodes(
+                path, fn.body, functions, "    ", fn, arrays,
+                track_source_lines=minimal_includes,
+            )
         finally:
             set_string_variables(previous_strings)
         lines.extend(body)
@@ -945,7 +960,12 @@ def emit_c(
     lines.append(
         f"    anvil_set_project({json.dumps(project_name, ensure_ascii=True)});"
     )
-    lines.extend(emit_nodes(path, setup, functions, "    ", arrays=arrays))
+    lines.extend(
+        emit_nodes(
+            path, setup, functions, "    ", arrays=arrays,
+            track_source_lines=minimal_includes,
+        )
+    )
     if has_engine:
         lines.append(
             f"    anvil_run({c_name('update') if 'update' in functions else 'NULL'}, "

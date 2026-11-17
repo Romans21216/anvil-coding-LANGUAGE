@@ -724,6 +724,8 @@ def load_animated(path: pathlib.Path) -> dict:
 
     vertices: list[float] = []
     groups: list[int] = []
+    morph: list[float] = []
+    morph_counts: list[int] = []
 
     def visit(index: int, depth: int) -> None:
         if depth > 64:
@@ -734,7 +736,13 @@ def load_animated(path: pathlib.Path) -> dict:
         if "mesh" in node:
             first = len(vertices) // 12
             for primitive in _mesh_for_node(document, node).get("primitives", []):
-                vertices.extend(_primitive(document, primitive, _identity(), base_dir, binary))
+                vertices.extend(
+                    _primitive(
+                        document, primitive, _identity(), base_dir, binary,
+                        morph if primitive.get("targets") else None,
+                    )
+                )
+                morph_counts.append(len(primitive.get("targets", [])))
             count = len(vertices) // 12 - first
             if count:
                 groups.extend((index, first, count))
@@ -749,8 +757,7 @@ def load_animated(path: pathlib.Path) -> dict:
         raise ModelError("the model has no triangle geometry")
 
     tracks, times, values, length = _clip(document, nodes_doc, base_dir, binary)
-
-    return {
+    entry = {
         "vertices": vertices,
         "nodes": nodes,
         "parents": parents,
@@ -760,6 +767,25 @@ def load_animated(path: pathlib.Path) -> dict:
         "values": values,
         "length": length,
     }
+    if morph_counts and max(morph_counts) > 0:
+        target_count = morph_counts[0]
+        if target_count > MAX_MORPH_TARGETS:
+            raise ModelError(f"a model may use at most {MAX_MORPH_TARGETS} morph targets")
+        if any(count != target_count for count in morph_counts):
+            raise ModelError("every animated primitive must use the same morph target count")
+        defaults = [0.0] * target_count
+        for mesh in document.get("meshes", []):
+            weights = mesh.get("weights")
+            if weights:
+                if len(weights) != target_count:
+                    raise ModelError("a mesh's default morph weights do not match its targets")
+                defaults = [float(value) for value in weights]
+                break
+        entry.update({"morph": morph, "morph_count": target_count,
+                      "morph_defaults": defaults})
+    elif any(morph_counts):
+        raise ModelError("every animated primitive must use the same morph target count")
+    return entry
 
 
 # ---- Compiler integration -------------------------------------------------
@@ -960,14 +986,6 @@ def definitions() -> list[str]:
             _double_array(lines, symbol + "_times", entry["times"], 8)
             _double_array(lines, symbol + "_values", entry["values"], 8)
             _int_array(lines, symbol + "_tracks", entry["tracks"], 6)
-        elif entry.get("morph_count"):
-            lines.append(
-                f"/* model: {pathlib.Path(key).name}, {count} morphing triangles, "
-                f"{entry['morph_count']} targets */"
-            )
-            _double_array(lines, symbol, entry["data"], 12)
-            _double_array(lines, symbol + "_morph", entry["morph"], 12)
-            _double_array(lines, symbol + "_morph_default", entry["morph_defaults"], 8)
         elif entry.get("animated"):
             lines.append(
                 f"/* model: {pathlib.Path(key).name}, {count} animated triangles, "
@@ -980,6 +998,17 @@ def definitions() -> list[str]:
             _double_array(lines, symbol + "_times", entry["times"], 8)
             _double_array(lines, symbol + "_values", entry["values"], 8)
             _int_array(lines, symbol + "_tracks", entry["tracks"], 6)
+            if entry.get("morph_count"):
+                _double_array(lines, symbol + "_morph", entry["morph"], 12)
+                _double_array(lines, symbol + "_morph_default", entry["morph_defaults"], 8)
+        elif entry.get("morph_count"):
+            lines.append(
+                f"/* model: {pathlib.Path(key).name}, {count} morphing triangles, "
+                f"{entry['morph_count']} targets */"
+            )
+            _double_array(lines, symbol, entry["data"], 12)
+            _double_array(lines, symbol + "_morph", entry["morph"], 12)
+            _double_array(lines, symbol + "_morph_default", entry["morph_defaults"], 8)
         else:
             lines.append(f"/* model: {pathlib.Path(key).name}, {count} triangles */")
             _double_array(lines, symbol, entry["data"], 12)

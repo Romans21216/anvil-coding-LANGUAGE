@@ -114,6 +114,8 @@ class MemoryBudgetTests(unittest.TestCase):
         # what matters is that the transport ran at all and is measured.
         self.assertGreaterEqual(result["run_peak_mb"], 1.0)
         self.assertGreater(result["run_ms"], 0.0)
+        self.assertEqual(result["scene"], "network")
+        self.assertNotIn("stdout", result)
 
     def test_budgets_hold_for_one_scene(self) -> None:
         run = subprocess.run(
