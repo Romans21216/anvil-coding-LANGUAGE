@@ -101,7 +101,7 @@ hello, Ada
 - A configurable fixed-step 2D circle and axis-aligned box-body system (up to 128 slots) with forces, gravity, restitution, mixed-shape collision response, and Coulomb friction.
 - A VS Code language extension and a browser-based preview workbench.
 
-This is an early prototype. Conventional primitives use a fixed-size software rasterizer, and ray-traced spheres use CPU BVH traversal; hardware DXR is not implemented. Image loading supports uncompressed BMP only; 3D mesh textures, image compression, and sprite animation are not implemented. Physics supports up to 128 fixed-step 2D circles and axis-aligned boxes, including mixed-shape contacts and per-body Coulomb friction, but has no rotation, continuous collision detection, or broad phase. The networking sample is a bare LAN prototype, not a secure or reliable Internet multiplayer stack. Audio, 3D physics, a full editor, portability, and performance benchmarks are future work. “Hyper-efficient” is a design goal, not a measured result.
+This is an early prototype. Conventional primitives use a fixed-size software rasterizer, and ray-traced spheres use CPU BVH traversal; hardware DXR is not implemented. Image loading supports uncompressed BMP only; 3D mesh textures, image compression, and sprite animation are not implemented. Physics supports up to 128 fixed-step 2D circles and axis-aligned boxes, including mixed-shape contacts and per-body Coulomb friction, but has no rotation, continuous collision detection, or broad phase. The networking sample is a bare LAN prototype, not a secure or reliable Internet multiplayer stack. Audio plays one uncompressed PCM WAV at a time through the Windows multimedia layer with no mixing, volume control or streaming. 3D physics, a full editor, and portability are future work. Measured support and timing live in [the backend feature matrix](docs/BACKEND_MATRIX.md) and [the baseline benchmarks](docs/BENCHMARKS.md); regression budgets are not enforced yet.
 
 ## Diagnose without building
 
@@ -129,6 +129,7 @@ On Windows, install Python 3.11 or newer and Visual Studio 2022 Build Tools with
 
 ```powershell
 python compiler/anvil.py examples/first_world.ANVL --release --output build/first_world.exe
+python compiler/anvil.py examples/first_world.ANVL --run
 python compiler/anvil.py game.ANVLproj --release --output build/first_world.exe
 python compiler/anvil.py examples/loops.ANVL --release --output build/loops.exe
 python compiler/anvil.py examples/arrays.ANVL --release --output build/arrays.exe
@@ -136,6 +137,29 @@ python compiler/anvil.py examples/physics.ANVL --release --output build/physics.
 python compiler/anvil.py examples/physics_boxes.ANVL --release --output build/physics_boxes.exe
 python compiler/anvil.py examples/physics_friction.ANVL --release --output build/physics_friction.exe
 python compiler/anvil.py examples/image_sprite.ANVL --release --output build/image_sprite.exe
+```
+
+`--run` builds and immediately launches the executable, returning the program's exit code, so edit → build → run is one command. `--format` restores canonical indentation and `--format-check` fails on unformatted files; `--deny-warnings` turns lint warnings into a failing build for CI.
+
+Builds are written beside the target and renamed into place only after the toolchain succeeds, so a compile or link failure leaves the previous executable untouched and never leaves a `.partial.exe` behind.
+
+Three project commands round out the lifecycle. `--new DEMO` scaffolds a `DEMO/DEMO.ANVLproj`, a `main.ANVL` starter scene and an `assets/` folder that builds unmodified on either backend; `--clean` removes the executable and generated C for a source or manifest so the next build starts from zero; `--doctor` prints which toolchains, runtime files and assets this checkout can actually use, and exits non-zero only when no backend can build. `--package` builds the project and writes `dist/<name>/` with the executable, the manifest, the project's assets and a `package.json` recording the compiler, target, feature groups, per-file sizes and SHA-256 checksums; add `--dry-run` to print that plan and validate every `image_load(...)` asset without writing anything. `--test` builds and runs every `tests/*.ANVL` and `*_test.ANVL` file in the project against the selected backend and fails when any run exits non-zero.
+
+```powershell
+python compiler/anvil.py --new demo
+python compiler/anvil.py --doctor
+python compiler/anvil.py demo/demo.ANVLproj --test
+python compiler/anvil.py demo/demo.ANVLproj --package --dry-run
+python compiler/anvil.py demo/demo.ANVLproj --package
+python compiler/anvil.py demo/demo.ANVLproj --clean
+```
+
+Tests use `expect(actual, expected)` and `expect_text(actual, expected)`, which print the failing file and line, dump the call stack and exit 1 when the value differs. The scaffolded project ships `tests/smoke_test.ANVL`, so `--new` followed by `--test` passes out of the box.
+
+Add `--web` to a package to target the browser instead of Windows. `--package --web` writes `dist/<name>/web/` containing `index.html`, `engine.js` and `style.css` with the project's source embedded, so the folder opens from `file://` with no server, build step or plugin. Remote font imports are stripped so the page makes no network requests. The bundled lab page is a preview: it parses `scene`, `clear` and `display` declarations and draws them on a canvas, but it is not the compiled runtime, so gameplay code that depends on the full language does not execute there yet. See [the browser target](docs/WEB.md).
+
+```powershell
+python compiler/anvil.py demo/demo.ANVLproj --package --web
 ```
 
 This compiles through temporary C with MSVC in the same build command, then removes the C and object intermediates automatically. Generated C keeps functions and global scalar/array storage reachable from selected entry points and callbacks, including function-reference targets. Release builds enable MSVC function/data sections and linker elimination. A runtime-module registry compiles image loading, networking, and 2D physics in separate C translation units only when reachable Anvil code uses those features. The renderer and remaining runtime systems still share the core translation unit. Image resources are released through the core runtime shutdown-hook interface. These are internal feature boundaries, not yet a user-facing package/import system. To preserve translated C for inspection, add `--generated-c build/first_world.c`; to only translate without building, use `--emit-c build/first_world.c`. The generated C is ordinary C, while the supplied runtime currently targets Windows. Anvil owns the language front end, validation, reachability analysis, and runtime; the C toolchain performs machine-code generation and linking.
@@ -162,6 +186,16 @@ npm test --prefix vscode-extension
 ```
 
 The numeric sample builds and prints `17`. The starter world builds into a native Windows executable. Run it to open the game window.
+
+Regression budgets live in `tools/benchmarks/budgets.json` and are checked against medians from the same workload:
+
+```powershell
+python tools/benchmark.py                # refresh docs/BENCHMARKS.md
+python tools/benchmark.py --check-budget # exit 1 when a metric regresses past tolerance
+python tools/benchmark.py --write-budget # re-record the agreed baseline
+```
+
+A metric is allowed `median * tolerance + slack`, so scheduling noise does not fail the build; a changed checksum also fails the check, because it means the workload printed a different answer.
 
 ## Files
 

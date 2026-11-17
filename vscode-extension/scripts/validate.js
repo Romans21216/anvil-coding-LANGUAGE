@@ -103,6 +103,15 @@ async function main() {
   expect('netIP("127.0.0.1")', 'netIP', 'support.function.engine.anvil');
   expect('call fn(move - input, call fn(value - other))', 'other', 'entity.name.namespace.anvil');
   expect('fn(update)', 'fn', 'keyword.declaration.function.anvil');
+  expect('print "score = 7"', 'print', 'keyword.control.anvil');
+  expect('say "score = 7"', 'say', 'keyword.control.anvil');
+  expect('output mod(7, 3)', 'mod', 'support.function.anvil');
+  expect('output round(2.4)', 'round', 'support.function.anvil');
+  expect('output len("anvil")', 'len', 'support.function.anvil');
+  expect('set var(text) = upper("anvil")', 'upper', 'support.function.anvil');
+  expect('output hypot(3, 4)', 'hypot', 'support.function.anvil');
+  expect('print utf8_char("aé🙂", 1)', 'utf8_char', 'support.function.anvil');
+  expect('output clamp(9, 1, 5)', 'clamp', 'support.function.anvil');
   expect('language version 1', 'language', 'keyword.control.anvil');
   expect('language version 1', 'version', 'keyword.control.anvil');
   expect('language version 1', '1', 'constant.numeric.integer.anvil');

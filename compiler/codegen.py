@@ -425,6 +425,7 @@ def emit_nodes(
             size = array_size(n.name, scope, arrays)
             if size is None:
                 raise CompileError(f"{path}:{n.line}: unknown array {n.name!r}")
+            check_literal_array_index(n.params[0], size, n.name, path, n.line)
             suffix = f"{c_name(scope.name if scope else 'top')}_{n.line}"
             index_var, value_var = (
                 f"_anvil_array_index_{suffix}",

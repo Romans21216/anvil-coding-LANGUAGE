@@ -10,6 +10,7 @@ from compiler.common import CompileError
 class NativeMath:
     ARITY = {"abs": 1, "sqrt": 1, "floor": 1, "ceil": 1, "round": 1, "sin": 1, "cos": 1,
              "min": 2, "max": 2, "rnd": 2, "noise": 3, "fbm": 6,
+             "mod": 2, "round": 1,
              "_anvil_native_hash": 3}
     PREFIX = "_anvil_native_"
     DEFAULT_SEED = 0x9E3779B97F4A7C15
@@ -183,6 +184,11 @@ class NativeMath:
             slot = owner.push_temp()
             owner.store_local(slot)
             slots.append(slot)
+        if name == "round" and parser._peek(","):
+            raise CompileError(
+                f"{owner.path}:{parser.line}: native round currently accepts one argument; "
+                "round(value, places) needs the default C backend"
+            )
         parser._expect(")")
 
         def load(index, register):
@@ -212,6 +218,10 @@ class NativeMath:
             owner.emit_saved_call(helper, slots)
         elif name == "rnd":
             self.rnd(load, parser.line)
+        elif name == "mod":
+            self.modulo(load, owner, parser.line)
+        elif name == "round":
+            self.round_half(load)
         else:
             load(0, 0)
             if name in ("min", "max"):

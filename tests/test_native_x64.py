@@ -15,7 +15,7 @@ class NativeRunMixin:
     """Compiles a snippet with the native backend and runs the EXE."""
 
     def _run_source(self, source: str) -> str:
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             path = pathlib.Path(temp) / "sample.ANVL"
             path.write_text(source, encoding="utf-8")
             functions, top, variables, arrays = parse(path, source)
@@ -67,15 +67,98 @@ call fn(main)
 """
         self.assertEqual(self._run_source(source), "-42\n")
 
+    def test_native_backend_accepts_literal_clear_inside_draw(self):
+        source = (
+            "scene 2d\n"
+            "fn(draw)\n"
+            "  clear rgba(0, 0, 0, 255)\n"
+            "  display rect(0, 0, 1, 1)\n"
+            "end\n"
+        )
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            path = pathlib.Path(temp) / "clear-draw.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            executable = NativeCodegen(path, functions, top, variables, arrays).generate()
+        self.assertTrue(executable)
+
+    def test_native_backend_rejects_transparent_clear_inside_draw(self):
+        source = "scene 2d\nfn(draw)\n clear rgba(0, 0, 0, 20)\nend\n"
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            path = pathlib.Path(temp) / "clear-alpha.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as raised:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        message = str(raised.exception)
+        self.assertIn("clear-alpha.ANVL:3", message)
+        self.assertIn("alpha 255", message)
+
+    def test_native_backend_prints_literal_text_lines(self):
+        source = """\
+fn(main)
+  print "score = 7"
+  print "say \\"hi\\""
+  output 0
+end
+"""
+        self.assertEqual(self._run_source(source), 'score = 7\nsay "hi"\n0\n')
+
+    def test_native_backend_runs_top_level_literal_print_before_main(self):
+        source = 'print "booting"\nfn(main)\n  output 0\nend\n'
+        self.assertEqual(self._run_source(source), "booting\n0\n")
+
+    def test_native_backend_rejects_dynamic_print_with_a_source_location(self):
+        source = 'fn(main)\n  set var(score) = 7\n  print "score = " + var(score)\nend\n'
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            path = pathlib.Path(temp) / "dynamic-print.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as raised:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        message = str(raised.exception)
+        self.assertIn("dynamic-print.ANVL:3", message)
+        self.assertIn("one string literal", message)
+
+    def test_native_backend_matches_floored_mod_and_half_rounding(self):
+        cases = {
+            "mod(7, 3)": "1\n",
+            "mod(0 - 5, 3)": "1\n",
+            "mod(5, 0 - 3)": "-1\n",
+            "round(2.4)": "2\n",
+            "round(2.5)": "3\n",
+            "round(0 - 2.5)": "-3\n",
+            "round(0 - 0.4)": "-0\n",
+        }
+        for expression, expected in cases.items():
+            with self.subTest(expression=expression):
+                source = f"fn(main)\n  output {expression}\nend\n"
+                self.assertEqual(self._run_source(source), expected)
+
+    def test_native_backend_rejects_round_places_with_a_source_location(self):
+        source = "fn(main)\n  output round(2.456, 2)\nend\n"
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            path = pathlib.Path(temp) / "round-places.ANVL"
+            path.write_text(source, encoding="utf-8")
+            functions, top, variables, arrays = parse(path, source)
+            with self.assertRaises(CompileError) as raised:
+                NativeCodegen(path, functions, top, variables, arrays).generate()
+        message = str(raised.exception)
+        self.assertIn("round-places.ANVL:2", message)
+        self.assertIn("accepts one argument", message)
+
     def test_native_backend_prints_fractional_numbers(self):
         cases = {
             "17.875": "17.875\n",
             "-0.75": "-0.75\n",
             "0.000005": "0.000005\n",
-            "0.123456789": "0.123457\n",
+            "1 / 3": "0.333333333333333\n",
+            "0.1 + 0.2": "0.3\n",
+            "12.5663706143592": "12.5663706143592\n",
+            "0.123456789": "0.123456789\n",
             "12.5": "12.5\n",
-            "12.9999999": "13\n",
-            "-1.9999999": "-2\n",
+            "12.9999999": "12.9999999\n",
+            "-1.9999999": "-1.9999999\n",
             "-9223372036854775808": "-9223372036854775808\n",
         }
         for expression, expected in cases.items():
@@ -85,7 +168,7 @@ call fn(main)
 
     def test_native_backend_rejects_out_of_range_output(self):
         for expression in ("100000000000000000000", "-100000000000000000000"):
-            with self.subTest(expression=expression), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(expression=expression), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 path = pathlib.Path(temp) / "range.ANVL"
                 source = f"fn(main)\n  output {expression}\nend\ncall fn(main)\n"
                 path.write_text(source, encoding="utf-8")
@@ -105,7 +188,7 @@ call fn(main)
 
     def test_native_backend_reports_nonfinite_arithmetic_with_source_line(self):
         for expression in ("0 / 0", "1 / 0"):
-            with self.subTest(expression=expression), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(expression=expression), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 path = pathlib.Path(temp) / "bad-math.ANVL"
                 source = f"fn(main)\n  output {expression}\nend\ncall fn(main)\n"
                 path.write_text(source, encoding="utf-8")
@@ -309,7 +392,7 @@ call fn(main)
 
     def test_native_backend_reports_global_array_bounds_errors(self):
         for index in ("-1", "2", "0.5"):
-            with self.subTest(index=index), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(index=index), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 path = pathlib.Path(temp) / "array-bounds.ANVL"
                 source = (
                     "array values(2)\n"
@@ -391,7 +474,7 @@ call fn(main)
     def test_native_backend_rejects_aggregate_array_data_before_pe_allocation(self):
         root = pathlib.Path(__file__).resolve().parents[1]
         for comment in ("", " # crosses cap"):
-            with self.subTest(comment=comment), tempfile.TemporaryDirectory() as temp:
+            with self.subTest(comment=comment), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
                 source = pathlib.Path(temp) / "large-arrays.ANVL"
                 executable = pathlib.Path(temp) / "large-arrays.exe"
                 source.write_text(
@@ -416,12 +499,13 @@ call fn(main)
                     timeout=10,
                 )
             self.assertEqual(result.returncode, 1)
-            self.assertIn(f"{source}:3: direct native global data needs", result.stderr)
+            self.assertIn(f"--> {source}:3:", result.stderr)
+            self.assertIn("direct native global data needs", result.stderr)
             self.assertIn("the limit is 16777216 bytes", result.stderr)
             self.assertFalse(executable.exists())
 
     def test_native_cli_builds_exe_without_generated_source(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(__file__).resolve().parents[1]
             source = pathlib.Path(temp) / "cli.ANVL"
             executable = pathlib.Path(temp) / "cli.exe"
@@ -481,7 +565,7 @@ call fn(main)
         self.assertEqual(struct.unpack_from("<H", image, optional)[0], 0x20B)
         self.assertEqual(struct.unpack_from("<H", image, optional + 68)[0], 3)
 
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             executable = pathlib.Path(temp) / "anvil-native-smoke.exe"
             executable.write_bytes(image)
             result = subprocess.run(

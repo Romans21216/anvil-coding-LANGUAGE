@@ -62,6 +62,25 @@ def build_c(
     deps_path: pathlib.Path | None = None,
     libs_path: pathlib.Path | None = None,
 ):
+    """Build beside the final path and move into place only on success.
+
+    A failed compile or link must never destroy the last good executable, so the
+    toolchain writes a sibling staging file and the finished PE is renamed over
+    the target atomically.
+    """
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging = output.with_name(f"{output.stem}.partial{output.suffix}")
+    try:
+        _build_c_into(compiler, generated, staging, release)
+        if staging.exists():
+            os.replace(staging, output)
+    finally:
+        staging.unlink(missing_ok=True)
+
+
+def _build_c_into(
+    compiler: str, generated: pathlib.Path, output: pathlib.Path, release: bool
+):
     output.parent.mkdir(parents=True, exist_ok=True)
     # Link into a sibling file and only replace the previous output once the
     # toolchain succeeds, so a failed build can never leave a truncated or

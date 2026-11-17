@@ -887,6 +887,7 @@ class NativeCodegen:
     BUILTIN_NAMES = {"len", "round", "upper", "lower", "ord", "chr", "trim", "number", "char", "contains", "mid", "left", "right", "starts_with", "ends_with", "sin", "cos", "compute", "time", "clock", "random", "delta", "held", "pressed",
                      "mouse_x", "mouse_y", "mouse_held", "mouse_pressed", "mouse_wheel",
                      "abs", "sqrt", "floor", "ceil", "min", "max", "rnd", "noise", "fbm",
+                     "mod", "round",
                      "_anvil_native_hash"}
     MAX_DATA_BYTES = 16 * 1024 * 1024
     MAX_FRAME_BYTES = 4096
@@ -1268,6 +1269,33 @@ class NativeCodegen:
         self._lea_array_base(2, name, scope)
         self.code.bytes(b"\xf2\x0f\x11\x04\xc2")  # movsd [rdx+rax*8],xmm0
         self.pop_temp()
+
+    def emit_print_statement(self, node) -> None:
+        """Write one literal text line to stdout; dynamic text stays C-only."""
+        import json as _json
+        import re as _re
+
+        location = f"{node.source or self.path}:{node.line}"
+        raw = (node.value or "").strip()
+        if not _re.fullmatch(r'"(?:\\.|[^"\\])*"', raw):
+            raise CompileError(
+                f"{location}: native print currently accepts one string literal; "
+                "dynamic text needs the default C backend"
+            )
+        try:
+            payload = _json.loads(raw).encode("utf-8") + b"\n"
+        except (ValueError, UnicodeEncodeError) as exc:
+            raise CompileError(f"{location}: invalid native print literal: {exc}") from exc
+        offset = self.reserve_data(payload + b"\0")
+        self.code.mov_imm(1, -11)  # STD_OUTPUT_HANDLE
+        self.code.rip_call_import("GetStdHandle")
+        self.code.mov_reg(1, 0)
+        self.code.rip_lea_data(2, offset)
+        self.code.mov_imm(8, len(payload))
+        self.code.stack_int(9, 0x28, address=True)
+        self.code.mov_imm(0, 0)
+        self.code.stack_int(0, 0x20, store=True)
+        self.code.rip_call_import("WriteFile")
 
     def emit_runtime_error(self, message_text: str) -> None:
         """Write pooled UTF-8 diagnostic data and terminate with status 2."""
@@ -1854,19 +1882,61 @@ class NativeCodegen:
         self.code.label(format_value)
         self.code.bytes(b"\xf2\x48\x0f\x2c\xc0")  # cvttsd2si rax,xmm0
         self.code.bytes(b"\x48\x89\x44\x24\x28")  # save integer part
-        self.code.bytes(b"\xf2\x48\x0f\x2a\xc8")  # cvtsi2sd xmm1,rax
+        # Count the integer digits so the fraction keeps 15 significant digits.
+        count_loop = self.label("print_count_digits")
+        digits_ok = self.label("print_digits_ok")
+        digits_ready = self.label("print_digits_ready")
+        self.code.bytes(b"\x45\x31\xc9")  # r9d = digit count
+        self.code.bytes(b"\x49\xb8\x0a\x00\x00\x00\x00\x00\x00\x00")  # divisor 10
+        self.code.label(count_loop)
+        self.code.bytes(b"\x41\xff\xc1\x31\xd2\x49\xf7\xf0")  # count++, div r8
+        self.code.bytes(b"\x48\x85\xc0")
+        self.code.conditional_jump(0x85, count_loop)
+        self.code.bytes(b"\x44\x89\xc8")  # eax = count
+        self.code.bytes(b"\x41\xb9\x0f\x00\x00\x00")  # r9d = 15
+        self.code.bytes(b"\x41\x29\xc1")  # digits = 15 - count
+        self.code.conditional_jump(0x89, digits_ok)
+        self.code.bytes(b"\x45\x31\xc9")  # integers with 16+ digits keep no fraction
+        self.code.label(digits_ok)
+        self.code.bytes(b"\x48\x83\x7c\x24\x28\x00")  # integer == 0?
+        self.code.conditional_jump(0x85, digits_ready)
+        self.code.bytes(b"\x41\xb9\x0f\x00\x00\x00")  # pure fraction uses all 15
+        self.code.label(digits_ready)
+        self.code.bytes(b"\x4c\x89\x4c\x24\x18")  # save digits
+        # scale = 10 ** digits, computed exactly (10^0..10^22 are exact doubles).
+        scale_loop = self.label("print_scale_loop")
+        scale_done = self.label("print_scale_done")
+        self.code.bytes(b"\x48\xb8\x00\x00\x00\x00\x00\x00\xf0\x3f")  # 1.0
+        self.code.bytes(b"\x66\x48\x0f\x6e\xd8")  # movq xmm3,rax
+        self.code.bytes(b"\x48\xb8\x00\x00\x00\x00\x00\x00\x24\x40")  # 10.0
+        self.code.bytes(b"\x66\x48\x0f\x6e\xe0")  # movq xmm4,rax
+        self.code.bytes(b"\x44\x89\xc9")  # ecx = digits
+        self.code.label(scale_loop)
+        self.code.bytes(b"\x85\xc9")
+        self.code.conditional_jump(0x84, scale_done)
+        self.code.bytes(b"\xf2\x0f\x59\xdc\xff\xc9")  # mulsd xmm3,xmm4; dec ecx
+        self.code.jump(scale_loop)
+        self.code.label(scale_done)
+        # fraction = round((abs(value) - integer) * scale)
+        self.code.bytes(b"\xf2\x48\x0f\x2a\x4c\x24\x28")  # cvtsi2sd xmm1,[rsp+28h]
         self.code.bytes(b"\x66\x0f\x28\xd0\xf2\x0f\x5c\xd1")  # fraction in xmm2
-        self.code.bytes(b"\x48\xb8\x40\x42\x0f\x00\x00\x00\x00\x00")  # 1,000,000
-        self.code.bytes(b"\xf2\x48\x0f\x2a\xc8\xf2\x0f\x59\xd1")  # scale fraction
+        self.code.bytes(b"\xf2\x0f\x59\xd3")  # scale fraction
         self.code.bytes(b"\x48\xb8\x00\x00\x00\x00\x00\x00\xe0\x3f")  # 0.5
         self.code.bytes(b"\x66\x48\x0f\x6e\xc8\xf2\x0f\x58\xd1")  # round to nearest
         self.code.bytes(b"\xf2\x48\x0f\x2c\xc2")  # cvttsd2si rax,xmm2
-        fraction_carry = self.label("print_fraction_carry")
-        fraction_ready = self.label("print_fraction_ready")
-        self.code.bytes(b"\x48\x3d\x40\x42\x0f\x00")  # cmp rax,1,000,000
-        self.code.conditional_jump(0x84, fraction_carry)
-        self.code.jump(fraction_ready)
-        self.code.label(fraction_carry)
+        limit_loop = self.label("print_limit_loop")
+        limit_done = self.label("print_limit_done")
+        no_carry = self.label("print_no_carry")
+        self.code.bytes(b"\x48\xb9\x01\x00\x00\x00\x00\x00\x00\x00")  # rcx = 1
+        self.code.bytes(b"\x45\x89\xc8")  # r8d = digits
+        self.code.label(limit_loop)
+        self.code.bytes(b"\x45\x85\xc0")
+        self.code.conditional_jump(0x84, limit_done)
+        self.code.bytes(b"\x48\x6b\xc9\x0a\x41\xff\xc8")  # imul rcx,10; dec r8d
+        self.code.jump(limit_loop)
+        self.code.label(limit_done)
+        self.code.bytes(b"\x48\x39\xc8")  # cmp fraction,limit
+        self.code.conditional_jump(0x82, no_carry)
         self.code.bytes(b"\x48\xff\x44\x24\x28\x31\xc0")  # carry into integer; fraction = 0
         self.code.label(fraction_ready)
         # A value that renders as zero must not keep its minus: -1e-7 prints "0"
@@ -1888,7 +1958,10 @@ class NativeCodegen:
         self.code.bytes(b"\xc6\x44\x24\x50\x0a")  # newline
         self.code.label(newline_skip)
         self.code.bytes(b"\x49\xb8\x0a\x00\x00\x00\x00\x00\x00\x00")  # divisor 10
-        self.code.bytes(b"\x41\xb9\x06\x00\x00\x00")  # six decimal digits
+        self.code.bytes(b"\x44\x8b\x4c\x24\x18")  # r9d = digits
+        no_point = self.label("print_no_point")
+        self.code.bytes(b"\x45\x85\xc9")
+        self.code.conditional_jump(0x84, no_point)
         fraction_loop = self.label("print_fraction_digit")
         fraction_write = self.label("print_fraction_write")
         fraction_done = self.label("print_fraction_done")
@@ -1904,6 +1977,7 @@ class NativeCodegen:
         self.code.label(fraction_done)
         self.code.bytes(b"\x41\xff\xc9")  # dec r9d
         self.code.conditional_jump(0x85, fraction_loop)
+        self.code.label(no_point)
         no_decimal = self.label("print_no_decimal")
         self.code.bytes(b"\x45\x85\xdb")
         self.code.conditional_jump(0x84, no_decimal)

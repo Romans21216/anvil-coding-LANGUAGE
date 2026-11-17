@@ -74,7 +74,7 @@ class QaReportValidationTests(unittest.TestCase):
             count=1,
         )
         self.assertEqual(count, 1)
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             report_path = pathlib.Path(temp_dir) / "QA_REPORT.md"
             report_path.write_text(report, encoding="utf-8")
             result = self._run_validator(report_path)
@@ -94,7 +94,7 @@ class QaReportValidationTests(unittest.TestCase):
             count=1,
         )
         self.assertEqual(count, 1)
-        with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             report_path = pathlib.Path(temp_dir) / "QA_REPORT.md"
             report_path.write_text(report, encoding="utf-8")
             result = self._run_validator(report_path)

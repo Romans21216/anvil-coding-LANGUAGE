@@ -81,6 +81,54 @@ def split_amp(text: str) -> list[str]:
         result.append(tail)
     return result
 
+_NUMBER_LITERAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
+
+
+def _literal_array_index(text):
+    """Return the value of a bare number literal, or None when it is computed.
+
+    A literal index is knowable at compile time, so a fractional or
+    out-of-range one can be rejected here instead of dying at run time.
+    """
+    stripped = text.strip()
+    if not _NUMBER_LITERAL.fullmatch(stripped):
+        return None
+    try:
+        return float(stripped)
+    except ValueError:
+        return None
+
+
+def check_literal_array_index(text, size, name, path, line):
+    """Reject a literal index that is fractional or out of range.
+
+    Computed indexes are left to the run-time check. This runs for both
+    array reads and array writes so the two paths cannot disagree.
+    """
+    literal_index = _literal_array_index(text)
+    if literal_index is None:
+        return
+    spelling = text.strip()
+    if literal_index != int(literal_index):
+        raise CompileError(
+            f"{path}:{line}: array index must be a whole number, got {spelling}",
+            hint="array(a, 1.5) is not valid; use a whole number such as array(a, 1)",
+            needle=spelling,
+        )
+    if literal_index < 0:
+        raise CompileError(
+            f"{path}:{line}: array index must be zero or greater, got {spelling}",
+            hint=f"valid indexes are 0 to {size - 1}",
+            needle=spelling,
+        )
+    if literal_index >= size:
+        raise CompileError(
+            f"{path}:{line}: array index {int(literal_index)} is past the end "
+            f"of {name!r} (size {size})",
+            hint=f"valid indexes are 0 to {size - 1}",
+            needle=spelling,
+        )
+
 
 def validate_expression_depth(source, path, line):
     depth, quoted, escaped = 0, False, False
@@ -297,7 +345,54 @@ BUILTINS = {
     "shadow_alpha": (1, 1),
 }
 
+# Text builtins take text arguments and return text or a number.  The spec is
+# the argument list; the second element is the result type.
+TEXT_BUILTINS = {
+    "len": (("text",), "number"),
+    "ord": (("text",), "number"),
+    "find": (("text", "text"), "number"),
+    "upper": (("text",), "string"),
+    "lower": (("text",), "string"),
+    "trim": (("text",), "string"),
+    "mid": (("text", "number", "number"), "string"),
+    "replace": (("text", "text", "text"), "string"),
+    "chr": (("number",), "string"),
+    "utf8_len": (("text",), "number"),
+    "utf8_char": (("text", "number"), "string"),
+    "utf8_mid": (("text", "number", "number"), "string"),
+    "expect_text": (("text", "text"), "number"),
+}
+
+TEXT_BUILTIN_C_NAMES = {
+    "len": "anvil_text_len",
+    "ord": "anvil_text_ord",
+    "find": "anvil_text_find",
+    "upper": "anvil_text_upper",
+    "lower": "anvil_text_lower",
+    "trim": "anvil_text_trim",
+    "mid": "anvil_text_mid",
+    "replace": "anvil_text_replace",
+    "chr": "anvil_text_chr",
+    "utf8_len": "anvil_utf8_len",
+    "utf8_char": "anvil_utf8_char",
+    "utf8_mid": "anvil_utf8_mid",
+    "expect_text": "anvil_expect_text",
+}
+
+# Trailing arguments that a builtin fills in when the call is shorter.
+BUILTIN_DEFAULTS = {"round": ["0.0"]}
+
+# Builtins that receive the source location so a failure can name the line.
+BUILTIN_LOCATION_ARGUMENTS = {"expect"}
+TEXT_BUILTIN_LOCATION_ARGUMENTS = {"expect_text"}
+
 BUILTIN_C_NAMES = {
+    "expect": "anvil_expect",
+    "sound_load": "anvil_sound_load",
+    "sound_play": "anvil_sound_play",
+    "sound_stop": "anvil_sound_stop",
+    "sound_rate": "anvil_sound_rate",
+    "sound_length": "anvil_sound_length_ms",
     "time": "anvil_time",
     "clock": "anvil_clock",
     "random": "anvil_random_pipeline",
@@ -1179,6 +1274,12 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: {value}() expects {expected} "
                     f"argument(s), got {len(args)}{hint}"
                 )
+            defaults = BUILTIN_DEFAULTS.get(value)
+            if defaults and len(args) < high:
+                args.extend(defaults[len(args) - low:])
+            if value in BUILTIN_LOCATION_ARGUMENTS:
+                args.append(c_string_literal(str(self.path)))
+                args.append(str(self.line))
             name = BUILTIN_C_NAMES.get(value, value)
             site_name = SITE_BUILTINS.get(value)
             if site_name is not None and len(args) == 1:
@@ -1265,7 +1366,7 @@ class ExpressionParser:
                 )
                 continue
             left_code = self.checked_number(self.require_number(left))
-            right = self.require_number(self.parse(precedence + 1))
+            right = self.require_number((right_code, right_kind))
             if operator == "/":
                 left = (
                     f"anvil_divide({left_code}, {right}, "
@@ -1305,14 +1406,51 @@ class ExpressionParser:
                 )
         return left
 
-    def compile(self, expected: str = "number") -> str:
+    def combine_text(self, operator, left, right_code, right_kind):
+        """Join text with `+`, compare text, or refuse a meaningless operator."""
+        left_code, left_kind = left
+        if operator == "+":
+            joined = [
+                code if kind == "string" else f"anvil_str_num({self.checked_number(code)})"
+                for code, kind in ((left_code, left_kind), (right_code, right_kind))
+            ]
+            return (f"anvil_str_cat({joined[0]}, {joined[1]})", "string")
+        if operator in ("=", "==", "!=") and left_kind == right_kind == "string":
+            equal = f"anvil_str_equal({left_code}, {right_code})"
+            return (equal if operator != "!=" else f"(1.0 - {equal})", "number")
+        raise CompileError(
+            f"{self.path}:{self.line}: operator {operator!r} does not apply to text",
+            hint="text supports + (join), =, == and != only",
+        )
+
+    def parse_text_argument(self) -> str:
+        code, kind = self.parse()
+        if kind != "string":
+            raise CompileError(
+                f"{self.path}:{self.line}: expected text, got a number",
+                hint="pass a quoted string, or build one with upper/lower/trim/mid/replace/chr",
+            )
+        return code
+
+    def parse_full(self) -> tuple[str, str]:
         result = self.parse()
         if self.peek():
             raise CompileError(
                 f"{self.path}:{self.line}: unexpected token "
-                f"{self.tokens[self.index][1]!r} in expression"
+                f"{self.tokens[self.index][1]!r} in expression",
+                needle=self.tokens[self.index][1],
             )
-        code, actual = result
+        return result
+
+    def compile(self, expected: str = "number") -> str:
+        code, actual = self.parse_full()
+        if expected == "text":
+            if actual != "string":
+                raise CompileError(
+                    f"{self.path}:{self.line}: expected text, got a number",
+                    hint="text is a quoted string or a text expression made with +",
+                )
+            return code
         if actual != expected:
             article = {
                 "number": "a number",

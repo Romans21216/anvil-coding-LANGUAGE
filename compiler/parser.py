@@ -110,6 +110,14 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
                 )
             )
             continue
+        library_import = re.fullmatch(r"library\s+import\s+([A-Za-z_][\w-]*)", line)
+        if library_import:
+            if len(stack) != 1:
+                raise CompileError(f"{path}:{line_no}: library import must be at top level")
+            top.append(
+                Node("library_import", line_no, value=library_import.group(1), source=path)
+            )
+            continue
         if re.match(r"include\b", line):
             if len(stack) != 1:
                 raise CompileError(f"{path}:{line_no}: include must be at top level")
@@ -280,8 +288,22 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
             functions[name] = node
             stack.append((node.body, "function", node))
             continue
+        if line.startswith("else if "):
+            if stack[-1][1] not in ("if", "if-chained"):
+                raise CompileError(
+                    f"{path}:{line_no}: 'else if' must follow an if",
+                    hint="write `else`, then put `if` on its own line inside it",
+                    needle="else if",
+                )
+            parent = stack[-1][2]
+            assert parent is not None
+            stack[-1] = (parent.otherwise, "else", parent)
+            node = Node("if", line_no, value=line[len("else if ") :].strip(), chained=True)
+            parent.otherwise.append(node)
+            stack.append((node.body, "if-chained", node))
+            continue
         if line == "else":
-            if stack[-1][1] != "if":
+            if stack[-1][1] not in ("if", "if-chained"):
                 raise CompileError(f"{path}:{line_no}: 'else' must match an if")
             block = stack[-1][2]
             assert block is not None
@@ -307,8 +329,15 @@ def parse_syntax(path: pathlib.Path, source: str) -> ParsedProgram:
         if line == "end":
             if len(stack) == 1:
                 raise CompileError(f"{path}:{line_no}: unexpected 'end'")
-            _, kind, _ = stack.pop()
-            if kind not in ("function", "if", "else", "while", "for"):
+            frame_nodes, kind, block = stack.pop()
+            if kind == "if-chained" or (
+                kind == "else" and block is not None and block.chained
+            ):
+                # `else if` opens one nested if per link; one `end` closes the
+                # whole chain, so pop the else frames that belong to it too.
+                while len(stack) > 1 and stack[-1][1] == "else":
+                    stack.pop()
+            if kind not in ("function", "if", "if-chained", "else", "while", "for"):
                 raise CompileError(f"{path}:{line_no}: mismatched block end")
             continue
         if line.startswith("if "):

@@ -405,6 +405,42 @@ def main() -> int:
         metavar="CODE",
         help="print the cause and fix for a diagnostic code (for example ANV102)",
     )
+    ap.add_argument(
+        "--doctor",
+        action="store_true",
+        help="report which toolchains and backends are usable here and stop",
+    )
+    ap.add_argument(
+        "--new",
+        type=pathlib.Path,
+        metavar="FOLDER",
+        help="create a starter project in FOLDER and stop",
+    )
+    ap.add_argument(
+        "--clean",
+        action="store_true",
+        help="delete the build artifacts next to SOURCE and stop",
+    )
+    ap.add_argument(
+        "--package",
+        action="store_true",
+        help="build and emit a distributable folder with a hashed package.json",
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="with --package, print the plan and validate assets without writing",
+    )
+    ap.add_argument(
+        "--test",
+        action="store_true",
+        help="build and run every tests/*.ANVL and *_test.ANVL file in the project",
+    )
+    ap.add_argument(
+        "--web",
+        action="store_true",
+        help="with --package, emit a static browser preview instead of an exe",
+    )
     ap.add_argument("--emit-c", type=pathlib.Path, help="emit C source only and stop")
     ap.add_argument("--generated-c", type=pathlib.Path, help="choose generated C path")
     ap.add_argument("--output", "-o", type=pathlib.Path, help="output executable")
@@ -512,6 +548,11 @@ def main() -> int:
         help="print the builtins this program actually uses and stop",
     )
     ap.add_argument(
+        "--check",
+        action="store_true",
+        help="parse, validate and report warnings without writing an executable",
+    )
+    ap.add_argument(
         "--backend",
         choices=("c", "native", "wasm"),
         default="c",
@@ -541,6 +582,31 @@ def main() -> int:
         choices=("native", "c"),
         default="native",
         help="backend the interactive shell uses (default: native)",
+    )
+    ap.add_argument(
+        "--deny-warnings",
+        action="store_true",
+        help="treat lint warnings as errors and stop before building",
+    )
+    ap.add_argument(
+        "--json-diagnostics",
+        action="store_true",
+        help="write errors and warnings as one JSON object per line (for editors)",
+    )
+    ap.add_argument(
+        "--run",
+        action="store_true",
+        help="build, run the executable, and return its exit code",
+    )
+    ap.add_argument(
+        "--format",
+        action="store_true",
+        help="rewrite the .ANVL source with canonical block indentation and stop",
+    )
+    ap.add_argument(
+        "--format-check",
+        action="store_true",
+        help="exit 1 when the .ANVL source is not canonically indented",
     )
     args = ap.parse_args()
     if args.debug and args.release:

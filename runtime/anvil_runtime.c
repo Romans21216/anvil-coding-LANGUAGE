@@ -1889,6 +1889,360 @@ void anvil_text_number(double x, double y, const char *format, double value,
               anvil_format_number(value));
   anvil_text(x, y, buffer, r, g, b, a);
 }
+/* ---- text values ---------------------------------------------------------
+   Text is a const char* built by anvil_str_cat / anvil_str_num and the text
+   builtins.  Results live in a scratch arena: every string is consumed by the
+   display call or print that produced it, so reuse is safe.  When the arena is
+   exhausted it wraps and reuses the oldest bytes. */
+enum { ANVIL_TEXT_ARENA_BYTES = 256 * 1024 };
+static char anvil_text_arena[ANVIL_TEXT_ARENA_BYTES];
+static size_t anvil_text_arena_used;
+static char anvil_text_truncated[256];
+
+static char *anvil_text_alloc(size_t bytes) {
+  char *result;
+  if (bytes > sizeof(anvil_text_arena))
+    return anvil_text_truncated;
+  if (anvil_text_arena_used + bytes > sizeof(anvil_text_arena))
+    anvil_text_arena_used = 0;
+  result = anvil_text_arena + anvil_text_arena_used;
+  anvil_text_arena_used += bytes;
+  return result;
+}
+
+/* One number format for every output path: optional '-', then the value
+   rounded to at most 15 significant digits in plain decimal, with trailing
+   zeros removed.  Integers with more than 15 digits keep no fraction, which
+   is honest because doubles at that magnitude are whole numbers.  Magnitudes
+   at or above 2^63 cannot be expanded without lying about the value, so
+   console output refuses them instead of printing a rounded approximation. */
+static int anvil_format_number(double value, char *out) {
+  unsigned long long bits, integer, fraction, limit;
+  double magnitude, scaled, scale;
+  char frac[24];
+  int negative, count, digits, end, used, i;
+
+  memcpy(&bits, &value, sizeof bits);
+  negative = (int)(bits >> 63);
+  magnitude = negative ? -value : value;
+  if (magnitude != magnitude || magnitude > 9223372036854775808.0)
+    return 0;
+  if (magnitude == 9223372036854775808.0) {
+    if (!negative)
+      return 0;
+    integer = 9223372036854775808ULL;
+  } else {
+    integer = (unsigned long long)(long long)magnitude;
+  }
+  {
+    unsigned long long probe = integer;
+    used = 0;
+    do {
+      used++;
+      probe /= 10;
+    } while (probe != 0);
+  }
+  digits = integer == 0 ? 15 : (used >= 15 ? 0 : 15 - used);
+  scale = 1.0;
+  limit = 1;
+  for (i = 0; i < digits; i++) {
+    scale *= 10.0;
+    limit *= 10;
+  }
+  scaled = (magnitude - (double)integer) * scale + 0.5;
+  fraction = (unsigned long long)scaled;
+  if (fraction >= limit) {
+    integer += 1;
+    fraction = 0;
+  }
+  for (i = 0; i < digits; i++) {
+    frac[i] = (char)('0' + (int)(fraction % 10));
+    fraction /= 10;
+  }
+  for (i = 0; i < digits / 2; i++) {
+    char swap = frac[i];
+    frac[i] = frac[digits - 1 - i];
+    frac[digits - 1 - i] = swap;
+  }
+  end = digits;
+  while (end > 0 && frac[end - 1] == '0')
+    end--;
+  count = 0;
+  if (negative)
+    out[count++] = '-';
+  {
+    char digitsbuf[24];
+    int used_integer = 0;
+    do {
+      digitsbuf[used_integer++] = (char)('0' + (int)(integer % 10));
+      integer /= 10;
+    } while (integer != 0);
+    while (used_integer > 0)
+      out[count++] = digitsbuf[--used_integer];
+  }
+  if (end > 0) {
+    out[count++] = '.';
+    for (i = 0; i < end; i++)
+      out[count++] = frac[i];
+  }
+  out[count] = '\0';
+  return 1;
+}
+
+void anvil_print_number(double value) {
+  char buffer[48];
+  if (!anvil_format_number(value, buffer)) {
+    fputs("Anvil output out of range\n", stdout);
+    fflush(stdout);
+    exit(2);
+  }
+  fputs(buffer, stdout);
+  fputc('\n', stdout);
+}
+
+const char *anvil_str_num(double value) {
+  char *buffer = anvil_text_alloc(48);
+  if (buffer == anvil_text_truncated)
+    return anvil_text_truncated;
+  if (!anvil_format_number(value, buffer))
+    _snprintf_s(buffer, 48, _TRUNCATE, ANVIL_NUMBER_FORMAT, value);
+  return buffer;
+}
+
+const char *anvil_str_cat(const char *left, const char *right) {
+  size_t a, b;
+  char *out;
+  if (!left)
+    left = "";
+  if (!right)
+    right = "";
+  a = strlen(left);
+  b = strlen(right);
+  out = anvil_text_alloc(a + b + 1);
+  if (out == anvil_text_truncated) {
+    memcpy(anvil_text_truncated, left, sizeof(anvil_text_truncated) - 1);
+    anvil_text_truncated[sizeof(anvil_text_truncated) - 1] = '\0';
+    return anvil_text_truncated;
+  }
+  memcpy(out, left, a);
+  memcpy(out + a, right, b + 1);
+  return out;
+}
+
+double anvil_str_equal(const char *left, const char *right) {
+  if (!left)
+    left = "";
+  if (!right)
+    right = "";
+  return strcmp(left, right) == 0 ? 1.0 : 0.0;
+}
+
+double anvil_text_len(const char *text) {
+  return text ? (double)strlen(text) : 0.0;
+}
+
+double anvil_text_ord(const char *text) {
+  return text && text[0] ? (double)(unsigned char)text[0] : 0.0;
+}
+
+double anvil_text_find(const char *text, const char *needle) {
+  const char *found;
+  if (!text || !needle)
+    return -1.0;
+  found = strstr(text, needle);
+  return found ? (double)(found - text) : -1.0;
+}
+
+const char *anvil_text_upper(const char *text) {
+  size_t i, length = text ? strlen(text) : 0;
+  char *out = anvil_text_alloc(length + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  for (i = 0; i < length; ++i) {
+    char c = text[i];
+    out[i] = (char)(c >= 'a' && c <= 'z' ? c - 'a' + 'A' : c);
+  }
+  out[length] = '\0';
+  return out;
+}
+
+const char *anvil_text_lower(const char *text) {
+  size_t i, length = text ? strlen(text) : 0;
+  char *out = anvil_text_alloc(length + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  for (i = 0; i < length; ++i) {
+    char c = text[i];
+    out[i] = (char)(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+  }
+  out[length] = '\0';
+  return out;
+}
+
+const char *anvil_text_trim(const char *text) {
+  size_t start = 0, end;
+  char *out;
+  if (!text)
+    return "";
+  end = strlen(text);
+  while (start < end && (text[start] == ' ' || text[start] == '\t' ||
+                         text[start] == '\r' || text[start] == '\n'))
+    ++start;
+  while (end > start && (text[end - 1] == ' ' || text[end - 1] == '\t' ||
+                         text[end - 1] == '\r' || text[end - 1] == '\n'))
+    --end;
+  out = anvil_text_alloc(end - start + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  memcpy(out, text + start, end - start);
+  out[end - start] = '\0';
+  return out;
+}
+
+const char *anvil_text_mid(const char *text, double start, double count) {
+  size_t length = text ? strlen(text) : 0;
+  size_t from, take;
+  char *out;
+  if (!text)
+    return "";
+  if (!(start == start) || start < 0)
+    start = 0;
+  if (!(count == count) || count < 0)
+    count = 0;
+  from = (size_t)start;
+  if (from > length)
+    from = length;
+  take = (size_t)count;
+  if (take > length - from)
+    take = length - from;
+  out = anvil_text_alloc(take + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  memcpy(out, text + from, take);
+  out[take] = '\0';
+  return out;
+}
+
+const char *anvil_text_chr(double code) {
+  char *out;
+  if (!(code == code) || code < 0 || code > 255)
+    return "";
+  out = anvil_text_alloc(2);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  out[0] = (char)(int)code;
+  out[1] = '\0';
+  return out;
+}
+
+/* Code-point (not byte) operations over UTF-8 text.  Invalid bytes count as one
+   code point each, and slices copy whole byte sequences so a code point is
+   never split. */
+double anvil_utf8_len(const char *text) {
+  size_t i = 0, count = 0, length;
+  if (!text)
+    return 0.0;
+  length = strlen(text);
+  while (i < length) {
+    ++count;
+    ++i;
+    while (i < length && ((unsigned char)text[i] & 0xC0) == 0x80)
+      ++i;
+  }
+  return (double)count;
+}
+
+static size_t anvil_utf8_offset(const char *text, size_t length, size_t index) {
+  size_t i = 0, at = 0;
+  while (i < length && at < index) {
+    ++i;
+    while (i < length && ((unsigned char)text[i] & 0xC0) == 0x80)
+      ++i;
+    ++at;
+  }
+  return i;
+}
+
+const char *anvil_utf8_char(const char *text, double index) {
+  size_t length, from, to, take;
+  char *out;
+  if (!text)
+    return "";
+  length = strlen(text);
+  if (!(index == index) || index < 0)
+    index = 0;
+  from = anvil_utf8_offset(text, length, (size_t)index);
+  to = from < length ? anvil_utf8_offset(text, length, (size_t)index + 1) : from;
+  take = to - from;
+  out = anvil_text_alloc(take + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  memcpy(out, text + from, take);
+  out[take] = '\0';
+  return out;
+}
+
+const char *anvil_utf8_mid(const char *text, double start, double count) {
+  size_t length, from, to, take;
+  char *out;
+  if (!text)
+    return "";
+  length = strlen(text);
+  if (!(start == start) || start < 0)
+    start = 0;
+  if (!(count == count) || count < 0)
+    count = 0;
+  from = anvil_utf8_offset(text, length, (size_t)start);
+  to = anvil_utf8_offset(text, length, (size_t)start + (size_t)count);
+  take = to - from;
+  out = anvil_text_alloc(take + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  memcpy(out, text + from, take);
+  out[take] = '\0';
+  return out;
+}
+
+const char *anvil_text_replace(const char *text, const char *from,
+                               const char *to) {
+  size_t text_length, from_length, to_length, i, out_length = 0, capacity;
+  char *out;
+  if (!text)
+    return "";
+  if (!from || !*from)
+    return text;
+  if (!to)
+    to = "";
+  text_length = strlen(text);
+  from_length = strlen(from);
+  to_length = strlen(to);
+  capacity = text_length * (to_length > from_length ? to_length : 1) + 1;
+  out = anvil_text_alloc(capacity + 1);
+  if (out == anvil_text_truncated)
+    return anvil_text_truncated;
+  for (i = 0; i + from_length <= text_length;) {
+    if (strncmp(text + i, from, from_length) == 0) {
+      memcpy(out + out_length, to, to_length);
+      out_length += to_length;
+      i += from_length;
+    } else {
+      out[out_length++] = text[i++];
+    }
+  }
+  while (i < text_length)
+    out[out_length++] = text[i++];
+  out[out_length] = '\0';
+  return out;
+}
+
+void anvil_print(const char *text) {
+  if (!text)
+    return;
+  fputs(text, stdout);
+  fputc('\n', stdout);
+  fflush(stdout);
+}
+
 
 double anvil_time(void) { return anvil_elapsed_seconds; }
 double anvil_clock(void) { return (double)GetTickCount64(); }
@@ -1904,6 +2258,7 @@ double anvil_check_number(double value, const char *path, int line) {
   if (!isfinite(value)) {
     fprintf(stderr, "%s:%d: numeric overflow or non-finite result\n",
             path ? path : "<Anvil>", line);
+    anvil_report_call_stack();
     exit(2);
   }
   return value;
@@ -1914,9 +2269,78 @@ double anvil_divide(double numerator, double denominator, const char *path,
   denominator = anvil_check_number(denominator, path, line);
   if (denominator == 0.0) {
     fprintf(stderr, "%s:%d: division by zero\n", path ? path : "<Anvil>", line);
+    anvil_report_call_stack();
     exit(2);
   }
   return anvil_check_number(numerator / denominator, path, line);
+}
+double anvil_expect(double actual, double expected, const char *path,
+                    int line) {
+  if (actual != expected) {
+    fprintf(stderr, "%s:%d: expect failed: expected %.15g, got %.15g\n",
+            path ? path : "<Anvil>", line, expected, actual);
+    anvil_report_call_stack();
+    exit(1);
+  }
+  return actual;
+}
+double anvil_expect_text(const char *actual, const char *expected,
+                         const char *path, int line) {
+  const char *left = actual ? actual : "";
+  const char *right = expected ? expected : "";
+  if (strcmp(left, right) != 0) {
+    fprintf(stderr, "%s:%d: expect failed: expected \"%s\", got \"%s\"\n",
+            path ? path : "<Anvil>", line, right, left);
+    anvil_report_call_stack();
+    exit(1);
+  }
+  return 0.0;
+}
+double anvil_round(double value, double places) {
+  double factor = 1.0, result;
+  int count, i;
+  if (places != places)
+    places = 0.0;
+  if (places > 15.0)
+    places = 15.0;
+  if (places < -15.0)
+    places = -15.0;
+  count = (int)(places < 0.0 ? -places : places);
+  for (i = 0; i < count; ++i)
+    factor *= 10.0;
+  if (places < 0.0)
+    result = round(value / factor) * factor;
+  else
+    result = round(value * factor) / factor;
+  return result;
+}
+double anvil_clamp(double value, double low, double high) {
+  if (low > high)
+    return low;
+  if (value < low)
+    return low;
+  if (value > high)
+    return high;
+  return value;
+}
+double anvil_sign(double value) {
+  if (value > 0.0)
+    return 1.0;
+  if (value < 0.0)
+    return -1.0;
+  return 0.0;
+}
+double anvil_mod(double numerator, double denominator) {
+  double result;
+  if (denominator == 0.0) {
+    fprintf(stderr, "modulo by zero\n");
+    anvil_report_call_stack();
+    exit(2);
+  }
+  result = fmod(numerator, denominator);
+  if (result != 0.0 && ((result < 0.0) != (denominator < 0.0)))
+    result += denominator;
+  return result;
 }
 void anvil_set_fixed_hz(int hz) {
   if (hz >= 1 && hz <= 240)
@@ -7644,6 +8068,7 @@ static size_t anvil_array_checked_index(const double *values, int size,
             "%s:%d: array index %.15g is invalid; expected an integer from 0 "
             "through %d\n",
             source ? source : "<generated>", line, index, size - 1);
+    anvil_report_call_stack();
     exit(2);
   }
   return (size_t)index;

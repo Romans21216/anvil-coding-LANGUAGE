@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
   return 0;
 }
 '''
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             bitmap = temp_path / "sprite.bmp"
             top_down_bitmap = temp_path / "top_down_alpha.bmp"
@@ -259,7 +259,7 @@ int main(void) {
   return 0;
 }
 '''
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             c_file = temp_path / "mouse_probe.c"
             executable = temp_path / "mouse_probe.exe"
@@ -434,7 +434,7 @@ int main(void) {
   return 0;
 }
 '''
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             c_file = temp_path / "near_plane_clip.c"
             executable = temp_path / "near_plane_clip.exe"
@@ -480,7 +480,7 @@ int main(void) {
   return 0;
 }
 '''
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             c_file = temp_path / "viewport_resize.c"
             executable = temp_path / "viewport_resize.exe"
@@ -543,7 +543,7 @@ int main(void) {
   return 0;
 }
 '''
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             c_file = temp_path / "projection_bounds.c"
             executable = temp_path / "projection_bounds.exe"
@@ -603,7 +603,7 @@ int main(void) {
   return 0;
 }
 '''
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             c_file = temp_path / "runtime_probe.c"
             executable = temp_path / "runtime_probe.exe"

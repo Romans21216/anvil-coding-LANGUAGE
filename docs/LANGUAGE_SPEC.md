@@ -29,7 +29,7 @@ blank_line  = whitespace, physical_newline | physical_newline ;
 comment_line = whitespace, "#", { any_non_newline_character }, physical_newline ;
 ```
 
-The compiler accepts a numeric literal only if it converts to a finite double. Unary `+` and `-` are operators, not part of the number token. String escapes are passed through to the generated C string literal; the stable portable subset is `\\`, `\"`, `\n`, and `\t`. General string values, concatenation, mutation, and string-returning functions are not part of version 1.
+The compiler accepts a numeric literal only if it converts to a finite double. Unary `+` and `-` are operators, not part of the number token. String escapes are passed through to the generated C string literal; the stable portable subset is `\\`, `\"`, `\n`, and `\t`. Text values exist: quoted strings join with `+`, a number on either side is formatted with the one Anvil number format (plain decimal, rounded to at most 15 significant digits, trailing zeros removed), and the text built-ins return text (see §3.4). There is no text variable or parameter type yet, so text is built inside the `display`/`print` expression that consumes it.
 
 ## 2. File structure and declarations
 
@@ -76,12 +76,12 @@ array_write      = "set array(", IDENT, ",", expression, ") =", expression ;
 function_call_statement = "call fn(", IDENT, [ ",", argument_list ], ")" ;
 net_send_statement = "net send(", expression, ")" ;
 display_statement = "display", whitespace, display_call, display_tail ;
-display_tail     = { whitespace, display_style }, [ whitespace, INTEGER ], { whitespace, display_style } ;
+display_tail     = { whitespace, display_style } ;
 display_call     = "rect(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "circle(", expression, ",", expression, ",", expression, ")"
                  | "line(", expression, ",", expression, ",", expression, ",", expression,
                    [ ",", expression ], ")"
-                 | "text(", STRING, [ whitespace, "+", whitespace, "var(", IDENT, ")" ], ")"
+                 | "text(", text_expression, ")"
                  | "cube(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "sphere(", expression, ",", expression, ",", expression, ",", expression, ")"
                  | "ray_sphere(", expression, ",", expression, ",", expression, ",", expression, ")"
@@ -92,6 +92,12 @@ display_style    = "-rgb(", expression, ",", expression, ",", expression, ")"
                  | "-l(", expression, ",", expression, ")"
                  | "-rotate(", expression, ",", expression, ",", expression, ")" ;
 return_statement = "output", whitespace, expression ;
+print_statement  = ("print" | "say"), [ whitespace, text_expression ] ;
+assertion_statement = "expect", "(", expression, ",", expression, ")"
+                 | "expect_text", "(", text_expression, ",", text_expression, ")" ;
+text_expression  = STRING, { whitespace, "+", whitespace, (STRING | expression | text_call) }
+                 | expression | text_call ;
+text_call        = text_builtin, "(", [ argument_list ], ")" ;
 if_statement    = "if", whitespace, expression, line_end,
                   { block_item }, [ "else", line_end, { block_item } ], "end" ;
 while_statement = "while", whitespace, expression, line_end, { block_item }, "end" ;
@@ -127,6 +133,14 @@ An array may be global or local to a function. Arrays cannot be resized. The def
 `while expression` checks its expression before every iteration and repeats while the result is nonzero. It has no implicit termination limit. `break` and `continue` are not supported.
 
 `for local(i) = start to end [step amount]` evaluates `start`, `end`, and `step` once, then iterates inclusively in the direction of the step. The default step is `1`. Positive steps iterate while `i <= end`; negative steps iterate while `i >= end`. A zero step performs no iterations, leaving the loop variable equal to `start`. After a nonempty loop, the variable has the first value beyond the end condition. The loop variable is function-local, cannot be a parameter, and remains readable after the loop. Nested `for` loops must use different variable names.
+
+### 3.4 Text values and print
+
+`display text(...)` and `print`/`say` accept a text expression: quoted strings joined with `+`, numeric expressions (formatted with the one Anvil number format: at most 15 significant digits, plain decimal), and text-returning built-ins. `print` writes one line to the console from top level or any function; `print` alone writes a blank line and `say` is an alias. `output` remains a return, not a print.
+
+Text is byte-counted UTF-8. `len`, `ord`, `find`, and `mid` operate on bytes; `utf8_len`, `utf8_char`, and `utf8_mid` operate on code points and never split a multi-byte sequence. `upper`/`lower` convert ASCII only, and `chr` accepts a code from 0 through 255. Text results live in a 256 KiB scratch arena and stay valid until the statement that built them finishes. Text cannot be stored in a variable, parameter, or array yet.
+
+The direct native backend accepts literal text only (`display text("literal")`, `print "literal"`); dynamic text and the text built-ins require the C backend.
 
 ## 4. Expressions and evaluation
 
@@ -286,6 +300,19 @@ call fn(main)
 ```
 
 For the reader-friendly guide and engine-specific examples, see [Language Guide](LANGUAGE.md), [Language Reference](Wiki/Language-Reference.md), and [Engine Guide](ENGINE.md).
+
+A complete text-and-print example (C backend; the native backend accepts the literal forms only):
+
+```anv
+language version 1
+fn(main)
+  set var(score) = 7
+  print "score = " + var(score)
+  print "name: " + upper(trim("  anvil  "))
+  output 0
+end
+call fn(main)
+```
 
 Local multi-file source composition uses top-level `include "relative/library.ANVL"`. Both backends resolve the local include graph; the native backend compiles reachable functions and their runtime dependencies. See [include semantics and limits](INCLUDES.md). Namespaces, package registries and separate object linking remain unfinished.
 
