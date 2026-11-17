@@ -98,6 +98,9 @@ double anvil_tilemap_is_solid(double handle, double tile);
 double anvil_tilemap_cell(double handle, double x, double y, double scale);
 double anvil_tilemap_collide(double handle, double x, double y, double width,
                              double height, double scale);
+double anvil_tilemap_animate(double handle, double tile, double frames,
+                             double fps);
+double anvil_tilemap_frame(double handle, double tile);
 double anvil_tilemap_draw(double handle, double x, double y, double scale);
 const char *anvil_tilemap_error(void);
 

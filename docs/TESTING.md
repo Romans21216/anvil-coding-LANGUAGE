@@ -102,8 +102,11 @@ remote desktop can prevent window creation:
 - `test_tilemap` — headless API tests (bounds, fill/area, set/get, free,
   stale handles, invalid tiles; solid marking, `tilemap_cell` lookups and
   `tilemap_collide` AABB hits/misses including a zero-size rectangle and a
-  zero scale) plus a pixel test that draws a 3x2 map at 4x, captures the frame
-  and reads back each cell and the cell boundary.
+  zero scale; animation bounds, disabling and the wrapped frame index) plus a
+  pixel test that draws a 3x2 map at 4x, captures the frame and reads back each
+  cell and the cell boundary, and an animated-tile test that samples frame 5
+  (base tile) and frame 75 (wrapped frame) to prove the drawn tile follows the
+  animation clock.
 - `test_memory_report` — builds a headless `fn(main)` program that loads an
   image and a WAV, asserts `memory_report()` names the exact `file:line` and
   byte counts of each live resource, that destroying the image drops it from

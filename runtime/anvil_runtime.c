@@ -1695,6 +1695,8 @@ typedef struct {
   int tiles_per_row;
   int *cells;
   unsigned char *solid; /* bitset of solid tile indices, allocated on demand */
+  unsigned short *anim_frames; /* per-tile frame count, 0 = not animated */
+  float *anim_fps;
 } AnvilTilemap;
 
 static AnvilTilemap anvil_tilemaps[ANVIL_TILEMAPS];
@@ -1796,6 +1798,8 @@ double anvil_tilemap_free(double handle) {
     return 0.0;
   free(map->cells);
   free(map->solid);
+  free(map->anim_frames);
+  free(map->anim_fps);
   uint32_t generation = map->generation;
   memset(map, 0, sizeof(*map));
   map->generation = generation;
@@ -1972,6 +1976,77 @@ double anvil_tilemap_collide(double handle, double x, double y, double width,
   return 0.0;
 }
 
+/* Tile animations are a render-time substitution: the cell keeps its base
+   tile (so solid flags and tilemap_get stay stable) and the draw maps it to
+   the current frame. Frames advance left to right inside the base tile's row
+   of the sheet and wrap at the row end, so an animation can never bleed into
+   the row below. Like the solid bitset, the tables are allocated on demand. */
+static int anvil_tilemap_anim_ensure(AnvilTilemap *map) {
+  if (map->anim_frames)
+    return 1;
+  if (map->tiles > 1000000) {
+    anvil_tilemap_error_text =
+        "the tileset has too many tiles to animate (over 1,000,000)";
+    return 0;
+  }
+  size_t count = (size_t)map->tiles;
+  map->anim_frames = (unsigned short *)calloc(count ? count : 1u,
+                                              sizeof(unsigned short));
+  map->anim_fps = (float *)calloc(count ? count : 1u, sizeof(float));
+  if (!map->anim_frames || !map->anim_fps) {
+    free(map->anim_frames);
+    free(map->anim_fps);
+    map->anim_frames = NULL;
+    map->anim_fps = NULL;
+    anvil_tilemap_error_text = "there is not enough memory for tile animation";
+    return 0;
+  }
+  return 1;
+}
+
+static int anvil_tilemap_frame_at(const AnvilTilemap *map, int tile) {
+  if (!map->anim_frames || tile < 0 || tile >= map->tiles)
+    return tile;
+  int frames = (int)map->anim_frames[tile];
+  if (frames <= 1)
+    return tile;
+  double fps = (double)map->anim_fps[tile];
+  if (!(fps > 0.0))
+    return tile;
+  int column = tile % map->tiles_per_row;
+  int step = (int)fmod(floor(anvil_elapsed_seconds * fps), (double)frames);
+  if (step < 0)
+    step = 0;
+  return tile - column + (column + step) % map->tiles_per_row;
+}
+
+double anvil_tilemap_animate(double handle, double tile, double frames,
+                             double fps) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !anvil_tilemap_tile_ok(map, tile) ||
+      tile == (double)ANVIL_TILEMAP_EMPTY)
+    return 0.0;
+  if (!isfinite(frames) || floor(frames) != frames || frames < 1.0 ||
+      frames > (double)map->tiles_per_row || frames > 65535.0)
+    return 0.0;
+  if (!isfinite(fps) || fps <= 0.0)
+    return 0.0;
+  if (!anvil_tilemap_anim_ensure(map))
+    return 0.0;
+  int index = (int)tile;
+  map->anim_frames[index] = (unsigned short)(frames <= 1.0 ? 0.0 : frames);
+  map->anim_fps[index] = frames <= 1.0 ? 0.0f : (float)fps;
+  return 1.0;
+}
+
+double anvil_tilemap_frame(double handle, double tile) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !anvil_tilemap_tile_ok(map, tile) ||
+      tile == (double)ANVIL_TILEMAP_EMPTY)
+    return -1.0;
+  return (double)anvil_tilemap_frame_at(map, (int)tile);
+}
+
 double anvil_tilemap_draw(double handle, double x, double y, double scale) {
   AnvilTilemap *map = anvil_tilemap_from_handle(handle);
   if (!map) {
@@ -1993,6 +2068,10 @@ double anvil_tilemap_draw(double handle, double x, double y, double scale) {
   for (int row = 0; row < map->rows; ++row) {
     for (int column = 0; column < map->columns; ++column) {
       int tile = map->cells[(size_t)row * (size_t)map->columns + (size_t)column];
+      if (tile < 0 || tile >= map->tiles)
+        continue;
+      /* Animated tiles draw their current frame; the cell keeps its base. */
+      tile = anvil_tilemap_frame_at(map, tile);
       if (tile < 0 || tile >= map->tiles)
         continue;
       double dx = x + (double)column * step_x;

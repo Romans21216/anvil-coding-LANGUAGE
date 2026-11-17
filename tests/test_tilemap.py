@@ -232,6 +232,77 @@ EXPECTED_COLLISION = [
     "cell -1",
 ]
 
+ANIMATION_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        '  set var(sheet) = image_load("tiles.bmp")',
+        "  set var(map) = tilemap_new(var(sheet), 8, 8, 4, 3)",
+        # A tiny frame rate pins frame 0, so the headless values are stable.
+        "  say tilemap_animate(var(map), 3, 2, 0.000001)",
+        '  say "frame " & tilemap_frame(var(map), 3)',
+        '  say "frame " & tilemap_frame(var(map), 0)',
+        "  say tilemap_animate(var(map), 3, 0, 6)",
+        "  say tilemap_animate(var(map), 3, 5, 6)",
+        "  say tilemap_animate(var(map), 70, 2, 6)",
+        "  say tilemap_animate(var(map), -1, 2, 6)",
+        "  say tilemap_animate(var(map), 3, 2, 0)",
+        "  say tilemap_animate(var(map), 3, 1, 6)",
+        '  say "frame " & tilemap_frame(var(map), 3)',
+        "  say tilemap_free(var(map))",
+        '  say "frame " & tilemap_frame(var(map), 3)',
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+EXPECTED_ANIMATION = [
+    "1",
+    "frame 3",
+    "frame 0",
+    "0",
+    "0",  # five frames do not fit a four-tile row
+    "0",
+    "0",
+    "0",
+    "1",
+    "frame 3",
+    "1",
+    "frame -1",
+]
+
+ANIMATED_DRAW_PROGRAM = "\n".join(
+    (
+        "scene 2d",
+        "clear rgba(0, 0, 0, 255)",
+        'set var(sheet) = image_load("tiles.bmp")',
+        "set var(map) = tilemap_new(var(sheet), 8, 8, 1, 1)",
+        "set var(ok) = tilemap_set(var(map), 0, 0, 3)",
+        # One frame per second, two frames: white (tile 3) at t<1, then the
+        # row wraps to red (tile 0) from t>=1.
+        "set var(anim) = tilemap_animate(var(map), 3, 2, 1)",
+        "set var(frame) = 0",
+        "set var(early) = -1",
+        "set var(late) = -1",
+        "",
+        "fn(draw)",
+        "  add var(frame) 1",
+        "  set var(drawn) = tilemap_draw(var(map), 0, 0, 8)",
+        "  if var(frame) = 5",
+        "    set var(cap) = frame_capture()",
+        "    set var(early) = image_pixel(var(cap), 10, 10)",
+        "  end",
+        "  if var(frame) = 75",
+        "    set var(cap) = frame_capture()",
+        "    set var(late) = image_pixel(var(cap), 10, 10)",
+        '    say "early " & var(early)',
+        '    say "late " & var(late)',
+        "  end",
+        "end",
+        "",
+    )
+)
+
 class TilemapDrawTests(unittest.TestCase):
     def test_cells_land_on_the_expected_pixels(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -318,6 +389,52 @@ class TilemapCollisionTests(unittest.TestCase):
             combined = build.stdout + build.stderr
             self.assertIn("'tilemap_collide' is not available in the wasm backend yet", combined)
             self.assertIn(":3:", combined)
+
+
+
+class TilemapAnimationTests(unittest.TestCase):
+    def test_animation_bounds_and_disabling(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            executable = build(root, ANIMATION_PROGRAM, "anim")
+            run = subprocess.run(
+                [str(executable)], cwd=root, capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines(), EXPECTED_ANIMATION)
+
+    def test_the_current_frame_is_drawn_and_wraps_at_the_row_end(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            executable = build(root, ANIMATED_DRAW_PROGRAM, "animdraw")
+            process = subprocess.Popen(
+                [str(executable)],
+                cwd=root,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            lines: list[str] = []
+            assert process.stdout is not None
+            deadline = time.monotonic() + 60
+            try:
+                for line in process.stdout:
+                    lines.append(line.rstrip("\r\n"))
+                    if line.startswith("late") or time.monotonic() > deadline:
+                        break
+            finally:
+                process.kill()
+                process.wait(timeout=30)
+            values: dict[str, int] = {}
+            for line in lines:
+                key, _, value = line.partition(" ")
+                if key in ("early", "late"):
+                    values[key] = int(float(value))
+            self.assertEqual(sorted(values), ["early", "late"], lines)
+            # Frame 5 is under one second: the base tile, white.
+            self.assertEqual(values["early"] & 0xFFFFFF, WHITE)
+            # Frame 75 is past one second: frame 1 wraps to tile 0, red.
+            self.assertEqual(values["late"] & 0xFFFFFF, RED)
 
 
 

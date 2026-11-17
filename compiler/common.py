@@ -167,6 +167,8 @@ RUNTIME_C_NAMES = {
     "anvil_tilemap_is_solid",
     "anvil_tilemap_cell",
     "anvil_tilemap_collide",
+    "anvil_tilemap_animate",
+    "anvil_tilemap_frame",
     "anvil_tilemap_error",
     "anvil_image_width",
     "anvil_buffer",
