@@ -1,6 +1,6 @@
 # Anvil Language Support for Visual Studio Code
 
-This extension registers the Anvil language identifier (`anvil`) for `.ANVL` files and provides TextMate syntax colors plus editor pairing, comments, indentation, and folding rules. It highlights `include "relative/library.ANVL"` directives, function declarations and parameters, calls, global/local variables, fixed-array declarations/indexing, engine commands, ray-tracing backend selection, mouse and keyboard input, image/sprite, ray-tracing, and 2D physics built-ins, operators, and literals. It targets **Visual Studio Code**, not the separate Visual Studio IDE.
+This extension registers the Anvil language identifier (`anvil`) for `.ANVL` files and provides TextMate syntax colors plus editor pairing, comments, indentation, and folding rules. It highlights `include "relative/library.ANVL"` directives, function declarations and parameters, calls, global/local variables, fixed-array declarations/indexing, engine commands, ray-tracing backend selection, mouse and keyboard input, image/sprite, packet networking (`packet_send`, `packet_receive`, `packet_id`), ray-tracing, and 2D physics built-ins, operators, and literals. It targets **Visual Studio Code**, not the separate Visual Studio IDE.
 
 ## Install locally
 
@@ -16,7 +16,7 @@ The grammar scopes comments, escaped strings, `fn(name)` declarations, qualified
 
 ## Validation
 
-Run `npm ci` once, then `npm run validate` to validate the JSON manifest, language configuration, grammar structure, and representative Anvil tokens using the included checks.
+Run `npm ci` once, then `npm run validate` to validate the JSON manifest, language configuration, grammar structure, representative Anvil tokens, and function highlighting for every callable in the compiler's public builtin table. Validation also needs the repository's Python runtime (`python` on Windows, `python3` elsewhere); set `PYTHON` if it is installed under another command.
 
 
 Version 0.1.11 corrects indentation and folding for function, if, while, for, else and end statements, including trailing comments. Automated configuration tests exercise real control-flow headers and unrelated text. This package has not been installed or visibly verified; installed 0.1.4 is preserved per user preference.

@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const { Registry, INITIAL, parseRawGrammar } = require('vscode-textmate');
 const oniguruma = require('vscode-oniguruma');
 
@@ -7,6 +8,8 @@ const root = path.resolve(__dirname, '..');
 const manifestPath = path.join(root, 'package.json');
 const configPath = path.join(root, 'language-configuration.json');
 const grammarPath = path.join(root, 'syntaxes', 'anvil.tmLanguage.json');
+const grammarText = fs.readFileSync(grammarPath, 'utf8');
+const grammarJson = JSON.parse(grammarText);
 const samplePath = path.resolve(root, '..', 'examples', 'first_world.ANVL');
 const arraysSamplePath = path.resolve(root, '..', 'examples', 'arrays.ANVL');
 const physicsSamplePath = path.resolve(root, '..', 'examples', 'physics.ANVL');
@@ -14,13 +17,21 @@ const mouseSamplePath = path.resolve(root, '..', 'examples', 'mouse_input.ANVL')
 const imageSamplePath = path.resolve(root, '..', 'examples', 'image_sprite.ANVL');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-JSON.parse(fs.readFileSync(grammarPath, 'utf8'));
 const sample = fs.readFileSync(samplePath, 'utf8');
 const arraysSample = fs.readFileSync(arraysSamplePath, 'utf8');
 const physicsSample = fs.readFileSync(physicsSamplePath, 'utf8');
 const mouseSample = fs.readFileSync(mouseSamplePath, 'utf8');
 const imageSample = fs.readFileSync(imageSamplePath, 'utf8');
 const check = (condition, message) => { if (!condition) throw new Error(message); };
+const compilerRoot = path.resolve(root, '..');
+const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+const compilerBuiltins = JSON.parse(execFileSync(python, [
+  '-c',
+  'import json; from compiler.expressions import BUILTINS; print(json.dumps(sorted(BUILTINS)))'
+], { cwd: compilerRoot, encoding: 'utf8' }));
+const builtinPattern = grammarJson.repository.builtins.match;
+const builtinAlternation = builtinPattern.slice(builtinPattern.indexOf('(') + 1, builtinPattern.indexOf(')'));
+const highlightedBuiltins = new Set(builtinAlternation.split('|'));
 
 check(manifest.contributes.languages.some(x => x.id === 'anvil' && x.extensions.includes('.ANVL')), 'Anvil language or extension is not registered');
 check(manifest.capabilities?.untrustedWorkspaces?.supported === true, 'syntax-only language support should work in Restricted Mode');
@@ -64,7 +75,7 @@ async function main() {
       createOnigString: value => new oniguruma.OnigString(value)
     }),
     loadGrammar: async scopeName => scopeName === 'source.anvil'
-      ? parseRawGrammar(fs.readFileSync(grammarPath, 'utf8'), grammarPath)
+      ? parseRawGrammar(grammarText, grammarPath)
       : null
   });
   const grammar = await registry.loadGrammar('source.anvil');
@@ -82,6 +93,13 @@ async function main() {
     const scopes = scopesAt(line, needle);
     check(scopes.includes(scope), `'${needle}' expected ${scope}; got ${scopes.join(' ')} in ${line}`);
   }
+  for (const builtin of compilerBuiltins) {
+    check(highlightedBuiltins.has(builtin), `compiler builtin '${builtin}' is missing from the TextMate builtin inventory`);
+    expect(`${builtin}()`, builtin, 'support.function.anvil');
+  }
+  expect('set var(sent) = packet_send("move", 1)', 'packet_send', 'support.function.anvil');
+  expect('set var(received) = packet_receive()', 'packet_receive', 'support.function.anvil');
+  expect('set var(peer) = packet_id()', 'packet_id', 'support.function.anvil');
   expect('include \"lib/math.ANVL\"', 'include', 'keyword.control.anvil');
   expect('include \"lib/math.ANVL\"', 'lib/math.ANVL', 'string.quoted.double.anvil');
   expect('include fn(move) - "lib/player.ANVL" as input', 'move', 'variable.function.anvil');
@@ -123,6 +141,8 @@ async function main() {
   expect('for local(index) = 1 to 5 step 2', 'for', 'keyword.control.anvil');
   expect('for local(index) = 1 to 5 step 2', 'to', 'keyword.control.anvil');
   expect('for local(index) = 1 to 5 step 2', 'step', 'keyword.control.anvil');
+  expect('held', 'held', 'keyword.control.anvil');
+  expect('pressed', 'pressed', 'keyword.control.anvil');
   expect('array scores(4)', 'array', 'storage.type.array.anvil');
   expect('array scores(4)', 'scores', 'variable.other.array.anvil');
   expect('array(scores, local(index))', 'array', 'support.function.anvil');

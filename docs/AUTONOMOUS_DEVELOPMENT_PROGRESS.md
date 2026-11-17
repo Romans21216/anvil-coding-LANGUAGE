@@ -294,3 +294,11 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - Native runtime regression covers 24-bit and top-down 32-bit files, malformed/oversized inputs, dimension queries, clipped/scaled/native drawing, destruction, reload and stale-handle rejection. `python -m unittest discover -s tests -q` passed 79 tests; MSVC release build of the example, npm extension validation, compileall, QA arithmetic and diff check pass.
 - Canonical issue #23 status: #201 PARTIALLY IMPLEMENTED (BMP only), #202 IN PROGRESS pending independent review, #209 IN PROGRESS pending independent review, #212 PARTIALLY IMPLEMENTED (scaling present, rotation missing).
 - Latest independent score remains **92/100 — FAIL against 98** on `c102604`; review of the sprite source candidate is pending.
+
+
+## Batch 14 — highlight packet networking built-ins
+
+- Added `packet_send`, `packet_receive`, and `packet_id` to the VS Code builtin function pattern. `pressed()` and `held()` are now scoped as callable built-ins while bare `pressed`/`held` syntax remains a control keyword.
+- Extended the TextMate validator to load `compiler.expressions.BUILTINS`, require every compiler builtin in the grammar inventory, and check its actual `support.function.anvil` token scope. Added explicit token assertions for all three packet APIs and bare/call forms of `pressed` and `held`.
+- Updated the extension README to describe packet networking highlighting and the compiler inventory check.
+- Validation: `npm test` passed. No package, install, commit, or push was performed.
