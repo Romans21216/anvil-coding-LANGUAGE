@@ -119,7 +119,7 @@ class WasmBuildTests(unittest.TestCase):
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmRejectionTests(unittest.TestCase):
-    def test_unsupported_shapes_name_the_line(self) -> None:
+    def test_ray_sphere_requires_a_3d_scene(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             result, _ = build(
@@ -127,7 +127,18 @@ class WasmRejectionTests(unittest.TestCase):
                 "scene 2d\n\nfn(draw)\n  display ray_sphere(0, 0, 3, 1) -rgb(255, 0, 0)\nend\n",
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("display ray_sphere(...) is not available", result.stderr)
+            self.assertIn("display ray_sphere(...) requires scene 3d", result.stderr)
+            self.assertIn(":4:", result.stderr)
+
+    def test_unsupported_shapes_name_the_line(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, _ = build(
+                root,
+                "scene 3d\n\nfn(draw)\n  display torus(0, 0, 3, 1) -rgb(255, 0, 0)\nend\n",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("display torus(...) is not available", result.stderr)
             self.assertIn(":4:", result.stderr)
 
     def test_unsupported_builtins_name_the_call_site(self) -> None:
@@ -193,15 +204,31 @@ class WasmCanvasTests(unittest.TestCase):
             self.assertIn("getContext(\"2d\")", page)
             self.assertIn("requestAnimationFrame", page)
 
-    def test_unavailable_shapes_are_refused(self) -> None:
+    def test_ray_sphere_emits_a_shaded_mesh(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(
+            result, out = build(
                 root,
-                "scene 3d\n\nfn(draw)\n  display ray_sphere(0, 0, 3, 1) -rgb(255, 0, 0)\nend\n",
+                "scene 3d\ncamera perspective 0 0 8\n\nfn(draw)\n"
+                "  display ray_sphere(-0.7, 0, 3, 1) -rgb(210, 70, 40)\n"
+                "  display ray_sphere(0.7, 0, 5, 1) -rgb(60, 100, 230)\nend\n",
             )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("display ray_sphere(...) is not available", result.stderr)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            ops = json.loads(run.stdout.strip().splitlines()[-1])
+            batch = next(op for op in ops if op[0] == "triangles")
+            self.assertGreater(batch[1], 1000)
+            self.assertLess(batch[2], 480)
+            self.assertGreater(batch[3], 480)
+            self.assertGreater(batch[6], 20)
+            self.assertGreater(batch[8], batch[7])
 
 
 

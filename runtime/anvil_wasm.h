@@ -307,6 +307,9 @@ void anvil_plane(double x, double y, double z, double width, double depth,
                  int r, int g, int b, int a);
 void anvil_sphere(double x, double y, double z, double radius, int r, int g,
                   int b, int a);
+
+void anvil_trace_sphere(double x, double y, double z, double radius, int r,
+                        int g, int b, int a);
 double anvil_mesh_draw(const double *data, int triangle_count, double cx,
                        double cy, double cz, double radius, double x, double y,
                        double z, double scale, double rx, double ry, double rz);

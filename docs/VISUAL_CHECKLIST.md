@@ -55,3 +55,7 @@ Then open the PNGs and walk this list.
   (`examples/assets/...`), so they must run with the repository as the working
   directory. The capture tool does; `--run` from another directory will not
   find the assets. A future asset-root fallback is the general fix.
+
+## Automated review record (2026-11-17)
+
+python tools/visual_smoke.py --check passed for all seven captures at 960x600. Captures were reviewed for intended content, layout, clipping, and visible drawing artefacts. Keyboard/mouse interaction checks and watching each live scene for ten seconds were not exercised by this automated run; those remain manual checklist items.

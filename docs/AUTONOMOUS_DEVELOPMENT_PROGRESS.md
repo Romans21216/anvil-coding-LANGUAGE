@@ -1003,3 +1003,9 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Verification:** Chromium over HTTP — backend `indexedDB`, a 42/"Ada" round trip, a second page load reading both back, and a seeded `localStorage` entry migrating across with the old key cleared. `tests/test_wasm.py` covers the fallback round trip in CI.
 - **Bug caught:** the first cut named its map `memory`, colliding with the wasm `Memory` object (`memory.set is not a function`); the Node harness stayed green on the fallback, so only the Chromium run found it.
 - **Full suite:** 957 passed, 1 skipped, 1 xfailed in 493.77 s, exit 0.
+
+## Batch 104 — browser ray spheres (8.12)
+
+- **Backend:** `display ray_sphere(...)` now emits a tessellated, flat-shaded sphere mesh in wasm `scene 3d`; shadow rays account for other queued spheres. This approximates the C runtime's exact per-pixel tracer, so the capability ledger records that limitation.
+- **Validation:** the wasm compiler rejects `ray_sphere` outside `scene 3d` with a source line, while keeping other unsupported shapes located.
+- **Tests:** `tests/test_wasm.py` checks the 2D refusal, an unrelated unsupported shape, and a two-sphere 3D frame with a broad triangle bound and varied shaded tones. Focused wasm suite: 47 passed in 30.03 s.

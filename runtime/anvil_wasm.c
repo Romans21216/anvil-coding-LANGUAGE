@@ -862,6 +862,183 @@ void anvil_sphere(double x, double y, double z, double radius, int r, int g,
   }
 }
 
+/* ---- Ray-traced spheres -------------------------------------------------
+   The C runtime traces these against a per-frame BVH: a Lambert term from a
+   fixed light, a Blinn-Phong highlight at exponent 28, and sphere-on-sphere
+   shadows, all resolved per pixel. A WebGL page has no per-pixel tracer, so
+   the browser build tessellates the sphere and evaluates the same shading
+   model at each triangle's centroid. The light, the brightness curve and the
+   highlight exponent are the C runtime's; silhouette edges and cast-shadow
+   edges are polygons instead of exact curves, which is the honest difference
+   between the two backends here.
+
+   Spheres queue until the frame ends, because a sphere drawn first still has
+   to be shadowed by one drawn later - the C tracer works that way too, since
+   it runs after the frame's own draws. */
+#define ANVIL_WASM_TRACE_MAX 32
+typedef struct {
+  AnvilWasmVec3 center;
+  double radius;
+  int r, g, b, a;
+} AnvilWasmTraceSphere;
+static AnvilWasmTraceSphere anvil_wasm_trace_spheres[ANVIL_WASM_TRACE_MAX];
+static int anvil_wasm_trace_count;
+
+void anvil_trace_sphere(double x, double y, double z, double radius, int r,
+                        int g, int b, int a) {
+  if (!(radius > 0.0) || anvil_wasm_trace_count >= ANVIL_WASM_TRACE_MAX)
+    return;
+  AnvilWasmTraceSphere *sphere =
+      &anvil_wasm_trace_spheres[anvil_wasm_trace_count++];
+  sphere->center = (AnvilWasmVec3){x, y, z};
+  sphere->radius = radius;
+  sphere->r = r;
+  sphere->g = g;
+  sphere->b = b;
+  sphere->a = a;
+}
+
+/* Nearest positive root, or -1. Same epsilon and same "inside the sphere"
+   fallback as the C tracer, so a camera inside a sphere still shades. */
+static double anvil_wasm_ray_hit(AnvilWasmVec3 origin, AnvilWasmVec3 direction,
+                                 AnvilWasmVec3 center, double radius) {
+  AnvilWasmVec3 offset = anvil_wasm_sub(origin, center);
+  double half_b = anvil_wasm_dot(offset, direction);
+  double c = anvil_wasm_dot(offset, offset) - radius * radius;
+  double discriminant = half_b * half_b - c;
+  if (discriminant < 0.0)
+    return -1.0;
+  double root = __builtin_sqrt(discriminant);
+  double t = -half_b - root;
+  if (t <= 0.001)
+    t = -half_b + root;
+  return t <= 0.001 ? -1.0 : t;
+}
+
+static int anvil_wasm_trace_shadowed(AnvilWasmVec3 origin, AnvilWasmVec3 light) {
+  for (int index = 0; index < anvil_wasm_trace_count; ++index) {
+    const AnvilWasmTraceSphere *sphere = &anvil_wasm_trace_spheres[index];
+    if (anvil_wasm_ray_hit(origin, light, sphere->center, sphere->radius) > 0.0)
+      return 1;
+  }
+  return 0;
+}
+
+static int anvil_wasm_channel(double value) {
+  if (!(value > 0.0))
+    return 0;
+  return value > 255.0 ? 255 : (int)value;
+}
+
+/* x^28 by squaring; the freestanding runtime carries no pow(). */
+static double anvil_wasm_pow28(double base) {
+  if (!(base > 0.0))
+    return 0.0;
+  double x2 = base * base, x4 = x2 * x2, x8 = x4 * x4, x16 = x8 * x8;
+  return x16 * x8 * x4;
+}
+
+/* `point` must be on the sphere, not the triangle's centroid: a centroid sits
+   slightly inside the surface, so the shadow ray would start inside the sphere
+   and the sphere would shadow itself - every triangle came out at the 0.13
+   shadowed brightness before this was split out. */
+static void anvil_wasm_trace_shade(AnvilWasmVec3 point, AnvilWasmVec3 normal,
+                                   const AnvilWasmTraceSphere *sphere,
+                                   AnvilWasmVec3 light, AnvilWasmVec3 view,
+                                   int *red, int *green, int *blue) {
+  double diffuse = anvil_wasm_dot(normal, light);
+  if (diffuse < 0.0)
+    diffuse = 0.0;
+  int shadowed = 0;
+  if (diffuse > 0.0) {
+    AnvilWasmVec3 origin = {point.x + normal.x * 0.002,
+                            point.y + normal.y * 0.002,
+                            point.z + normal.z * 0.002};
+    shadowed = anvil_wasm_trace_shadowed(origin, light);
+  }
+  double brightness = shadowed ? 0.13 : 0.16 + 0.78 * diffuse;
+  AnvilWasmVec3 halfway = anvil_wasm_normalize(
+      (AnvilWasmVec3){light.x + view.x, light.y + view.y, light.z + view.z});
+  double specular = anvil_wasm_pow28(anvil_wasm_dot(normal, halfway)) * 0.22;
+  *red = anvil_wasm_channel(sphere->r * brightness + 255.0 * specular);
+  *green = anvil_wasm_channel(sphere->g * brightness + 255.0 * specular);
+  *blue = anvil_wasm_channel(sphere->b * brightness + 255.0 * specular);
+}
+
+static void anvil_wasm_triangle_flat(AnvilWasmVec3 a, AnvilWasmVec3 b,
+                                     AnvilWasmVec3 c, int red, int green,
+                                     int blue, int alpha) {
+  double x1, y1, d1, x2, y2, d2, x3, y3, d3;
+  if (!anvil_wasm_project(a, &x1, &y1, &d1) ||
+      !anvil_wasm_project(b, &x2, &y2, &d2) ||
+      !anvil_wasm_project(c, &x3, &y3, &d3))
+    return;
+  anvil_host_triangle(x1, y1, d1, x2, y2, d2, x3, y3, d3, red, green, blue,
+                      alpha, 0);
+}
+
+void anvil_wasm_trace_flush(void) {
+  if (anvil_wasm_trace_count == 0)
+    return;
+  if (!anvil_scene_is_3d) {
+    anvil_wasm_trace_count = 0;
+    return;
+  }
+  const double pi = 3.14159265358979323846;
+  const double tau = 6.283185307179586476925;
+  const AnvilWasmVec3 light =
+      anvil_wasm_normalize((AnvilWasmVec3){-0.4, 0.75, 0.55});
+  const AnvilWasmVec3 eye = {anvil_camera_x, anvil_camera_y, anvil_camera_z};
+  /* 36 x 54 gives a smooth silhouette at the fixed 960x600 canvas size. */
+  const int rings = 36, segments = 54;
+  for (int index = 0; index < anvil_wasm_trace_count; ++index) {
+    const AnvilWasmTraceSphere *sphere = &anvil_wasm_trace_spheres[index];
+    for (int ring = 0; ring < rings; ++ring) {
+      double phi0 = pi * (double)ring / (double)rings;
+      double phi1 = pi * (double)(ring + 1) / (double)rings;
+      for (int segment = 0; segment < segments; ++segment) {
+        double theta0 = tau * (double)segment / (double)segments;
+        double theta1 = tau * (double)(segment + 1) / (double)segments;
+        double phis[2] = {phi0, phi1};
+        double thetas[2] = {theta0, theta1};
+        AnvilWasmVec3 quad[4];
+        for (int corner = 0; corner < 4; ++corner) {
+          double phi = phis[corner >> 1];
+          double theta = thetas[corner & 1];
+          quad[corner] =
+              (AnvilWasmVec3){sphere->center.x + sphere->radius * sin(phi) * cos(theta),
+                              sphere->center.y + sphere->radius * cos(phi),
+                              sphere->center.z + sphere->radius * sin(phi) * sin(theta)};
+        }
+        AnvilWasmVec3 triangles[2][3] = {{quad[0], quad[1], quad[3]},
+                                         {quad[0], quad[3], quad[2]}};
+        for (int tri = 0; tri < 2; ++tri) {
+          AnvilWasmVec3 center = {
+              (triangles[tri][0].x + triangles[tri][1].x + triangles[tri][2].x) / 3.0,
+              (triangles[tri][0].y + triangles[tri][1].y + triangles[tri][2].y) / 3.0,
+              (triangles[tri][0].z + triangles[tri][1].z + triangles[tri][2].z) / 3.0};
+          AnvilWasmVec3 outward =
+              anvil_wasm_normalize(anvil_wasm_sub(center, sphere->center));
+          AnvilWasmVec3 sight = anvil_wasm_normalize(anvil_wasm_sub(eye, center));
+          /* Back faces would only be overdrawn; skipping them halves the op
+             stream and keeps the painter's sort from flickering. */
+          if (anvil_wasm_dot(outward, sight) <= 0.0)
+            continue;
+          AnvilWasmVec3 surface = {sphere->center.x + outward.x * sphere->radius,
+                                   sphere->center.y + outward.y * sphere->radius,
+                                   sphere->center.z + outward.z * sphere->radius};
+          int red, green, blue;
+          anvil_wasm_trace_shade(surface, outward, sphere, light, sight, &red,
+                                 &green, &blue);
+          anvil_wasm_triangle_flat(triangles[tri][0], triangles[tri][1],
+                                   triangles[tri][2], red, green, blue, sphere->a);
+        }
+      }
+    }
+  }
+  anvil_wasm_trace_count = 0;
+}
+
 
 __attribute__((import_module("env"), import_name("music_play")))
 extern int anvil_host_music_play(const short *pcm, int frames, int channels,
@@ -3040,6 +3217,9 @@ __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   if (anvil_frame_draw)
     anvil_frame_draw();
   anvil_particles_draw();
+  /* Ray-traced spheres last, in the same batch, so they depth-sort against the
+     frame's own geometry and against each other. */
+  anvil_wasm_trace_flush();
   /* Only when a fade is active, so an ordinary frame's op stream is unchanged. */
   if (anvil_screen_fade_value > 0.0)
     anvil_host_fade(anvil_screen_fade_value);

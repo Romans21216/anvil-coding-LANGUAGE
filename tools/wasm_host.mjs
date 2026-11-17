@@ -186,6 +186,12 @@ const imports = {
     },
     present() {
       if (triangles.length) {
+        if (process.env.ANVIL_WASM_DUMP_TRIANGLES) {
+          fs.writeFileSync(
+            process.env.ANVIL_WASM_DUMP_TRIANGLES,
+            JSON.stringify(triangles),
+          );
+        }
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         for (const t of triangles) {
           for (const [x, y] of [[t[0], t[1]], [t[3], t[4]], [t[6], t[7]]]) {
@@ -195,7 +201,29 @@ const imports = {
             if (y > maxY) maxY = y;
           }
         }
-        ops.push(["triangles", triangles.length, Math.round(minX), Math.round(maxX), Math.round(minY), Math.round(maxY)]);
+        // Colour variety alongside the bounds: a shaded sphere must not come
+        // out as one flat tone, and a cast shadow shows up as a much darker
+        // triangle, so both are worth recording without dumping every op.
+        const tones = new Set();
+        let darkest = Infinity;
+        let brightest = -Infinity;
+        for (const t of triangles) {
+          const luminance = t[9] + t[10] + t[11];
+          tones.add(t[9] + "," + t[10] + "," + t[11]);
+          if (luminance < darkest) darkest = luminance;
+          if (luminance > brightest) brightest = luminance;
+        }
+        ops.push([
+          "triangles",
+          triangles.length,
+          Math.round(minX),
+          Math.round(maxX),
+          Math.round(minY),
+          Math.round(maxY),
+          tones.size,
+          Math.round(darkest),
+          Math.round(brightest),
+        ]);
         triangles.length = 0;
       }
       ops.push(["present"]);

@@ -174,7 +174,16 @@ ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
 SCENE_STATEMENT = re.compile(r"^\s*scene\s+(\w+)", re.MULTILINE)
 DISPLAY_STATEMENT = re.compile(r"^\s*display\s+([a-z_]+)\s*\(", re.MULTILINE)
 CAMERA_STATEMENT = re.compile(r"^\s*camera\b", re.MULTILINE)
-ALLOWED_SHAPES = {"rect", "circle", "line", "text", "cube", "plane", "sphere"}
+ALLOWED_SHAPES = {
+    "rect",
+    "circle",
+    "line",
+    "text",
+    "cube",
+    "plane",
+    "sphere",
+    "ray_sphere",
+}
 
 HOST_PAGE = """<!doctype html>
 <html lang="en">
@@ -841,6 +850,13 @@ def validate(
     if text is None:
         text = pathlib.Path(source_path).read_text(encoding="utf-8")
     for match in DISPLAY_STATEMENT.finditer(text):
+        if match.group(1) == "ray_sphere":
+            scene = SCENE_STATEMENT.search(text)
+            if scene is None or scene.group(1) != "3d":
+                line = text.count("\n", 0, match.start()) + 1
+                raise CompileError(
+                    f"{source_path}:{line}: display ray_sphere(...) requires scene 3d"
+                )
         if match.group(1) in ALLOWED_SHAPES:
             continue
         line = text.count("\n", 0, match.start()) + 1
