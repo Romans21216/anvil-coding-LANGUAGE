@@ -218,6 +218,7 @@ SCENES.update(
         "ray_spheres_36": ray_sphere_scene(9, 4),
         "ray_spheres_40": ray_sphere_scene(8, 5),
         "ray_spheres_40_step2": "set var(previous_step) = ray_resolution(2)\n" + ray_sphere_scene(8, 5),
+        "ray_spheres_40_samples4": "set var(previous_samples) = ray_samples(4)\n" + ray_sphere_scene(8, 5),
     }
 )
 

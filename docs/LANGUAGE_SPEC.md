@@ -157,7 +157,7 @@ builtin_name     = "time" | "delta" | "rnd" | "noise" | "fbm" | "floor" | "ceil"
                  | "body_active" | "body_x" | "body_y" | "body_vx" | "body_vy"
                  | "body_set_velocity" | "body_force" | "body_restitution" | "body_friction"
                  | "body_collision" | "physics_capacity" | "physics_gravity" | "physics_step"
-                 | "ray_backend" | "ray_backend_available" | "ray_resolution" ;
+                 | "ray_backend" | "ray_backend_available" | "ray_resolution" | "ray_samples" ;
 key_name         = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
                  | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T"
                  | "U" | "V" | "W" | "X" | "Y" | "Z" | "SPACE" | "UP" | "DOWN"
@@ -221,6 +221,7 @@ All built-ins return a numeric result unless otherwise stated. Calls use parenth
 | Math | `floor(x)`; `ceil(x)`; `round(x)`; `sqrt(x)`; `sin(x)`; `cos(x)`; `tan(x)`; `abs(x)`; `min(a,b)`; `max(a,b)`; `%` operator | Double-precision math helpers. `round` sends halves away from zero, and `a % b` is the floating-point remainder with the sign of the left side. `tan` is a libm call on the C backend and `sin/cos` in the freestanding wasm runtime, which agree to the printed precision; the native backend refuses it with a located "not available" diagnostic. Invalid/non-finite results are rejected. |
 | Ray backend | `ray_backend(name)`; `ray_backend_available(name)` | String-literal names. `"bvh"` is selectable; only the CPU BVH backend is implemented. Availability queries for `"dxr"` and `"embree"` return false. Failed selection leaves the active backend unchanged. |
 | Ray resolution | `ray_resolution(step)` | C runtime integer step 1–8; returns the previous step, default 1. Larger values trace one ray per pixel block and fill the block. Invalid values return 0 without changing state. Not available in wasm. |
+| Ray samples | `ray_samples(count)` | C runtime integer sample count 1–16; returns the previous count, default 1. Stratified samples average shaded color and hit coverage per pixel block. Invalid values return 0 without changing state. Not available in wasm. |
 | Physics | `body_create(x,y,radius,mass)`; `body_create_box(x,y,width,height,mass)`; `physics_capacity(n)`; `body_destroy(handle)`; `body_active(handle)`; `body_x/y/vx/vy(handle)`; `body_set_velocity(handle,vx,vy)`; `body_force(handle,fx,fy)`; `body_restitution(handle,value)`; `body_friction(handle,value)`; `body_collision(a,b)`; `physics_gravity(x,y)`; `physics_step()` | Fixed-step 2D circle and axis-aligned box prototype; capacity 1–128; bounded bodies/velocities; restitution and Coulomb friction in [0,1]. Detailed solver contract and limits are in [the engine specification](ENGINE.md#fixed-step-2d-physics). |
 | Network | `net host(port)`; `net join("IPv4",port)`; `net send(value)` statement; `receive()` | Experimental one-peer numeric UDP transport. Each datagram carries one 8-byte IEEE-754 double; datagrams of any other length and non-finite payloads (NaN, infinity) are ignored, and `receive()` keeps its previous value. `host`/`join` are top-level setup statements. It is not reliable, secure, or suitable for Internet games. |
 

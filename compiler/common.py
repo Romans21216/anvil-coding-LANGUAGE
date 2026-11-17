@@ -242,6 +242,7 @@ RUNTIME_C_NAMES = {
     "anvil_ray_backend",
     "anvil_ray_backend_available",
     "anvil_ray_resolution",
+    "anvil_ray_samples",
     "anvil_body_create",
     "anvil_body_create_box",
     "anvil_body_destroy",
