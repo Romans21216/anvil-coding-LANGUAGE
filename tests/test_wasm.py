@@ -1224,10 +1224,229 @@ class WasmScene3DTests(unittest.TestCase):
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from test_gltf_model import write_quad  # noqa: E402
+from test_gltf_morph import write_morph_glb, write_morph_model  # noqa: E402
+from test_gltf_ray_mesh import write_animated_morph_glb  # noqa: E402
 
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmModelTests(unittest.TestCase):
+    def test_animated_morphed_ray_mesh_applies_all_pose_controls(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            model = write_animated_morph_glb(root)
+
+            def capture(animation_time: float, morph_weight: float, name: str) -> list:
+                program = "\n".join(
+                    (
+                        "scene 3d",
+                        "camera perspective 0 0 12",
+                        "fn(draw)",
+                        f'  set var(t) = model_animate("{model.name}", {animation_time})',
+                        f'  set var(w) = model_morph("{model.name}", 0, {morph_weight})',
+                        f'  set var(ok) = ray_mesh("{model.name}", 0, 0, 0, 1, 0, 0, 0)',
+                        "end",
+                        "",
+                    )
+                )
+                result, out = build(root, program, name)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                run = subprocess.run(
+                    ["node", str(HOST), "--record", str(out)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                records = json.loads(run.stdout.strip().splitlines()[-1])
+                return next(record for record in records if record[0] == "triangles")
+
+            rest = capture(0.0, 0.0, "animated_morph_rest")
+            animated = capture(0.5, 0.0, "animated_morph_node")
+            morphed = capture(0.0, 1.0, "animated_morph_target")
+            combined = capture(0.5, 1.0, "animated_morph_combined")
+
+        self.assertGreater(animated[2], rest[2] + 20, (rest, animated))
+        self.assertGreater(morphed[2], rest[2] + 40, (rest, morphed))
+        self.assertGreater(combined[2], animated[2] + 40, (animated, combined))
+
+    def test_ray_mesh_requires_a_3d_scene(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, _ = build(
+                root,
+                'scene 2d\nfn(draw)\n'
+                '  set var(ok) = ray_mesh("missing.gltf", 0, 0, 0, 1, 0, 0, 0)\n'
+                'end\n',
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("ray_mesh(...) requires scene 3d", result.stderr)
+
+    def test_morphed_ray_mesh_preserves_group_defaults_and_global_override(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            base = root / "base.gltf"
+            write_morph_model(root, base.name, defaults=(0.25,))
+            document = json.loads(base.read_text(encoding="utf-8"))
+            document["nodes"] = [
+                {"mesh": 0, "translation": [-3, 0, 0], "weights": [0.0]},
+                {"mesh": 0, "translation": [3, 0, 0], "weights": [1.0]},
+            ]
+            document["scenes"][0]["nodes"] = [0, 1]
+            model = write_morph_glb(root, "groups.glb", document)
+
+            def draw(override: bool, name: str) -> list:
+                statements = [
+                    "scene 3d",
+                    "camera perspective 0 0 12",
+                    "fn(draw)",
+                ]
+                if override:
+                    statements.append(
+                        f'  set var(prev) = model_morph("{model.name}", 0, 1)'
+                    )
+                statements.extend(
+                    [
+                        f'  set var(ok) = ray_mesh("{model.name}", 0, 0, 0, 1, 0, 0, 0)',
+                        "end",
+                        "",
+                    ]
+                )
+                result, out = build(root, "\n".join(statements), name)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                run = subprocess.run(
+                    ["node", str(HOST), "--record", str(out)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                records = json.loads(run.stdout.strip().splitlines()[-1])
+                return next(record for record in records if record[0] == "triangles")
+
+            per_group = draw(False, "morph_group_defaults")
+            overridden = draw(True, "morph_group_override")
+
+        per_group_width = per_group[3] - per_group[2]
+        override_width = overridden[3] - overridden[2]
+        self.assertGreater(per_group_width, override_width + 50, (per_group, overridden))
+        self.assertGreater(overridden[2], per_group[2] + 50, (per_group, overridden))
+
+    def test_morphed_model_draw_applies_static_defaults_and_override(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_morph_model(root, "morph.gltf")
+
+            def capture(override: bool, name: str) -> list:
+                statements = ["scene 3d", "camera perspective 0 0 12", "fn(draw)"]
+                if override:
+                    statements.append(
+                        '  set var(previous) = model_morph("morph.gltf", 0, 1)'
+                    )
+                statements.extend(
+                    [
+                        '  set var(ok) = model_draw("morph.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                        "end",
+                        "",
+                    ]
+                )
+                result, out = build(root, "\n".join(statements), name)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                run = subprocess.run(
+                    ["node", str(HOST), "--record", str(out)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                records = json.loads(run.stdout.strip().splitlines()[-1])
+                return next(record for record in records if record[0] == "triangles")
+
+            default = capture(False, "morphed_model_draw_default")
+            overridden = capture(True, "morphed_model_draw_override")
+
+        self.assertGreater(overridden[2], default[2] + 50, (default, overridden))
+
+    def test_static_ray_mesh_uses_the_depth_tested_triangle_path(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+
+            def capture(call: str, name: str) -> tuple[str, list]:
+                program = "\n".join(
+                    (
+                        "scene 3d",
+                        "camera perspective 0 0 6",
+                        "clear rgba(10, 12, 18, 255)",
+                        "fn(draw)",
+                        f"  set var(ok) = {call}",
+                        "  say var(ok)",
+                        "end",
+                        "",
+                    )
+                )
+                result, out = build(root, program, name)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                run = subprocess.run(
+                    ["node", str(HOST), "--record", str(out)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                lines = run.stdout.strip().splitlines()
+                records = json.loads(lines[-1])
+                triangles = [record for record in records if record[0] == "triangles"]
+                self.assertEqual(len(triangles), 1)
+                return lines[0], triangles[0]
+
+            ray_result, ray_triangles = capture(
+                'ray_mesh("quad.gltf", 0, 0, 0, 1, 0, 0, 0)', "ray_mesh_static"
+            )
+            draw_result, draw_triangles = capture(
+                'model_draw("quad.gltf", 0, 0, 0, 1, 0, 0, 0)', "model_draw_static"
+            )
+        self.assertEqual(ray_result, "1")
+        self.assertEqual(ray_triangles, draw_triangles)
+        self.assertEqual(ray_triangles[1], 2, "a quad submits its two GLTF triangles")
+
+    def test_static_ray_mesh_has_a_per_frame_triangle_budget(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_quad(root, "quad.gltf", (1.0, 0.0, 0.0))
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 6",
+                    "set var(last) = 1",
+                    "fn(draw)",
+                    "  for local(i) = 1 to 8193",
+                    '    set var(last) = ray_mesh("quad.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    "  end",
+                    "  say var(last)",
+                    "end",
+                    "",
+                )
+            )
+            result, out = build(root, program, "ray_mesh_budget")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "2"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            self.assertEqual(lines[:2], ["0", "0"], "the over-budget draw is refused each frame")
+            records = json.loads(lines[-1])
+            triangles = [record for record in records if record[0] == "triangles"]
+            self.assertEqual([record[1] for record in triangles], [16384, 16384])
+
     def test_a_gltf_model_is_baked_and_drawn(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)

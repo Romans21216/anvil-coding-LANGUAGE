@@ -17,9 +17,15 @@ COMPILER = ROOT / "compiler" / "anvil.py"
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from test_sprite_draw import WindowReader  # noqa: E402
+from test_gltf_morph import write_morph_glb, write_morph_model  # noqa: E402
+from compiler import gltf  # noqa: E402
 
 
-def write_animated_morph_glb(root: pathlib.Path) -> pathlib.Path:
+def write_animated_morph_glb(
+    root: pathlib.Path,
+    node_weights: tuple[float, float] | None = None,
+    duplicate_primitive: bool = False,
+) -> pathlib.Path:
     """Write one triangle with a node translation track and an X morph delta."""
     blob = bytearray()
     views: list[dict[str, int]] = []
@@ -42,8 +48,11 @@ def write_animated_morph_glb(root: pathlib.Path) -> pathlib.Path:
     document = {
         "asset": {"version": "2.0"},
         "scene": 0,
-        "scenes": [{"nodes": [0]}],
-        "nodes": [{"mesh": 0}],
+        "scenes": [{"nodes": [0] if node_weights is None else [0, 1]}],
+        "nodes": ([{"mesh": 0}] if node_weights is None else [
+            {"mesh": 0, "weights": [node_weights[0]]},
+            {"mesh": 0, "weights": [node_weights[1]]},
+        ]),
         "meshes": [
             {
                 "weights": [0.0],
@@ -83,6 +92,10 @@ def write_animated_morph_glb(root: pathlib.Path) -> pathlib.Path:
             }
         ],
     }
+    if duplicate_primitive:
+        document["meshes"][0]["primitives"].append(
+            json.loads(json.dumps(document["meshes"][0]["primitives"][0]))
+        )
     json_chunk = json.dumps(document, separators=(",", ":")).encode("utf-8")
     json_chunk += b" " * ((-len(json_chunk)) % 4)
     while len(blob) % 4:
@@ -200,6 +213,146 @@ class AnimatedRayMeshTests(unittest.TestCase):
             )
         self.assertGreater(animated[0] - rest[0], 20, (rest, animated))
         self.assertGreater(morphed[0] - rest[0], 40, (rest, morphed))
+
+    def test_static_ray_mesh_keeps_per_group_defaults(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            base = root / "base.gltf"
+            write_morph_model(root, base.name, defaults=(0.0,))
+            document = json.loads(base.read_text(encoding="utf-8"))
+            second_mesh = json.loads(json.dumps(document["meshes"][0]))
+            second_mesh["weights"] = [1.0]
+            document["meshes"].append(second_mesh)
+            document["nodes"] = [
+                {"mesh": 0, "translation": [-3, 0, 0]},
+                {"mesh": 1, "translation": [3, 0, 0]},
+            ]
+            document["scenes"][0]["nodes"] = [0, 1]
+            model = write_morph_glb(root, "per-mesh.glb", document)
+            per_group = rendered_bounds(
+                build_ray_program(
+                    root,
+                    [f'set var(ok) = ray_mesh("{model.name}", 0, 0, -1, 1, 0, 0, 0)'],
+                    "static_per_group",
+                )
+            )
+
+            second_mesh["weights"] = [0.0]
+            document["meshes"][1] = second_mesh
+            baseline_model = write_morph_glb(root, "same-default.glb", document)
+            baseline = rendered_bounds(
+                build_ray_program(
+                    root,
+                    [f'set var(ok) = ray_mesh("{baseline_model.name}", 0, 0, -1, 1, 0, 0, 0)'],
+                    "static_same_default",
+                )
+            )
+        self.assertGreater(
+            (per_group[2] - per_group[0]) - (baseline[2] - baseline[0]),
+            40,
+            (per_group, baseline),
+        )
+
+    def test_grouped_ray_mesh_capacity_failure_does_not_consume_last_slot(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_morph_model(root, "single.gltf", defaults=(0.0,))
+            base = root / "single.gltf"
+            document = json.loads(base.read_text(encoding="utf-8"))
+            second_mesh = json.loads(json.dumps(document["meshes"][0]))
+            second_mesh["weights"] = [1.0]
+            document["meshes"].append(second_mesh)
+            document["nodes"] = [{"mesh": 0}, {"mesh": 1}]
+            document["scenes"][0]["nodes"] = [0, 1]
+            grouped = write_morph_glb(root, "grouped.glb", document)
+
+            statements = [
+                'set var(fill) = ray_mesh("single.gltf", 0, 0, -1, 1, 0, 0, 0)'
+                for _ in range(39)
+            ]
+            # The two-group registration is intentionally offscreen. With one
+            # queue slot left it must fail atomically, leaving that slot for the
+            # visible single-group mesh submitted afterward.
+            statements.append(
+                f'set var(failed) = ray_mesh("{grouped.name}", 100, 0, -1, 1, 0, 0, 0)'
+            )
+            statements.append(
+                'set var(visible) = ray_mesh("single.gltf", 0, 0, -1, 1, 0, 0, 0)'
+            )
+            bounds = rendered_bounds(
+                build_ray_program(root, statements, "grouped_capacity_atomic")
+            )
+        self.assertGreater(bounds[2] - bounds[0], 20, bounds)
+
+    def test_animated_ray_mesh_keeps_node_level_default_weights(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            asset = write_animated_morph_glb(
+                root, (0.0, 1.0), duplicate_primitive=True
+            )
+            baked = gltf.load_animated(asset)
+            self.assertEqual(len(baked["groups"]) // 3, 2)
+            self.assertEqual(baked["morph_defaults"], [0.0, 1.0])
+            self.assertEqual([baked["groups"][i + 2] for i in (0, 3)], [2, 2])
+            per_node = rendered_bounds(
+                build_ray_program(
+                    root,
+                    [
+                        'set var(t) = model_animate("animated_morph.glb", 0)',
+                        'set var(ok) = ray_mesh("animated_morph.glb", -4, 0, -1, 1, 0, 0, 0)',
+                    ],
+                    "animated_per_node_default",
+                )
+            )
+            write_animated_morph_glb(root, (0.0, 0.0))
+            baseline = rendered_bounds(
+                build_ray_program(
+                    root,
+                    [
+                        'set var(t) = model_animate("animated_morph.glb", 0)',
+                        'set var(ok) = ray_mesh("animated_morph.glb", -4, 0, -1, 1, 0, 0, 0)',
+                    ],
+                    "animated_same_node_default",
+                )
+            )
+        self.assertGreater(
+            (per_node[2] - per_node[0]) - (baseline[2] - baseline[0]),
+            20,
+            (per_node, baseline),
+        )
+
+    def test_animated_morph_model_draw_supports_all_pose_controls(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_animated_morph_glb(
+                root, (0.0, 1.0), duplicate_primitive=True
+            )
+
+            def draw(time_value: float, weight: float | None, name: str):
+                statements = [
+                    f'set var(t) = model_animate("animated_morph.glb", {time_value})'
+                ]
+                if weight is not None:
+                    statements.append(
+                        f'set var(w) = model_morph("animated_morph.glb", 0, {weight})'
+                    )
+                statements.append(
+                    'set var(ok) = model_draw("animated_morph.glb", -4, 0, -1, 3, 0, 0, 0)'
+                )
+                return rendered_bounds(build_ray_program(root, statements, name))
+
+            rest = draw(0, None, "model_draw_rest")
+            animated = draw(0.5, None, "model_draw_animated")
+            morphed = draw(0, 1, "model_draw_morphed")
+            combined = draw(0.5, 1, "model_draw_combined")
+
+        rest_width = rest[2] - rest[0]
+        morph_width = morphed[2] - morphed[0]
+        combined_width = combined[2] - combined[0]
+        self.assertGreater(animated[0], rest[0], (rest, animated))
+        self.assertGreater(rest_width - morph_width, 40, (rest, morphed))
+        self.assertGreater(combined[2], morphed[2], (morphed, combined))
+        self.assertGreater(combined_width - morph_width, 20, (morphed, combined))
 
     def test_same_asset_pose_is_snapshotted_per_queued_instance(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:

@@ -101,6 +101,10 @@ ALLOWED_BUILTINS = {
     "sound_error",
     "camera_angle",
     "model_draw",
+    "model_animate",
+    "model_animation_length",
+    "model_morph",
+    "ray_mesh",
     "mesh_drawn",
     "mesh_culled",
     "mesh_culling",
@@ -889,12 +893,6 @@ def validate(
             f"{source_path}:{line}: display {match.group(1)}(...) is not available "
             "in the wasm backend yet"
         )
-    match = re.search(r"\bray_mesh\s*\(", text)
-    if match:
-        line = text.count("\n", 0, match.start()) + 1
-        raise CompileError(
-            f"{source_path}:{line}: ray_mesh is not available in the wasm backend yet"
-        )
     match = re.search(r"\bframe_capture\s*\(", text)
     if match:
         line = text.count("\n", 0, match.start()) + 1
@@ -930,31 +928,34 @@ def validate(
             f"{source_path}:{line}: 'engine' statements are not available in "
             "the wasm backend yet"
         )
-    # An animated model bakes node-local triangles and is posed by the C
-    # runtime; the browser bakes world-space triangles and has no pose code.
-    for match in re.finditer(r'\bmodel_draw\s*\(\s*"((?:[^"\\]|\\.)*)"', text):
+    # The wasm model paths share the depth-tested triangle renderer. Static
+    # models, morph groups and animated node poses are baked before submission;
+    # skinning and textured materials still need separate runtime paths.
+    model_calls = re.compile(
+        r'\b(model_draw|ray_mesh)\s*\(\s*"((?:[^"\\]|\\.)*)"'
+    )
+    for match in model_calls.finditer(text):
         try:
-            asset = json.loads('"' + match.group(1) + '"')
+            asset = json.loads('"' + match.group(2) + '"')
         except ValueError:
             continue
+        is_ray_mesh = match.group(1) == "ray_mesh"
+        if is_ray_mesh:
+            scene = SCENE_STATEMENT.search(text)
+            if scene is None or scene.group(1) != "3d":
+                line = text.count("\n", 0, match.start()) + 1
+                raise CompileError(
+                    f"{source_path}:{line}: ray_mesh(...) requires scene 3d"
+                )
         from compiler import gltf
 
         try:
             model = gltf.ensure_model(asset, pathlib.Path(source_path))
         except gltf.ModelError:
             continue  # the C generator reports the real problem with the file
-        if model.get("animated"):
-            line = text.count("\n", 0, match.start()) + 1
-            raise CompileError(
-                f"{source_path}:{line}: animated models are not available in the "
-                "wasm backend yet (the browser draws a baked static pose)"
-            )
-        if model.get("morph_count"):
-            line = text.count("\n", 0, match.start()) + 1
-            raise CompileError(
-                f"{source_path}:{line}: morph targets are not available in the "
-                "wasm backend yet (the browser bakes a single pose)"
-            )
+        # Static morph targets are supported by both model_draw and ray_mesh;
+        # animated node groups use the same baked data and the runtime pose
+        # evaluator; both lowerings submit their effective weights per group.
         if model.get("skinned"):
             line = text.count("\n", 0, match.start()) + 1
             raise CompileError(

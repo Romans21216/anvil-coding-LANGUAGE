@@ -104,6 +104,28 @@ class AnnotationTests(unittest.TestCase):
                     parse(path, source)
                 self.assertIn(expected, str(caught.exception))
 
+    def test_annotation_constrains_later_assignments(self) -> None:
+        source = (
+            "fn(main)\n  set var(active): bool = true\n"
+            "  set var(active) = 5\nend\ncall fn(main)\n"
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            path = pathlib.Path(temp) / "bad-reassignment.ANVL"
+            path.write_text(source, encoding="utf-8")
+            with self.assertRaises(CompileError) as caught:
+                parse(path, source)
+            self.assertIn(
+                f"{path}:3: declared bool but this value is a number", str(caught.exception)
+            )
+
+    def test_annotation_accepts_later_values_of_the_same_kind(self) -> None:
+        source = (
+            "fn(main)\n  set var(active): bool = true\n"
+            "  set var(active) = 2 > 1\n  say var(active)\nend\ncall fn(main)\n"
+        )
+        self.assertEqual(run_c(source), "true\n")
+        self.assertEqual(run_native(source), "true\n")
+
     def test_a_comparison_counts_as_bool(self) -> None:
         source = (
             "fn(main)\n  set var(ok): bool = 2 > 1\n  say var(ok)\nend\n"
@@ -111,6 +133,17 @@ class AnnotationTests(unittest.TestCase):
         )
         self.assertEqual(run_c(source), "true\n")
         self.assertEqual(run_native(source), "true\n")
+
+    def test_bool_parameter_annotation_is_scoped_away_from_same_named_global(self) -> None:
+        source = (
+            "set var(flag): number = 3\n"
+            "fn(show, flag)\n  set var(flag): bool = true\n"
+            "  say var(flag)\nend\n"
+            "fn(main)\n  call fn(show, 0)\n  say var(flag)\nend\n"
+            "call fn(main)\n"
+        )
+        self.assertEqual(run_c(source), "true\n3\n")
+        self.assertEqual(run_native(source), "true\n3\n")
 
 
 if __name__ == "__main__":

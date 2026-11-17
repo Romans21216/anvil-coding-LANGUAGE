@@ -104,7 +104,8 @@ set var(ok) = model_draw("walk.gltf", 0, 0, 0, 1, 0, 0, 0)
 - Animated models skip the bounding-sphere culling test and overhead shadows;
   the whole hierarchy is drawn every frame.
 - The browser backend bakes world-space triangles and has no pose code, so
-  `--backend wasm` refuses an animated model with a located error.
+  Wasm samples unskinned animated models in `model_draw` and `ray_mesh` using
+  the WebGL depth-tested triangle path. Skinned wasm models remain unsupported.
 
 `tests/test_gltf_animation.py` measures ink bounds: a translation track moves
 the triangle by the expected amount at half a second and a quarter of the way,
@@ -158,21 +159,28 @@ set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
 - Every primitive in the model must declare the same number of targets, so the
   per-vertex delta stride is uniform; a mismatch, a target without a `POSITION`
   delta, or more than eight targets is refused at compile time.
-- `model_morph(path, index, weight)` clamps the weight to 0-1, stores it and
-  returns the previous value, so a caller can restore it. A non-finite weight
-  leaves the stored value alone.
+- `model_morph(path, index, weight)` clamps the weight to 0-1, stores the
+  override for that model asset and returns the previous value from its first
+  geometry group, so a caller can restore it. A non-finite weight leaves the
+  stored value alone.
 - The weights start at the mesh's `weights` array the first time the model is
   drawn or a weight is set (so setting one weight before the first draw keeps
   the rest at their defaults), and stay per model for the life of the process.
+  Animated, skinned and morphing model assets share a 32-slot runtime state
+  table; registering a stateful asset beyond that limit is refused at compile
+  time.
 - Blending is additive on the vertex position before scale/rotate/translate;
-  vertex colour does not animate, and culling still uses the rest-pose bounding
-  sphere.
-- Only static models morph: a model with an animation clip or a skin is refused
-  at the `model_morph` line, and the browser backend refuses a morphing model
-  outright.
+  vertex colour does not animate. Morphing draws skip culling because the
+  rest-pose bounding sphere may not contain every weighted pose.
+- C supports morph targets on static models and on animated, unskinned models;
+  morph targets combined with skinning remain unsupported. Wasm
+  `model_draw` and `ray_mesh` support static and animated unskinned morphs
+  with per-group defaults and `model_morph` overrides. Skinned wasm models
+  remain unsupported.
 
 `tests/test_gltf_morph.py` measures ink: weight 1 moves the triangle the whole
 delta, 0.5 moves it half way, a mesh default of 1.0 is applied on the first
 draw, weights clamp while returning the previous value, a model without targets
-refuses `model_morph` at its source line, and wasm refuses a morphing model.
+refuses `model_morph` at its source line, and wasm coverage verifies per-group
+defaults and an override through both `model_draw` and `ray_mesh`.
 

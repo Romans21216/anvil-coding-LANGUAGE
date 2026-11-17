@@ -63,6 +63,17 @@ static int anvil_text_buffer_index;
 char anvil_str_scratch[256][ANVIL_STR_CAP];
 static int anvil_fixed_hz = 60;
 static int anvil_frame_depth;
+static int anvil_wasm_ray_mesh_triangles_frame;
+#define ANVIL_WASM_RAY_MESH_TRIANGLE_BUDGET 16384
+#define ANVIL_WASM_MODEL_STATES 32
+#define ANVIL_WASM_MORPH_TARGETS 8
+static double anvil_wasm_morph_values[ANVIL_WASM_MODEL_STATES]
+                                          [ANVIL_WASM_MORPH_TARGETS];
+static unsigned char anvil_wasm_morph_ready[ANVIL_WASM_MODEL_STATES];
+static unsigned char anvil_wasm_morph_overridden[ANVIL_WASM_MODEL_STATES]
+                                                    [ANVIL_WASM_MORPH_TARGETS];
+#define ANVIL_WASM_MODEL_NODES 128
+static double anvil_wasm_model_times[ANVIL_WASM_MODEL_STATES];
 
 static char *anvil_text_buffer(void) {
   char *destination = anvil_text_buffers[anvil_text_buffer_index & (ANVIL_TEXT_BUFFERS - 1)];
@@ -288,6 +299,8 @@ void anvil_set_fixed_hz(int hz) { anvil_fixed_hz = hz; }
 void anvil_net_close(void) {}
 
 void anvil_frame_enter(void) {
+  if (anvil_frame_depth == 0)
+    anvil_wasm_ray_mesh_triangles_frame = 0;
   anvil_frame_depth += 1;
   if (anvil_frame_depth > 1000)
     anvil_runtime_error("call depth exceeded the wasm frame budget");
@@ -1790,6 +1803,627 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
     anvil_mesh_drawn_frame += 1;
   }
   return 1.0;
+}
+
+double anvil_trace_mesh(const double *data, int triangle_count, double cx,
+                        double cy, double cz, double radius, double x,
+                        double y, double z, double scale, double rx,
+                        double ry, double rz) {
+  if (!anvil_scene_is_3d || !data || triangle_count <= 0 ||
+      triangle_count > ANVIL_WASM_RAY_MESH_TRIANGLE_BUDGET ||
+      !anvil_wasm_finite(cx) || !anvil_wasm_finite(cy) ||
+      !anvil_wasm_finite(cz) || !anvil_wasm_finite(radius) || radius < 0.0 ||
+      !anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
+      !anvil_wasm_finite(z) || !anvil_wasm_finite(scale) || scale == 0.0 ||
+      !anvil_wasm_finite(rx) || !anvil_wasm_finite(ry) ||
+      !anvil_wasm_finite(rz))
+    return 0.0;
+  if (!anvil_wasm_sphere_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry,
+                                 rz)) {
+    anvil_mesh_culled_frame = 1;
+    return 1.0;
+  }
+  if (triangle_count > ANVIL_WASM_RAY_MESH_TRIANGLE_BUDGET -
+                           anvil_wasm_ray_mesh_triangles_frame)
+    return 0.0;
+  if (!anvil_mesh_draw(data, triangle_count, cx, cy, cz, radius, x, y, z,
+                       scale, rx, ry, rz))
+    return 0.0;
+  anvil_wasm_ray_mesh_triangles_frame += triangle_count;
+  return 1.0;
+}
+
+const double *anvil_model_morph_weights(int id, const double *defaults,
+                                        int count) {
+  if (id < 0 || id >= ANVIL_WASM_MODEL_STATES || !defaults || count <= 0 ||
+      count > ANVIL_WASM_MORPH_TARGETS)
+    return defaults;
+  if (!anvil_wasm_morph_ready[id]) {
+    for (int target = 0; target < ANVIL_WASM_MORPH_TARGETS; ++target)
+      anvil_wasm_morph_values[id][target] =
+          target < count ? defaults[target] : 0.0;
+    anvil_wasm_morph_ready[id] = 1;
+  }
+  return anvil_wasm_morph_values[id];
+}
+
+double anvil_model_morph(int id, int index, double weight,
+                         const double *defaults, int count) {
+  if (id < 0 || id >= ANVIL_WASM_MODEL_STATES || index < 0 ||
+      index >= ANVIL_WASM_MORPH_TARGETS || !anvil_wasm_finite(weight) ||
+      !defaults || count <= 0 || count > ANVIL_WASM_MORPH_TARGETS)
+    return 0.0;
+  anvil_model_morph_weights(id, defaults, count);
+  double previous = anvil_wasm_morph_values[id][index];
+  anvil_wasm_morph_values[id][index] =
+      weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
+  anvil_wasm_morph_overridden[id][index] = 1;
+  return previous;
+}
+
+double anvil_trace_mesh_morphed_groups(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const int *groups, int group_count, const double *group_defaults,
+    const double *current_weights, int model_id, int morph_count, double cx,
+    double cy, double cz, double radius, double x, double y, double z,
+    double scale, double rx, double ry, double rz) {
+  if (!anvil_scene_is_3d || !data || !morph_deltas || !groups ||
+      !group_defaults || !current_weights || triangle_count <= 0 ||
+      group_count <= 0 || morph_count <= 0 ||
+      morph_count > ANVIL_WASM_MORPH_TARGETS ||
+      triangle_count > ANVIL_WASM_RAY_MESH_TRIANGLE_BUDGET ||
+      !anvil_wasm_finite(cx) || !anvil_wasm_finite(cy) ||
+      !anvil_wasm_finite(cz) || !anvil_wasm_finite(radius) || radius < 0.0 ||
+      !anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
+      !anvil_wasm_finite(z) || !anvil_wasm_finite(scale) || scale == 0.0 ||
+      !anvil_wasm_finite(rx) || !anvil_wasm_finite(ry) ||
+      !anvil_wasm_finite(rz))
+    return 0.0;
+  int active_triangles = 0;
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (first < 0 || count < 0 || first > triangle_count ||
+        count > triangle_count - first)
+      return 0.0;
+    const double *defaults =
+        group_defaults + (size_t)group * (size_t)morph_count;
+    for (int target = 0; target < morph_count; ++target) {
+      if (!anvil_wasm_finite(defaults[target]) ||
+          !anvil_wasm_finite(current_weights[target]))
+        return 0.0;
+    }
+    if (count > 0) {
+      const double *deltas =
+          morph_deltas + (size_t)first * 9 * (size_t)morph_count;
+      size_t values = (size_t)count * 9 * (size_t)morph_count;
+      for (size_t value = 0; value < values; ++value) {
+        if (!anvil_wasm_finite(deltas[value]))
+          return 0.0;
+      }
+      active_triangles += count;
+    }
+  }
+  if (active_triangles <= 0)
+    return 0.0;
+  if (morph_count == 0 &&
+      !anvil_wasm_sphere_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry,
+                                 rz)) {
+    anvil_mesh_culled_frame = 1;
+    return 1.0;
+  }
+  anvil_mesh_culled_frame = 0;
+  if (active_triangles > ANVIL_WASM_RAY_MESH_TRIANGLE_BUDGET -
+                             anvil_wasm_ray_mesh_triangles_frame)
+    return 0.0;
+
+  anvil_mesh_drawn_frame = 0;
+  double weights[ANVIL_WASM_MORPH_TARGETS];
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (count <= 0)
+      continue;
+    const double *defaults =
+        group_defaults + (size_t)group * (size_t)morph_count;
+    for (int target = 0; target < morph_count; ++target)
+      weights[target] =
+          model_id >= 0 && model_id < ANVIL_WASM_MODEL_STATES &&
+                  anvil_wasm_morph_overridden[model_id][target]
+              ? current_weights[target]
+              : defaults[target];
+    for (int triangle = first; triangle < first + count; ++triangle) {
+      const double *source = data + (size_t)triangle * 12;
+      AnvilWasmVec3 points[3];
+      for (int vertex = 0; vertex < 3; ++vertex) {
+        size_t vertex_index = (size_t)triangle * 3 + (size_t)vertex;
+        const double *deltas =
+            morph_deltas + vertex_index * (size_t)morph_count * 3;
+        AnvilWasmVec3 local = {source[vertex * 3], source[vertex * 3 + 1],
+                               source[vertex * 3 + 2]};
+        for (int target = 0; target < morph_count; ++target) {
+          local.x += deltas[target * 3] * weights[target];
+          local.y += deltas[target * 3 + 1] * weights[target];
+          local.z += deltas[target * 3 + 2] * weights[target];
+        }
+        local = (AnvilWasmVec3){local.x * scale, local.y * scale,
+                                local.z * scale};
+        local = anvil_wasm_rotate(local, rx, ry, rz);
+        points[vertex] =
+            (AnvilWasmVec3){local.x + x, local.y + y, local.z + z};
+      }
+      int red = (int)source[9], green = (int)source[10], blue = (int)source[11];
+      AnvilWasmVec3 normal = anvil_wasm_normalize(
+          anvil_wasm_cross(anvil_wasm_sub(points[1], points[0]),
+                           anvil_wasm_sub(points[2], points[0])));
+      anvil_wasm_triangle(points[0], points[1], points[2], normal, red, green,
+                          blue, 255, 0.0, 0);
+      anvil_wasm_shadow_triangle(points[0], points[1], points[2]);
+      anvil_mesh_drawn_frame += 1;
+    }
+  }
+  anvil_wasm_ray_mesh_triangles_frame += active_triangles;
+  return 1.0;
+}
+
+double anvil_mesh_draw_morphed_groups(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const int *groups, int group_count, const double *group_defaults,
+    const double *current_weights, int model_id, int morph_count, double x,
+    double y, double z, double scale, double rx, double ry, double rz) {
+  if (!data || !morph_deltas || !groups || !group_defaults ||
+      !current_weights || triangle_count <= 0 || group_count <= 0 ||
+      morph_count <= 0 || morph_count > ANVIL_WASM_MORPH_TARGETS ||
+      !anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
+      !anvil_wasm_finite(z) || !anvil_wasm_finite(scale) || scale == 0.0 ||
+      !anvil_wasm_finite(rx) || !anvil_wasm_finite(ry) ||
+      !anvil_wasm_finite(rz))
+    return 0.0;
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (first < 0 || count < 0 || first > triangle_count ||
+        count > triangle_count - first)
+      return 0.0;
+    const double *defaults =
+        group_defaults + (size_t)group * (size_t)morph_count;
+    for (int target = 0; target < morph_count; ++target) {
+      if (!anvil_wasm_finite(defaults[target]) ||
+          !anvil_wasm_finite(current_weights[target]))
+        return 0.0;
+    }
+    if (count > 0) {
+      const double *deltas =
+          morph_deltas + (size_t)first * 9 * (size_t)morph_count;
+      size_t values = (size_t)count * 9 * (size_t)morph_count;
+      for (size_t value = 0; value < values; ++value) {
+        if (!anvil_wasm_finite(deltas[value]))
+          return 0.0;
+      }
+    }
+  }
+
+  anvil_mesh_culled_frame = 0;
+  anvil_mesh_drawn_frame = 0;
+  double weights[ANVIL_WASM_MORPH_TARGETS];
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (count <= 0)
+      continue;
+    const double *defaults =
+        group_defaults + (size_t)group * (size_t)morph_count;
+    for (int target = 0; target < morph_count; ++target)
+      weights[target] =
+          model_id >= 0 && model_id < ANVIL_WASM_MODEL_STATES &&
+                  anvil_wasm_morph_overridden[model_id][target]
+              ? current_weights[target]
+              : defaults[target];
+    for (int triangle = first; triangle < first + count; ++triangle) {
+      const double *source = data + (size_t)triangle * 12;
+      AnvilWasmVec3 points[3];
+      for (int vertex = 0; vertex < 3; ++vertex) {
+        size_t vertex_index = (size_t)triangle * 3 + (size_t)vertex;
+        const double *deltas =
+            morph_deltas + vertex_index * (size_t)morph_count * 3;
+        AnvilWasmVec3 local = {source[vertex * 3], source[vertex * 3 + 1],
+                               source[vertex * 3 + 2]};
+        for (int target = 0; target < morph_count; ++target) {
+          local.x += deltas[target * 3] * weights[target];
+          local.y += deltas[target * 3 + 1] * weights[target];
+          local.z += deltas[target * 3 + 2] * weights[target];
+        }
+        local = (AnvilWasmVec3){local.x * scale, local.y * scale,
+                                local.z * scale};
+        local = anvil_wasm_rotate(local, rx, ry, rz);
+        points[vertex] =
+            (AnvilWasmVec3){local.x + x, local.y + y, local.z + z};
+      }
+      int red = (int)source[9], green = (int)source[10], blue = (int)source[11];
+      AnvilWasmVec3 normal = anvil_wasm_normalize(
+          anvil_wasm_cross(anvil_wasm_sub(points[1], points[0]),
+                           anvil_wasm_sub(points[2], points[0])));
+      anvil_wasm_triangle(points[0], points[1], points[2], normal, red, green,
+                          blue, 255, 0.0, 0);
+      anvil_wasm_shadow_triangle(points[0], points[1], points[2]);
+      anvil_mesh_drawn_frame += 1;
+    }
+  }
+  return 1.0;
+}
+
+double anvil_model_animate(int id, double seconds) {
+  if (id < 0 || id >= ANVIL_WASM_MODEL_STATES ||
+      !anvil_wasm_finite(seconds))
+    return 0.0;
+  anvil_wasm_model_times[id] = seconds;
+  return seconds;
+}
+
+double anvil_model_clock(int id) {
+  return id >= 0 && id < ANVIL_WASM_MODEL_STATES
+             ? anvil_wasm_model_times[id]
+             : 0.0;
+}
+
+static double anvil_wasm_model_local_t[ANVIL_WASM_MODEL_NODES][3];
+static double anvil_wasm_model_local_r[ANVIL_WASM_MODEL_NODES][4];
+static double anvil_wasm_model_local_s[ANVIL_WASM_MODEL_NODES][3];
+static double anvil_wasm_model_world[ANVIL_WASM_MODEL_NODES][16];
+static int anvil_wasm_model_resolving[ANVIL_WASM_MODEL_NODES];
+
+static void anvil_wasm_mat_trs(const double *translation,
+                               const double *rotation, const double *scale,
+                               double *matrix) {
+  double x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
+  matrix[0] = (1.0 - 2.0 * (y * y + z * z)) * scale[0];
+  matrix[1] = (2.0 * (x * y + z * w)) * scale[0];
+  matrix[2] = (2.0 * (x * z - y * w)) * scale[0];
+  matrix[3] = 0.0;
+  matrix[4] = (2.0 * (x * y - z * w)) * scale[1];
+  matrix[5] = (1.0 - 2.0 * (x * x + z * z)) * scale[1];
+  matrix[6] = (2.0 * (y * z + x * w)) * scale[1];
+  matrix[7] = 0.0;
+  matrix[8] = (2.0 * (x * z + y * w)) * scale[2];
+  matrix[9] = (2.0 * (y * z - x * w)) * scale[2];
+  matrix[10] = (1.0 - 2.0 * (x * x + y * y)) * scale[2];
+  matrix[11] = 0.0;
+  matrix[12] = translation[0];
+  matrix[13] = translation[1];
+  matrix[14] = translation[2];
+  matrix[15] = 1.0;
+}
+
+static void anvil_wasm_mat_mul(const double *a, const double *b, double *out) {
+  for (int column = 0; column < 4; ++column)
+    for (int row = 0; row < 4; ++row)
+      out[column * 4 + row] =
+          a[row] * b[column * 4] + a[4 + row] * b[column * 4 + 1] +
+          a[8 + row] * b[column * 4 + 2] +
+          a[12 + row] * b[column * 4 + 3];
+}
+
+static void anvil_wasm_mat_point(const double *matrix, double x, double y,
+                                 double z, double *out) {
+  out[0] = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
+  out[1] = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+  out[2] = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
+}
+
+static double anvil_wasm_acos(double value) {
+  const double pi = 3.14159265358979323846;
+  double magnitude = fabs(value);
+  if (magnitude > 1.0)
+    magnitude = 1.0;
+  double result =
+      (((-0.0187293 * magnitude + 0.0742610) * magnitude - 0.2121144) *
+       magnitude + 1.5707288) *
+      sqrt(1.0 - magnitude);
+  return value < 0.0 ? pi - result : result;
+}
+
+static void anvil_wasm_slerp(const double *a, const double *b, double amount,
+                             double *out) {
+  double dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+  double sign = 1.0;
+  if (dot < 0.0) {
+    sign = -1.0;
+    dot = -dot;
+  }
+  if (dot > 0.9995) {
+    for (int i = 0; i < 4; ++i)
+      out[i] = a[i] + (sign * b[i] - a[i]) * amount;
+  } else {
+    double theta = anvil_wasm_acos(dot);
+    double sin_theta = sin(theta);
+    double weight_a = sin((1.0 - amount) * theta) / sin_theta;
+    double weight_b = sin(amount * theta) / sin_theta;
+    for (int i = 0; i < 4; ++i)
+      out[i] = a[i] * weight_a + sign * b[i] * weight_b;
+  }
+  double norm = out[0] * out[0] + out[1] * out[1] + out[2] * out[2] +
+                out[3] * out[3];
+  if (norm > 0.0) {
+    norm = sqrt(norm);
+    for (int i = 0; i < 4; ++i)
+      out[i] /= norm;
+  }
+}
+
+static void anvil_wasm_track_sample(const double *times, const double *values,
+                                    int first_time, int first_value, int count,
+                                    int path, int interpolation, double time,
+                                    double *out) {
+  int width = path == 1 ? 4 : 3;
+  const double *row;
+  if (time <= times[first_time]) {
+    row = values + first_value;
+  } else if (time >= times[first_time + count - 1]) {
+    row = values + first_value + (size_t)(count - 1) * (size_t)width;
+  } else {
+    int index = 0;
+    while (index + 2 < count && times[first_time + index + 1] <= time)
+      ++index;
+    if (interpolation == 1) {
+      row = values + first_value + (size_t)index * (size_t)width;
+    } else {
+      double t0 = times[first_time + index];
+      double t1 = times[first_time + index + 1];
+      double amount = t1 > t0 ? (time - t0) / (t1 - t0) : 0.0;
+      const double *left = values + first_value + (size_t)index * (size_t)width;
+      const double *right = left + width;
+      if (path == 1) {
+        anvil_wasm_slerp(left, right, amount, out);
+        return;
+      }
+      for (int i = 0; i < width; ++i)
+        out[i] = left[i] + (right[i] - left[i]) * amount;
+      return;
+    }
+  }
+  for (int i = 0; i < width; ++i)
+    out[i] = row[i];
+}
+
+static void anvil_wasm_model_resolve(int index, const int *parents,
+                                     int depth) {
+  if (anvil_wasm_model_resolving[index] == 2)
+    return;
+  if (anvil_wasm_model_resolving[index] == 1 || depth > 64) {
+    anvil_wasm_mat_trs(anvil_wasm_model_local_t[index],
+                       anvil_wasm_model_local_r[index],
+                       anvil_wasm_model_local_s[index],
+                       anvil_wasm_model_world[index]);
+    anvil_wasm_model_resolving[index] = 2;
+    return;
+  }
+  anvil_wasm_model_resolving[index] = 1;
+  double local[16];
+  anvil_wasm_mat_trs(anvil_wasm_model_local_t[index],
+                     anvil_wasm_model_local_r[index],
+                     anvil_wasm_model_local_s[index], local);
+  int parent = parents[index];
+  if (parent >= 0 && parent != index) {
+    if (parent >= ANVIL_WASM_MODEL_NODES) {
+      anvil_wasm_model_resolving[index] = 0;
+      return;
+    }
+    anvil_wasm_model_resolve(parent, parents, depth + 1);
+    anvil_wasm_mat_mul(anvil_wasm_model_world[parent], local,
+                       anvil_wasm_model_world[index]);
+  } else {
+    for (int i = 0; i < 16; ++i)
+      anvil_wasm_model_world[index][i] = local[i];
+  }
+  anvil_wasm_model_resolving[index] = 2;
+}
+
+static double anvil_wasm_positive_remainder(double value, double period) {
+  if (value < period)
+    return value;
+  double multiple = period;
+  while (multiple <= value * 0.5 && multiple <= 8.988465674311579e307)
+    multiple *= 2.0;
+  while (multiple >= period) {
+    if (value >= multiple)
+      value -= multiple;
+    multiple *= 0.5;
+  }
+  return value;
+}
+
+static int anvil_wasm_model_pose(const double *nodes, int node_count,
+                                 const int *parents, const double *times,
+                                 const double *values, const int *tracks,
+                                 int track_count, double clip_length,
+                                 double clip_time) {
+  if (!nodes || !parents || !times || !values || !tracks || node_count <= 0 ||
+      node_count > ANVIL_WASM_MODEL_NODES || track_count <= 0 ||
+      !anvil_wasm_finite(clip_length) || !anvil_wasm_finite(clip_time))
+    return 0;
+  for (int node = 0; node < node_count; ++node) {
+    for (int i = 0; i < 3; ++i) {
+      anvil_wasm_model_local_t[node][i] = nodes[node * 10 + i];
+      anvil_wasm_model_local_r[node][i] = nodes[node * 10 + 3 + i];
+      anvil_wasm_model_local_s[node][i] = nodes[node * 10 + 7 + i];
+    }
+    anvil_wasm_model_local_r[node][3] = nodes[node * 10 + 6];
+  }
+  double time = 0.0;
+  if (clip_length > 0.0) {
+    double magnitude = fabs(clip_time);
+    time = anvil_wasm_positive_remainder(magnitude, clip_length);
+    if (clip_time < 0.0 && time > 0.0)
+      time = clip_length - time;
+  }
+  for (int i = 0; i < track_count; ++i) {
+    const int *track = tracks + i * 6;
+    int node = track[0];
+    int path = track[1];
+    int interpolation = track[2];
+    int first_time = track[3];
+    int first_value = track[4];
+    int count = track[5];
+    if (node < 0 || node >= node_count || path < 0 || path > 2 ||
+        (interpolation != 0 && interpolation != 1) || first_time < 0 ||
+        first_value < 0 || count <= 0)
+      return 0;
+    double sampled[4] = {0.0, 0.0, 0.0, 0.0};
+    anvil_wasm_track_sample(times, values, first_time, first_value, count,
+                            path, interpolation, time, sampled);
+    if (path == 0)
+      for (int k = 0; k < 3; ++k)
+        anvil_wasm_model_local_t[node][k] = sampled[k];
+    else if (path == 2)
+      for (int k = 0; k < 3; ++k)
+        anvil_wasm_model_local_s[node][k] = sampled[k];
+    else
+      for (int k = 0; k < 4; ++k)
+        anvil_wasm_model_local_r[node][k] = sampled[k];
+  }
+  for (int node = 0; node < node_count; ++node) {
+    anvil_wasm_model_resolving[node] = 0;
+    anvil_wasm_model_resolve(node, parents, 0);
+    if (anvil_wasm_model_resolving[node] != 2)
+      return 0;
+  }
+  return 1;
+}
+
+static double anvil_wasm_submit_animated_groups(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, const double *morph_deltas,
+    const double *group_defaults, const double *morph_weights, int model_id,
+    int morph_count, double x, double y, double z, double scale, double rx,
+    double ry, double rz, int ray_mesh) {
+  if (!anvil_scene_is_3d || !data || !groups || triangle_count <= 0 ||
+      group_count <= 0 || morph_count < 0 ||
+      morph_count > ANVIL_WASM_MORPH_TARGETS ||
+      (morph_count > 0 &&
+       (!morph_deltas || !group_defaults || !morph_weights)) ||
+      !anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
+      !anvil_wasm_finite(z) || !anvil_wasm_finite(scale) || scale == 0.0 ||
+      !anvil_wasm_finite(rx) || !anvil_wasm_finite(ry) ||
+      !anvil_wasm_finite(rz))
+    return 0.0;
+  size_t active_triangles = 0;
+  for (int group = 0; group < group_count; ++group) {
+    const int *entry = groups + (size_t)group * 3;
+    int node = entry[0], first = entry[1], count = entry[2];
+    if (node < 0 || node >= node_count || first < 0 || count < 0 ||
+        first > triangle_count || count > triangle_count - first)
+      return 0.0;
+    if (morph_count > 0) {
+      const double *defaults =
+          group_defaults + (size_t)group * (size_t)morph_count;
+      for (int target = 0; target < morph_count; ++target) {
+        if (!anvil_wasm_finite(defaults[target]) ||
+            !anvil_wasm_finite(morph_weights[target]))
+          return 0.0;
+      }
+    }
+    active_triangles += (size_t)count;
+  }
+  if (active_triangles == 0 ||
+      (ray_mesh &&
+       active_triangles >
+           (size_t)(ANVIL_WASM_RAY_MESH_TRIANGLE_BUDGET -
+                    anvil_wasm_ray_mesh_triangles_frame)))
+    return 0.0;
+  if (!anvil_wasm_model_pose(nodes, node_count, parents, times, values, tracks,
+                             track_count, clip_length, clip_time))
+    return 0.0;
+
+  anvil_mesh_culled_frame = 0;
+  anvil_mesh_drawn_frame = 0;
+  double weights[ANVIL_WASM_MORPH_TARGETS];
+  for (int group = 0; group < group_count; ++group) {
+    const int *entry = groups + (size_t)group * 3;
+    int node = entry[0], first = entry[1], count = entry[2];
+    if (count <= 0)
+      continue;
+    if (morph_count > 0) {
+      const double *defaults =
+          group_defaults + (size_t)group * (size_t)morph_count;
+      for (int target = 0; target < morph_count; ++target)
+        weights[target] =
+            model_id >= 0 && model_id < ANVIL_WASM_MODEL_STATES &&
+                    anvil_wasm_morph_overridden[model_id][target]
+                ? morph_weights[target]
+                : defaults[target];
+    }
+    const double *matrix = anvil_wasm_model_world[node];
+    for (int triangle = first; triangle < first + count; ++triangle) {
+      const double *source = data + (size_t)triangle * 12;
+      AnvilWasmVec3 points[3];
+      for (int vertex = 0; vertex < 3; ++vertex) {
+        double position[3];
+        double px = source[vertex * 3];
+        double py = source[vertex * 3 + 1];
+        double pz = source[vertex * 3 + 2];
+        if (morph_count > 0) {
+          size_t vertex_index = (size_t)triangle * 3 + (size_t)vertex;
+          for (int target = 0; target < morph_count; ++target) {
+            const double *delta =
+                morph_deltas +
+                (vertex_index * (size_t)morph_count + (size_t)target) * 3;
+            px += delta[0] * weights[target];
+            py += delta[1] * weights[target];
+            pz += delta[2] * weights[target];
+          }
+        }
+        anvil_wasm_mat_point(matrix, px, py, pz, position);
+        AnvilWasmVec3 local = {position[0] * scale, position[1] * scale,
+                               position[2] * scale};
+        local = anvil_wasm_rotate(local, rx, ry, rz);
+        points[vertex] =
+            (AnvilWasmVec3){x + local.x, y + local.y, z + local.z};
+      }
+      int red = (int)source[9], green = (int)source[10], blue = (int)source[11];
+      AnvilWasmVec3 normal = anvil_wasm_normalize(
+          anvil_wasm_cross(anvil_wasm_sub(points[1], points[0]),
+                           anvil_wasm_sub(points[2], points[0])));
+      anvil_wasm_triangle(points[0], points[1], points[2], normal, red, green,
+                          blue, 255, 0.0, 0);
+      anvil_wasm_shadow_triangle(points[0], points[1], points[2]);
+      anvil_mesh_drawn_frame += 1;
+    }
+  }
+  if (ray_mesh)
+    anvil_wasm_ray_mesh_triangles_frame += (int)active_triangles;
+  return 1.0;
+}
+
+double anvil_mesh_draw_animated(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, const double *morph_deltas,
+    const double *group_defaults, const double *morph_weights, int model_id,
+    int morph_count, double x, double y, double z, double scale, double rx,
+    double ry, double rz) {
+  return anvil_wasm_submit_animated_groups(
+      data, triangle_count, nodes, node_count, parents, groups, group_count,
+      times, values, tracks, track_count, clip_length, clip_time, morph_deltas,
+      group_defaults, morph_weights, model_id, morph_count, x, y, z, scale, rx,
+      ry, rz, 0);
+}
+
+double anvil_trace_mesh_animated(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, const double *morph_deltas,
+    const double *group_defaults, const double *morph_weights, int model_id,
+    int morph_count, double x, double y, double z, double scale, double rx,
+    double ry, double rz) {
+  return anvil_wasm_submit_animated_groups(
+      data, triangle_count, nodes, node_count, parents, groups, group_count,
+      times, values, tracks, track_count, clip_length, clip_time, morph_deltas,
+      group_defaults, morph_weights, model_id, morph_count, x, y, z, scale, rx,
+      ry, rz, 1);
 }
 
 /* ---- Images, baked at compile time --------------------------------------

@@ -21,6 +21,7 @@ COMPILER = ROOT / "compiler" / "anvil.py"
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from test_gltf_animation import run_poses, tempfile_dir  # noqa: E402
+from compiler import gltf  # noqa: E402
 
 
 def write_morph_model(root: pathlib.Path, name: str, *, defaults: tuple[float, ...] = (0.0,)) -> None:
@@ -62,6 +63,24 @@ def write_morph_model(root: pathlib.Path, name: str, *, defaults: tuple[float, .
         ],
     }
     (root / name).write_text(json.dumps(document, indent=1), encoding="utf-8")
+
+
+def write_morph_glb(root: pathlib.Path, name: str, document: dict) -> pathlib.Path:
+    binary = (root / "morph.bin").read_bytes()
+    document = json.loads(json.dumps(document))
+    document["buffers"] = [{"byteLength": len(binary)}]
+    json_chunk = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    json_chunk += b" " * ((-len(json_chunk)) % 4)
+    binary_chunk = binary + b"\0" * ((-len(binary)) % 4)
+    total = 12 + 8 + len(json_chunk) + 8 + len(binary_chunk)
+    contents = bytearray(b"glTF" + struct.pack("<II", 2, total))
+    contents.extend(struct.pack("<II", len(json_chunk), 0x4E4F534A))
+    contents.extend(json_chunk)
+    contents.extend(struct.pack("<II", len(binary_chunk), 0x004E4942))
+    contents.extend(binary_chunk)
+    path = root / name
+    path.write_bytes(contents)
+    return path
 
 
 SCAN = [
@@ -146,6 +165,85 @@ def run_headless(case: unittest.TestCase, root: pathlib.Path, program: str) -> s
 
 
 class GltfMorphTests(unittest.TestCase):
+    def test_import_rejects_non_finite_morph_deltas(self) -> None:
+        with tempfile_dir() as root:
+            model = root / "non_finite.gltf"
+            write_morph_model(root, model.name)
+            binary = bytearray((root / "morph.bin").read_bytes())
+            struct.pack_into("<f", binary, 42, float("nan"))
+            (root / "morph.bin").write_bytes(binary)
+
+            with self.assertRaisesRegex(
+                gltf.ModelError, "morph target contains a non-finite value"
+            ):
+                gltf.load_morphed(model)
+
+    def test_mesh_groups_keep_their_own_default_weights(self) -> None:
+        with tempfile_dir() as root:
+            base = root / "base.gltf"
+            write_morph_model(root, base.name, defaults=(0.0,))
+            document = json.loads(base.read_text(encoding="utf-8"))
+            second_mesh = json.loads(json.dumps(document["meshes"][0]))
+            second_mesh["weights"] = [1.0]
+            document["meshes"].append(second_mesh)
+            document["nodes"] = [
+                {"mesh": 0, "translation": [-3, 0, 0]},
+                {"mesh": 1, "translation": [3, 0, 0]},
+            ]
+            document["scenes"][0]["nodes"] = [0, 1]
+            model = write_morph_glb(root, "per-mesh.glb", document)
+            per_mesh = run_poses(self, root, draw_only_program(model.name))
+            override_program = draw_only_program(model.name).replace(
+                f'    set var(ok) = model_draw("{model.name}", 0, 0, 0, 1, 0, 0, 0)',
+                f'    set var(prev) = model_morph("{model.name}", 0, 0)\n'
+                f'    set var(ok) = model_draw("{model.name}", 0, 0, 0, 1, 0, 0, 0)',
+            )
+            overridden = run_poses(self, root, override_program)
+
+            second_mesh["weights"] = [0.0]
+            document["meshes"][1] = second_mesh
+            baseline = write_morph_glb(root, "same-default.glb", document)
+            same_default = run_poses(
+                self, root, draw_only_program(baseline.name)
+            )
+
+        def span(output: list[str]) -> int:
+            line = next(line for line in output if line.startswith("box "))
+            minimum, maximum = (int(value) for value in line[4:].split(","))
+            return maximum - minimum
+
+        self.assertGreater(span(per_mesh) - span(same_default), 80)
+        self.assertLessEqual(abs(span(overridden) - span(same_default)), 5)
+
+    def test_node_weights_override_mesh_defaults_per_instance(self) -> None:
+        with tempfile_dir() as root:
+            base = root / "base.gltf"
+            write_morph_model(root, base.name, defaults=(0.25,))
+            document = json.loads(base.read_text(encoding="utf-8"))
+            document["nodes"] = [
+                {"mesh": 0, "weights": [0.0]},
+                {"mesh": 0, "weights": [1.0]},
+            ]
+            document["scenes"][0]["nodes"] = [0, 1]
+            model = write_morph_glb(root, "per-node.glb", document)
+            per_node = run_poses(self, root, draw_only_program(model.name))
+
+            document["nodes"][1]["weights"] = [0.0]
+            baseline = write_morph_glb(root, "same-node-default.glb", document)
+            same_default = run_poses(
+                self, root, draw_only_program(baseline.name)
+            )
+
+        def span(output: list[str]) -> int:
+            line = next(line for line in output if line.startswith("box "))
+            minimum, maximum = (int(value) for value in line[4:].split(","))
+            return maximum - minimum
+
+        self.assertGreater(
+            span(per_node) - span(same_default), 80,
+            (per_node, same_default, span(per_node), span(same_default)),
+        )
+
     def test_the_weight_scales_the_delta(self) -> None:
         with tempfile_dir() as root:
             write_morph_model(root, "morph.gltf")

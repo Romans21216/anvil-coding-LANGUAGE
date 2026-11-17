@@ -317,6 +317,42 @@ void anvil_trace_sphere(double x, double y, double z, double radius, int r,
 double anvil_mesh_draw(const double *data, int triangle_count, double cx,
                        double cy, double cz, double radius, double x, double y,
                        double z, double scale, double rx, double ry, double rz);
+double anvil_mesh_draw_morphed_groups(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const int *groups, int group_count, const double *group_defaults,
+    const double *current_weights, int model_id, int morph_count, double x,
+    double y, double z, double scale, double rx, double ry, double rz);
+double anvil_model_animate(int id, double seconds);
+double anvil_model_clock(int id);
+double anvil_mesh_draw_animated(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, const double *morph_deltas,
+    const double *group_defaults, const double *morph_weights, int model_id,
+    int morph_count, double x, double y, double z, double scale, double rx,
+    double ry, double rz);
+double anvil_trace_mesh(const double *data, int triangle_count, double cx,
+                        double cy, double cz, double radius, double x, double y,
+                        double z, double scale, double rx, double ry, double rz);
+const double *anvil_model_morph_weights(int id, const double *defaults,
+                                        int count);
+double anvil_model_morph(int id, int index, double weight,
+                         const double *defaults, int count);
+double anvil_trace_mesh_morphed_groups(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const int *groups, int group_count, const double *group_defaults,
+    const double *current_weights, int model_id, int morph_count, double cx,
+    double cy, double cz, double radius, double x, double y, double z,
+    double scale, double rx, double ry, double rz);
+double anvil_trace_mesh_animated(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, const double *morph_deltas,
+    const double *group_defaults, const double *morph_weights, int model_id,
+    int morph_count, double x, double y, double z, double scale, double rx,
+    double ry, double rz);
 double anvil_mesh_drawn(void);
 double anvil_mesh_culled(void);
 double anvil_mesh_culling(double on);

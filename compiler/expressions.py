@@ -883,11 +883,6 @@ class ExpressionParser:
                     f"{self.path}:{self.line}: ray_mesh does not support skinned "
                     "meshes yet"
                 )
-            if value == "model_draw" and model.get("animated") and model.get("morph_count"):
-                raise CompileError(
-                    f"{self.path}:{self.line}: model_draw does not support morph "
-                    "targets on animated models yet"
-                )
             mesh_args = []
             for _ in range(7):
                 self.expect(",")
@@ -911,23 +906,27 @@ class ExpressionParser:
                         f"anvil_model_clock({model['id']}), "
                         + (
                             f"(const double *){symbol}_morph, "
+                            f"(const double *){symbol}_morph_default, "
                             f"anvil_model_morph_weights({model['id']}, "
                             f"(const double *){symbol}_morph_default, "
-                            f"{model['morph_count']}), {model['morph_count']}, "
+                            f"{model['morph_count']}), {model['id']}, "
+                            f"{model['morph_count']}, "
                             if model.get("morph_count")
-                            else "NULL, NULL, 0, "
+                            else "NULL, NULL, NULL, -1, 0, "
                         )
                         + f"{placement})"
                     )
                 elif model.get("morph_count"):
                     morph_count = model["morph_count"]
                     call = (
-                        f"anvil_trace_mesh_morphed((const double *){symbol}, "
+                        f"anvil_trace_mesh_morphed_groups((const double *){symbol}, "
                         f"{count}, (const double *){symbol}_morph, "
+                        f"(const int *){symbol}_morph_groups, "
+                        f"{len(model['morph_groups']) // 2}, "
                         f"(const double *){symbol}_morph_default, "
                         f"anvil_model_morph_weights({model['id']}, "
                         f"(const double *){symbol}_morph_default, {morph_count}), "
-                        f"{morph_count}, "
+                        f"{model['id']}, {morph_count}, "
                         + ", ".join(f"{item:.6g}" for item in bounds)
                         + f", {placement})"
                     )
@@ -948,12 +947,17 @@ class ExpressionParser:
                     f"{model['length']:.6g}, anvil_model_clock({model['id']}), "
                     f"{placement})"
                 )
-            elif model.get("morph_count"):
+            elif model.get("morph_count") and not model.get("animated"):
                 call = (
-                    f"anvil_mesh_draw_morphed((const double *){symbol}, {count}, "
-                    f"(const double *){symbol}_morph, {model['morph_count']}, "
+                    f"anvil_mesh_draw_morphed_groups((const double *){symbol}, {count}, "
+                    f"(const double *){symbol}_morph, "
+                    f"(const int *){symbol}_morph_groups, "
+                    f"{len(model['morph_groups']) // 2}, "
+                    f"(const double *){symbol}_morph_default, "
                     f"anvil_model_morph_weights({model['id']}, "
-                    f"(const double *){symbol}_morph_default, {model['morph_count']}), "
+                    f"(const double *){symbol}_morph_default, "
+                    f"{model['morph_count']}), {model['id']}, "
+                    f"{model['morph_count']}, "
                     f"{placement})"
                 )
             elif model.get("animated"):
@@ -966,7 +970,18 @@ class ExpressionParser:
                     f"{len(model['groups']) // 3}, (const double *){symbol}_times, "
                     f"(const double *){symbol}_values, (const int *){symbol}_tracks, "
                     f"{len(model['tracks']) // 6}, {model['length']:.6g}, "
-                    f"anvil_model_clock({model['id']}), {placement})"
+                    f"anvil_model_clock({model['id']}), "
+                    + (
+                        f"(const double *){symbol}_morph, "
+                        f"(const double *){symbol}_morph_default, "
+                        f"anvil_model_morph_weights({model['id']}, "
+                        f"(const double *){symbol}_morph_default, "
+                        f"{model['morph_count']}), {model['id']}, "
+                        f"{model['morph_count']}, "
+                        if model.get("morph_count")
+                        else "NULL, NULL, NULL, -1, 0, "
+                    )
+                    + f"{placement})"
                 )
             else:
                 call = (
