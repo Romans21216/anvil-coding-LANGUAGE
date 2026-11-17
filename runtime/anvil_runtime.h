@@ -93,6 +93,11 @@ double anvil_tilemap_get(double handle, double column, double row);
 double anvil_tilemap_fill(double handle, double tile);
 double anvil_tilemap_area(double handle, double tile, double column, double row,
                           double columns, double rows);
+double anvil_tilemap_solid(double handle, double tile, double on);
+double anvil_tilemap_is_solid(double handle, double tile);
+double anvil_tilemap_cell(double handle, double x, double y, double scale);
+double anvil_tilemap_collide(double handle, double x, double y, double width,
+                             double height, double scale);
 double anvil_tilemap_draw(double handle, double x, double y, double scale);
 const char *anvil_tilemap_error(void);
 

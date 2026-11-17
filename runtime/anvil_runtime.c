@@ -1694,6 +1694,7 @@ typedef struct {
   int tiles;
   int tiles_per_row;
   int *cells;
+  unsigned char *solid; /* bitset of solid tile indices, allocated on demand */
 } AnvilTilemap;
 
 static AnvilTilemap anvil_tilemaps[ANVIL_TILEMAPS];
@@ -1794,6 +1795,7 @@ double anvil_tilemap_free(double handle) {
   if (!map)
     return 0.0;
   free(map->cells);
+  free(map->solid);
   uint32_t generation = map->generation;
   memset(map, 0, sizeof(*map));
   map->generation = generation;
@@ -1869,6 +1871,105 @@ double anvil_tilemap_area(double handle, double tile, double column, double row,
     for (int x = x0; x < x1; ++x)
       map->cells[(size_t)y * (size_t)map->columns + (size_t)x] = (int)tile;
   return 1.0;
+}
+
+/* Solid tiles are a per-map bitset, allocated the first time a map marks one,
+   so a map that never collides costs nothing. */
+static int anvil_tilemap_solid_ensure(AnvilTilemap *map) {
+  if (map->solid)
+    return 1;
+  if (map->tiles > 1000000) {
+    anvil_tilemap_error_text =
+        "the tileset has too many tiles to mark solid (over 1,000,000)";
+    return 0;
+  }
+  size_t bytes = ((size_t)map->tiles + 7u) / 8u;
+  map->solid = (unsigned char *)calloc(bytes ? bytes : 1u, 1u);
+  if (!map->solid) {
+    anvil_tilemap_error_text = "there is not enough memory for the solid map";
+    return 0;
+  }
+  return 1;
+}
+
+double anvil_tilemap_solid(double handle, double tile, double on) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !anvil_tilemap_tile_ok(map, tile) ||
+      tile == (double)ANVIL_TILEMAP_EMPTY)
+    return 0.0;
+  if (!anvil_tilemap_solid_ensure(map))
+    return 0.0;
+  int index = (int)tile;
+  if (on != 0.0)
+    map->solid[index >> 3] |= (unsigned char)(1u << (index & 7));
+  else
+    map->solid[index >> 3] &= (unsigned char)~(1u << (index & 7));
+  return 1.0;
+}
+
+double anvil_tilemap_is_solid(double handle, double tile) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !anvil_tilemap_tile_ok(map, tile) ||
+      tile == (double)ANVIL_TILEMAP_EMPTY || !map->solid)
+    return 0.0;
+  int index = (int)tile;
+  return ((map->solid[index >> 3] >> (index & 7)) & 1u) ? 1.0 : 0.0;
+}
+
+/* The tile under a world point, using the placement rule of
+   tilemap_draw(map, 0, 0, scale): cells are tile_w*scale wide. */
+double anvil_tilemap_cell(double handle, double x, double y, double scale) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !isfinite(x) || !isfinite(y) || !isfinite(scale) || scale <= 0.0)
+    return -1.0;
+  if (x < 0.0 || y < 0.0)
+    return -1.0;
+  double step_x = (double)map->tile_w * scale;
+  double step_y = (double)map->tile_h * scale;
+  double column = floor(x / step_x);
+  double row = floor(y / step_y);
+  if (column >= (double)map->columns || row >= (double)map->rows)
+    return -1.0;
+  return (double)map->cells[(size_t)row * (size_t)map->columns + (size_t)column];
+}
+
+/* Does the world-space rectangle [x, x+width) x [y, y+height) touch a solid
+   cell? The map is treated as drawn at the origin with `scale`, exactly like
+   tilemap_draw(map, 0, 0, scale), so world coordinates are the same ones the
+   draws use. Returns 1 on a hit and 0 otherwise. */
+double anvil_tilemap_collide(double handle, double x, double y, double width,
+                             double height, double scale) {
+  AnvilTilemap *map = anvil_tilemap_from_handle(handle);
+  if (!map || !isfinite(x) || !isfinite(y) || !isfinite(width) ||
+      !isfinite(height) || !isfinite(scale) || scale <= 0.0 || width <= 0.0 ||
+      height <= 0.0 || !map->solid)
+    return 0.0;
+  double step_x = (double)map->tile_w * scale;
+  double step_y = (double)map->tile_h * scale;
+  double left = floor(x / step_x);
+  double right = ceil((x + width) / step_x) - 1.0;
+  double top = floor(y / step_y);
+  double bottom = ceil((y + height) / step_y) - 1.0;
+  if (left < 0.0)
+    left = 0.0;
+  if (top < 0.0)
+    top = 0.0;
+  if (right > (double)(map->columns - 1))
+    right = (double)(map->columns - 1);
+  if (bottom > (double)(map->rows - 1))
+    bottom = (double)(map->rows - 1);
+  if (left > right || top > bottom)
+    return 0.0;
+  for (int row = (int)top; row <= (int)bottom; ++row) {
+    for (int column = (int)left; column <= (int)right; ++column) {
+      int tile = map->cells[(size_t)row * (size_t)map->columns + (size_t)column];
+      if (tile < 0 || tile >= map->tiles)
+        continue;
+      if ((map->solid[tile >> 3] >> (tile & 7)) & 1u)
+        return 1.0;
+    }
+  }
+  return 0.0;
 }
 
 double anvil_tilemap_draw(double handle, double x, double y, double scale) {

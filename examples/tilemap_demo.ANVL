@@ -25,8 +25,21 @@ set var(ok) = tilemap_set(var(map), 15, 3, 4)
 set var(ok) = tilemap_set(var(map), 4, 8, 4)
 set var(ok) = tilemap_set(var(map), 15, 8, 4)
 
+# Collision: the stone path is solid, water is not. Two probes are drawn at
+# map-local coordinates (the map itself is drawn 24 px lower) and coloured by
+# the query result.
+set var(ok) = tilemap_solid(var(map), 3, 1)
+
 fn(draw)
   display rect(0, 0, 960, 600) -rgba(9, 12, 20, 255)
   set var(drawn) = tilemap_draw(var(map), 0, 24, 3)
+  set var(on_stone) = tilemap_collide(var(map), 432, 144, 18, 18, 3)
+  set var(on_water) = tilemap_collide(var(map), 96, 432, 18, 18, 3)
+  if var(on_stone) = 1
+    display rect(432, 168, 18, 18) -rgba(214, 92, 82, 255)
+  end
+  if var(on_water) = 0
+    display rect(96, 456, 18, 18) -rgba(96, 196, 128, 255)
+  end
   display text("Anvil tilemap  20 x 12 cells  3x") -l(12, 4) -rgb(196, 210, 236)
 end

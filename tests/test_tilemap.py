@@ -169,6 +169,69 @@ class TilemapApiTests(unittest.TestCase):
             self.assertEqual(lines[21], "0")
 
 
+COLLISION_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        '  set var(sheet) = image_load("tiles.bmp")',
+        "  set var(map) = tilemap_new(var(sheet), 8, 8, 4, 3)",
+        "  say tilemap_fill(var(map), 0)",
+        "  say tilemap_set(var(map), 1, 1, 2)",
+        # Nothing is solid yet, so the query over the future-solid cell misses.
+        "  say tilemap_collide(var(map), 16, 16, 8, 8, 2)",
+        "  say tilemap_solid(var(map), 2, 1)",
+        "  say tilemap_is_solid(var(map), 2)",
+        "  say tilemap_is_solid(var(map), 0)",
+        "  say tilemap_solid(var(map), -1, 1)",
+        "  say tilemap_solid(var(map), 9, 1)",
+        "  say tilemap_solid(var(map), 3, 1)",
+        "  say tilemap_is_solid(var(map), 3)",
+        "  say tilemap_solid(var(map), 3, 0)",
+        "  say tilemap_is_solid(var(map), 3)",
+        '  say "cell " & tilemap_cell(var(map), 20, 20, 2)',
+        '  say "cell " & tilemap_cell(var(map), 0, 0, 2)',
+        '  say "cell " & tilemap_cell(var(map), 80, 20, 2)',
+        '  say "cell " & tilemap_cell(var(map), -1, 20, 2)',
+        "  say tilemap_collide(var(map), 16, 16, 8, 8, 2)",
+        "  say tilemap_collide(var(map), 0, 0, 8, 8, 2)",
+        "  say tilemap_collide(var(map), 8, 20, 16, 8, 2)",
+        "  say tilemap_collide(var(map), 20, 20, 0, 8, 2)",
+        "  say tilemap_collide(var(map), 16, 16, 8, 8, 0)",
+        "  say tilemap_free(var(map))",
+        "  say tilemap_collide(var(map), 16, 16, 8, 8, 2)",
+        '  say "cell " & tilemap_cell(var(map), 20, 20, 2)',
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+EXPECTED_COLLISION = [
+    "1",   # fill
+    "1",   # set
+    "0",   # nothing is solid yet
+    "1",   # solid(2, 1)
+    "1",   # is_solid(2)
+    "0",   # is_solid(0)
+    "0",   # solid(-1, 1): the empty tile cannot be solid
+    "0",   # solid(9, 1): the sheet holds four tiles
+    "1",   # solid(3, 1)
+    "1",   # is_solid(3)
+    "1",   # solid(3, 0)
+    "0",   # is_solid(3) after clearing
+    "cell 2",
+    "cell 0",
+    "cell -1",
+    "cell -1",
+    "1",
+    "0",
+    "1",
+    "0",
+    "0",
+    "1",
+    "0",
+    "cell -1",
+]
+
 class TilemapDrawTests(unittest.TestCase):
     def test_cells_land_on_the_expected_pixels(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -220,6 +283,42 @@ class TilemapDrawTests(unittest.TestCase):
             self.assertEqual(values["edge-b"] & 0xFFFFFF, GREEN)
             # Nothing was drawn past the 3x2 grid (black, opaque after capture).
             self.assertEqual(values["outside"] & 0xFFFFFF, 0)
+
+
+class TilemapCollisionTests(unittest.TestCase):
+    def test_solid_tiles_and_collision_queries(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            executable = build(root, COLLISION_PROGRAM, "collision")
+            run = subprocess.run(
+                [str(executable)], cwd=root, capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines(), EXPECTED_COLLISION)
+
+    def test_wasm_refuses_tilemap_collision(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            source = root / "refuse.ANVL"
+            source.write_text("\n".join((
+                "scene 2d",
+                "clear rgba(0, 0, 0, 255)",
+                "set var(map) = tilemap_collide(0, 0, 0, 8, 8, 1)",
+                "fn(draw)",
+                "  display rect(0, 0, 40, 40) -rgb(255, 0, 0)",
+                "end",
+                "",
+            )), encoding="utf-8")
+            build = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--backend", "wasm",
+                 "-o", str(root / "refuse.wasm")],
+                capture_output=True, text=True, timeout=180,
+            )
+            self.assertNotEqual(build.returncode, 0)
+            combined = build.stdout + build.stderr
+            self.assertIn("'tilemap_collide' is not available in the wasm backend yet", combined)
+            self.assertIn(":3:", combined)
+
 
 
 if __name__ == "__main__":

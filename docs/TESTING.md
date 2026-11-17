@@ -99,9 +99,11 @@ remote desktop can prevent window creation:
   delay until `pressed(A)` fires; interactive, kept to a few presses.
 - `test_memory_builtins` — loads images and a WAV and asserts the exact byte
   counts from `memory_images`/`memory_audio`/`memory_video`/`memory_total`.
-- `test_tilemap` — a headless API test (bounds, fill/area, set/get, free,
-  stale handles, invalid tiles) plus a pixel test that draws a 3x2 map at 4x,
-  captures the frame and reads back each cell and the cell boundary.
+- `test_tilemap` — headless API tests (bounds, fill/area, set/get, free,
+  stale handles, invalid tiles; solid marking, `tilemap_cell` lookups and
+  `tilemap_collide` AABB hits/misses including a zero-size rectangle and a
+  zero scale) plus a pixel test that draws a 3x2 map at 4x, captures the frame
+  and reads back each cell and the cell boundary.
 - `test_memory_report` — builds a headless `fn(main)` program that loads an
   image and a WAV, asserts `memory_report()` names the exact `file:line` and
   byte counts of each live resource, that destroying the image drops it from
