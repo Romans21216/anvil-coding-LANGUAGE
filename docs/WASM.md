@@ -74,6 +74,10 @@ Supported today:
 - music: `music_load`, `music_play`, `music_play_loop`, `music_stop`,
   `music_playing`, `music_volume`, `music_position`, `music_length`,
   `music_error` (one literal track, baked at build time)
+- physics: `body_create`, `body_create_box`, `body_destroy`, `body_active`,
+  `body_x/y/vx/vy`, `body_set_velocity`, `body_force`, `body_restitution`,
+  `body_friction`, `body_collision`, `physics_capacity`, `physics_gravity`,
+  `physics_step`
 - saves: `save_number`, `load_number`, `save_text`, `load_text`,
   `save_exists`, `save_delete`, `save_error`
 
@@ -215,6 +219,15 @@ the C runtime.
 
 Not implemented yet: 4-bit BMPs and any image loaded through a non-literal
 path.
+
+## Physics
+
+The 2D physics solver is ported from the C runtime rather than reimplemented:
+the same circle/box contact tests, four solver iterations, default gravity of
+-9.81, restitution and friction bounds and the same handle encoding, so a scene
+that settles on the desktop settles identically in the browser. The only shim
+additions it needed were `isfinite` and `hypot`. The capability matrix's
+`physics-body` case now runs on C and wasm, which is how that parity is checked.
 
 ## Music
 

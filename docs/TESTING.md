@@ -120,7 +120,7 @@ remote desktop can prevent window creation:
   compared against the C backend, baked sprites and atlas regions through
   recorded draw streams, baked sounds through recorded play ops including loop, pan, pitch and group routing,
   3D cubes/planes/spheres, baked glTF models, shadows and culling through
-  recorded triangle summaries, a baked music track through recorded music ops, and source-mapped traps), checks the generated host
+  recorded triangle summaries, a baked music track through recorded music ops, source-mapped traps, and 2D physics parity against the C backend), checks the generated host
   page, and asserts located refusals.
 - `test_particles` — argument validation, the 4,096-particle bound, clear
   counts, and window pixels for a fresh and fading particle.

@@ -19,6 +19,6 @@ output matches the expected text exactly.
 | `math-builtins` | `runs` | `runs` | `runs` |
 | `noise` | `runs` | `runs` | `runs` |
 | `image-load` | `runs` | `rejected`: case.ANVL:2: image_load() is not available in the native x64 backend yet; build with --backend c | `runs` |
-| `physics-body` | `runs` | `rejected`: case.ANVL:2: body_create() is not available in the native x64 backend yet; build with --backend c | `rejected`: case.ANVL:3: 'body_active' is not available in the wasm backend yet |
+| `physics-body` | `runs` | `rejected`: case.ANVL:2: body_create() is not available in the native x64 backend yet; build with --backend c | `runs` |
 
-Summary: 12 of 14 cases run on all three backends; 12 run on C and native, 13 on C and WASM.
+Summary: 12 of 14 cases run on all three backends; 12 run on C and native, 14 on C and WASM.

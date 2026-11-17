@@ -29,6 +29,9 @@ void exit(int code);
 
 /* Wasm instructions back these, so no libm is required. */
 static inline double fabs(double value) { return __builtin_fabs(value); }
+static inline double hypot(double a, double b) {
+  return __builtin_sqrt(a * a + b * b);
+}
 static inline double floor(double value) { return __builtin_floor(value); }
 static inline double ceil(double value) { return __builtin_ceil(value); }
 static inline double sqrt(double value) { return __builtin_sqrt(value); }
@@ -146,6 +149,24 @@ int anvil_str_contains(const char *source, const char *needle);
 int anvil_str_starts(const char *source, const char *prefix);
 double anvil_list_get(const double *values, int index, double count,
                       const char *path, int line);
+
+double anvil_body_create(double x, double y, double radius, double mass);
+double anvil_body_create_box(double x, double y, double width, double height,
+                             double mass);
+double anvil_body_destroy(double handle);
+double anvil_body_active(double handle);
+double anvil_body_x(double handle);
+double anvil_body_y(double handle);
+double anvil_body_vx(double handle);
+double anvil_body_vy(double handle);
+double anvil_body_set_velocity(double handle, double vx, double vy);
+double anvil_body_force(double handle, double force_x, double force_y);
+double anvil_body_restitution(double handle, double restitution);
+double anvil_body_friction(double handle, double friction);
+double anvil_body_collision(double first, double second);
+double anvil_physics_capacity(double requested_capacity);
+double anvil_physics_gravity(double x, double y);
+double anvil_physics_step(void);
 int anvil_str_ends(const char *source, const char *suffix);
 
 /* Perlin-style noise and character conversion, matching the C runtime. */

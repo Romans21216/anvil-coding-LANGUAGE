@@ -133,9 +133,9 @@ class WasmRejectionTests(unittest.TestCase):
     def test_unsupported_builtins_name_the_call_site(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
-            result, _ = build(root, "fn(main)\n  say body_create(0, 0, 1, 1)\nend\ncall fn(main)\n")
+            result, _ = build(root, "fn(main)\n  say window_on_top(1)\nend\ncall fn(main)\n")
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("'body_create' is not available in the wasm backend yet", result.stderr)
+            self.assertIn("'window_on_top' is not available in the wasm backend yet", result.stderr)
             self.assertIn(":2:", result.stderr)
 
 
@@ -1459,6 +1459,66 @@ class WasmSourceMapTests(unittest.TestCase):
             self.assertNotEqual(run.returncode, 0)
             self.assertIn("Anvil runtime error in fn(update) at line 4", run.stderr)
             self.assertIn("Anvil chr out of range", run.stderr)
+
+
+
+_PHYSICS_PROGRAM = "\n".join(
+    (
+        "fn(main)",
+        "  set var(b) = body_create(0, 10, 0.5, 1)",
+        "  set var(f) = body_create_box(0, 0, 10, 1, 0)",
+        "  set var(i) = 0",
+        "  set var(c) = 0",
+        "  while var(i) < 180",
+        "    set var(s) = physics_step()",
+        "    set var(c) = compute(var(c) + var(s))",
+        "    set var(i) = compute(var(i) + 1)",
+        "  end",
+        "  say round(body_x(var(b)) * 1000)",
+        "  say round(body_y(var(b)) * 1000)",
+        "  say round(body_vy(var(b)) * 1000)",
+        '  say var(c)',
+        "end",
+        "call fn(main)",
+        "",
+    )
+)
+
+
+@unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
+class WasmPhysicsTests(unittest.TestCase):
+    def test_a_body_rests_on_a_static_box_like_the_c_backend(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            result, out = build(root, _PHYSICS_PROGRAM)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), str(out)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout.splitlines(), ["0", "1000", "0", "99"])
+
+            executable = root / "program.exe"
+            compiled = subprocess.run(
+                [
+                    sys.executable,
+                    str(COMPILER),
+                    str(root / "program.ANVL"),
+                    "-o",
+                    str(executable),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            native = subprocess.run(
+                [str(executable)], capture_output=True, text=True, timeout=60
+            )
+            self.assertEqual(native.stdout, run.stdout)
 
 
 if __name__ == "__main__":

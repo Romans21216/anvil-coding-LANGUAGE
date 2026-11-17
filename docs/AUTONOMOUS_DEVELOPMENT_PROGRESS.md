@@ -748,3 +748,9 @@ This is a historical batch log. Each entry describes the state at that batch, in
 - **Measured:** images 131,072 B (8 x 64 x 64 x 4), audio 576,000 B (two mono 8 kHz clips resampled to 48 kHz stereo), video 2,304,000 B; runtime peak 5.2 MB with the assets live, against 1.9 MB without the wait — the wait is what makes the peak visible, which is worth knowing when reading the number.
 - **Budgets:** `tools/mem_budgets.json` now records exact byte budgets for the asset counters alongside the per-scene RSS budgets, and `--check` fails if a load leaks or a size changes.
 - **Tests:** `tests/test_memory_budget.py` asserts the exact image and video bytes, a positive audio count, and that destroying one image and one sound reduces each counter. 4 passed.
+
+## Batch 71 — 2D physics in wasm (8.12)
+
+- **Port, not reimplementation:** the wasm runtime now carries the C runtime's 2D solver — circle and axis-aligned box bodies, the same contact tests, four solver iterations, -9.81 default gravity, restitution/friction bounds, the same generational handle encoding and the same 1,000,000-unit coordinate and speed clamps. Reimplementing it would have meant two solvers drifting apart.
+- **Shim additions:** `isfinite` (bit-free comparison form) and `hypot` (sqrt of the sum of squares) were the only missing pieces; `uint64_t`/`uint32_t` uses became plain unsigned types and `UINT32_MAX` a literal.
+- **Verified:** a circle dropped from y = 10 onto a static box at 180 fixed steps comes to rest at y = 1.000 with vy = 0 and 99 contact reports on both backends, byte for byte. The capability matrix now reports all 14 cases running on C and wasm (12 on all three, because native still refuses `image-load` and `physics-body`). `tests/test_wasm.py` asserts the parity program against the C build; 40 passed.

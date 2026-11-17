@@ -115,6 +115,22 @@ ALLOWED_BUILTINS = {
     "music_position",
     "music_length",
     "music_error",
+    "body_create",
+    "body_create_box",
+    "body_destroy",
+    "body_active",
+    "body_x",
+    "body_y",
+    "body_vx",
+    "body_vy",
+    "body_set_velocity",
+    "body_force",
+    "body_restitution",
+    "body_friction",
+    "body_collision",
+    "physics_capacity",
+    "physics_gravity",
+    "physics_step",
 }
 
 ENGINE_STATEMENT = re.compile(r"^\s*engine\b", re.MULTILINE)
