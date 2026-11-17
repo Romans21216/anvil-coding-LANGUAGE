@@ -210,8 +210,14 @@ has polygonal silhouettes and facet lighting.
 and animated unskinned models, including morph targets. Per-group glTF defaults
 are preserved and `model_morph(path,index,weight)` overrides that target for every
 group. Morph deltas are applied before the animated node transform and the
-placement transform; culling is skipped for animated or morphed models because
-the baked rest-pose bounds do not contain all poses. Both calls use the same WebGL depth-tested triangle path, which resolves
+placement transform. Static morph groups use conservative bounds spanning
+defaults and all supported 0–1 overrides; animated models bypass culling. For
+separate morph states, use `model_instance(path)`,
+`model_instance_morph(path,handle,index,weight)`,
+`model_draw_instance(path,handle,x,y,z,scale,rx,ry,rz)` and
+`model_instance_destroy(path,handle)`. The 64 generation-checked handles are
+available in both C and wasm; each must match the asset path used to create it.
+All model draw calls use the same WebGL depth-tested triangle path, which resolves
 overlapping mesh depth per pixel in the browser. `model_draw` and `ray_mesh`
 share a 16,384-triangle frame budget across
 static and animated submissions; each call is accepted whole or rejected before
@@ -386,7 +392,7 @@ identical.
   resolved by the browser build. 4-bit BMPs are supported.
 - 3D uses WebGL with a depth buffer when available; Node and `?painter=1` use
   painter sorting and can show intersection artifacts. The browser supports
-  static and animated unskinned `model_draw` and `ray_mesh`, including morph
+  static and animated unskinned `model_draw`, `model_draw_instance` and `ray_mesh`, including morph
   targets through the depth-tested triangle path, plus overhead shadows and tessellated
   `ray_sphere`; both model APIs share the 16,384-triangle frame budget.
   Skinned `ray_mesh` and textured geometry remain unsupported in wasm; skinned

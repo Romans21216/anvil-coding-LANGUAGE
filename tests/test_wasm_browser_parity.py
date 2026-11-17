@@ -114,6 +114,69 @@ def _native_rgba(executable: pathlib.Path) -> bytes:
     NEEDS_BROWSER, "cross-renderer mask checks need Windows, Node and Chrome"
 )
 class WasmBrowserParityTests(unittest.TestCase):
+    def test_independent_morph_instances_render_distinct_c_and_wasm_poses(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            captures: dict[tuple[str, int], bytes] = {}
+            for assignment in (0, 1):
+                c_dir = root / f"c{assignment}"
+                wasm_dir = root / f"wasm{assignment}"
+                c_dir.mkdir()
+                wasm_dir.mkdir()
+                program = "\n".join(
+                    (
+                        "scene 3d",
+                        "camera perspective 0 0 8",
+                        "camera fov(70)",
+                        "set var(frame) = 0",
+                        "fn(update)",
+                        "  add var(frame) 1",
+                        "  if var(frame) = 1",
+                        '    set var(a) = model_instance("instance.gltf")',
+                        '    set var(b) = model_instance("instance.gltf")',
+                        f'    set var(wa) = model_instance_morph("instance.gltf", var(a), 0, {1 - assignment})',
+                        f'    set var(wb) = model_instance_morph("instance.gltf", var(b), 0, {assignment})',
+                        "  end",
+                        "end",
+                        "fn(draw)",
+                        "  clear rgba(0, 0, 0, 255)",
+                        '  set var(db) = model_draw_instance("instance.gltf", var(b), 2, 0, 0, 1, 0, 0, 0)',
+                        '  set var(da) = model_draw_instance("instance.gltf", var(a), -2, 0, 0, 1, 0, 0, 0)',
+                        "end",
+                        "",
+                    )
+                )
+                for directory in (c_dir, wasm_dir):
+                    write_morph_model(directory, "instance.gltf", defaults=(0.0,))
+                    (directory / "program.ANVL").write_text(program, encoding="utf-8")
+                c_output = c_dir / "program.exe"
+                _compile(c_dir / "program.ANVL", c_output)
+                wasm_output = wasm_dir / "program.wasm"
+                _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+                browser = subprocess.run(
+                    ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    env={**os.environ, "CHROME_PATH": str(CHROME)},
+                )
+                self.assertEqual(browser.returncode, 0, browser.stderr)
+                page = json.loads(browser.stdout.strip().splitlines()[-1])
+                captures[("C", assignment)] = _native_rgba(c_output)
+                captures[("wasm", assignment)] = base64.b64decode(
+                    page["rgba"], validate=True
+                )
+
+        for assignment in (0, 1):
+            self.assertGreater(
+                self._silhouette_iou(
+                    captures[("C", assignment)], captures[("wasm", assignment)]
+                ),
+                0.90,
+            )
+        self.assertNotEqual(captures[("C", 0)], captures[("C", 1)])
+        self.assertNotEqual(captures[("wasm", 0)], captures[("wasm", 1)])
+
     def test_static_morph_model_draw_matches_c_silhouette(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
