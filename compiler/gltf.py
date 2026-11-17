@@ -719,7 +719,7 @@ def load_animated(path: pathlib.Path) -> dict:
 _registry: dict[str, tuple[str, int, list[float], tuple[float, float, float, float]]] = {}
 _prescan: set[str] = set()
 PATTERN = re.compile(
-    r'\b(?:model_draw|model_animate|model_animation_length)\s*\(\s*"((?:[^"\\]|\\.)*)"'
+    r'\b(?:model_draw|model_animate|model_animation_length|model_morph)\s*\(\s*"((?:[^"\\]|\\.)*)"'
 )
 
 

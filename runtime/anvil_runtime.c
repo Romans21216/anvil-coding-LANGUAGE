@@ -1196,11 +1196,14 @@ const double *anvil_model_morph_weights(int id, const double *defaults,
   return anvil_morph_values[id];
 }
 
-double anvil_model_morph(int id, int index, double weight) {
+double anvil_model_morph(int id, int index, double weight,
+                         const double *defaults, int count) {
   if (id < 0 || id >= ANVIL_MODEL_STATES || index < 0 ||
       index >= ANVIL_MORPH_TARGETS || !isfinite(weight))
     return 0.0;
-  anvil_model_morph_weights(id, NULL, 0);
+  /* Initialise from the mesh defaults even when a program sets a weight
+     before the first draw, so the untouched targets keep their rest blend. */
+  anvil_model_morph_weights(id, defaults, count);
   double previous = anvil_morph_values[id][index];
   anvil_morph_values[id][index] =
       weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;

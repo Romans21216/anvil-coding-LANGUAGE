@@ -189,7 +189,8 @@ double anvil_mesh_draw_skinned(
     double rz);
 const double *anvil_model_morph_weights(int id, const double *defaults,
                                         int count);
-double anvil_model_morph(int id, int index, double weight);
+double anvil_model_morph(int id, int index, double weight,
+                         const double *defaults, int count);
 double anvil_mesh_draw_morphed(const double *data, int triangle_count,
                                const double *deltas, int targets,
                                const double *weights, double x, double y,

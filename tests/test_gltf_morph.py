@@ -125,6 +125,26 @@ def draw_only_program(model: str) -> str:
     return "\n".join(lines)
 
 
+def run_headless(case: unittest.TestCase, root: pathlib.Path, program: str) -> str:
+    source = root / "headless.ANVL"
+    source.write_text(program, encoding="utf-8")
+    build = subprocess.run(
+        [sys.executable, str(COMPILER), str(source), "-o", str(root / "headless.exe")],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    if build.returncode != 0:
+        if "No C compiler found" in build.stderr:
+            raise unittest.SkipTest("MSVC is not available")
+        case.fail(build.stderr)
+    run = subprocess.run(
+        [str(root / "headless.exe")], cwd=root, capture_output=True, text=True, timeout=60
+    )
+    case.assertEqual(run.returncode, 0, run.stderr)
+    return run.stdout
+
+
 class GltfMorphTests(unittest.TestCase):
     def test_the_weight_scales_the_delta(self) -> None:
         with tempfile_dir() as root:
@@ -191,6 +211,25 @@ class GltfMorphTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         # Every returned value matches the stored weight before the clamp.
         self.assertEqual(run.stdout.splitlines(), ["0", "1", "0", "0.25"])
+
+    def test_a_weight_set_before_the_first_draw_keeps_the_other_defaults(self) -> None:
+        with tempfile_dir() as root:
+            write_morph_model(root, "pre.gltf", defaults=(0.5,))
+            program = "\n".join(
+                (
+                    "fn(main)",
+                    '  say model_morph("pre.gltf", 0, 1)',
+                    '  say model_morph("pre.gltf", 0, 1)',
+                    "end",
+                    "",
+                    "call fn(main)",
+                    "",
+                )
+            )
+            out = run_headless(self, root, program)
+        # The first call must see the mesh default (0.5), not a zeroed table,
+        # even though no draw has happened yet.
+        self.assertEqual(out.splitlines(), ["0.5", "1"])
 
     def test_a_model_without_targets_refuses_model_morph(self) -> None:
         with tempfile_dir() as root:

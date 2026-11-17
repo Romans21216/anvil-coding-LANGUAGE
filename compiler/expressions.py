@@ -945,7 +945,9 @@ class ExpressionParser:
             self.expect(")")
             left = (
                 self.checked_number(
-                    f"anvil_model_morph({model['id']}, {index}, {weight})"
+                    f"anvil_model_morph({model['id']}, {index}, {weight}, "
+                    f"(const double *){model['symbol']}_morph_default, "
+                    f"{model['morph_count']})"
                 ),
                 "number",
             )
