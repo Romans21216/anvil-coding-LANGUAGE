@@ -1195,6 +1195,57 @@ double anvil_memory_video(void) {
 double anvil_memory_total(void) {
   return anvil_memory_images() + anvil_memory_audio() + anvil_memory_video();
 }
+/* Snapshot the frame that was just drawn into a new image, so it can be
+   drawn again as a sprite: portals, reflections, thumbnails and a cheap
+   render-to-texture path on the software renderer. */
+double anvil_frame_capture(void) {
+  if (!anvil_pixels)
+    return 0.0;
+  size_t bytes = (size_t)ANVIL_WIDTH * (size_t)ANVIL_HEIGHT * sizeof(uint32_t);
+  if (bytes > ANVIL_IMAGE_MEMORY_LIMIT - anvil_image_memory_used) {
+    anvil_image_error_note(
+        "the capture needs %llu MiB; only %llu MiB of the 128 MiB image budget "
+        "remain",
+        (unsigned long long)(bytes / 1048576u),
+        (unsigned long long)((ANVIL_IMAGE_MEMORY_LIMIT -
+                              anvil_image_memory_used) /
+                             1048576u));
+    return 0.0;
+  }
+  int slot = -1;
+  for (int i = 0; i < ANVIL_IMAGES; ++i) {
+    if (!anvil_images[i].pixels && anvil_images[i].generation < UINT32_MAX) {
+      slot = i;
+      break;
+    }
+  }
+  if (slot < 0) {
+    anvil_image_error_text = "no free image slot";
+    return 0.0;
+  }
+  uint32_t *pixels = (uint32_t *)malloc(bytes);
+  if (!pixels) {
+    anvil_image_error_text = "the capture could not be allocated";
+    return 0.0;
+  }
+  memcpy(pixels, anvil_pixels, bytes);
+  /* The framebuffer stores 0x00RRGGBB, so a captured image would be fully
+     transparent; mark every texel opaque before it becomes a drawable image. */
+  for (size_t i = 0; i < (size_t)ANVIL_WIDTH * (size_t)ANVIL_HEIGHT; ++i)
+    pixels[i] |= UINT32_C(0xff000000);
+  anvil_images[slot].pixels = pixels;
+  anvil_images[slot].width = ANVIL_WIDTH;
+  anvil_images[slot].height = ANVIL_HEIGHT;
+  anvil_images[slot].tint_r = 255;
+  anvil_images[slot].tint_g = 255;
+  anvil_images[slot].tint_b = 255;
+  anvil_images[slot].flip_x = 0;
+  anvil_images[slot].flip_y = 0;
+  ++anvil_images[slot].generation;
+  anvil_image_memory_used += bytes;
+  return (double)(anvil_images[slot].generation - 1) * ANVIL_IMAGES + slot + 1;
+}
+
 double anvil_image_width(double handle) {
   AnvilImage *image = anvil_image_from_handle(handle);
   return image ? (double)image->width : 0.0;
@@ -2677,53 +2728,6 @@ double anvil_physics_step(void) {
   return (double)contact_count;
 }
 
-/* Double buffering for the window: the frame is composed in a memory DC and
-   blitted in one operation, so the black background never reaches the screen
-   between the fill and the scaled image. Without this, every WM_PAINT painted
-   black first and the frame visibly flashed at 60 Hz. */
-static HDC anvil_paint_dc;
-static HBITMAP anvil_paint_bitmap;
-static HGDIOBJ anvil_paint_previous;
-static int anvil_paint_width, anvil_paint_height;
-
-static int anvil_paint_buffer(HDC dc, int width, int height) {
-  if (width <= 0 || height <= 0)
-    return 0;
-  if (anvil_paint_dc && anvil_paint_width == width &&
-      anvil_paint_height == height)
-    return 1;
-  if (anvil_paint_dc) {
-    SelectObject(anvil_paint_dc, anvil_paint_previous);
-    DeleteObject(anvil_paint_bitmap);
-    DeleteDC(anvil_paint_dc);
-    anvil_paint_dc = NULL;
-  }
-  anvil_paint_dc = CreateCompatibleDC(dc);
-  if (!anvil_paint_dc)
-    return 0;
-  anvil_paint_bitmap = CreateCompatibleBitmap(dc, width, height);
-  if (!anvil_paint_bitmap) {
-    DeleteDC(anvil_paint_dc);
-    anvil_paint_dc = NULL;
-    return 0;
-  }
-  anvil_paint_previous = SelectObject(anvil_paint_dc, anvil_paint_bitmap);
-  anvil_paint_width = width;
-  anvil_paint_height = height;
-  return 1;
-}
-
-static void anvil_paint_release(void) {
-  if (!anvil_paint_dc)
-    return;
-  SelectObject(anvil_paint_dc, anvil_paint_previous);
-  DeleteObject(anvil_paint_bitmap);
-  DeleteDC(anvil_paint_dc);
-  anvil_paint_dc = NULL;
-  anvil_paint_bitmap = NULL;
-  anvil_paint_width = anvil_paint_height = 0;
-}
-
 /* Present the frame straight to the window DC. Going through
    InvalidateRect + UpdateWindow forced a WM_PAINT per frame, which repainted
    the black background and re-scaled the image inside the paint handler; at
@@ -2767,26 +2771,19 @@ static void anvil_present_window(void) {
   HDC dc = GetDC(anvil_window);
   if (!dc)
     return;
-  if (anvil_double_buffer && anvil_paint_buffer(dc, width, height)) {
-    if (anvil_present_full_fill) {
-      RECT full = {0, 0, width, height};
-      FillRect(anvil_paint_dc, &full, (HBRUSH)GetStockObject(BLACK_BRUSH));
-      anvil_present_full_fill = 0;
-    }
-    StretchDIBits(anvil_paint_dc, viewport.x, viewport.y, viewport.width,
-                  viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT, source,
-                  &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
-    BitBlt(dc, 0, 0, width, height, anvil_paint_dc, 0, 0, SRCCOPY);
-  } else {
-    if (anvil_present_full_fill) {
-      RECT full = {0, 0, width, height};
-      FillRect(dc, &full, (HBRUSH)GetStockObject(BLACK_BRUSH));
-      anvil_present_full_fill = 0;
-    }
-    StretchDIBits(dc, viewport.x, viewport.y, viewport.width, viewport.height, 0,
-                  0, ANVIL_WIDTH, ANVIL_HEIGHT, source, &anvil_bitmap_info,
-                  DIB_RGB_COLORS, SRCCOPY);
+  /* One scaled copy straight to the window. With double buffering the source is
+     a finished frame that will not be drawn on again, so there is nothing to
+     tear and no reason to stage it through a second surface; the staging bitmap
+     stays for WM_PAINT repaints, which need to redraw from the display buffer
+     without holding a DC across the message. */
+  if (anvil_present_full_fill) {
+    RECT full = {0, 0, width, height};
+    FillRect(dc, &full, (HBRUSH)GetStockObject(BLACK_BRUSH));
+    anvil_present_full_fill = 0;
   }
+  StretchDIBits(dc, viewport.x, viewport.y, viewport.width, viewport.height, 0, 0,
+                ANVIL_WIDTH, ANVIL_HEIGHT, source, &anvil_bitmap_info,
+                DIB_RGB_COLORS, SRCCOPY);
   ReleaseDC(anvil_window, dc);
 }
 
@@ -2797,7 +2794,6 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     DestroyWindow(window);
     return 0;
   case WM_DESTROY:
-    anvil_paint_release();
     anvil_running = 0;
     anvil_window = NULL;
     PostQuitMessage(0);
@@ -2806,7 +2802,6 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
     return 1;
   case WM_SIZE:
     anvil_present_full_fill = 1;
-    anvil_paint_release();
     InvalidateRect(window, NULL, FALSE);
     break;
   case WM_MOUSEMOVE: {
@@ -2880,27 +2875,15 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
       int have_viewport =
           anvil_pixels && anvil_compute_viewport(width, height, ANVIL_WIDTH,
                                                  ANVIL_HEIGHT, &viewport);
-      if (anvil_double_buffer && anvil_paint_buffer(dc, width, height)) {
-        HBRUSH black = (HBRUSH)GetStockObject(BLACK_BRUSH);
-        RECT full = {0, 0, width, height};
-        FillRect(anvil_paint_dc, &full, black);
-        if (have_viewport)
-          StretchDIBits(anvil_paint_dc, viewport.x, viewport.y, viewport.width,
-                        viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
-                        anvil_display_pixels ? anvil_display_pixels
-                                             : anvil_pixels,
-                        &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
-        BitBlt(dc, 0, 0, width, height, anvil_paint_dc, 0, 0, SRCCOPY);
-      } else {
-        /* No double buffer available: paint directly rather than not at all. */
-        FillRect(dc, &client, (HBRUSH)GetStockObject(BLACK_BRUSH));
-        if (have_viewport)
-          StretchDIBits(dc, viewport.x, viewport.y, viewport.width,
-                        viewport.height, 0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
-                        anvil_display_pixels ? anvil_display_pixels
-                                             : anvil_pixels,
-                        &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
-      }
+      /* Repaint from the frame that is currently on screen. It is a finished
+         buffer that nothing is drawing into, so one scaled blit is enough and
+         the black background never shows between the fill and the image. */
+      FillRect(dc, &client, (HBRUSH)GetStockObject(BLACK_BRUSH));
+      if (have_viewport)
+        StretchDIBits(dc, viewport.x, viewport.y, viewport.width, viewport.height,
+                      0, 0, ANVIL_WIDTH, ANVIL_HEIGHT,
+                      anvil_display_pixels ? anvil_display_pixels : anvil_pixels,
+                      &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
     }
     EndPaint(window, &ps);
     return 0;

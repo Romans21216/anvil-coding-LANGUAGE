@@ -150,6 +150,7 @@ RUNTIME_C_NAMES = {
     "anvil_image_load",
     "anvil_image_width",
     "anvil_buffer",
+    "anvil_frame_capture",
     "anvil_sprite_batch",
     "anvil_sprite_depth",
     "anvil_sprite_queued",

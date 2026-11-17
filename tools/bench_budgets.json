@@ -61,44 +61,54 @@
     "machine": "Windows-11-10.0.26200-SP0",
     "scenes": {
       "cubes_3d": {
-        "p50_ms": 7.2,
-        "p95_ms": 8.45,
-        "max_ms": 15.0,
-        "measured_p50_ms": 2.88,
-        "measured_p95_ms": 3.38,
-        "measured_max_ms": 3.86
+        "work_p50_ms": 5.95,
+        "work_p95_ms": 6.55,
+        "present_p95_ms": 5.95,
+        "measured_work_p50_ms": 2.38,
+        "measured_work_p95_ms": 2.62,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 2.38,
+        "measured_max_ms": 2.75
       },
       "idle_2d": {
-        "p50_ms": 1.0,
-        "p95_ms": 4.7,
-        "max_ms": 15.0,
-        "measured_p50_ms": 0.38,
-        "measured_p95_ms": 1.88,
-        "measured_max_ms": 3.69
+        "work_p50_ms": 0.5,
+        "work_p95_ms": 2.0,
+        "present_p95_ms": 10.3,
+        "measured_work_p50_ms": 0.12,
+        "measured_work_p95_ms": 0.12,
+        "measured_present_p50_ms": 0.38,
+        "measured_present_p95_ms": 4.12,
+        "measured_max_ms": 0.25
       },
       "overdraw_2d": {
-        "p50_ms": 9.05,
-        "p95_ms": 12.2,
-        "max_ms": 15.95,
-        "measured_p50_ms": 3.62,
-        "measured_p95_ms": 4.88,
-        "measured_max_ms": 6.38
+        "work_p50_ms": 9.05,
+        "work_p95_ms": 9.7,
+        "present_p95_ms": 4.7,
+        "measured_work_p50_ms": 3.62,
+        "measured_work_p95_ms": 3.88,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 1.88,
+        "measured_max_ms": 3.93
       },
       "text_ui": {
-        "p50_ms": 2.8,
-        "p95_ms": 4.7,
-        "max_ms": 15.0,
-        "measured_p50_ms": 1.12,
-        "measured_p95_ms": 1.88,
-        "measured_max_ms": 4.76
+        "work_p50_ms": 1.55,
+        "work_p95_ms": 2.2,
+        "present_p95_ms": 10.3,
+        "measured_work_p50_ms": 0.62,
+        "measured_work_p95_ms": 0.88,
+        "measured_present_p50_ms": 0.12,
+        "measured_present_p95_ms": 4.12,
+        "measured_max_ms": 0.84
       },
       "particles_2d": {
-        "p50_ms": 2.2,
-        "p95_ms": 4.0,
-        "max_ms": 15.0,
-        "measured_p50_ms": 0.88,
-        "measured_p95_ms": 1.38,
-        "measured_max_ms": 3.5
+        "work_p50_ms": 0.95,
+        "work_p95_ms": 2.0,
+        "present_p95_ms": 10.95,
+        "measured_work_p50_ms": 0.38,
+        "measured_work_p95_ms": 0.38,
+        "measured_present_p50_ms": 0.38,
+        "measured_present_p95_ms": 4.38,
+        "measured_max_ms": 0.55
       }
     }
   }

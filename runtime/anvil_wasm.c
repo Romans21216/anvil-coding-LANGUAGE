@@ -2534,3 +2534,7 @@ double anvil_sprite_depth(double depth) {
 }
 
 double anvil_sprite_queued(void) { return 0.0; }
+
+/* The canvas is the display surface, and reading it back synchronously is not
+   possible from wasm; the compiler refuses the builtin before this point. */
+double anvil_frame_capture(void) { return 0.0; }

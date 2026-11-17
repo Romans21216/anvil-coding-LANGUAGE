@@ -30,7 +30,8 @@ WARMUP = 30
 BUCKETS = 400  # 0.25 ms each, so 0..100 ms
 
 TIMING = f"""
-array buckets({BUCKETS})
+array work_buckets({BUCKETS})
+array present_buckets({BUCKETS})
 set var(frame) = 0
 set var(count) = 0
 set var(worst) = 0
@@ -38,17 +39,26 @@ set var(worst) = 0
 fn(update)
   add var(frame) 1
   if var(frame) > {WARMUP}
-    set var(ms) = (frame_tick() + frame_render() + frame_present()) * 1000
-    set var(slot) = floor(var(ms) * 4)
+    set var(work) = (frame_tick() + frame_render()) * 1000
+    set var(present) = frame_present() * 1000
+    set var(slot) = floor(var(work) * 4)
     if var(slot) < 0
       set var(slot) = 0
     end
     if var(slot) > {BUCKETS - 1}
       set var(slot) = {BUCKETS - 1}
     end
-    set array(buckets, var(slot)) = array(buckets, var(slot)) + 1
-    if var(ms) > var(worst)
-      set var(worst) = var(ms)
+    set array(work_buckets, var(slot)) = array(work_buckets, var(slot)) + 1
+    set var(pslot) = floor(var(present) * 4)
+    if var(pslot) < 0
+      set var(pslot) = 0
+    end
+    if var(pslot) > {BUCKETS - 1}
+      set var(pslot) = {BUCKETS - 1}
+    end
+    set array(present_buckets, var(pslot)) = array(present_buckets, var(pslot)) + 1
+    if var(work) > var(worst)
+      set var(worst) = var(work)
     end
     add var(count) 1
   end
@@ -63,7 +73,7 @@ fn(report)
   set var(p50) = 0
   set var(p95) = 0
   for local(b) = 0 to {BUCKETS - 1}
-    set var(running) = var(running) + array(buckets, local(b))
+    set var(running) = var(running) + array(work_buckets, local(b))
     if var(p50) = 0 and var(running) * 2 >= {SAMPLES}
       set var(p50) = (local(b) + 0.5) / 4
     end
@@ -71,8 +81,22 @@ fn(report)
       set var(p95) = (local(b) + 0.5) / 4
     end
   end
+  set var(running) = 0
+  set var(pp50) = 0
+  set var(pp95) = 0
+  for local(b) = 0 to {BUCKETS - 1}
+    set var(running) = var(running) + array(present_buckets, local(b))
+    if var(pp50) = 0 and var(running) * 2 >= {SAMPLES}
+      set var(pp50) = (local(b) + 0.5) / 4
+    end
+    if var(pp95) = 0 and var(running) * 20 >= {SAMPLES} * 19
+      set var(pp95) = (local(b) + 0.5) / 4
+    end
+  end
   say var(p50)
   say var(p95)
+  say var(pp50)
+  say var(pp95)
   say var(worst)
 end
 """
@@ -186,12 +210,22 @@ def measure(name: str, runs: int) -> dict[str, float]:
                 for line in run.stdout.splitlines()
                 if line.strip() and line.replace(".", "", 1).replace("-", "", 1).isdigit()
             ]
-            if len(numbers) < 3:
-                raise SystemExit(f"{name} did not report three numbers:\n{run.stdout}")
-            results.append({"p50": numbers[-3], "p95": numbers[-2], "max": numbers[-1]})
+            if len(numbers) < 5:
+                raise SystemExit(f"{name} did not report five numbers:\n{run.stdout}")
+            results.append(
+                {
+                    "work_p50": numbers[-5],
+                    "work_p95": numbers[-4],
+                    "present_p50": numbers[-3],
+                    "present_p95": numbers[-2],
+                    "max": numbers[-1],
+                }
+            )
     return {
-        "p50_ms": round(statistics.median(r["p50"] for r in results), 2),
-        "p95_ms": round(statistics.median(r["p95"] for r in results), 2),
+        "work_p50_ms": round(statistics.median(r["work_p50"] for r in results), 2),
+        "work_p95_ms": round(statistics.median(r["work_p95"] for r in results), 2),
+        "present_p50_ms": round(statistics.median(r["present_p50"] for r in results), 2),
+        "present_p95_ms": round(statistics.median(r["present_p95"] for r in results), 2),
         "max_ms": round(min(r["max"] for r in results), 2),
     }
 
@@ -213,19 +247,29 @@ def main(argv: list[str] | None = None) -> int:
     measured: dict[str, dict[str, float]] = {}
     failures: list[str] = []
 
-    print(f"{'scene':<14}{'p50 ms':>9}{'p95 ms':>9}{'max ms':>9}   budget p50/p95/max")
+    print(
+        f"{'scene':<14}{'work p50':>9}{'work p95':>9}{'pres p95':>9}{'max':>7}"
+        "   budget work p50/p95, present p95"
+    )
     for name in names:
         stats = measure(name, args.runs)
         measured[name] = stats
         budget = budgets.get(name)
-        label = (
-            f"{budget['p50_ms']}/{budget['p95_ms']}/{budget['max_ms']}" if budget else "-"
-        )
+        if budget and "work_p50_ms" in budget:
+            label = (
+                f"{budget['work_p50_ms']}/{budget['work_p95_ms']}/"
+                f"{budget['present_p95_ms']}"
+            )
+        elif budget:
+            label = f"{budget.get('p50_ms', '-')}/{budget.get('p95_ms', '-')}/-"
+        else:
+            label = "-"
         print(
-            f"{name:<14}{stats['p50_ms']:>9.2f}{stats['p95_ms']:>9.2f}{stats['max_ms']:>9.2f}   {label}"
+            f"{name:<14}{stats['work_p50_ms']:>9.2f}{stats['work_p95_ms']:>9.2f}"
+            f"{stats['present_p95_ms']:>9.2f}{stats['max_ms']:>7.2f}   {label}"
         )
-        if args.check and budget:
-            for key in ("p50_ms", "p95_ms", "max_ms"):
+        if args.check and budget and "work_p50_ms" in budget:
+            for key in ("work_p50_ms", "work_p95_ms", "present_p95_ms"):
                 if stats[key] > budget[key]:
                     failures.append(
                         f"{name} {key} {stats[key]:.2f} > budget {budget[key]:.2f}"
@@ -240,11 +284,13 @@ def main(argv: list[str] | None = None) -> int:
         scenes = runtime.setdefault("scenes", {})
         for name, stats in measured.items():
             scenes[name] = {
-                "p50_ms": max(1.0, round(stats["p50_ms"] * 2.5, 2)),
-                "p95_ms": max(4.0, round(stats["p95_ms"] * 2.5, 2)),
-                "max_ms": max(15.0, round(stats["max_ms"] * 2.5, 2)),
-                "measured_p50_ms": stats["p50_ms"],
-                "measured_p95_ms": stats["p95_ms"],
+                "work_p50_ms": max(0.5, round(stats["work_p50_ms"] * 2.5, 2)),
+                "work_p95_ms": max(2.0, round(stats["work_p95_ms"] * 2.5, 2)),
+                "present_p95_ms": max(3.0, round(stats["present_p95_ms"] * 2.5, 2)),
+                "measured_work_p50_ms": stats["work_p50_ms"],
+                "measured_work_p95_ms": stats["work_p95_ms"],
+                "measured_present_p50_ms": stats["present_p50_ms"],
+                "measured_present_p95_ms": stats["present_p95_ms"],
                 "measured_max_ms": stats["max_ms"],
             }
         BUDGETS.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")

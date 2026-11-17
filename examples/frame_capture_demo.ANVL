@@ -1,0 +1,32 @@
+# Render to texture: frame_capture() snapshots the drawn frame into an image,
+# then the snapshot is drawn back as a sprite. A squashed band across the top
+# and a thumbnail in the bottom-right both come from the same capture, cropped
+# with image_draw_region so the caption is not copied into them.
+# Run from the repository root:
+#   python compiler/anvil.py examples/frame_capture_demo.ANVL --run
+scene 2d
+clear rgba(12, 16, 24, 255)
+set var(shot) = 0
+set var(counter) = 0
+
+fn(update)
+  set var(counter) = compute(var(counter) + 1)
+end
+
+fn(draw)
+  display text("frame_capture(): band and thumbnail are snapshots") -l(24, 24) -rgb(226, 236, 250)
+  display circle(300, 320, 90) -rgb(240, 90, 120)
+  display rect(380, 240, 140, 160) -rgb(80, 180, 255)
+  display line(120, 520, 620, 470) -rgb(250, 200, 80)
+
+  # Take one snapshot once the scene has been drawn for a few frames.
+  if var(counter) == 6
+    set var(shot) = frame_capture()
+  end
+
+  # The source rect starts below the caption, so the copies show the scene only.
+  if var(counter) > 6
+    set var(band) = image_draw_region(var(shot), 0, 160, 960, 240, 0, 60, 960, 120)
+    set var(thumb) = image_draw_region(var(shot), 160, 200, 520, 300, 700, 400, 220, 127)
+  end
+end

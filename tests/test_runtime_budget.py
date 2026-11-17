@@ -36,6 +36,18 @@ class RuntimeBudgetTests(unittest.TestCase):
         recorded = set(budgets.get("runtime", {}).get("scenes", {}))
         self.assertEqual(recorded, set(SCENES))
 
+    def test_budgets_split_scene_work_from_present(self) -> None:
+        """Present cost is platform noise; scene work must have its own budget."""
+        import json
+
+        scenes = json.loads(
+            (ROOT / "tools" / "bench_budgets.json").read_text(encoding="utf-8")
+        )["runtime"]["scenes"]
+        for name, entry in scenes.items():
+            for key in ("work_p50_ms", "work_p95_ms", "present_p95_ms"):
+                self.assertIn(key, entry, f"{name} has no {key} budget")
+                self.assertGreater(entry[key], 0.0, f"{name} {key} is not positive")
+
 
 if __name__ == "__main__":
     unittest.main()

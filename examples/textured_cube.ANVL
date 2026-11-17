@@ -1,0 +1,18 @@
+# A BMP mapped onto a cube: display <shape>(...) -texture(handle).
+# Run from the repository root:
+#   python compiler/anvil.py examples/textured_cube.ANVL --run
+scene 3d
+camera perspective 0 1.2 6.5
+camera control(0, -8)
+clear rgba(9, 13, 22, 255)
+set var(tex) = image_load("examples/assets/checker.bmp")
+set var(angle) = 0.0
+
+fn(update)
+  set var(angle) = compute(var(angle) + delta() * 22)
+end
+
+fn(draw)
+  display text("textured cube: -texture(handle)") -l(24, 32) -rgb(226, 236, 250)
+  display cube(0, 1.2, 0, 2.2) -texture(var(tex)) -rotate(0, var(angle), 0)
+end

@@ -215,6 +215,16 @@ Implemented draw commands are `rect`, `circle`, `line`, `text`, `cube`, `sphere`
 
 The window itself can be controlled from the game. `window_on_top(1)` keeps it above other applications and `window_on_top(0)` returns it to normal, so a game can float over the editor while it is being written and go behind other programs afterwards. `window_fullscreen(1)` switches to borderless fullscreen on the current monitor and `window_fullscreen(0)` restores the previous window style and position. Both return `1` on success and `0` when no window exists yet, and both work as a statement or inside an expression. They are C-backend only; the native backend reports a located "not available" diagnostic. `examples/window_controls.ANVL` toggles both with F and T.
 
+### Capturing the frame
+
+`frame_capture()` copies the frame drawn so far into a new image and returns its
+handle, so a scene can be drawn again as a sprite — portals, reflections,
+thumbnails, or a screenshot the program keeps. The image is 960x600 with opaque
+pixels and counts against the 128 MiB image budget, so capture a frame or two,
+not one per frame forever. Draw it like any other image (`image_draw`,
+`image_draw_region`, tint, flip, rotation all work). The wasm backend refuses the
+builtin: a canvas cannot be read back synchronously from inside the frame.
+
 ### Sprite batching and depth
 
 `sprite_batch(1)` defers `image_draw`, `image_draw_scaled`, `image_draw_rotated`

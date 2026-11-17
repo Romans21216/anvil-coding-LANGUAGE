@@ -684,6 +684,13 @@ def validate(
             f"{source_path}:{line}: display {match.group(1)}(...) is not available "
             "in the wasm backend yet"
         )
+    match = re.search(r"\bframe_capture\s*\(", text)
+    if match:
+        line = text.count("\n", 0, match.start()) + 1
+        raise CompileError(
+            f"{source_path}:{line}: 'frame_capture' is not available in the wasm "
+            "backend yet (the canvas cannot be read back synchronously)"
+        )
     match = re.search(r"-texture\(", text)
     if match:
         line = text.count("\n", 0, match.start()) + 1
