@@ -135,6 +135,50 @@ class SceneManagerTests(unittest.TestCase):
         self.assertIn("flag 1", seen)
         self.assertIn("next 0", seen)
 
+    def test_an_immediate_change_from_update_reaches_that_frames_draw(self) -> None:
+        # The one-frame flag is reset at the start of the frame, so a change
+        # requested from update() must still be visible to the draw that
+        # follows it in the same frame.
+        program = "\n".join(
+            (
+                "scene 2d",
+                "set var(step) = 0",
+                "set var(reported) = 0",
+                "",
+                "fn(update)",
+                "  add var(step) 1",
+                "  if var(step) = 3",
+                '    set var(ok) = scene_change("level2", 0)',
+                "  end",
+                "end",
+                "",
+                "fn(draw)",
+                "  clear rgba(0, 0, 0, 255)",
+                "  if var(step) >= 3",
+                "    if var(reported) = 0",
+                "      set var(reported) = 1",
+                '      say "name " & scene_name()',
+                '      say "flagdraw " & scene_changed()',
+                '      say "mark"',
+                "    else",
+                "      if var(reported) = 1",
+                "        set var(reported) = 2",
+                '        say "nextflag " & scene_changed()',
+                '        say "done"',
+                "      end",
+                "    end",
+                "  end",
+                "end",
+                "",
+            )
+        )
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            with Runner(pathlib.Path(temp), program) as runner:
+                seen = runner.until("done")
+        self.assertIn("name level2", seen)
+        self.assertIn("flagdraw 1", seen)
+        self.assertIn("nextflag 0", seen)
+
     def test_a_timed_change_swaps_in_the_black_hold(self) -> None:
         program = "\n".join(
             (
