@@ -827,17 +827,15 @@ def _is_native_text_list_read(part: str) -> bool:
     return match is not None and match.group(1) in TEXT_LISTS
 
 
-def _is_native_bool_var(part: str) -> bool:
-    match = _VAR_PATTERN.fullmatch(part.strip()) if "_VAR_PATTERN" in globals() else None
-    return match is not None and match.group(1) in BOOL_VARIABLES
-
-
 _BOOL_VAR_PATTERN = __import__("re").compile(r"var\(([A-Za-z_][\w-]*)\)")
 
 
-def _is_native_bool_var(part: str) -> bool:
+def _is_native_bool_var(part: str, scope=None) -> bool:
     match = _BOOL_VAR_PATTERN.fullmatch(part.strip())
-    return match is not None and match.group(1) in BOOL_VARIABLES
+    return match is not None and (
+        match.group(1) in BOOL_VARIABLES
+        or match.group(1) in getattr(scope, "bool_params", set())
+    )
 
 
 def _is_native_string_var(part: str) -> bool:
@@ -1626,7 +1624,7 @@ class NativeCodegen:
                         self.emit_expression(part, node.line, scope)
                         self.code.mov_imm(1, 0)  # no newline mid-line
                         self.code.call("function:anvil_print_number")
-                    elif _is_native_bool_var(part):
+                    elif _is_native_bool_var(part, scope):
                         self.emit_expression(part, node.line, scope)
                         self.emit_print_bool()
                     elif (

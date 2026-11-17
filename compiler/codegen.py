@@ -47,9 +47,12 @@ def _walk_nodes(top, functions):
 _VAR_PATTERN = __import__("re").compile(r"var\(([A-Za-z_][\w-]*)\)")
 
 
-def _is_bool_variable(part: str) -> bool:
+def _is_bool_variable(part: str, scope: Node | None = None) -> bool:
     match = _VAR_PATTERN.fullmatch(part.strip())
-    return match is not None and match.group(1) in BOOL_VARIABLES
+    return match is not None and (
+        match.group(1) in BOOL_VARIABLES
+        or match.group(1) in getattr(scope, "bool_params", set())
+    )
 
 
 def _is_string_variable(part: str) -> bool:
@@ -525,7 +528,7 @@ def emit_nodes(
                 elif part.startswith('"'):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
                     out.append(f'{indent}printf("%s", "{say_string(rendered)}");')
-                elif _is_bool_variable(part):
+                elif _is_bool_variable(part, scope):
                     out.append(f"{indent}anvil_print_bool({lower(n, part)});")
                 elif _is_string_variable(part):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
@@ -555,7 +558,7 @@ def emit_nodes(
                 elif part.startswith('"'):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)
                     out.append(f'{indent}printf("%s", "{say_string(rendered)}");')
-                elif _is_bool_variable(part):
+                elif _is_bool_variable(part, scope):
                     out.append(f"{indent}anvil_print_bool({lower(n, part)});")
                 elif _is_string_variable(part):
                     rendered = expr(path, n.line, part, functions, "string", scope, arrays)

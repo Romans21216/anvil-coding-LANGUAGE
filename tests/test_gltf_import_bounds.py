@@ -22,6 +22,7 @@ COMPILER = ROOT / "compiler" / "anvil.py"
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from test_gltf_animation import pose_program, run_poses, tempfile_dir  # noqa: E402
+from test_gltf_morph import write_morph_model  # noqa: E402
 from test_gltf_skins import write_skinned_model  # noqa: E402
 
 
@@ -175,6 +176,21 @@ class GltfImportBoundsTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         combined = result.stdout + result.stderr
         self.assertIn("clock slot 32", combined)
+        self.assertIn("bounds.ANVL:", combined)
+
+    def test_a_morphing_model_past_the_runtime_state_slots_is_refused(self) -> None:
+        with tempfile_dir() as root:
+            names = []
+            for index in range(32):
+                name = f"s{index}.gltf"
+                write_static_model(root, name)
+                names.append(name)
+            write_morph_model(root, "morphed.gltf")
+            names.append("morphed.gltf")
+            result = build(root, draw_program(names))
+        self.assertNotEqual(result.returncode, 0)
+        combined = result.stdout + result.stderr
+        self.assertIn("runtime state slot 32", combined)
         self.assertIn("bounds.ANVL:", combined)
 
 

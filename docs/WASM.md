@@ -1,8 +1,9 @@
 # WebAssembly target
 
 `--backend wasm` compiles a subset of Anvil to a WebAssembly module and writes a
-host page beside it. Console programs run under Node and in a browser; 2D scenes
-draw on a `<canvas>`. Input, audio, storage and 3D are not there yet.
+host page beside it. Console programs run under Node and browser pages render 2D
+and selected 3D scenes to a `<canvas>`. The browser host also provides input,
+audio, IndexedDB-backed saves and WebGL for the documented feature subset.
 
 ```sh
 python compiler/anvil.py hello.ANVL --backend wasm -o hello.wasm
@@ -40,8 +41,9 @@ void present(void);
 the exported `anvil_frame(delta_ms)`, which runs one update, clears with the
 scene colour, draws and calls `present`.
 
-It provides `printf`/`putchar`, number formatting, string helpers, arrays and a
-1 MiB bump allocator. Audio, files, network and input are outside the subset.
+The freestanding runtime provides `printf`/`putchar`, number formatting, string
+helpers, arrays and a 1 MiB bump allocator. Browser resources are baked at build
+time; arbitrary runtime file and network access are not exposed.
 
 Supported today:
 
@@ -90,9 +92,9 @@ Supported today:
 
 Refused with a source-located error:
 
-- `scene 3d`, `camera` and `engine` statements
-- `display` shapes other than `rect`, `circle`, `line` and `text` (cubes,
-  spheres, planes, sprites, ray-sphere)
+- `engine` statements
+- `display` shapes other than `rect`, `circle`, `line`, `text`, `cube`, `plane`,
+  `sphere` and `ray_sphere` (sprites use the image API)
 - any other builtin; the current refusals are `memory_report`,
   `frame_capture`, `text_width` and the `tilemap_*` family (the console, canvas, baked-asset,
   audio, save, physics, particle and accounting builtins listed above
@@ -155,12 +157,16 @@ Bounding-sphere culling is implemented for `model_draw`: a model is skipped when
 its whole sphere is behind the near plane or outside the screen, and
 `mesh_culled()` reports it.
 
-`model_draw` works because the compiler bakes glTF triangles into the module
-exactly as it does for the C backend: the runtime receives 12 doubles per
-triangle (three positions plus RGB), scales, rotates and translates them, then
-submits them through the same path as the primitives. `mesh_drawn()` counts the
-triangles submitted in the frame; `mesh_culled()` is always 0 because there is
-no bounding-sphere test yet, and `mesh_culling(on)` only echoes its argument.
+`model_draw` and static unskinned `ray_mesh` bake glTF triangles into the module:
+the runtime receives 12 doubles per triangle (three positions plus RGB), scales,
+rotates and translates them, then submits them through the same path as the
+primitives. In WebAssembly, `ray_mesh` is a depth-tested triangle submission, not
+the C runtime's software ray-tracing/BVH implementation. Its call returns 1 when
+accepted and 0 for invalid input or when it would exceed the 16,384 ray-mesh
+triangle frame budget. `model_draw` remains raster-submitted without that
+ray-mesh-specific budget. `mesh_drawn()` counts triangles from the most recent
+model submission; `mesh_culled()` reports whole-model frustum culling, and
+`mesh_culling(on)` controls that culling.
 
 The page renders triangles with WebGL into an offscreen 960x600 canvas and blits
 it onto the visible canvas at `present()`. The shader maps camera depth onto the
@@ -174,7 +180,12 @@ page opened with `?painter=1`. `?nosort=1` additionally skips the far-to-near
 sort, which is how the depth test is demonstrated — an unsorted painter shows
 the farther cube, WebGL shows the nearer one. 3D is still painted after any 2D
 drawing in the frame, and 2D primitives in a 3D scene are covered by the blit.
-Skins, morph targets and textures remain C-backend only.
+Skinned models and textured geometry remain C-backend only. Unskinned animated
+`model_draw` and `ray_mesh` models support the first glTF clip with translation,
+rotation and scale tracks using LINEAR or STEP interpolation. `model_animate`
+sets a per-model clock; `model_animation_length` is baked as a compile-time
+constant. Static and animated unskinned models also support morph targets as
+described below.
 
 `display ray_sphere(...)` is supported in `scene 3d` as a tessellated,
 per-vertex shaded approximation, with sphere-to-sphere shadow checks. Tessellation
@@ -184,6 +195,24 @@ benchmark measured maximum p95 work of 4.6 ms for 1 sphere, 4.9 ms for 8, and
 6.0 ms for 32; the maximum sampled JS heap peaks were 4.7, 17.0 and 72.6 MiB.
 The C backend still provides exact per-pixel sphere tracing; the browser path
 has polygonal silhouettes and facet lighting.
+
+`model_draw(...)` and `ray_mesh(...)` are supported in `scene 3d` for static or
+animated unskinned models, including morph targets. Per-group glTF defaults are
+preserved and `model_morph(path,index,weight)` overrides that target for every
+group. Morph deltas are applied before the animated node transform and the
+placement transform; culling is skipped for animated or morphed models because
+the baked rest-pose bounds do not contain all poses. Both calls use the same
+WebGL depth-tested triangle path, which resolves overlapping mesh depth per
+pixel in the browser. `ray_mesh` has a shared 16,384-triangle frame budget for
+static and animated submissions. The Node and `?painter=1` fallbacks sort
+triangles and can show intersections. The browser path has no mesh BVH or
+ray-traced shadows; skinned models remain a located unsupported case.
+
+`tests/test_wasm_browser_parity.py` renders a static morphing GLTF and an
+animated-morph ray mesh through the C/Win32 and wasm/Chrome paths, then compares
+visible-pixel masks. Each fixture requires silhouette IoU above 0.92. These
+fixtures do not establish full colour or shading parity, or parity across other
+cameras and depth cases.
 
 ## Audio
 
@@ -332,10 +361,12 @@ identical.
   resolved by the browser build. 4-bit BMPs are supported.
 - 3D uses WebGL with a depth buffer when available; Node and `?painter=1` use
   painter sorting and can show intersection artifacts. The browser supports
-  static model loading, overhead shadows and tessellated `ray_sphere`; skeletal
-  animation, morph targets and textured geometry remain C-backend only.
+  static unskinned `model_draw` and `ray_mesh`, including morph targets, through
+  the depth-tested triangle path, plus overhead shadows and tessellated
+  `ray_sphere`. Skinned models and textured geometry remain unsupported in wasm.
 - `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
   same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the
   same as the C runtime; `char` returns empty text for out-of-range indexes.
-- `anvil_frame` ignores its delta argument; animations advance per host frame.
+- `anvil_frame(delta_ms)` advances `time()` and `delta()`; unskinned model clips
+  are sampled when `model_draw` or `ray_mesh` is submitted.

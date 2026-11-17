@@ -1096,3 +1096,83 @@ Validation: `python -m pytest tests/test_compiler.py -q` — 73 passed in 72.08 
 The compiler lint pass now locates each `output` nested under a `while` or `for` and warns that it returns from the function on the first loop iteration. Nested conditionals inside the loop are included; a branch-only `output` outside a loop stays quiet. The CLI regression confirms the warning includes the source line and caret and still allows `--check` to succeed. Both language references now state the early-return behavior.
 
 Validation: `python -m pytest tests/test_lints.py -q` — 27 passed in 0.76 s.
+
+8.126 ENFORCE VARIABLE ANNOTATIONS ON REASSIGNMENT
+
+Semantic validation previously checked `: number`, `: text` and `: bool` only on the annotated `set var(...)` statement, so a later assignment could silently change a declared bool to a number. The validator now records declared storage kinds and applies the constraint to every assignment, including ones before a declaration and parameter-shadowed `var(...)` storage. Conflicting annotations receive an error at the conflict site. The regression confirms that a later numeric value assigned to a bool is rejected at that line, while a later comparison value runs as `true` on C and native.
+
+Validation: `python -m pytest tests/test_declared_types.py tests/test_bool_values.py tests/test_backend_agreement.py -q` — 14 passed in 11.02 s. `git -c core.whitespace=cr-at-eol diff --check` passes.
+
+8.127 COMPLETE THE DECLARED TYPE CONTRACT FOR BOOL PARAMETERS
+
+An annotation on a parameter-shadowing `var(name)` already constrained assignments, but output selection only consulted the global bool-name set, so `say var(parameter)` formatted as a number. Semantic validation now records bool parameters on their owning function; C and native output choose bool formatting using that function scope, avoiding accidental classification of a same-named global. The formal grammar and both language references now describe scalar annotations and reassignments consistently.
+
+Validation: `python -m pytest tests/test_declared_types.py -q` — 7 passed, including a same-name global/parameter regression on C and native. `git -c core.whitespace=cr-at-eol diff --check` passes.
+
+8.128 PRESERVE FLATTENED GLTF MORPH DEFAULTS PER GROUP
+
+The importer previously selected the first mesh's default morph weights for the whole flattened model, while ignoring node-level weight overrides. Static and animated ray-mesh paths now retain per-group defaults, resolve node-over-mesh precedence, and apply explicit `model_morph` overrides across groups while leaving untouched targets at each group's default. Static model rendering and ray-traced mesh registration each use the group ranges and their own effective weight vectors. Ray registration preflights group-slot and BVH-cache budgets and rolls back queued groups if allocation fails. The language references document per-group semantics and resource limits.
+
+Validation: `python -m pytest tests/test_gltf_morph.py tests/test_gltf_animation.py tests/test_gltf_ray_mesh.py tests/test_declared_types.py -q` — 26 passed. Rendered bounds cover GLB fixtures with different mesh defaults, node overrides, explicit cross-group overrides, animated ray-mesh groups and animated raster model drawing. `git -c core.whitespace=cr-at-eol diff --check` passes.
+
+8.129 RASTER MODEL DRAW WITH ANIMATED MORPH TARGETS
+
+The compiler previously rejected animated models with morph targets in `model_draw`, even though the importer and ray path already had node groups and weight data. Raster drawing now samples the node pose and applies each group's effective morph weights before the node transform. Untouched targets retain per-node/per-mesh defaults; an explicit `model_morph` weight overrides that target for every group. Skinned morph combinations remain a located unsupported case.
+
+Validation: the 26-test focused run above includes a pixel regression for rest pose, animation-only, morph-only and combined animation+morph states using a GLB whose two nodes reference one mesh with different defaults.
+
+8.130 RECONCILE THE GLTF MORPH SOURCE AUDIT (P8-122)
+
+The animated-default alignment claim does not match the current importer/runtime contract. `load_animated()` emits one flattened range and one morph-default vector per emitted node group; multiple primitives belonging to a node are concatenated into that node's range, and runtime reads defaults by group index. Morph target counts are validated across primitives before the flattened arrays are produced. The regression fixture now includes duplicate primitives and two nodes with distinct defaults, and checks the generated group count, group triangle counts, default vector and rendered result.
+
+The grouped ray-registration findings exposed a real input-validation gap. Registration now rejects non-finite or negative bounds, non-finite placement/rotation/scale, non-finite group defaults/current weights and non-finite morph deltas before it mutates the trace queue. The importer also checks raw and transformed morph deltas for finite results. A malformed GLTF regression confirms NaN deltas are rejected. Group-slot and BVH cache budgets are preflighted, and a failed later allocation rolls back queued groups. A pixel regression fills 39 of 40 slots, attempts an offscreen two-group registration, then verifies a visible one-group mesh can still occupy the final slot.
+
+Validation: `python -m pytest tests/test_gltf_morph.py tests/test_gltf_animation.py tests/test_gltf_ray_mesh.py tests/test_declared_types.py -q` — 28 passed in 44.32 s. This verifies grouped capacity refusal leaves the final queue slot usable. The animated-default review finding is reconciled as stale rather than changed because the per-group array alignment is already covered by the fixture and runtime indexing contract.
+
+`python tools/visual_smoke.py --check` also passed all seven 960×600 examples after the renderer changes. This is automated capture evidence; the documented live flicker and keyboard/mouse checks remain open.
+
+Full regression run on the complete worktree: `python -m pytest tests -q` — 988 passed, 1 xfailed in 701.48 s. The run left no additional tracked generated artifacts; `git diff --check` passed with the existing autocrlf warnings.
+
+8.131 STATIC WEBASSEMBLY RAY-MESH SUBMISSION
+
+The wasm backend now accepts `ray_mesh` for static, unskinned, unmorphed glTF models in `scene 3d`. It reuses the baked geometry and WebGL depth-tested triangle path used by `model_draw`; this is a browser raster path, not C-style ray tracing, and it adds no BVH or ray-traced shadows. Runtime rejects invalid/non-finite transforms and caps accepted ray-mesh submissions at 16,384 triangles per frame. Calls that would exceed the cap return 0 without submitting geometry. Animated, morphed and skinned wasm ray meshes remain located unsupported cases.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py -q` — 56 passed. The new tests check located `scene 3d` enforcement, located rejection of morph targets, static ray-mesh/model-draw triangle parity, budget overflow and reset across two frames. The extended Chrome 157 / SwiftShader harness passed overlapping red/blue ray-mesh triangles in both submission orders, returning center pixel `[168, 13, 6, 255]` for both. The same run's 1/8/32 ray-sphere p95 was 4.7/5.0/6.2 ms, maximum frame 12.1 ms, heap peaks 4.8/23.1/70.5 MiB, all within recorded limits. This does not establish C/WASM pixel parity or complete P8-119-F1; those remain open. `node --check tools/bench_wasm_ray_spheres.mjs` and `git diff --check` pass.
+
+Repository status correction for the 8.122 audit: local `HEAD` and `origin/main` resolve to `97192e4`. `origin/codex/anvil-user-updates-2f0ac68` resolves to `aea10f8`, an ancestor of `HEAD`; `git rev-list --left-right --count origin/codex/anvil-user-updates-2f0ac68...HEAD` reports `0 17` (no remote-only commits, 17 local-only commits). No remote task-branch update needs integration. Local `main` remains at `2f0ac68` and is behind `origin/main`; publication would require separately reviewing that branch relationship. The worktree remains unpublished and `.scratch/` remains untouched.
+
+8.132 STATIC WASM MORPHED RAY-MESHES (2026-11-17)
+
+Extended wasm `ray_mesh` to support static, unskinned glTF morph targets. It applies each geometry group's glTF default weights before transforms; `model_morph` overrides that target across groups, and morphing models skip frustum culling because imported bounds describe the rest pose. Animated and skinned wasm ray meshes remain unsupported, as does raster `model_draw` for morph targets. This is WebGL depth-tested triangle submission, not C-style ray tracing, and it does not establish direct C/WASM pixel parity.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py -q` — 57 passed in 35.42 s. The Chrome 157 / SwiftShader benchmark shows default morph pixel `[168,13,6,255]` and overridden pixel `[11,16,27,255]`; both static-mesh depth-order permutations also pass. Sphere p95 for 1/8/32 was 4.5/5.0/6.3 ms, maximum frame 12.3 ms, and heap peaks 4.5/18.7/64.5 MiB, all within existing budgets. `node --check tools/bench_wasm_ray_spheres.mjs` and `git diff --check` pass.
+
+P8-119-F1 remains incomplete: animated/skinned support, bounded ray traversal, broader benchmark workloads, and C/WASM pixel parity remain open. Work remains uncommitted and unpublished; `.scratch/` was not modified.
+
+8.133 WASM STATIC MORPHED MODEL DRAW (2026-11-17)
+
+Wasm `model_draw` now handles static, unskinned glTF morph targets through the existing depth-tested triangle submission path. It preserves group defaults and `model_morph` overrides, and skips rest-pose culling. Animated/skinned models and textures remain unsupported; this is WebGL raster submission, not ray tracing. Updated `docs/WASM.md`'s stale statements about 3D, input, audio, model calls and runtime limits, and aligned the model/compiler/language references.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py -q` — 57 passed in 40.15 s. The Node draw-stream regression checks default and overridden geometry. Chrome 157 / SwiftShader produced identical pixels for both APIs: default `[168,13,6,255]`; target override `[11,16,27,255]`. Static mesh depth ordering passed. The first timing pass recorded one 18 ms scheduling outlier; the immediate rerun passed all budgets (1/8/32 sphere p95 5.6/5.9/6.8 ms, max frame 10.5 ms, heap peak 4.9/20.4/70.4 MiB). `node --check` and `git diff --check` pass.
+
+P8-119-F1 remains open for direct C/WASM render parity, animated/skinned browser paths and broader ray workload coverage. Changes remain uncommitted and unpublished; `.scratch/` remains untouched.
+
+8.134 C/CHROMIUM STATIC MODEL SILHOUETTE PARITY (2026-11-17)
+
+Added a Windows integration regression that compiles the same static morphing GLTF and camera to the desktop C runtime and wasm, captures a live Win32 frame and a Chromium/SwiftShader frame, and compares non-background pixel masks. The silhouette intersection-over-union must exceed 0.92. This verifies projected coverage for one representative morphing model; it does not prove full colour/shading parity or parity across other cameras and depth scenes. `docs/WASM.md` and the Part 8 evidence matrix now state that boundary explicitly.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py -q -s` — 1 passed in 4.72 s on Windows/Chrome. `node --check tools/capture_wasm_mask.mjs` passes. The wider wasm suite last passed 57 tests in 40.15 s after the model-draw morph implementation. `git diff --check` passes.
+
+P8-119-F1 remains open for broader color/depth parity, animated/skinned browser paths, and representative ray workload coverage. Changes remain uncommitted and unpublished; `.scratch/` remains untouched.
+
+8.135 BOUND STATEFUL GLTF ASSETS TO RUNTIME SLOTS
+
+The importer now rejects static morph assets that would exceed the 32-entry runtime state tables, matching the existing animated/skinned model limit. A compiler regression registers 32 stateless assets before a morph model and checks for a source-located slot diagnostic. `docs/MODELS.md` now documents the shared state limit and the current static/animated C versus static-only wasm morph boundary.
+
+Validation: this follow-up did not run the new regression or other tests. The previous implementation batch recorded focused morph and wasm suites plus a Chromium silhouette comparison; the state-slot guard is not covered by those prior results.
+
+8.136 ANIMATED MORPHED MODELS ON THE WASM RASTER PATH
+
+The wasm model path now samples the first glTF animation clip and composes node TRS animation with morph deltas/defaults for both `model_draw` and `ray_mesh`. Animated ray-mesh submissions share the existing 16,384-triangle per-frame budget; static or animated `model_draw` remains outside that budget. Skinned models remain unsupported. `docs/WASM.md` now reflects those limits and the cross-renderer test fixtures.
+
+Validation: this audit inspected the importer/runtime lowering, Node draw-stream tests, and the C/Chrome mask test, but did not run tests or the browser harness. The progress ledger's prior static-only wasm results do not verify this animated addition.

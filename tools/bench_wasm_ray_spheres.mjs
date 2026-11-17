@@ -35,6 +35,94 @@ function source(count) {
   ].join("\n");
 }
 
+function writeTriangleModel(file, colour, morphDelta = null) {
+  const positions = Buffer.from(new Float32Array([
+    -1.4, -1.2, 0, 1.4, -1.2, 0, 0, 1.4, 0,
+  ]).buffer);
+  const indices = Buffer.from(new Uint16Array([0, 1, 2]).buffer);
+  const deltas = morphDelta ? Buffer.from(new Float32Array([
+    morphDelta[0], morphDelta[1], morphDelta[2],
+    morphDelta[0], morphDelta[1], morphDelta[2],
+    morphDelta[0], morphDelta[1], morphDelta[2],
+  ]).buffer) : null;
+  const chunks = [positions, indices];
+  if (deltas) chunks.push(deltas);
+  const binary = Buffer.concat(chunks);
+  const primitive = { attributes: { POSITION: 0 }, indices: 1, material: 0 };
+  const bufferViews = [
+    { buffer: 0, byteOffset: 0, byteLength: positions.length },
+    { buffer: 0, byteOffset: positions.length, byteLength: indices.length },
+  ];
+  const accessors = [
+    { bufferView: 0, componentType: 5126, count: 3, type: "VEC3" },
+    { bufferView: 1, componentType: 5123, count: 3, type: "SCALAR" },
+  ];
+  if (deltas) {
+    primitive.targets = [{ POSITION: 2 }];
+    bufferViews.push({ buffer: 0, byteOffset: positions.length + indices.length, byteLength: deltas.length });
+    accessors.push({ bufferView: 2, componentType: 5126, count: 3, type: "VEC3" });
+  }
+  const document = {
+    asset: { version: "2.0" },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }],
+    meshes: [{ ...(deltas ? { weights: [0] } : {}), primitives: [primitive] }],
+    materials: [{ pbrMetallicRoughness: { baseColorFactor: [...colour, 1] } }],
+    buffers: [{ uri: `data:application/octet-stream;base64,${binary.toString("base64")}`, byteLength: binary.length }],
+    bufferViews,
+    accessors,
+  };
+  fs.writeFileSync(file, JSON.stringify(document));
+}
+
+writeTriangleModel(path.join(temp, "mesh_far.gltf"), [0.05, 0.12, 0.95]);
+writeTriangleModel(path.join(temp, "mesh_near.gltf"), [0.95, 0.08, 0.04]);
+writeTriangleModel(path.join(temp, "mesh_morph.gltf"), [0.95, 0.08, 0.04], [2, 0, 0]);
+for (const order of ["far_near", "near_far"]) {
+  const meshes = {
+    far: 'ray_mesh("mesh_far.gltf", 0, 0, 0, 1, 0, 0, 0)',
+    near: 'ray_mesh("mesh_near.gltf", 0, 0, 1, 1, 0, 0, 0)',
+  };
+  const draws = order === "far_near" ? [meshes.far, meshes.near] : [meshes.near, meshes.far];
+  const src = path.join(temp, `mesh_depth_${order}.ANVL`);
+  const out = path.join(temp, `mesh_depth_${order}.wasm`);
+  fs.writeFileSync(src, [
+    "scene 3d", "camera perspective 0 0 8", "clear rgba(11, 16, 27, 255)",
+    "fn(draw)", ...draws.map((line) => `  set var(ok) = ${line}`), "end", "",
+  ].join("\n"));
+  const built = spawnSync("python", [path.join(root, "compiler/anvil.py"), src, "--backend", "wasm", "-o", out], { encoding: "utf8", timeout: 300000 });
+  if (built.status !== 0) throw new Error(`compile ray-mesh depth ${order} failed: ${built.stderr}`);
+  files[`/mesh_depth_${order}.html`] = fs.readFileSync(out.replace(/\.wasm$/, ".html"));
+  files[`/mesh_depth_${order}.wasm`] = fs.readFileSync(out);
+}
+
+for (const mode of ["default", "override"]) {
+  const src = path.join(temp, `mesh_morph_${mode}.ANVL`);
+  const out = path.join(temp, `mesh_morph_${mode}.wasm`);
+  const calls = mode === "override"
+    ? ['  set var(weight) = model_morph("mesh_morph.gltf", 0, 1)', '  set var(ok) = ray_mesh("mesh_morph.gltf", 0, 0, 0, 1, 0, 0, 0)']
+    : ['  set var(ok) = ray_mesh("mesh_morph.gltf", 0, 0, 0, 1, 0, 0, 0)'];
+  fs.writeFileSync(src, ["scene 3d", "camera perspective 0 0 8", "clear rgba(11, 16, 27, 255)", "fn(draw)", ...calls, "end", ""].join("\n"));
+  const built = spawnSync("python", [path.join(root, "compiler/anvil.py"), src, "--backend", "wasm", "-o", out], { encoding: "utf8", timeout: 300000 });
+  if (built.status !== 0) throw new Error(`compile ray-mesh morph ${mode} failed: ${built.stderr}`);
+  files[`/mesh_morph_${mode}.html`] = fs.readFileSync(out.replace(/\.wasm$/, ".html"));
+  files[`/mesh_morph_${mode}.wasm`] = fs.readFileSync(out);
+}
+
+for (const mode of ["default", "override"]) {
+  const src = path.join(temp, `mesh_morph_draw_${mode}.ANVL`);
+  const out = path.join(temp, `mesh_morph_draw_${mode}.wasm`);
+  const calls = mode === "override"
+    ? ['  set var(weight) = model_morph("mesh_morph.gltf", 0, 1)', '  set var(ok) = model_draw("mesh_morph.gltf", 0, 0, 0, 1, 0, 0, 0)']
+    : ['  set var(ok) = model_draw("mesh_morph.gltf", 0, 0, 0, 1, 0, 0, 0)'];
+  fs.writeFileSync(src, ["scene 3d", "camera perspective 0 0 8", "clear rgba(11, 16, 27, 255)", "fn(draw)", ...calls, "end", ""].join("\n"));
+  const built = spawnSync("python", [path.join(root, "compiler/anvil.py"), src, "--backend", "wasm", "-o", out], { encoding: "utf8", timeout: 300000 });
+  if (built.status !== 0) throw new Error(`compile model-draw morph ${mode} failed: ${built.stderr}`);
+  files[`/mesh_morph_draw_${mode}.html`] = fs.readFileSync(out.replace(/\.wasm$/, ".html"));
+  files[`/mesh_morph_draw_${mode}.wasm`] = fs.readFileSync(out);
+}
+
 for (const count of [1, 8, 32]) {
   const src = path.join(temp, `spheres_${count}.ANVL`);
   const out = path.join(temp, `spheres_${count}.wasm`);
@@ -177,6 +265,81 @@ try {
   const frontColorVisible = (pixel) => pixel[0] > pixel[2] * 2 && pixel[0] > pixel[1] * 2;
   const depthOrderPass = JSON.stringify(depthPixels.far_near) === JSON.stringify(depthPixels.near_far) && frontColorVisible(depthPixels.far_near);
   if (!depthOrderPass) throw new Error(`WebGL sphere depth order failed: ${JSON.stringify(depthPixels)}`);
+  const meshDepthPixels = {};
+  for (const order of ["far_near", "near_far"]) {
+    const targetResponse = await fetch(`http://127.0.0.1:${port}/json/new?http://127.0.0.1:${httpPort}/mesh_depth_${order}.html`, { method: "PUT" });
+    if (!targetResponse.ok) throw new Error(`ray-mesh depth target create failed: ${targetResponse.status}`);
+    const target = await targetResponse.json();
+    const cdp = await connect(target);
+    await cdp.send("Runtime.enable");
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width: 960, height: 600, deviceScaleFactor: 1, mobile: false });
+    for (let wait = 0; wait < 100; wait++) {
+      const ready = await cdp.send("Runtime.evaluate", { expression: "!!(window.anvil && window.anvil.exports.anvil_frame)", returnByValue: true });
+      if (ready.result.value) break;
+      await delay(50);
+      if (wait === 99) throw new Error(`ray-mesh depth ${order} page did not initialize`);
+    }
+    const evaluated = await cdp.send("Runtime.evaluate", {
+      expression: "(() => { const canvas=document.createElement('canvas'); const gl=canvas.getContext('webgl'); if(!gl) throw new Error('WebGL unavailable'); window.anvil.exports.anvil_frame(16.6667); return Array.from(document.getElementById('screen').getContext('2d').getImageData(480,324,1,1).data); })()",
+      returnByValue: true,
+    });
+    if (evaluated.exceptionDetails) throw new Error(JSON.stringify(evaluated.exceptionDetails));
+    meshDepthPixels[order] = evaluated.result.value;
+    cdp.ws.close();
+  }
+  const meshDepthOrderPass = JSON.stringify(meshDepthPixels.far_near) === JSON.stringify(meshDepthPixels.near_far) && frontColorVisible(meshDepthPixels.far_near);
+  if (!meshDepthOrderPass) throw new Error(`WebGL ray-mesh depth order failed: ${JSON.stringify(meshDepthPixels)}`);
+  const morphPixels = {};
+  for (const mode of ["default", "override"]) {
+    const targetResponse = await fetch(`http://127.0.0.1:${port}/json/new?http://127.0.0.1:${httpPort}/mesh_morph_${mode}.html`, { method: "PUT" });
+    if (!targetResponse.ok) throw new Error(`ray-mesh morph target create failed: ${targetResponse.status}`);
+    const target = await targetResponse.json();
+    const cdp = await connect(target);
+    await cdp.send("Runtime.enable");
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width: 960, height: 600, deviceScaleFactor: 1, mobile: false });
+    for (let wait = 0; wait < 100; wait++) {
+      const ready = await cdp.send("Runtime.evaluate", { expression: "!!(window.anvil && window.anvil.exports.anvil_frame)", returnByValue: true });
+      if (ready.result.value) break;
+      await delay(50);
+      if (wait === 99) throw new Error(`ray-mesh morph ${mode} page did not initialize`);
+    }
+    const evaluated = await cdp.send("Runtime.evaluate", {
+      expression: "(() => { const gl=document.createElement('canvas').getContext('webgl'); if(!gl) throw new Error('WebGL unavailable'); window.anvil.exports.anvil_frame(16.6667); return Array.from(document.getElementById('screen').getContext('2d').getImageData(480,324,1,1).data); })()",
+      returnByValue: true,
+    });
+    if (evaluated.exceptionDetails) throw new Error(JSON.stringify(evaluated.exceptionDetails));
+    morphPixels[mode] = evaluated.result.value;
+    cdp.ws.close();
+  }
+  const morphDefaultVisible = frontColorVisible(morphPixels.default);
+  const morphOverrideMoved = JSON.stringify(morphPixels.default) !== JSON.stringify(morphPixels.override) && morphPixels.override[0] < 40 && morphPixels.override[1] < 40 && morphPixels.override[2] < 60;
+  if (!morphDefaultVisible || !morphOverrideMoved) throw new Error(`WebGL ray-mesh morph failed: ${JSON.stringify(morphPixels)}`);
+  const modelDrawMorphPixels = {};
+  for (const mode of ["default", "override"]) {
+    const targetResponse = await fetch(`http://127.0.0.1:${port}/json/new?http://127.0.0.1:${httpPort}/mesh_morph_draw_${mode}.html`, { method: "PUT" });
+    if (!targetResponse.ok) throw new Error(`model-draw morph target create failed: ${targetResponse.status}`);
+    const target = await targetResponse.json();
+    const cdp = await connect(target);
+    await cdp.send("Runtime.enable");
+    await cdp.send("Emulation.setDeviceMetricsOverride", { width: 960, height: 600, deviceScaleFactor: 1, mobile: false });
+    for (let wait = 0; wait < 100; wait++) {
+      const ready = await cdp.send("Runtime.evaluate", { expression: "!!(window.anvil && window.anvil.exports.anvil_frame)", returnByValue: true });
+      if (ready.result.value) break;
+      await delay(50);
+      if (wait === 99) throw new Error(`model-draw morph ${mode} page did not initialize`);
+    }
+    const evaluated = await cdp.send("Runtime.evaluate", {
+      expression: "(() => { const gl=document.createElement('canvas').getContext('webgl'); if(!gl) throw new Error('WebGL unavailable'); window.anvil.exports.anvil_frame(16.6667); return Array.from(document.getElementById('screen').getContext('2d').getImageData(480,324,1,1).data); })()",
+      returnByValue: true,
+    });
+    if (evaluated.exceptionDetails) throw new Error(JSON.stringify(evaluated.exceptionDetails));
+    modelDrawMorphPixels[mode] = evaluated.result.value;
+    cdp.ws.close();
+  }
+  const modelDrawMorphPass = frontColorVisible(modelDrawMorphPixels.default) &&
+    JSON.stringify(modelDrawMorphPixels.default) !== JSON.stringify(modelDrawMorphPixels.override) &&
+    modelDrawMorphPixels.override[0] < 40 && modelDrawMorphPixels.override[1] < 40 && modelDrawMorphPixels.override[2] < 60;
+  if (!modelDrawMorphPass) throw new Error(`WebGL model-draw morph failed: ${JSON.stringify(modelDrawMorphPixels)}`);
   const summaries = [1, 8, 32].map((spheres) => {
     const rows = results.filter((row) => row.spheres === spheres);
     return {
@@ -194,7 +357,7 @@ try {
     if (row.heap_peak_mb > budgets.heap_peak_mb[row.spheres]) missed.push(`${row.spheres} spheres heap ${row.heap_peak_mb.toFixed(1)} MB > ${budgets.heap_peak_mb[row.spheres]} MB`);
     return missed;
   });
-  const output = { chrome: await (await fetch(`http://127.0.0.1:${port}/json/version`)).json(), platform: { os: os.platform(), release: os.release(), arch: os.arch(), cpu: os.cpus()[0]?.model }, warmup_frames: warmupCount, measured_frames_per_trial: sampleCount, trials, budgets, summaries, depth_pixels: depthPixels, depth_order_pass: depthOrderPass, results, failures };
+  const output = { chrome: await (await fetch(`http://127.0.0.1:${port}/json/version`)).json(), platform: { os: os.platform(), release: os.release(), arch: os.arch(), cpu: os.cpus()[0]?.model }, warmup_frames: warmupCount, measured_frames_per_trial: sampleCount, trials, budgets, summaries, depth_pixels: depthPixels, depth_order_pass: depthOrderPass, ray_mesh_depth_pixels: meshDepthPixels, ray_mesh_depth_order_pass: meshDepthOrderPass, ray_mesh_morph_pixels: morphPixels, ray_mesh_morph_pass: morphDefaultVisible && morphOverrideMoved, model_draw_morph_pixels: modelDrawMorphPixels, model_draw_morph_pass: modelDrawMorphPass, results, failures };
   const outputPath = process.env.WASM_RAY_BENCH_OUTPUT || path.join(root, ".scratch/wasm_ray_sphere_chromium.json");
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));

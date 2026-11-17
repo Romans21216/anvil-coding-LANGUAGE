@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import pathlib
 import re
 import struct
@@ -194,6 +195,8 @@ def _primitive(
     positions = _accessor(document, attributes["POSITION"], base_dir, binary)
     if attributes.get("POSITION") is not None and len(positions) and len(positions[0]) != 3:
         raise ModelError("POSITION must be a VEC3 accessor")
+    if any(not math.isfinite(float(value)) for row in positions for value in row):
+        raise ModelError("POSITION contains a non-finite value")
     if primitive.get("indices") is not None:
         indices = [
             int(row[0])
@@ -214,6 +217,8 @@ def _primitive(
         if "POSITION" not in target:
             raise ModelError("a morph target needs a POSITION delta")
         raw = _accessor(document, target["POSITION"], base_dir, binary)
+        if any(not math.isfinite(float(value)) for row in raw for value in row):
+            raise ModelError("a morph target contains a non-finite value")
         # Only the linear part of the world matrix applies to a delta; the
         # translation would move a delta that is a displacement, not a point.
         deltas.append(
@@ -226,6 +231,13 @@ def _primitive(
                 for row in raw
             ]
         )
+    if any(
+        not math.isfinite(component)
+        for target in deltas
+        for vertex in target
+        for component in vertex
+    ):
+        raise ModelError("a transformed morph target contains a non-finite value")
 
     triangles = _triangle_indices(primitive.get("mode", 4), len(indices))
     out: list[float] = []
@@ -246,6 +258,8 @@ def _primitive(
             for corner in corners:
                 for target in deltas:
                     morph_out.extend(target[corner])
+    if any(not math.isfinite(value) for value in out):
+        raise ModelError("the transformed geometry contains a non-finite value")
     return out
 
 
@@ -301,6 +315,8 @@ def _static_walk(
     binary: bytes | None,
     base_dir: pathlib.Path,
     morph_out: list[float] | None = None,
+    morph_defaults_out: list[list[float]] | None = None,
+    morph_groups_out: list[int] | None = None,
 ) -> tuple[list[float], list[int]]:
     """Bake every mesh in world space; optionally collect morph deltas."""
     nodes = document.get("nodes", [])
@@ -322,10 +338,17 @@ def _static_walk(
         if "mesh" in node:
             mesh = _mesh_for_node(document, node)
             for primitive in mesh.get("primitives", []):
+                first = len(triangles) // 12
                 triangles.extend(
                     _primitive(document, primitive, world, base_dir, binary, morph_out)
                 )
                 target_counts.append(len(primitive.get("targets", [])))
+                if morph_defaults_out is not None and primitive.get("targets"):
+                    morph_defaults_out.append(
+                        _morph_defaults(document, node, len(primitive["targets"]))
+                    )
+                    if morph_groups_out is not None:
+                        morph_groups_out.extend((first, len(triangles) // 12 - first))
                 if len(triangles) // 12 > MAX_TRIANGLES:
                     raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
         for child in node.get("children", []):
@@ -355,6 +378,21 @@ def _mesh_for_node(document: dict, node: dict) -> dict:
     return meshes[index]
 
 
+def _morph_defaults(document: dict, node: dict, target_count: int) -> list[float]:
+    """Resolve the glTF node-over-mesh default precedence for one group."""
+    mesh = _mesh_for_node(document, node)
+    raw = node.get("weights", mesh.get("weights", [0.0] * target_count))
+    if not isinstance(raw, list) or len(raw) != target_count:
+        raise ModelError("a node's default morph weights do not match its targets")
+    try:
+        values = [float(value) for value in raw]
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ModelError("a node's default morph weights are not numeric") from error
+    if any(not math.isfinite(value) for value in values):
+        raise ModelError("a node's default morph weights must be finite")
+    return values
+
+
 def _static_document(path: pathlib.Path) -> tuple[dict, bytes | None]:
     document, binary = _container(path)
     if not isinstance(document, dict) or "asset" not in document:
@@ -379,7 +417,11 @@ def load_morphed(path: pathlib.Path) -> dict:
     """
     document, binary = _static_document(path)
     morph: list[float] = []
-    triangles, counts = _static_walk(document, binary, path.parent, morph)
+    group_defaults: list[list[float]] = []
+    morph_groups: list[int] = []
+    triangles, counts = _static_walk(
+        document, binary, path.parent, morph, group_defaults, morph_groups
+    )
     if not triangles:
         raise ModelError("the model has no triangle geometry")
     if not counts or max(counts) == 0:
@@ -389,19 +431,12 @@ def load_morphed(path: pathlib.Path) -> dict:
         raise ModelError("every primitive must use the same morph target count")
     if targets > MAX_MORPH_TARGETS:
         raise ModelError(f"a model may use at most {MAX_MORPH_TARGETS} morph targets")
-    defaults = [0.0] * targets
-    for mesh in document.get("meshes", []):
-        weights = mesh.get("weights")
-        if weights:
-            if len(weights) != targets:
-                raise ModelError("a mesh's default morph weights do not match its targets")
-            defaults = [float(value) for value in weights]
-            break
     return {
         "vertices": triangles,
         "morph": morph,
         "morph_count": targets,
-        "morph_defaults": defaults,
+        "morph_defaults": [weight for group in group_defaults for weight in group],
+        "morph_groups": morph_groups,
     }
 
 
@@ -726,6 +761,7 @@ def load_animated(path: pathlib.Path) -> dict:
     groups: list[int] = []
     morph: list[float] = []
     morph_counts: list[int] = []
+    group_defaults: list[list[float]] = []
 
     def visit(index: int, depth: int) -> None:
         if depth > 64:
@@ -735,7 +771,18 @@ def load_animated(path: pathlib.Path) -> dict:
         node = nodes_doc[index]
         if "mesh" in node:
             first = len(vertices) // 12
-            for primitive in _mesh_for_node(document, node).get("primitives", []):
+            mesh = _mesh_for_node(document, node)
+            primitives = mesh.get("primitives", [])
+            node_target_count = max(
+                (len(primitive.get("targets", [])) for primitive in primitives),
+                default=0,
+            )
+            node_defaults = (
+                _morph_defaults(document, node, node_target_count)
+                if node_target_count
+                else None
+            )
+            for primitive in primitives:
                 vertices.extend(
                     _primitive(
                         document, primitive, _identity(), base_dir, binary,
@@ -746,6 +793,8 @@ def load_animated(path: pathlib.Path) -> dict:
             count = len(vertices) // 12 - first
             if count:
                 groups.extend((index, first, count))
+                if node_defaults is not None:
+                    group_defaults.append(node_defaults)
             if len(vertices) // 12 > MAX_TRIANGLES:
                 raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
         for child in node.get("children", []):
@@ -773,16 +822,9 @@ def load_animated(path: pathlib.Path) -> dict:
             raise ModelError(f"a model may use at most {MAX_MORPH_TARGETS} morph targets")
         if any(count != target_count for count in morph_counts):
             raise ModelError("every animated primitive must use the same morph target count")
-        defaults = [0.0] * target_count
-        for mesh in document.get("meshes", []):
-            weights = mesh.get("weights")
-            if weights:
-                if len(weights) != target_count:
-                    raise ModelError("a mesh's default morph weights do not match its targets")
-                defaults = [float(value) for value in weights]
-                break
         entry.update({"morph": morph, "morph_count": target_count,
-                      "morph_defaults": defaults})
+                      "morph_defaults": [weight for group in group_defaults
+                                          for weight in group]})
     elif any(morph_counts):
         raise ModelError("every animated primitive must use the same morph target count")
     return entry
@@ -928,11 +970,15 @@ def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
         data = load_triangles(path)
         entry.update({"animated": False, "count": len(data) // 12, "data": data})
         entry["bounds"] = bounds_of(data)
-    if (entry.get("animated") or entry.get("skinned")) and entry["id"] >= MODEL_STATES:
-        # The runtime's clock table has MODEL_STATES slots; a posed model past
-        # it would read clock 0 forever and never move. Fail at the source line.
+    if (
+        (entry.get("animated") or entry.get("skinned") or entry.get("morph_count"))
+        and entry["id"] >= MODEL_STATES
+    ):
+        # The runtime state table also stores morph overrides. A morphing model
+        # past it would silently ignore model_morph() writes. Fail at source.
         raise ModelError(
-            f"the model needs clock slot {entry['id']} but only {MODEL_STATES} "
+            f"the model needs runtime state slot {entry['id']} (clock slot "
+            f"{entry['id']} for animated assets) but only {MODEL_STATES} "
             "models can be registered; reduce the number of models before it"
         )
     _registry[key] = entry
@@ -1008,6 +1054,7 @@ def definitions() -> list[str]:
             )
             _double_array(lines, symbol, entry["data"], 12)
             _double_array(lines, symbol + "_morph", entry["morph"], 12)
+            _int_array(lines, symbol + "_morph_groups", entry["morph_groups"], 12)
             _double_array(lines, symbol + "_morph_default", entry["morph_defaults"], 8)
         else:
             lines.append(f"/* model: {pathlib.Path(key).name}, {count} triangles */")

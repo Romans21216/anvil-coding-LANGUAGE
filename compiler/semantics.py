@@ -294,17 +294,51 @@ def _has_compare(value: str) -> bool:
 
 
 def _validate_declared_types(program, string_vars: set[str]) -> set[str]:
-    """Check `set var(x): type = value` annotations and collect bool variables."""
+    """Check annotated storage on every assignment and collect bool variables."""
     entries = [(node, None) for node in _walk_all(program.top)]
     for function in program.functions.values():
         entries.extend((node, function) for node in _walk_all(function.body))
 
-    bool_vars: set[str] = set()
+    def storage_key(node, scope):
+        if scope is not None and node.name in scope.params:
+            return ("parameter", scope.name, node.name)
+        return ("global", node.name)
+
+    declared_types = {}
+    for node, scope in entries:
+        declared = getattr(node, "declared_type", None)
+        if node.kind not in ("set", "local_set") or declared is None:
+            continue
+        key = storage_key(node, scope)
+        previous = declared_types.get(key)
+        if previous is not None and previous != declared:
+            raise CompileError(
+                f"{node.source or program.path}:{node.line}: {node.name!r} is "
+                f"already declared as {previous}, not {declared}"
+            )
+        declared_types[key] = declared
+
+    for function in program.functions.values():
+        function.bool_params = {
+            name
+            for name in function.params
+            if declared_types.get(("parameter", function.name, name)) == "bool"
+        }
+
+    bool_vars: set[str] = {
+        node.name
+        for node, scope in entries
+        if node.kind == "set"
+        and getattr(node, "declared_type", None) == "bool"
+        and (scope is None or node.name not in scope.params)
+    }
     for _pass in range(4):
         changed = False
         for node, _scope in entries:
-            declared = getattr(node, "declared_type", None)
-            if node.kind not in ("set", "local_set") or declared is None:
+            if node.kind not in ("set", "local_set"):
+                continue
+            declared = declared_types.get(storage_key(node, _scope))
+            if declared is None:
                 continue
             kind = _declared_kind(program, node, string_vars, bool_vars)
             shown = {"number": "a number", "text": "text", "bool": "a bool"}[kind]
@@ -324,7 +358,12 @@ def _validate_declared_types(program, string_vars: set[str]) -> set[str]:
                     f"{node.source or program.path}:{node.line}: declared text "
                     f"but this value is {shown}"
                 )
-            if declared == "bool" and node.name not in bool_vars:
+            if (
+                declared == "bool"
+                and node.kind == "set"
+                and (_scope is None or node.name not in _scope.params)
+                and node.name not in bool_vars
+            ):
                 bool_vars.add(node.name)
                 changed = True
         if not changed:

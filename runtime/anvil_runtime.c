@@ -99,6 +99,7 @@ typedef struct {
   double cx, cy, cz, radius;
   double x, y, z, scale, rx, ry, rz;
   const double *morph_weights;
+  double morph_weights_storage[ANVIL_MORPH_TARGETS];
   size_t transient_bytes;
 } AnvilTraceMesh;
 typedef struct {
@@ -1136,13 +1137,22 @@ static int anvil_model_pose(const double *nodes, int node_count,
   return 1;
 }
 
+static void anvil_model_morph_group_weights(
+    int id, const double *defaults, const double *current, int count,
+    double *weights);
+
 double anvil_mesh_draw_animated(
     const double *data, int triangle_count, const double *nodes, int node_count,
     const int *parents, const int *groups, int group_count, const double *times,
     const double *values, const int *tracks, int track_count, double clip_length,
-    double clip_time, double x, double y, double z, double scale, double rx,
+    double clip_time, const double *morph_deltas,
+    const double *group_defaults, const double *morph_weights, int model_id,
+    int morph_count, double x, double y, double z, double scale, double rx,
     double ry, double rz) {
   if (!data || !groups || triangle_count <= 0 || group_count <= 0 ||
+      morph_count < 0 || morph_count > ANVIL_MORPH_TARGETS ||
+      (morph_count > 0 &&
+       (!morph_deltas || !group_defaults || !morph_weights)) ||
       !isfinite(x) || !isfinite(y) || !isfinite(z) || !isfinite(scale) ||
       !isfinite(rx) || !isfinite(ry) || !isfinite(rz) || scale == 0.0)
     return 0.0;
@@ -1150,6 +1160,7 @@ double anvil_mesh_draw_animated(
                         track_count, clip_length, clip_time))
     return 0.0;
   anvil_mesh_drawn_frame++;
+  double group_weights[ANVIL_MORPH_TARGETS];
   for (int group = 0; group < group_count; ++group) {
     const int *entry = groups + group * 3;
     int node = entry[0];
@@ -1157,14 +1168,29 @@ double anvil_mesh_draw_animated(
     int count = entry[2];
     if (node < 0 || node >= node_count)
       continue;
+    if (morph_count > 0)
+      anvil_model_morph_group_weights(
+          model_id, group_defaults + (size_t)group * (size_t)morph_count,
+          morph_weights, morph_count, group_weights);
     const double *matrix = anvil_model_world[node];
     for (int triangle = first; triangle < first + count; ++triangle) {
       const double *p = data + (size_t)triangle * 12;
       AnvilVec3 v[3];
       for (int corner = 0; corner < 3; ++corner) {
         double point[3];
-        anvil_mat_point(matrix, p[corner * 3], p[corner * 3 + 1],
-                        p[corner * 3 + 2], point);
+        double px = p[corner * 3], py = p[corner * 3 + 1];
+        double pz = p[corner * 3 + 2];
+        if (morph_count > 0) {
+          size_t vertex = (size_t)triangle * 3 + (size_t)corner;
+          for (int target = 0; target < morph_count; ++target) {
+            const double *delta = morph_deltas +
+                (vertex * (size_t)morph_count + (size_t)target) * 3;
+            px += delta[0] * group_weights[target];
+            py += delta[1] * group_weights[target];
+            pz += delta[2] * group_weights[target];
+          }
+        }
+        anvil_mat_point(matrix, px, py, pz, point);
         AnvilVec3 q = {point[0] * scale, point[1] * scale, point[2] * scale};
         q = anvil_rotate(q, rx, ry, rz);
         v[corner] = (AnvilVec3){x + q.x, y + q.y, z + q.z};
@@ -1250,6 +1276,7 @@ double anvil_mesh_draw_skinned(
 
 static double anvil_morph_values[ANVIL_MODEL_STATES][ANVIL_MORPH_TARGETS];
 static int anvil_morph_ready[ANVIL_MODEL_STATES];
+static int anvil_morph_overridden[ANVIL_MODEL_STATES][ANVIL_MORPH_TARGETS];
 
 /* Weights start at the mesh's default blend; the first draw initialises them
    and model_morph() edits them in place. */
@@ -1266,6 +1293,16 @@ const double *anvil_model_morph_weights(int id, const double *defaults,
   return anvil_morph_values[id];
 }
 
+static void anvil_model_morph_group_weights(
+    int id, const double *defaults, const double *current, int count,
+    double *weights) {
+  for (int i = 0; i < count; ++i)
+    weights[i] = id >= 0 && id < ANVIL_MODEL_STATES &&
+                         anvil_morph_overridden[id][i]
+                     ? current[i]
+                     : defaults[i];
+}
+
 double anvil_model_morph(int id, int index, double weight,
                          const double *defaults, int count) {
   if (id < 0 || id >= ANVIL_MODEL_STATES || index < 0 ||
@@ -1277,21 +1314,16 @@ double anvil_model_morph(int id, int index, double weight,
   double previous = anvil_morph_values[id][index];
   anvil_morph_values[id][index] =
       weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
+  anvil_morph_overridden[id][index] = 1;
   return previous;
 }
 
-double anvil_mesh_draw_morphed(const double *data, int triangle_count,
-                               const double *deltas, int targets,
-                               const double *weights, double x, double y,
-                               double z, double scale, double rx, double ry,
-                               double rz) {
-  if (!data || !deltas || !weights || triangle_count <= 0 || targets <= 0 ||
-      targets > ANVIL_MORPH_TARGETS || !isfinite(x) || !isfinite(y) ||
-      !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
-      !isfinite(rz) || scale == 0.0)
-    return 0.0;
-  anvil_mesh_drawn_frame++;
-  for (int triangle = 0; triangle < triangle_count; ++triangle) {
+static void anvil_mesh_draw_morphed_range(
+    const double *data, int first_triangle, int triangle_count,
+    const double *deltas, int targets, const double *weights, double x,
+    double y, double z, double scale, double rx, double ry, double rz) {
+  for (int offset = 0; offset < triangle_count; ++offset) {
+    int triangle = first_triangle + offset;
     const double *p = data + (size_t)triangle * 12;
     AnvilVec3 v[3];
     for (int corner = 0; corner < 3; ++corner) {
@@ -1317,6 +1349,54 @@ double anvil_mesh_draw_morphed(const double *data, int triangle_count,
     double brightness = anvil_light_level(n, 1);
     uint32_t base = anvil_color((int)p[9], (int)p[10], (int)p[11]);
     anvil_world_triangle(v, base, brightness, 255);
+  }
+}
+
+double anvil_mesh_draw_morphed(const double *data, int triangle_count,
+                               const double *deltas, int targets,
+                               const double *weights, double x, double y,
+                               double z, double scale, double rx, double ry,
+                               double rz) {
+  if (!data || !deltas || !weights || triangle_count <= 0 || targets <= 0 ||
+      targets > ANVIL_MORPH_TARGETS || !isfinite(x) || !isfinite(y) ||
+      !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
+      !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  anvil_mesh_drawn_frame++;
+  anvil_mesh_draw_morphed_range(data, 0, triangle_count, deltas, targets,
+                                weights, x, y, z, scale, rx, ry, rz);
+  return 1.0;
+}
+
+double anvil_mesh_draw_morphed_groups(
+    const double *data, int triangle_count, const double *deltas,
+    const int *groups, int group_count, const double *group_defaults,
+    const double *current_weights, int model_id, int targets, double x,
+    double y, double z, double scale, double rx, double ry, double rz) {
+  if (!data || !deltas || !groups || !group_defaults || !current_weights ||
+      triangle_count <= 0 || group_count <= 0 || targets <= 0 ||
+      targets > ANVIL_MORPH_TARGETS || !isfinite(x) || !isfinite(y) ||
+      !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
+      !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (first < 0 || count < 0 || first > triangle_count ||
+        count > triangle_count - first)
+      return 0.0;
+  }
+  anvil_mesh_drawn_frame++;
+  double weights[ANVIL_MORPH_TARGETS];
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (!count) continue;
+    anvil_model_morph_group_weights(
+        model_id, group_defaults + (size_t)group * (size_t)targets,
+        current_weights, targets, weights);
+    anvil_mesh_draw_morphed_range(data, first, count, deltas, targets, weights,
+                                  x, y, z, scale, rx, ry, rz);
   }
   return 1.0;
 }
@@ -3472,10 +3552,23 @@ static double anvil_trace_mesh_register(
   if (!data || triangle_count <= 0 || triangle_count > ANVIL_MESH_MAX_TRIANGLES ||
       anvil_trace_mesh_count >= ANVIL_TRACE_MESHES || !isfinite(x) ||
       !isfinite(y) || !isfinite(z) || !isfinite(scale) || scale == 0.0 ||
-      !isfinite(rx) || !isfinite(ry) || !isfinite(rz) || morph_count < 0 ||
-      morph_count > 8 || (morph_count > 0 &&
+      !isfinite(rx) || !isfinite(ry) || !isfinite(rz) || !isfinite(cx) ||
+      !isfinite(cy) || !isfinite(cz) || !isfinite(radius) || radius < 0.0 ||
+      morph_count < 0 ||
+      morph_count > ANVIL_MORPH_TARGETS || (morph_count > 0 &&
                           (!morph_deltas || !morph_defaults || !morph_weights)))
     return 0.0;
+  if (morph_count > 0) {
+    size_t values = (size_t)triangle_count * 9 * (size_t)morph_count;
+    for (int i = 0; i < morph_count; ++i) {
+      if (!isfinite(morph_defaults[i]) || !isfinite(morph_weights[i]))
+        return 0.0;
+    }
+    for (size_t i = 0; i < values; ++i) {
+      if (!isfinite(morph_deltas[i]))
+        return 0.0;
+    }
+  }
   AnvilMeshBvh *bvh = anvil_mesh_bvh_get(
       data, triangle_count, morph_deltas, morph_defaults, morph_count);
   if (!bvh)
@@ -3494,7 +3587,11 @@ static double anvil_trace_mesh_register(
   mesh->rx = rx;
   mesh->ry = ry;
   mesh->rz = rz;
-  mesh->morph_weights = morph_weights;
+  if (morph_count > 0) {
+    memcpy(mesh->morph_weights_storage, morph_weights,
+           (size_t)morph_count * sizeof(*morph_weights));
+    mesh->morph_weights = mesh->morph_weights_storage;
+  }
   return 1.0;
 }
 
@@ -3517,6 +3614,94 @@ double anvil_trace_mesh_morphed(
                                    morph_defaults, morph_weights, morph_count,
                                    cx, cy, cz, radius, x, y, z, scale, rx, ry,
                                    rz);
+}
+
+double anvil_trace_mesh_morphed_groups(
+    const double *data, int triangle_count, const double *morph_deltas,
+    const int *groups, int group_count, const double *group_defaults,
+    const double *current_weights, int model_id, int morph_count,
+    double cx, double cy, double cz, double radius, double x, double y,
+    double z, double scale, double rx, double ry, double rz) {
+  if (!data || !morph_deltas || !groups || !group_defaults ||
+      !current_weights || triangle_count <= 0 || group_count <= 0 ||
+      triangle_count > ANVIL_MESH_MAX_TRIANGLES || morph_count <= 0 ||
+      morph_count > ANVIL_MORPH_TARGETS || !isfinite(cx) || !isfinite(cy) ||
+      !isfinite(cz) || !isfinite(radius) || radius < 0.0 || !isfinite(x) ||
+      !isfinite(y) || !isfinite(z) || !isfinite(scale) || scale == 0.0 ||
+      !isfinite(rx) || !isfinite(ry) || !isfinite(rz))
+    return 0.0;
+  for (int i = 0; i < morph_count; ++i) {
+    if (!isfinite(current_weights[i]))
+      return 0.0;
+  }
+  int active_groups = 0;
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (first < 0 || count < 0 || first > triangle_count ||
+        count > triangle_count - first)
+      return 0.0;
+    const double *defaults =
+        group_defaults + (size_t)group * (size_t)morph_count;
+    for (int target = 0; target < morph_count; ++target) {
+      if (!isfinite(defaults[target]))
+        return 0.0;
+    }
+    if (count > 0) {
+      const double *group_deltas =
+          morph_deltas + (size_t)first * 9 * (size_t)morph_count;
+      size_t values = (size_t)count * 9 * (size_t)morph_count;
+      for (size_t i = 0; i < values; ++i) {
+        if (!isfinite(group_deltas[i]))
+          return 0.0;
+      }
+    }
+    active_groups += count > 0;
+  }
+  if (active_groups > ANVIL_TRACE_MESHES - anvil_trace_mesh_count)
+    return 0.0;
+  size_t new_bvh_bytes = 0;
+  int new_bvh_count = 0;
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (!count) continue;
+    const double *group_data = data + (size_t)first * 12;
+    const double *group_deltas =
+        morph_deltas + (size_t)first * 3 * (size_t)morph_count * 3;
+    const double *defaults =
+        group_defaults + (size_t)group * (size_t)morph_count;
+    if (anvil_mesh_bvh_cached(group_data, count, group_deltas, defaults,
+                              morph_count))
+      continue;
+    ++new_bvh_count;
+    new_bvh_bytes += (size_t)count *
+                     (2 * sizeof(AnvilBvhNode) + sizeof(int));
+  }
+  if (new_bvh_count > ANVIL_MESH_BVH_CACHE - anvil_mesh_bvh_cache_count ||
+      anvil_mesh_bvh_memory_bytes > ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES ||
+      new_bvh_bytes > ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES -
+                          anvil_mesh_bvh_memory_bytes)
+    return 0.0;
+  double weights[ANVIL_MORPH_TARGETS];
+  int starting_mesh_count = anvil_trace_mesh_count;
+  for (int group = 0; group < group_count; ++group) {
+    int first = groups[group * 2];
+    int count = groups[group * 2 + 1];
+    if (!count) continue;
+    anvil_model_morph_group_weights(
+        model_id, group_defaults + (size_t)group * (size_t)morph_count,
+        current_weights, morph_count, weights);
+    if (!anvil_trace_mesh_register(
+            data + (size_t)first * 12, count,
+            morph_deltas + (size_t)first * 3 * (size_t)morph_count * 3,
+            group_defaults + (size_t)group * (size_t)morph_count, weights,
+            morph_count, cx, cy, cz, radius, x, y, z, scale, rx, ry, rz)) {
+      anvil_trace_mesh_count = starting_mesh_count;
+      return 0.0;
+    }
+  }
+  return 1.0;
 }
 
 static int anvil_ray_backend_id(const char *name) {
@@ -3785,6 +3970,19 @@ static void anvil_mesh_bvh_cleanup(void) {
   anvil_mesh_bvh_memory_bytes = 0;
 }
 
+static int anvil_mesh_bvh_cached(const double *data, int triangle_count,
+                                const double *morph_deltas,
+                                const double *morph_defaults, int morph_count) {
+  for (int i = 0; i < anvil_mesh_bvh_cache_count; ++i)
+    if (anvil_mesh_bvh_cache[i].data == data &&
+        anvil_mesh_bvh_cache[i].triangle_count == triangle_count &&
+        anvil_mesh_bvh_cache[i].morph_deltas == morph_deltas &&
+        anvil_mesh_bvh_cache[i].morph_defaults == morph_defaults &&
+        anvil_mesh_bvh_cache[i].morph_count == morph_count)
+      return 1;
+  return 0;
+}
+
 static AnvilMeshBvh *anvil_mesh_bvh_get(
     const double *data, int triangle_count, const double *morph_deltas,
     const double *morph_defaults, int morph_count) {
@@ -3871,12 +4069,14 @@ double anvil_trace_mesh_animated(
     const int *parents, const int *groups, int group_count, const double *times,
     const double *values, const int *tracks, int track_count, double clip_length,
     double clip_time, const double *morph_deltas,
-    const double *morph_weights, int morph_count, double x, double y,
-    double z, double scale, double rx, double ry, double rz) {
+    const double *group_defaults, const double *morph_weights, int model_id,
+    int morph_count, double x, double y, double z, double scale, double rx,
+    double ry, double rz) {
   if (!data || !groups || triangle_count <= 0 ||
       triangle_count > ANVIL_MESH_MAX_TRIANGLES || group_count <= 0 ||
       morph_count < 0 || morph_count > ANVIL_MORPH_TARGETS ||
-      (morph_count > 0 && (!morph_deltas || !morph_weights)) ||
+      (morph_count > 0 &&
+       (!morph_deltas || !group_defaults || !morph_weights)) ||
       anvil_trace_mesh_count >= ANVIL_TRACE_MESHES || !isfinite(x) ||
       !isfinite(y) || !isfinite(z) || !isfinite(scale) || scale == 0.0 ||
       !isfinite(rx) || !isfinite(ry) || !isfinite(rz) ||
@@ -3933,10 +4133,16 @@ double anvil_trace_mesh_animated(
   bvh = &mesh->animated_bvh;
   memcpy(bvh->posed_data, data,
          (size_t)triangle_count * 12 * sizeof(*bvh->posed_data));
+  double group_weights[ANVIL_MORPH_TARGETS];
   for (int group = 0; group < group_count; ++group) {
     const int *entry = groups + group * 3;
     int node = entry[0], first = entry[1], count = entry[2];
     const double *matrix = anvil_model_world[node];
+    if (morph_count > 0)
+      anvil_model_morph_group_weights(
+          model_id,
+          group_defaults + (size_t)group * (size_t)morph_count,
+          morph_weights, morph_count, group_weights);
     for (int triangle = first; triangle < first + count; ++triangle) {
       const double *source = data + (size_t)triangle * 12;
       double *posed = bvh->posed_data + (size_t)triangle * 12;
@@ -3949,9 +4155,9 @@ double anvil_trace_mesh_animated(
           for (int target = 0; target < morph_count; ++target) {
             const double *delta = morph_deltas +
                 (vertex_index * (size_t)morph_count + (size_t)target) * 3;
-            px += delta[0] * morph_weights[target];
-            py += delta[1] * morph_weights[target];
-            pz += delta[2] * morph_weights[target];
+            px += delta[0] * group_weights[target];
+            py += delta[1] * group_weights[target];
+            pz += delta[2] * group_weights[target];
           }
         }
         anvil_mat_point(matrix, px, py, pz, posed + vertex * 3);
