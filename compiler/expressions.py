@@ -892,6 +892,11 @@ class ExpressionParser:
                     )
                 self.expect(",")
                 instance_handle = self.require_number(self.parse())
+                if re.search(r"\banvil_[A-Za-z0-9_]+\s*\(", instance_handle):
+                    raise CompileError(
+                        f"{self.path}:{self.line}: store a model instance handle "
+                        "in a variable before drawing it"
+                    )
                 state_id = f"(-(int)({instance_handle}))"
             if value == "ray_mesh" and model.get("skinned"):
                 raise CompileError(

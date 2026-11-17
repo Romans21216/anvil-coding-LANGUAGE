@@ -290,6 +290,26 @@ class GltfMorphTests(unittest.TestCase):
             output = run_poses(self, root, program)
         self.assertIn("state 1,0,0,0,1", output)
 
+    def test_instance_draw_requires_a_stored_handle(self) -> None:
+        with tempfile_dir() as root:
+            write_morph_model(root, "instance.gltf")
+            source = root / "nested.ANVL"
+            source.write_text(
+                "scene 3d\n\nfn(draw)\n"
+                '  set var(d) = model_draw_instance("instance.gltf", '
+                'model_instance("instance.gltf"), 0, 0, 0, 1, 0, 0, 0)\n'
+                "end\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "-o", str(root / "nested.exe")],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("store a model instance handle in a variable", result.stderr)
+
     def test_morph_group_bounds_cover_defaults_and_all_override_combinations(self) -> None:
         with tempfile_dir() as root:
             model = write_two_target_morph_model(
