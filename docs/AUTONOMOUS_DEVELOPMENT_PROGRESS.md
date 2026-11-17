@@ -1009,3 +1009,9 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Backend:** `display ray_sphere(...)` now emits a tessellated, flat-shaded sphere mesh in wasm `scene 3d`; shadow rays account for other queued spheres. This approximates the C runtime's exact per-pixel tracer, so the capability ledger records that limitation.
 - **Validation:** the wasm compiler rejects `ray_sphere` outside `scene 3d` with a source line, while keeping other unsupported shapes located.
 - **Tests:** `tests/test_wasm.py` checks the 2D refusal, an unrelated unsupported shape, and a two-sphere 3D frame with a broad triangle bound and varied shaded tones. Focused wasm suite: 47 passed in 30.03 s.
+
+## Batch 105 — benchmark CPU BVH scaling (backlog #351)
+
+- **Scenes:** `tools/bench_runtime.py` now exercises 1, 8, and 32 `ray_sphere` instances at the fixed 960×600 render size. Each invocation warms 30 frames, samples 120, and repeats the executable three times; scene work and presentation remain measured separately.
+- **Baseline:** measured work p50 was 0.38/2.62/13.62 ms and p95 was 0.38/2.88/14.62 ms for 1/8/32 spheres. The 32-sphere scene stayed below a 16.7 ms 60 Hz frame-work interval in this baseline.
+- **Budgets:** `tools/bench_budgets.json` stores a 2.5× work budget and separate present budget for each sphere count. Repeated `python tools/bench_runtime.py --scene ray_spheres_1 --scene ray_spheres_8 --scene ray_spheres_32 --runs 3 --check` passed. This is end-to-end frame work; isolated BVH construction and traversal timings remain unmeasured.

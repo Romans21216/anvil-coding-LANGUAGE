@@ -187,6 +187,37 @@ SCENES = {
     ),
 }
 
+
+def ray_sphere_scene(columns: int, rows: int) -> str:
+    """Build a fixed grid of traced spheres for BVH scaling measurements."""
+    x_offset = (columns - 1) * 0.65
+    y_offset = (rows - 1) * 0.65
+    return "\n".join(
+        (
+            "scene 3d",
+            "camera perspective 0 0 12",
+            "camera fov(70)",
+            "clear rgba(11, 16, 27, 255)",
+            "",
+            "fn(draw)",
+            f"  for local(x) = 0 to {columns - 1}",
+            f"    for local(y) = 0 to {rows - 1}",
+            f"      display ray_sphere(local(x) * 1.3 - {x_offset:g}, local(y) * 1.3 - {y_offset:g}, -1, 0.45) -rgb(172, 106, 255)",
+            "    end",
+            "  end",
+            "end",
+        )
+    )
+
+
+SCENES.update(
+    {
+        "ray_spheres_1": ray_sphere_scene(1, 1),
+        "ray_spheres_8": ray_sphere_scene(4, 2),
+        "ray_spheres_32": ray_sphere_scene(8, 4),
+    }
+)
+
 RUN_TIMEOUT = 120
 
 
