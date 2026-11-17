@@ -270,6 +270,12 @@ void anvil_frame_enter(void) {
 
 void anvil_frame_leave(void) { anvil_frame_depth -= 1; }
 
+/* The compiler pushes an Anvil function name on every entry so the C runtime
+   can print an allocation's call chain. The browser bakes its loads at compile
+   time and has no memory_report(), so the names are accepted and dropped. */
+void anvil_call_enter(const char *name) { (void)name; }
+void anvil_call_leave(void) {}
+
 double anvil_array_get(const double *values, int size, double index,
                        const char *path, int line) {
   (void)path;

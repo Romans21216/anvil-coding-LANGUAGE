@@ -132,8 +132,57 @@ typedef struct {
   const char *file;
   const char *path;
   int line;
+  /* The Anvil call chain that reached the load, innermost last. The compiler
+     pushes one name per function entry, so a load buried in helper functions
+     reports "fn(main) > fn(setup) > fn(load_world)" instead of only a line. */
+  const char *stack[8];
+  int depth;
+  int truncated;
 } AnvilAllocSite;
 static AnvilAllocSite anvil_image_sites[ANVIL_IMAGES];
+
+enum {
+  ANVIL_CALL_STACK_MAX = 64,
+  ANVIL_ALLOC_STACK_SHOWN = 8
+};
+static const char *anvil_call_names[ANVIL_CALL_STACK_MAX];
+static int anvil_call_depth;
+
+void anvil_call_enter(const char *name) {
+  if (anvil_call_depth < ANVIL_CALL_STACK_MAX)
+    anvil_call_names[anvil_call_depth] = name;
+  ++anvil_call_depth;
+}
+
+void anvil_call_leave(void) {
+  if (anvil_call_depth > 0)
+    --anvil_call_depth;
+}
+
+static void anvil_capture_site(AnvilAllocSite *site) {
+  int depth = anvil_call_depth < ANVIL_CALL_STACK_MAX ? anvil_call_depth
+                                                     : ANVIL_CALL_STACK_MAX;
+  site->depth = depth < ANVIL_ALLOC_STACK_SHOWN ? depth : ANVIL_ALLOC_STACK_SHOWN;
+  site->truncated = depth > ANVIL_ALLOC_STACK_SHOWN;
+  for (int i = 0; i < site->depth; ++i)
+    site->stack[i] = anvil_call_names[i];
+}
+
+/* "  file:line  from fn(a) > fn(b)  path" - the path stays last so a reader
+   can still grab it with a plain suffix match. */
+static void anvil_print_site(const AnvilAllocSite *site) {
+  printf("  %s:%d  ", site->file ? site->file : "?", site->line);
+  if (site->depth > 0) {
+    printf("from ");
+    for (int i = 0; i < site->depth; ++i)
+      printf("%sfn(%s)", i ? " > " : "", site->stack[i]);
+    if (site->truncated)
+      printf(" > ...");
+  } else {
+    printf("from top level");
+  }
+  printf("  %s\n", site->path ? site->path : "?");
+}
 static int anvil_clear_color[4] = {12, 17, 29, 255};
 static int anvil_scene_is_3d = 1;
 static double anvil_camera_x = 0.0, anvil_camera_y = 3.0, anvil_camera_z = 8.0;
@@ -1491,6 +1540,7 @@ double anvil_image_load_site(const char *path, const char *file, int line) {
     anvil_image_sites[slot].file = file;
     anvil_image_sites[slot].path = path;
     anvil_image_sites[slot].line = line;
+    anvil_capture_site(&anvil_image_sites[slot]);
   }
   return handle;
 }
@@ -4664,6 +4714,7 @@ double anvil_sound_load_site(const char *path, const char *file, int line) {
     anvil_sound_sites[slot].file = file;
     anvil_sound_sites[slot].path = path;
     anvil_sound_sites[slot].line = line;
+    anvil_capture_site(&anvil_sound_sites[slot]);
   }
   return handle;
 }
@@ -4681,12 +4732,9 @@ double anvil_memory_report(void) {
       continue;
     size_t bytes = (size_t)anvil_images[i].width * (size_t)anvil_images[i].height * 4u;
     image_bytes += bytes;
-    const AnvilAllocSite *site = &anvil_image_sites[i];
-    printf("  image %d  %dx%d  %llu bytes  %s:%d  %s\n", i,
-           anvil_images[i].width, anvil_images[i].height,
-           (unsigned long long)bytes,
-           site->file ? site->file : "?", site->line,
-           site->path ? site->path : "?");
+    printf("  image %d  %dx%d  %llu bytes  ", i, anvil_images[i].width,
+           anvil_images[i].height, (unsigned long long)bytes);
+    anvil_print_site(&anvil_image_sites[i]);
     ++live;
   }
   for (int i = 0; i < ANVIL_SOUND_SLOTS; ++i) {
@@ -4694,12 +4742,10 @@ double anvil_memory_report(void) {
       continue;
     size_t bytes = anvil_sounds[i].frame_count * 2u * sizeof(short);
     audio_bytes += bytes;
-    const AnvilAllocSite *site = &anvil_sound_sites[i];
-    printf("  sound %d  %llu frames  %llu bytes  %s:%d  %s\n", i,
+    printf("  sound %d  %llu frames  %llu bytes  ", i,
            (unsigned long long)anvil_sounds[i].frame_count,
-           (unsigned long long)bytes,
-           site->file ? site->file : "?", site->line,
-           site->path ? site->path : "?");
+           (unsigned long long)bytes);
+    anvil_print_site(&anvil_sound_sites[i]);
     ++live;
   }
   printf("  live allocations: %d  (%llu image bytes, %llu audio bytes)\n", live,

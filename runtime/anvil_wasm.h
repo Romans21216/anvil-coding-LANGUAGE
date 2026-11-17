@@ -66,6 +66,8 @@ void anvil_set_project(const char *name);
 void anvil_net_close(void);
 void anvil_frame_enter(void);
 void anvil_frame_leave(void);
+void anvil_call_enter(const char *name);
+void anvil_call_leave(void);
 
 double anvil_array_get(const double *values, int size, double index,
                        const char *path, int line);

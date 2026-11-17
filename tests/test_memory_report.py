@@ -129,5 +129,97 @@ class MemoryReportTests(unittest.TestCase):
             self.assertIn(":3:", combined)
 
 
+NESTED_PROGRAM = "\n".join(
+    (
+        "fn(load_world)",
+        '  set var(img) = image_load("a.bmp")',
+        "end",
+        "",
+        "fn(setup)",
+        "  call fn(load_world)",
+        '  set var(snd) = sound_load("tone.wav")',
+        "end",
+        "",
+        "fn(main)",
+        "  call fn(setup)",
+        "  say memory_report()",
+        "end",
+        "",
+        "call fn(main)",
+        "",
+    )
+)
+
+# The load runs in the setup block, before any fn is entered, so the report
+# has no chain to print and must say so rather than inventing one.
+TOP_LEVEL_PROGRAM = "\n".join(
+    (
+        'set var(img) = image_load("a.bmp")',
+        "fn(main)",
+        "  say memory_report()",
+        "end",
+        "",
+        "call fn(main)",
+        "",
+    )
+)
+
+DEEP_PROGRAM = "\n".join(
+    ["fn(step9)", '  set var(img) = image_load("a.bmp")', "end", ""]
+    + [line for level in range(8, 0, -1)
+       for line in (f"fn(step{level})", f"  call fn(step{level + 1})", "end", "")]
+    + ["fn(main)", "  call fn(step1)", "  say memory_report()", "end", "",
+       "call fn(main)", ""]
+)
+
+
+class AllocationCallStackTests(unittest.TestCase):
+    def run_program(self, root: pathlib.Path, program: str) -> subprocess.CompletedProcess[str]:
+        write_bmp(root / "a.bmp", 8, 8)
+        write_wave(root / "tone.wav")
+        source = root / "stack.ANVL"
+        source.write_text(program, encoding="utf-8")
+        executable = root / "stack.exe"
+        build = subprocess.run(
+            [sys.executable, str(COMPILER), str(source), "-o", str(executable)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        self.assertEqual(build.returncode, 0, build.stderr)
+        return subprocess.run(
+            [str(executable)], cwd=root, capture_output=True, text=True, timeout=60
+        )
+
+    def test_report_prints_the_call_chain(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            run = self.run_program(pathlib.Path(temp), NESTED_PROGRAM)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.splitlines()
+            image = next(line for line in lines if "image 0" in line)
+            sound = next(line for line in lines if "sound 0" in line)
+        self.assertIn("from fn(main) > fn(setup) > fn(load_world)", image)
+        self.assertIn("from fn(main) > fn(setup)", sound)
+        self.assertTrue(image.rstrip().endswith("a.bmp"), image)
+        self.assertTrue(sound.rstrip().endswith("tone.wav"), sound)
+
+    def test_a_top_level_load_says_so(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            run = self.run_program(pathlib.Path(temp), TOP_LEVEL_PROGRAM)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            image = next(line for line in run.stdout.splitlines() if "image 0" in line)
+        self.assertIn("from top level", image)
+        self.assertTrue(image.rstrip().endswith("a.bmp"), image)
+
+    def test_a_deep_chain_is_truncated_after_eight_names(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            run = self.run_program(pathlib.Path(temp), DEEP_PROGRAM)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            image = next(line for line in run.stdout.splitlines() if "image 0" in line)
+        self.assertIn("from fn(main) > fn(step1)", image)
+        self.assertIn(" > ...", image)
+        self.assertNotIn("fn(step9)", image)
+
+
 if __name__ == "__main__":
     unittest.main()

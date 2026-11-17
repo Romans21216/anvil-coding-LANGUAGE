@@ -842,7 +842,11 @@ def emit_c(
         arguments = ", ".join(c_name(name + "__" + param) for param in fn.params)
         lines.append(f"static {result_type} {c_name(name)}({params}) {{")
         lines.append("    anvil_frame_enter();")
+        # One name per entry makes memory_report() able to print the Anvil call
+        # chain that reached a load, not just the line inside the loader.
+        lines.append(f"    anvil_call_enter({json.dumps(name)});")
         lines.append(f"    {result_type} result = {c_name(name)}_body({arguments});")
+        lines.append("    anvil_call_leave();")
         lines.append("    anvil_frame_leave();")
         lines.append("    return result;")
         lines.extend(["}", ""])

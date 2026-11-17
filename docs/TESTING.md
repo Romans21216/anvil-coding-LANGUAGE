@@ -126,8 +126,10 @@ remote desktop can prevent window creation:
 - `test_memory_report` — builds a headless `fn(main)` program that loads an
   image and a WAV, asserts `memory_report()` names the exact `file:line` and
   byte counts of each live resource, that destroying the image drops it from
-  the report, and that the wasm backend refuses the builtin with a located
-  message.
+  the report, that a load three calls deep prints the whole
+  `fn(main) > fn(setup) > fn(load_world)` chain, that a setup-block load says
+  `from top level`, that a nine-deep chain is cut after eight names, and that
+  the wasm backend refuses the builtin with a located message.
 - `test_memory_budget` — samples the compiler's process tree and each scene's
   working set, checks generated C and executable sizes, and enforces
   `tools/mem_budgets.json`.
