@@ -958,3 +958,10 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Ordering fix:** a code review of the first cut found that an immediate transition requested from C `update()` set the one-frame `scene_changed` event before `anvil_scene_update()` cleared it, so that frame's draw missed it. The reset now happens in the frame prologue, before user update, matching the wasm order; `test_an_immediate_change_from_update_reaches_that_frames_draw` pins it (the change is visible to the same frame's draw and gone on the next).
 - **Tests:** `tests/test_scene_manager.py` (5 cases) covers an immediate change and its one-frame flag, a change requested from `update()`, a timed change whose name swaps while a real window reads black at the midpoint and the drawn frame afterwards, the overlap/empty/over-long refusals, and the wasm fade ramp peaking at 255 and returning to no overlay.
 - **Full suite:** 944 passed, 1 skipped, 1 xfailed in 483.12 s, exit 0.
+
+## Batch 98 — save-file versioning (8.14)
+
+- **Version API:** `save_version()` reads the per-project layout version (0 on a fresh project, 0 plus a named error for an unreadable file); `save_set_version(n)` stores a whole number 0–1000000, returns the previous one, and refuses anything else without touching the file. The value lives in `.version` beside the slots — a name no slot can take — and is replaced atomically like a slot.
+- **Format generation:** a save whose magic names a newer generation now reports `the save needs a newer Anvil version` instead of "not a readable Anvil save"; the wasm store makes the same distinction from its payload type byte.
+- **Tests:** `tests/test_saves.py` gains five cases (round trip and file contents, persistence across processes, the three refusals, a crafted `ANVSAVE2` file, and a wasm round trip through the node host's save file).
+- **Full suite:** 949 passed, 1 skipped, 1 xfailed in 483.51 s, exit 0.
