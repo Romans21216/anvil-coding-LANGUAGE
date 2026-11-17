@@ -2507,3 +2507,12 @@ __attribute__((export_name("anvil_frame"))) void anvil_frame(double delta_ms) {
   anvil_particles_draw();
   anvil_host_present();
 }
+
+/* The browser composites for us, so this only records the preference. */
+static double anvil_wasm_double_buffer = 1.0;
+
+double anvil_buffer(double on) {
+  double previous = anvil_wasm_double_buffer;
+  anvil_wasm_double_buffer = on != 0.0 ? 1.0 : 0.0;
+  return previous;
+}

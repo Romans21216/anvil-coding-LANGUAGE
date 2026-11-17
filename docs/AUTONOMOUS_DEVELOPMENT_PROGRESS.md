@@ -801,3 +801,10 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Fix, in three parts:** the paint handler now composes into a cached memory DC and blits once (`BitBlt`) instead of painting the window directly; the frame loop presents straight to the window DC with `anvil_present_window()` instead of forcing a repaint per frame, leaving `WM_PAINT` for occlusion and resize; and `DwmFlush()` at the top of the frame paces the loop to the compositor so a blit cannot land mid-composition and tear a moving scene. The flush sits before the phase timers so `frame_present()` still reports blit cost, not the wait.
 - **Measured:** 40 resize cycles sampling the client centre found 0 frames with any black in both the old and the new build — the capture path cannot see the transient, so the flicker evidence is the code path (a full-window black fill on the window DC every frame) rather than a reproduced frame. Said plainly because a test that cannot fail is not evidence.
 - **Tests:** `tests/test_flicker.py` asserts a static full-window rectangle covers over 90% of every sampled frame with under 2% black; runtime budgets still pass with the compositor pacing.
+
+## Batch 78 — buffer(on) toggle
+
+- **Builtin:** `buffer(on)` switches the window's double buffer and returns the previous state, so `say buffer(0)` reports `1` the first time. It starts on. `buffer(0)` presents straight to the window DC; `buffer(1)` composes in the cached memory DC and blits once.
+- **Why a toggle rather than always-on:** the flag makes the difference visible and measurable (and lets a machine with an expensive copy turn it off), and it gives the flicker fix a name a program can control instead of hidden behaviour.
+- **Wasm:** the call is accepted and only records the preference, because the browser composites the canvas for us.
+- **Tests:** `tests/test_buffer_toggle.py` reads the previous-state values back from the save store (`1, 1, 0, 0` for on/off/off/on), captures the window with buffering on and off, and asserts the full-window rectangle is still drawn. Grammar and language docs updated; 876 passed, 1 xfailed.

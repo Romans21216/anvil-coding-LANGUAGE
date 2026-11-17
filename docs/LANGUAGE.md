@@ -215,6 +215,17 @@ Implemented draw commands are `rect`, `circle`, `line`, `text`, `cube`, `sphere`
 
 The window itself can be controlled from the game. `window_on_top(1)` keeps it above other applications and `window_on_top(0)` returns it to normal, so a game can float over the editor while it is being written and go behind other programs afterwards. `window_fullscreen(1)` switches to borderless fullscreen on the current monitor and `window_fullscreen(0)` restores the previous window style and position. Both return `1` on success and `0` when no window exists yet, and both work as a statement or inside an expression. They are C-backend only; the native backend reports a located "not available" diagnostic. `examples/window_controls.ANVL` toggles both with F and T.
 
+### Double buffering
+
+`buffer(on)` turns the window's double buffer on or off and returns the previous
+state, so `say buffer(0)` prints `1` the first time. It starts **on**: the frame
+is composed in a memory DC and blitted in one operation, which is what keeps the
+black background from flashing between the clear and the frame. `buffer(0)`
+presents straight to the window DC — it exists to demonstrate the difference and
+for machines where the extra copy costs more than it saves, not because games
+should normally run with it off. The wasm backend accepts the call and records
+the preference, since the browser composites for us.
+
 ## Multiplayer
 
 The current experimental API is `net host(port)`, `net join("IPv4",port)`, `net send(number)`, and `receive()`. It transfers a single numeric value over UDP to one LAN peer. See [MULTIPLAYER.md](MULTIPLAYER.md) for setup and limitations. It is a prototype transport primitive, not a complete game networking stack.

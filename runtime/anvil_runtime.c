@@ -2602,6 +2602,15 @@ static void anvil_paint_release(void) {
    60 Hz that repaint churn is what read as flicker. WM_PAINT is still handled
    for occlusion, resize and the first frame. */
 static int anvil_present_full_fill = 1;
+/* Double buffering is on unless a program turns it off with buffer(0). */
+static int anvil_double_buffer = 1;
+
+double anvil_buffer(double on) {
+  int previous = anvil_double_buffer;
+  anvil_double_buffer = on != 0.0;
+  anvil_present_full_fill = 1;
+  return (double)previous;
+}
 
 static void anvil_present_window(void) {
   if (!anvil_window || !anvil_pixels || IsIconic(anvil_window))
@@ -2617,7 +2626,7 @@ static void anvil_present_window(void) {
   HDC dc = GetDC(anvil_window);
   if (!dc)
     return;
-  if (anvil_paint_buffer(dc, width, height)) {
+  if (anvil_double_buffer && anvil_paint_buffer(dc, width, height)) {
     if (anvil_present_full_fill) {
       RECT full = {0, 0, width, height};
       FillRect(anvil_paint_dc, &full, (HBRUSH)GetStockObject(BLACK_BRUSH));
@@ -2628,6 +2637,11 @@ static void anvil_present_window(void) {
                   &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
     BitBlt(dc, 0, 0, width, height, anvil_paint_dc, 0, 0, SRCCOPY);
   } else {
+    if (anvil_present_full_fill) {
+      RECT full = {0, 0, width, height};
+      FillRect(dc, &full, (HBRUSH)GetStockObject(BLACK_BRUSH));
+      anvil_present_full_fill = 0;
+    }
     StretchDIBits(dc, viewport.x, viewport.y, viewport.width, viewport.height, 0,
                   0, ANVIL_WIDTH, ANVIL_HEIGHT, anvil_pixels,
                   &anvil_bitmap_info, DIB_RGB_COLORS, SRCCOPY);
@@ -2725,7 +2739,7 @@ static LRESULT CALLBACK anvil_window_proc(HWND window, UINT message,
       int have_viewport =
           anvil_pixels && anvil_compute_viewport(width, height, ANVIL_WIDTH,
                                                  ANVIL_HEIGHT, &viewport);
-      if (anvil_paint_buffer(dc, width, height)) {
+      if (anvil_double_buffer && anvil_paint_buffer(dc, width, height)) {
         HBRUSH black = (HBRUSH)GetStockObject(BLACK_BRUSH);
         RECT full = {0, 0, width, height};
         FillRect(anvil_paint_dc, &full, black);

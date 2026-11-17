@@ -256,6 +256,7 @@ double anvil_memory_images(void);
 double anvil_memory_audio(void);
 double anvil_memory_video(void);
 double anvil_memory_total(void);
+double anvil_buffer(double on);
 
 /* Canvas 2D surface: every call is forwarded to the host. */
 typedef double (*AnvilCallback)(void);

@@ -135,6 +135,7 @@ ALLOWED_BUILTINS = {
     "memory_audio",
     "memory_video",
     "memory_total",
+    "buffer",
     "image_pixel",
     "particle_emit",
     "particle_count",
