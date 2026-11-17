@@ -173,6 +173,20 @@ set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
   override for that model asset and returns the previous value from its first
   geometry group, so a caller can restore it. A non-finite weight leaves the
   stored value alone.
+- For independently deforming copies, create a handle with
+  `model_instance(path)`, set weights with
+  `model_instance_morph(path, handle, index, weight)`, and draw that copy with
+  `model_draw_instance(path, handle, x, y, z, scale, rx, ry, rz)`. The draw API
+  supports unskinned models with morph targets, including animated models. Each
+  handle owns only its overrides; untouched targets keep each group's glTF
+  defaults. The morph setter returns the previous value for the first geometry
+  group's target.
+- `model_instance_destroy(path, handle)` releases a handle and returns 1, or 0
+  for a stale or mismatched handle. The runtime keeps 64 live handles and uses
+  generation-checked reuse, so destroyed handles cannot affect later instances.
+  Creation returns 0 when the bounded table is full. C and wasm share these
+  semantics. Existing `model_morph` and `model_draw` retain their asset-wide
+  behavior.
 - The weights start at the mesh's `weights` array the first time the model is
   drawn or a weight is set (so setting one weight before the first draw keeps
   the rest at their defaults), and stay per model for the life of the process.
