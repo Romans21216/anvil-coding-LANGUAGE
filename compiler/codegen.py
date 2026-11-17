@@ -680,6 +680,9 @@ def emit_c(
         _gltf.prescan(pathlib.Path(path).read_text(encoding="utf-8"), pathlib.Path(path))
     except OSError:
         pass
+    except _gltf.ModelError as error:
+        # A model the prescan cannot read must name the source file, not trace.
+        raise CompileError(f"{path}: {error}") from None
     # Emit only functions reachable from the real entry points (top-level calls,
     # main, and active engine callbacks), exactly like the native backend. A
     # helper that is never called should not reach the generated C at all.

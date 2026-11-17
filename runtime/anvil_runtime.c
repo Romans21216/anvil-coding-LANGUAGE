@@ -1016,17 +1016,15 @@ static void anvil_model_resolve(int index, const int *parents, int depth) {
   anvil_model_resolving[index] = 2;
 }
 
-double anvil_mesh_draw_animated(
-    const double *data, int triangle_count, const double *nodes, int node_count,
-    const int *parents, const int *groups, int group_count, const double *times,
-    const double *values, const int *tracks, int track_count, double clip_length,
-    double clip_time, double x, double y, double z, double scale, double rx,
-    double ry, double rz) {
-  if (!data || !nodes || !parents || !groups || triangle_count <= 0 ||
-      node_count <= 0 || node_count > ANVIL_MODEL_NODES || group_count <= 0 ||
-      !isfinite(x) || !isfinite(y) || !isfinite(z) || !isfinite(scale) ||
-      !isfinite(rx) || !isfinite(ry) || !isfinite(rz) || scale == 0.0)
-    return 0.0;
+/* Fill the static node tables from base TRS, override animated channels, then
+   compose the hierarchy. Shared by the animated and skinned draw paths. */
+static int anvil_model_pose(const double *nodes, int node_count,
+                            const int *parents, const double *times,
+                            const double *values, const int *tracks,
+                            int track_count, double clip_length,
+                            double clip_time) {
+  if (!nodes || !parents || node_count <= 0 || node_count > ANVIL_MODEL_NODES)
+    return 0;
   for (int node = 0; node < node_count; ++node) {
     for (int i = 0; i < 3; ++i) {
       anvil_model_local_t[node][i] = nodes[node * 10 + i];
@@ -1064,6 +1062,22 @@ double anvil_mesh_draw_animated(
     anvil_model_resolving[node] = 0;
     anvil_model_resolve(node, parents, 0);
   }
+  return 1;
+}
+
+double anvil_mesh_draw_animated(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, double x, double y, double z, double scale, double rx,
+    double ry, double rz) {
+  if (!data || !groups || triangle_count <= 0 || group_count <= 0 ||
+      !isfinite(x) || !isfinite(y) || !isfinite(z) || !isfinite(scale) ||
+      !isfinite(rx) || !isfinite(ry) || !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  if (!anvil_model_pose(nodes, node_count, parents, times, values, tracks,
+                        track_count, clip_length, clip_time))
+    return 0.0;
   anvil_mesh_drawn_frame++;
   for (int group = 0; group < group_count; ++group) {
     const int *entry = groups + group * 3;
@@ -1090,6 +1104,73 @@ double anvil_mesh_draw_animated(
       uint32_t base = anvil_color((int)p[9], (int)p[10], (int)p[11]);
       anvil_world_triangle(v, base, brightness, 255);
     }
+  }
+  return 1.0;
+}
+
+/* Skinned draw: every vertex carries four joint indices and four weights, and
+   the pose fuses them with jointMatrix = nodeWorld * inverseBindMatrix. */
+double anvil_mesh_draw_skinned(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *joint_nodes, int joint_count,
+    const double *bind, const double *times, const double *values,
+    const int *tracks, int track_count, double clip_length, double clip_time,
+    double x, double y, double z, double scale, double rx, double ry,
+    double rz) {
+  if (!data || !joint_nodes || !bind || triangle_count <= 0 ||
+      joint_count <= 0 || joint_count > 64 || !isfinite(x) || !isfinite(y) ||
+      !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
+      !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  if (!anvil_model_pose(nodes, node_count, parents, times, values, tracks,
+                        track_count, clip_length, clip_time))
+    return 0.0;
+  static double joint_matrices[64][16];
+  for (int joint = 0; joint < joint_count; ++joint) {
+    int node = joint_nodes[joint];
+    if (node < 0 || node >= node_count) {
+      for (int i = 0; i < 16; ++i)
+        joint_matrices[joint][i] = i % 5 == 0 ? 1.0 : 0.0;
+      continue;
+    }
+    anvil_mat_mul(anvil_model_world[node], bind + joint * 16,
+                  joint_matrices[joint]);
+  }
+  anvil_mesh_drawn_frame++;
+  for (int triangle = 0; triangle < triangle_count; ++triangle) {
+    const double *p = data + (size_t)triangle * 42;
+    AnvilVec3 v[3];
+    uint32_t base = anvil_color((int)p[3], (int)p[4], (int)p[5]);
+    for (int corner = 0; corner < 3; ++corner) {
+      const double *vertex = p + corner * 14;
+      double px = 0.0, py = 0.0, pz = 0.0;
+      double carried = 0.0;
+      for (int k = 0; k < 4; ++k) {
+        int joint = (int)vertex[6 + k];
+        double weight = vertex[10 + k];
+        if (weight <= 0.0 || joint < 0 || joint >= joint_count)
+          continue;
+        double point[3];
+        anvil_mat_point(joint_matrices[joint], vertex[0], vertex[1], vertex[2],
+                        point);
+        px += point[0] * weight;
+        py += point[1] * weight;
+        pz += point[2] * weight;
+        carried += weight;
+      }
+      if (carried <= 0.0) {
+        px = vertex[0];
+        py = vertex[1];
+        pz = vertex[2];
+      }
+      AnvilVec3 q = {px * scale, py * scale, pz * scale};
+      q = anvil_rotate(q, rx, ry, rz);
+      v[corner] = (AnvilVec3){x + q.x, y + q.y, z + q.z};
+    }
+    AnvilVec3 n = anvil_normalize(
+        anvil_cross(anvil_sub(v[1], v[0]), anvil_sub(v[2], v[0])));
+    double brightness = anvil_light_level(n, 1);
+    anvil_world_triangle(v, base, brightness, 255);
   }
   return 1.0;
 }

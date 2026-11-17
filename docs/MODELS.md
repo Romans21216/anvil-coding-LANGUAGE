@@ -104,3 +104,30 @@ the triangle by the expected amount at half a second and a quarter of the way,
 a rotation track changes its silhouette, a STEP track holds its left key until
 the next one, and the clip wraps at its length.
 
+## Skins
+
+A model whose file has one `skin` is baked as a skinned mesh. Each vertex keeps
+its mesh-space position, colour, four joint indices (`JOINTS_0`) and four
+weights (`WEIGHTS_0`); the weights are normalised at import. The runtime
+composes every joint as
+
+```
+jointMatrix[i] = nodeWorld[skin.joints[i]] * inverseBindMatrix[i]
+```
+
+and blends the four influences per vertex, then applies the usual model
+placement and shading. One skin with 1-64 joints is supported; a primitive
+missing `JOINTS_0` or `WEIGHTS_0`, a bind-matrix count that does not match the
+joint list, and a second skin are refused at compile time with a located error.
+
+A skinned model shares the animation clock: `model_animate(path, seconds)`
+drives its joint channels, and `model_draw` poses it. With no clip it draws at
+its bind pose, so a static character rig needs no animation call. A vertex whose
+four weights are all zero keeps its mesh-space position rather than collapsing
+to the origin.
+
+`tests/test_gltf_skins.py` measures ink: a fully weighted joint moves the mesh
+by the joint's animated translation, a 50/50 blend between a moving joint and a
+static one lands half way, a clip-less rig draws at rest, and the malformed and
+wasm cases are refused with the source line.
+

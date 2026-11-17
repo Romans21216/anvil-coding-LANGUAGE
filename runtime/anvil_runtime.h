@@ -180,6 +180,13 @@ double anvil_mesh_draw_animated(
     const double *values, const int *tracks, int track_count, double clip_length,
     double clip_time, double x, double y, double z, double scale, double rx,
     double ry, double rz);
+double anvil_mesh_draw_skinned(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *joint_nodes, int joint_count,
+    const double *bind, const double *times, const double *values,
+    const int *tracks, int track_count, double clip_length, double clip_time,
+    double x, double y, double z, double scale, double rx, double ry,
+    double rz);
 double anvil_mesh_drawn(void);
 double anvil_mesh_culling(double on);
 double anvil_shadow(double on);

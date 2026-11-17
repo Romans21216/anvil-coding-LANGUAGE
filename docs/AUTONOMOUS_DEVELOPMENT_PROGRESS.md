@@ -912,3 +912,11 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Wasm:** the browser bakes world-space triangles and has no pose code, so an animated `model_draw` is refused with a located error instead of failing at link time.
 - **Tests:** `tests/test_gltf_animation.py` measures ink bounds from captured frames — translation moves the triangle at 0.5 s and a quarter of the way, rotation changes the silhouette, STEP holds the left key until 1.0 s, the clip wraps at its length, the length is reported, a static model refuses `model_animate`, and wasm refuses an animated model.
 
+## Batch 93 — glTF skins: joint matrices and weight blending (8.13)
+
+- **Import:** a model with one `skin` bakes mesh-space vertices plus four joint indices and four normalised weights per vertex, the skin's joint node list and its inverse bind matrices (1-64 joints). A primitive missing `JOINTS_0`/`WEIGHTS_0`, a bind count that does not match the joints, or a second skin is a located compile error.
+- **Runtime:** `anvil_mesh_draw_skinned` composes each joint as `nodeWorld * inverseBind`, blends the four influences per vertex, then applies the existing placement and shading. The pose code was extracted into `anvil_model_pose` and is shared with the animated path, so one clock drives both. A vertex with zero total weight keeps its mesh-space position instead of collapsing to the origin.
+- **Empty clips:** a clip-less model referenced the time/value/track arrays with zero elements; the emitter now writes a one-element placeholder so C accepts the reference, and `model_animate` on such a model is still refused at the source line.
+- **Pre-scan:** a model problem found during the pre-scan used to escape as a traceback; the pre-scan now defers to the `model_draw`/`model_animate` lowering, which knows the line, and `emit_c` reports a prescan failure against the source path if one ever escapes.
+- **Tests:** `tests/test_gltf_skins.py` measures ink bounds for a fully weighted joint (moves as far as the joint), a 50/50 blend (half way), the bind pose with no clip, the missing-weights refusal and the wasm refusal.
+

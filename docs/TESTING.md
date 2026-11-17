@@ -123,6 +123,10 @@ remote desktop can prevent window creation:
 - `test_parallax` — clamps the factor and returns the previous value, then pans
   the camera 100 px and proves with captured pixels that a factor-1 layer
   lands at x=0 and a 0.5 layer at x=50.
+- `test_gltf_skins` — a one-joint skin follows its animated joint, a 50/50
+  blend between a moving and a static joint lands half way, a clip-less rig
+  draws at its bind pose, and a primitive without weights plus the wasm case
+  are refused at the source line.
 - `test_gltf_animation` — builds a one-triangle animated glTF and measures the
   drawn ink bounds across poses: translation moves it by half the key at 0.5 s,
   rotation changes the silhouette, STEP holds the left key until 1.0 s, the clip

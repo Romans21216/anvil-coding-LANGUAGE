@@ -12,8 +12,10 @@ baseColorFactor, and node TRS animation clips (translation/rotation/scale,
 LINEAR and STEP keys). A model with an animation clip bakes its triangles in
 node-local space plus the node hierarchy and keyframes, and the runtime
 evaluates the pose; a static model keeps the cheaper world-space bake.
-Not supported yet: skins, morph targets, CUBICSPLINE keys, textures and sparse
-accessors.
+A model with one skin bakes mesh-space vertices with four joint indices and
+weights each, plus the skin's inverse bind matrices, so the runtime can blend
+the joints. Not supported yet: morph targets, multiple skins, CUBICSPLINE keys,
+textures and sparse accessors.
 """
 
 from __future__ import annotations
@@ -370,6 +372,187 @@ def _node_trs(node: dict) -> tuple[list[float], list[float], list[float]]:
     return translation, [x, y, z, w], scale
 
 
+def _clip(
+    document: dict, nodes_doc: list, base_dir: pathlib.Path, binary: bytes | None
+) -> tuple[list[int], list[float], list[float], float]:
+    """Flatten the first animation clip into track metadata plus key arrays.
+
+    A track is six ints: node index, path (0 translation, 1 rotation, 2 scale),
+    interpolation (0 LINEAR, 1 STEP), first time index, first value index and
+    key count.
+    """
+    animations = document.get("animations") or []
+    if not animations:
+        return [], [], [], 0.0
+    if len(animations) > 1:
+        raise ModelError("only the first animation clip is supported")
+    clip = animations[0]
+    samplers = clip.get("samplers", [])
+    tracks: list[int] = []
+    times: list[float] = []
+    values: list[float] = []
+    length = 0.0
+    for channel in clip.get("channels", []):
+        target = channel.get("target", {})
+        path_name = target.get("path")
+        if path_name not in PATHS:
+            continue
+        node_index = target.get("node")
+        if not isinstance(node_index, int) or not 0 <= node_index < len(nodes_doc):
+            raise ModelError("an animation targets a node that does not exist")
+        sampler_index = channel.get("sampler")
+        if not isinstance(sampler_index, int) or not 0 <= sampler_index < len(samplers):
+            raise ModelError("an animation refers to a missing sampler")
+        sampler = samplers[sampler_index]
+        interpolation = sampler.get("interpolation", "LINEAR")
+        if interpolation not in INTERPOLATIONS:
+            raise ModelError(f"animation interpolation {interpolation!r} is not supported")
+        key_times = [float(row[0]) for row in _accessor(document, sampler["input"], base_dir, binary)]
+        key_values = _accessor(document, sampler["output"], base_dir, binary)
+        if not key_times or not key_values:
+            raise ModelError("an animation sampler is empty")
+        width = 4 if path_name == "rotation" else 3
+        if len(key_values[0]) != width:
+            raise ModelError("an animation sampler has the wrong component count")
+        if len(key_times) != len(key_values):
+            raise ModelError("an animation sampler's keys and values differ in length")
+        tracks.extend(
+            (node_index, PATHS[path_name], INTERPOLATIONS[interpolation],
+             len(times), len(values), len(key_times))
+        )
+        times.extend(key_times)
+        for row in key_values:
+            values.extend(float(v) for v in row)
+        length = max(length, key_times[-1])
+    if not tracks:
+        raise ModelError("the animation clip has no translation, rotation or scale channels")
+    return tracks, times, values, length
+
+
+def load_skinned(path: pathlib.Path) -> dict:
+    """Bake a skinned model: skin joints, inverse bind matrices and weights.
+
+    Vertices are stored in mesh space with four joint indices and four weights
+    each; the runtime fuses them with the posed joint matrices. One skin and
+    one mesh hierarchy are supported.
+    """
+    document, binary = _container(path)
+    if not isinstance(document, dict) or "asset" not in document:
+        raise ModelError(f"{path.name} has no glTF 'asset' block")
+    nodes_doc = document.get("nodes", [])
+    if len(nodes_doc) > 128:
+        raise ModelError("the model has more than 128 nodes")
+    skins = document.get("skins") or []
+    if len(skins) != 1:
+        raise ModelError("only a model with exactly one skin is supported")
+    skin = skins[0]
+    joint_nodes = [int(node) for node in skin.get("joints", [])]
+    if not joint_nodes or len(joint_nodes) > 64:
+        raise ModelError("a skin must have 1 to 64 joints")
+    for node in joint_nodes:
+        if not 0 <= node < len(nodes_doc):
+            raise ModelError("a skin joint is not a node")
+    bind_rows = _accessor(document, skin["inverseBindMatrices"], path.parent, binary)
+    if len(bind_rows) != len(joint_nodes):
+        raise ModelError("the inverse bind matrices do not match the joint count")
+    bind: list[float] = []
+    for row in bind_rows:
+        if len(row) != 16:
+            raise ModelError("an inverse bind matrix must have 16 entries")
+        bind.extend(float(value) for value in row)
+
+    parents = [-1] * len(nodes_doc)
+    for index, node in enumerate(nodes_doc):
+        for child in node.get("children", []):
+            if not isinstance(child, int) or child < 0 or child >= len(nodes_doc):
+                raise ModelError("a node index is out of range")
+            parents[child] = index
+
+    nodes: list[float] = []
+    for node in nodes_doc:
+        translation, rotation, scale = _node_trs(node)
+        nodes.extend(translation)
+        nodes.extend(rotation)
+        nodes.extend(scale)
+
+    skin_nodes = [index for index, node in enumerate(nodes_doc) if "skin" in node]
+    if not skin_nodes:
+        raise ModelError("no node uses the skin")
+    vertices: list[float] = []
+    for node_index in skin_nodes:
+        node = nodes_doc[node_index]
+        if "mesh" not in node:
+            continue
+        for primitive in document["meshes"][node["mesh"]].get("primitives", []):
+            vertices.extend(_skinned_primitive(document, primitive, path.parent, binary))
+        if len(vertices) // 14 > MAX_TRIANGLES * 3:
+            raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
+    if not vertices:
+        raise ModelError("the skinned model has no triangle geometry")
+
+    tracks, times, values, length = _clip(document, nodes_doc, path.parent, binary)
+    return {
+        "vertices": vertices,
+        "nodes": nodes,
+        "parents": parents,
+        "joint_nodes": joint_nodes,
+        "bind": bind,
+        "tracks": tracks,
+        "times": times,
+        "values": values,
+        "length": length,
+    }
+
+
+def _skinned_primitive(
+    document: dict, primitive: dict, base_dir: pathlib.Path, binary: bytes | None
+) -> list[float]:
+    attributes = primitive.get("attributes", {})
+    for required in ("POSITION", "JOINTS_0", "WEIGHTS_0"):
+        if required not in attributes:
+            raise ModelError(f"a skinned primitive needs {required}")
+    positions = _accessor(document, attributes["POSITION"], base_dir, binary)
+    joints = _accessor(document, attributes["JOINTS_0"], base_dir, binary)
+    weights = _accessor(document, attributes["WEIGHTS_0"], base_dir, binary)
+    if primitive.get("indices") is not None:
+        indices = [int(row[0]) for row in _accessor(document, primitive["indices"], base_dir, binary)]
+    else:
+        indices = list(range(len(positions)))
+    colours = None
+    if "COLOR_0" in attributes:
+        raw = _accessor(document, attributes["COLOR_0"], base_dir, binary)
+        colours = [tuple(max(0, min(255, int(round(v * 255.0)))) for v in row[:3]) for row in raw]
+    fallback = _material_colour(document, primitive)
+    out: list[float] = []
+    for a, b, c in _triangle_indices(primitive.get("mode", 4), len(indices)):
+        corners = (indices[a], indices[b], indices[c])
+        if max(corners) >= len(positions) or min(corners) < 0:
+            raise ModelError("an index points past the POSITION accessor")
+        if max(corners) >= len(joints) or max(corners) >= len(weights):
+            raise ModelError("an index points past the skin attributes")
+        channels = [colours[i] for i in corners] if colours is not None else None
+        colour = (
+            tuple(int(round(sum(channel[k] for channel in channels) / 3.0)) for k in range(3))
+            if channels is not None
+            else fallback
+        )
+        for i in corners:
+            out.extend(float(v) for v in positions[i][:3])
+            out.extend((float(colour[0]), float(colour[1]), float(colour[2])))
+            joint_row = list(joints[i])[:4]
+            weight_row = [float(value) for value in list(weights[i])[:4]]
+            while len(joint_row) < 4:
+                joint_row.append(0)
+            while len(weight_row) < 4:
+                weight_row.append(0.0)
+            total = sum(weight_row)
+            if total > 0.0:
+                weight_row = [value / total for value in weight_row]
+            out.extend(float(value) for value in joint_row)
+            out.extend(weight_row)
+    return out
+
+
 def load_animated(path: pathlib.Path) -> dict:
     """Bake a model with its node hierarchy and one animation clip.
 
@@ -438,46 +621,7 @@ def load_animated(path: pathlib.Path) -> dict:
     if not vertices:
         raise ModelError("the model has no triangle geometry")
 
-    clip = animations[0]
-    samplers = clip.get("samplers", [])
-    tracks: list[int] = []
-    times: list[float] = []
-    values: list[float] = []
-    length = 0.0
-    for channel in clip.get("channels", []):
-        target = channel.get("target", {})
-        path_name = target.get("path")
-        if path_name not in PATHS:
-            continue
-        node_index = target.get("node")
-        if not isinstance(node_index, int) or not 0 <= node_index < len(nodes_doc):
-            raise ModelError("an animation targets a node that does not exist")
-        sampler_index = channel.get("sampler")
-        if not isinstance(sampler_index, int) or not 0 <= sampler_index < len(samplers):
-            raise ModelError("an animation refers to a missing sampler")
-        sampler = samplers[sampler_index]
-        interpolation = sampler.get("interpolation", "LINEAR")
-        if interpolation not in INTERPOLATIONS:
-            raise ModelError(f"animation interpolation {interpolation!r} is not supported")
-        key_times = [float(row[0]) for row in _accessor(document, sampler["input"], base_dir, binary)]
-        key_values = _accessor(document, sampler["output"], base_dir, binary)
-        if not key_times or not key_values:
-            raise ModelError("an animation sampler is empty")
-        width = 4 if path_name == "rotation" else 3
-        if len(key_values[0]) != width:
-            raise ModelError("an animation sampler has the wrong component count")
-        if len(key_times) != len(key_values):
-            raise ModelError("an animation sampler's keys and values differ in length")
-        tracks.extend(
-            (node_index, PATHS[path_name], INTERPOLATIONS[interpolation],
-             len(times), len(values), len(key_times))
-        )
-        times.extend(key_times)
-        for row in key_values:
-            values.extend(float(v) for v in row)
-        length = max(length, key_times[-1])
-    if not tracks:
-        raise ModelError("the animation clip has no translation, rotation or scale channels")
+    tracks, times, values, length = _clip(document, nodes_doc, base_dir, binary)
 
     return {
         "vertices": vertices,
@@ -512,7 +656,12 @@ def prescan(source_text: str, source_path: pathlib.Path) -> None:
             asset = json.loads('"' + match.group(1) + '"')
         except ValueError:
             continue
-        ensure_model(asset, source_path)
+        try:
+            ensure_model(asset, source_path)
+        except ModelError:
+            # Leave the report to the model_draw/model_animate lowering, which
+            # knows the source line; a prescan has no line to name.
+            continue
         _prescan.add(str(_resolve(asset, source_path)))
 
 
@@ -545,12 +694,37 @@ def bounds_of(data: list[float]) -> tuple[float, float, float, float]:
     return (cx, cy, cz, radius)
 
 
-def _has_animation(path: pathlib.Path) -> bool:
+def _kind(path: pathlib.Path) -> str:
+    """Classify the model from one read: skinned, animated or static."""
     try:
         document, _ = _container(path)
     except ModelError:
-        return False
-    return bool(isinstance(document, dict) and document.get("animations"))
+        return "static"
+    if not isinstance(document, dict):
+        return "static"
+    nodes = document.get("nodes", [])
+    if document.get("skins") and any("skin" in node for node in nodes):
+        return "skinned"
+    return "animated" if document.get("animations") else "static"
+
+
+def _skinned_bounds(vertices: list[float]) -> tuple[float, float, float, float]:
+    xs: list[float] = []
+    ys: list[float] = []
+    zs: list[float] = []
+    for start in range(0, len(vertices), 14):
+        xs.append(vertices[start])
+        ys.append(vertices[start + 1])
+        zs.append(vertices[start + 2])
+    if not xs:
+        return (0.0, 0.0, 0.0, 0.0)
+    cx = (min(xs) + max(xs)) / 2.0
+    cy = (min(ys) + max(ys)) / 2.0
+    cz = (min(zs) + max(zs)) / 2.0
+    radius = 0.0
+    for x, y, z in zip(xs, ys, zs):
+        radius = max(radius, ((x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2) ** 0.5)
+    return (cx, cy, cz, radius)
 
 
 def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
@@ -568,7 +742,16 @@ def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
     if not key.endswith((".gltf", ".glb")):
         raise ModelError("only .gltf and .glb models are supported")
     entry: dict = {"id": len(_registry), "symbol": f"anvil_model_{len(_registry)}"}
-    if _has_animation(path):
+    kind = _kind(path)
+    if kind == "skinned":
+        clip = load_skinned(path)
+        entry.update(clip)
+        entry["skinned"] = True
+        entry["animated"] = False
+        entry["count"] = len(clip["vertices"]) // 14 // 3
+        entry["data"] = clip["vertices"]
+        entry["bounds"] = _skinned_bounds(clip["vertices"])
+    elif kind == "animated":
         clip = load_animated(path)
         entry.update(clip)
         entry["animated"] = True
@@ -591,6 +774,10 @@ def ensure_emitted(
 
 
 def _double_array(lines: list[str], symbol: str, values: list[float], per_line: int) -> None:
+    if not values:
+        # A model with no clip still has to reference the time/value arrays; a
+        # one-element placeholder keeps C happy and nothing reads it.
+        values = [0.0]
     lines.append(f"static const double {symbol}[{len(values)}] = {{")
     for start in range(0, len(values), per_line):
         chunk = values[start : start + per_line]
@@ -599,6 +786,8 @@ def _double_array(lines: list[str], symbol: str, values: list[float], per_line: 
 
 
 def _int_array(lines: list[str], symbol: str, values: list[int], per_line: int) -> None:
+    if not values:
+        values = [0]
     lines.append(f"static const int {symbol}[{len(values)}] = {{")
     for start in range(0, len(values), per_line):
         chunk = values[start : start + per_line]
@@ -611,7 +800,20 @@ def definitions() -> list[str]:
     for key, entry in _registry.items():
         symbol = entry["symbol"]
         count = entry["count"]
-        if entry.get("animated"):
+        if entry.get("skinned"):
+            lines.append(
+                f"/* model: {pathlib.Path(key).name}, {count} skinned triangles, "
+                f"{len(entry['joint_nodes'])} joints */"
+            )
+            _double_array(lines, symbol, entry["data"], 14)
+            _double_array(lines, symbol + "_nodes", entry["nodes"], 10)
+            _int_array(lines, symbol + "_parents", entry["parents"], 16)
+            _int_array(lines, symbol + "_joints", entry["joint_nodes"], 16)
+            _double_array(lines, symbol + "_bind", entry["bind"], 16)
+            _double_array(lines, symbol + "_times", entry["times"], 8)
+            _double_array(lines, symbol + "_values", entry["values"], 8)
+            _int_array(lines, symbol + "_tracks", entry["tracks"], 6)
+        elif entry.get("animated"):
             lines.append(
                 f"/* model: {pathlib.Path(key).name}, {count} animated triangles, "
                 f"{entry['length']:.6g} s clip */"

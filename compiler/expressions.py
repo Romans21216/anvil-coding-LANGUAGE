@@ -828,7 +828,18 @@ class ExpressionParser:
                 mesh_args.append(self.require_number(self.parse()))
             self.expect(")")
             placement = ", ".join(mesh_args)
-            if model.get("animated"):
+            if model.get("skinned"):
+                call = (
+                    f"anvil_mesh_draw_skinned((const double *){symbol}, {count}, "
+                    f"(const double *){symbol}_nodes, {len(model['nodes']) // 10}, "
+                    f"(const int *){symbol}_parents, (const int *){symbol}_joints, "
+                    f"{len(model['joint_nodes'])}, (const double *){symbol}_bind, "
+                    f"(const double *){symbol}_times, (const double *){symbol}_values, "
+                    f"(const int *){symbol}_tracks, {len(model['tracks']) // 6}, "
+                    f"{model['length']:.6g}, anvil_model_clock({model['id']}), "
+                    f"{placement})"
+                )
+            elif model.get("animated"):
                 # The clip is evaluated per draw: node-local triangles plus the
                 # hierarchy and keyframes, sampled at the model's clock.
                 call = (
@@ -865,7 +876,7 @@ class ExpressionParser:
                 model = gltf.ensure_model(asset, pathlib.Path(self.path))
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
-            if not model.get("animated"):
+            if not model.get("tracks"):
                 raise CompileError(
                     f"{self.path}:{self.line}: the model has no animation clip to play"
                 )
@@ -892,7 +903,7 @@ class ExpressionParser:
                 model = gltf.ensure_model(asset, pathlib.Path(self.path))
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
-            if not model.get("animated"):
+            if not model.get("tracks"):
                 raise CompileError(
                     f"{self.path}:{self.line}: the model has no animation clip"
                 )

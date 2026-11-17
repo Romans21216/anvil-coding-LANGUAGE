@@ -143,51 +143,56 @@ def pose_program(model: str, poses: list[float]) -> str:
     return "\n".join(lines)
 
 
+def run_poses(case: unittest.TestCase, root: pathlib.Path, program: str) -> list[str]:
+    """Build and run a pose program; return its printed lines."""
+    source = root / "pose.ANVL"
+    source.write_text(program, encoding="utf-8")
+    executable = root / "pose.exe"
+    build = subprocess.run(
+        [sys.executable, str(COMPILER), str(source), "-o", str(executable)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    if build.returncode != 0:
+        if "No C compiler found" in build.stderr:
+            raise unittest.SkipTest("MSVC is not available")
+        case.fail(build.stderr)
+    process = subprocess.Popen(
+        [str(executable)],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    lines: queue.Queue[str] = queue.Queue()
+
+    def pump() -> None:
+        assert process.stdout is not None
+        for line in process.stdout:
+            lines.put(line.strip())
+
+    threading.Thread(target=pump, daemon=True).start()
+    out: list[str] = []
+    try:
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            try:
+                line = lines.get(timeout=5)
+            except queue.Empty:
+                break
+            out.append(line)
+            if line == "done":
+                break
+    finally:
+        process.kill()
+        process.wait(timeout=30)
+    return out
+
+
 class GltfAnimationTests(unittest.TestCase):
     def run_poses(self, root: pathlib.Path, program: str) -> list[str]:
-        source = root / "pose.ANVL"
-        source.write_text(program, encoding="utf-8")
-        executable = root / "pose.exe"
-        build = subprocess.run(
-            [sys.executable, str(COMPILER), str(source), "-o", str(executable)],
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if build.returncode != 0:
-            if "No C compiler found" in build.stderr:
-                raise unittest.SkipTest("MSVC is not available")
-            self.fail(build.stderr)
-        process = subprocess.Popen(
-            [str(executable)],
-            cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        lines: queue.Queue[str] = queue.Queue()
-
-        def pump() -> None:
-            assert process.stdout is not None
-            for line in process.stdout:
-                lines.put(line.strip())
-
-        threading.Thread(target=pump, daemon=True).start()
-        out: list[str] = []
-        try:
-            deadline = time.monotonic() + 90
-            while time.monotonic() < deadline:
-                try:
-                    line = lines.get(timeout=5)
-                except queue.Empty:
-                    break
-                out.append(line)
-                if line == "done":
-                    break
-        finally:
-            process.kill()
-            process.wait(timeout=30)
-        return out
+        return run_poses(self, root, program)
 
     def test_a_translation_track_moves_the_triangle(self) -> None:
         with tempfile_dir() as root:
