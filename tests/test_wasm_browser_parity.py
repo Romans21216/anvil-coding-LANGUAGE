@@ -377,10 +377,14 @@ class WasmBrowserParityTests(unittest.TestCase):
             program = "\n".join(
                 (
                     "scene 3d",
-                    "camera perspective 0 0 12",
-                    "camera fov(70)",
+                    "camera perspective 1 1 12",
+                    "camera fov(58)",
                     "clear rgba(0, 0, 0, 255)",
                     "fn(draw)",
+                    "  set var(camera_ok) = camera_angle(-8, 6)",
+                    "  set var(light_ok) = light(0.4, 0.7, 1)",
+                    "  set var(ambient_old) = light_ambient(0.22)",
+                    "  set var(intensity_old) = light_intensity(0.78)",
                     '  set var(t) = model_animate("skin.gltf", 0.5)',
                     '  set var(ok) = model_draw("skin.gltf", 0, 0, 0, 1, 0, 0, 0)',
                     "end",
@@ -388,7 +392,9 @@ class WasmBrowserParityTests(unittest.TestCase):
                 )
             )
             for directory in (c_dir, wasm_dir):
-                write_skinned_model(directory, "skin.gltf")
+                write_skinned_model(
+                    directory, "skin.gltf", weights=(0.5, 0.5), joints=2
+                )
                 (directory / "program.ANVL").write_text(program, encoding="utf-8")
             c_output = c_dir / "program.exe"
             _compile(c_dir / "program.ANVL", c_output)

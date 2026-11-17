@@ -1239,3 +1239,38 @@ Validation: `python -m pytest tests/test_wasm_browser_parity.py tests/test_wasm_
 8.145 REMOVE DOUBLE ACCOUNTING FROM STATIC WASM RAY-MESHES
 
 The shared wasm model triangle budget revealed a counter mismatch: unmorphed `ray_mesh` goes through `anvil_mesh_draw()`, which accounts submitted triangles, and `anvil_trace_mesh()` was adding the same count again. This limited that path to roughly half of the documented budget. Removed the wrapper's duplicate increment and corrected the per-frame regression to expect 16,384 submitted triangles before the next call is rejected. The test was not run in this audit; the budget correction remains unverified here.
+
+
+8.147 VERIFY THE SHARED WASM MODEL TRIANGLE BUDGET (2026-11-17)
+
+Ran the corrected static `ray_mesh` budget regression as part of the focused wasm suite. The test now confirms 16,384 triangles are accepted, the next quad is rejected as a whole, and accounting resets for a new frame. This verifies the correction described in 8.146 and resolves that regression gap.
+
+Validation: `python -m pytest tests/test_wasm.py tests/test_wasm_docs.py tests/test_wasm_browser_parity.py tests/test_gltf_skins.py -q` — 74 passed in 85.77 s; a follow-up docs check passed (2 tests). `git diff --check` passes. The implementation batch was committed as `0b6a74e`; documentation corrections were committed as `4415d21` and `983d81c`, and all three were fast-forward-published to the task branch. `origin/main` remains `118b0f5`. The implementation ledger reports the focused tests passing; this audit did not rerun them. `.scratch/` remains untouched.
+
+
+8.148 ADD WASM SKINNED MODEL_DRAW SUPPORT (2026-11-17)
+
+Wasm now accepts one-skin models through `model_draw`, supports up to 64 joints and four normalized vertex influences, evaluates the first animation clip, and draws bind pose when no clip exists. The runtime transforms vertices with `nodeWorld * inverseBind`, shares the model triangle budget, and skips culling and overhead shadows like C's skinned draw path. Skinned `ray_mesh` remains a located unsupported case. Added Node pose/weight tests and a C/Chrome animated-skin pixel comparison. Updated the model, wasm, engine, language and implementation contract docs.
+
+Validation: the focused suite passed 74 tests, including bind pose, animated full-weight and half-weight blending, source-located `ray_mesh` refusal, and animated skinned model C/Chrome parity. Browser parity is covered by the available Windows/Chrome fixture. `git diff --check` passes. Broader cameras, skinned ray tracing, and skin-plus-morph remain outside this support slice. The implementation batch was committed as `0b6a74e`; documentation corrections were committed as `4415d21` and `983d81c`, and all three were fast-forward-published to the task branch. `origin/main` remains `118b0f5`. The implementation ledger reports the focused tests passing; this audit did not rerun them. `.scratch/` remains untouched.
+
+
+8.149 CHECK SKINNED MODEL PARITY FROM AN OBLIQUE CAMERA (2026-11-17)
+
+Expanded the animated skinned `model_draw` C/Chrome fixture to use an offset camera, 58-degree field of view, and nonzero yaw and pitch. The joint-animated shape still meets the existing silhouette and color thresholds, extending camera coverage for the new skin path. The broader model/camera matrix remains open.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_skinned_model_draw_matches_c -q` — 1 passed in 3.80 s. `git diff --check` passes. This change remains uncommitted and unpublished; `.scratch/` remains untouched.
+
+
+8.150 COMPARE A BLENDED SKIN POSE ACROSS BACKENDS (2026-11-17)
+
+Strengthened the oblique C/Chrome skin fixture to use two joints with 50/50 vertex weights, one animated and one stationary. This checks the rasterized blended result across both backends rather than only a fully weighted joint. The existing comparison thresholds still pass.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_skinned_model_draw_matches_c -q` — 1 passed in 3.75 s. `git diff --check` passes. Broader skin inputs and camera coverage remain open; work is uncommitted and unpublished, and `.scratch/` remains untouched.
+
+
+8.151 CHECK SKIN SHADING WITH CUSTOM WASM LIGHTING (2026-11-17)
+
+The oblique half-weight skin parity fixture now sets a non-default light direction, ambient floor and intensity before drawing. This covers joint blending, camera transformation and shared model shading controls in one browser comparison.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_skinned_model_draw_matches_c -q` — 1 passed in 7.16 s. `git diff --check` passes. Wider camera/light/depth combinations remain open; work remains uncommitted and unpublished, and `.scratch/` remains untouched.
