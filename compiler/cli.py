@@ -463,7 +463,13 @@ def main() -> int:
     ap.add_argument(
         "--timings",
         action="store_true",
-        help="print read/parse/generate/build timings to stderr (C backend)",
+        help="print read/parse/generate/build timings to stderr",
+    )
+    ap.add_argument(
+        "--profile-json",
+        type=pathlib.Path,
+        metavar="PATH",
+        help="write a versioned compiler phase profile as JSON",
     )
     ap.add_argument(
         "--no-cache",
@@ -690,7 +696,7 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: entry must resolve inside the project folder"
                 ) from exc
-        timings = Timings(args.timings)
+        timings = Timings(args.timings, args.profile_json)
         try:
             size = source_path.stat().st_size
             if size > SOURCE_LIMIT_BYTES:
@@ -711,6 +717,14 @@ def main() -> int:
                 f"cannot read {source_path}: the file is not valid UTF-8 ({error.reason} at byte {error.start})"
             ) from error
         timings.mark("read")
+        timings.set_metadata(
+            backend=args.backend,
+            source_bytes=size,
+            generated_bytes=0,
+            output_bytes=0,
+            build_state="not_built",
+            generated_kind=None,
+        )
         funcs, top, variables, arrays = parse(source_path, source, include_root=include_root)
         timings.mark("parse")
         for provided in extension_api.anvil_sources():
@@ -758,14 +772,25 @@ def main() -> int:
             # parse-only check reported "ok" for programs that cannot build.
             # --check must never write files, whichever backend is selected.
             if args.backend == "native":
-                NativeCodegen(source_path, funcs, top, variables, arrays).generate()
+                generated = NativeCodegen(source_path, funcs, top, variables, arrays).generate()
+                timings.set_metadata(
+                    generated_bytes=len(generated),
+                    generated_kind="native_pe",
+                    output_bytes=0,
+                )
             elif args.backend == "wasm":
                 from compiler import wasm as wasm_backend
 
                 wasm_backend.validate(source_path, funcs, top)
+                timings.set_metadata(generated_bytes=0, output_bytes=0)
             else:
-                emit_c(
+                generated = emit_c(
                     source_path, funcs, top, variables, arrays, fixed_hz, project_name
+                )
+                timings.set_metadata(
+                    generated_bytes=len(generated.encode("utf-8")),
+                    generated_kind="c_source",
+                    output_bytes=0,
                 )
             timings.mark("generate")
             timings.report()
@@ -790,6 +815,17 @@ def main() -> int:
                 emit_c_path=pathlib.Path(emit_path) if emit_path else None,
             )
             timings.mark("build")
+            generated_c = (
+                pathlib.Path(emit_path)
+                if emit_path
+                else out.parent / ".anvil-cache" / (out.stem + ".wasm.c")
+            )
+            timings.set_metadata(
+                generated_bytes=generated_c.stat().st_size if generated_c.exists() else 0,
+                generated_kind="c_source",
+                output_bytes=0 if emit_path else (out.stat().st_size if out.exists() else 0),
+                build_state="emit_c_only" if emit_path else "cold_build",
+            )
             timings.report()
             if emit_path:
                 print(f"Wrote {emit_path}")
@@ -811,10 +847,19 @@ def main() -> int:
             executable = NativeCodegen(
                 source_path, funcs, top, variables, arrays
             ).generate()
+            timings.mark("generate")
             out = args.output or source_path.with_suffix(".exe")
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(executable)
             _place_extension_dlls(out)
+            timings.mark("build")
+            timings.set_metadata(
+                generated_bytes=len(executable),
+                generated_kind="native_pe",
+                output_bytes=out.stat().st_size,
+                build_state="native_emit",
+            )
+            timings.report()
             print(f"Built {out} as native AMD64 PE (no C/Rust compiler)")
             if args.run:
                 return _run_program([str(out.resolve())], source_path, manifest_path)
@@ -828,12 +873,19 @@ def main() -> int:
             source_path, funcs, top, variables, arrays, fixed_hz, project_name
         )
         timings.mark("generate")
+        timings.set_metadata(
+            generated_bytes=len(generated.encode("utf-8")),
+            generated_kind="c_source",
+        )
         c_path = (
             args.emit_c or args.generated_c or source_path.with_suffix(".generated.c")
         )
         c_path.parent.mkdir(parents=True, exist_ok=True)
         c_path.write_text(generated, encoding="utf-8", newline="\n")
         if args.emit_c:
+            timings.mark("build")
+            timings.set_metadata(output_bytes=0, build_state="emit_c_only")
+            timings.report()
             print(f"Wrote {c_path}")
             return 0
         compiler = find_compiler(args.cc)
@@ -864,6 +916,12 @@ def main() -> int:
                 args.dynamic_runtime,
             )
             timings.mark("build")
+            timings.set_metadata(
+                generated_bytes=c_path.stat().st_size,
+                generated_kind="c_source",
+                output_bytes=out.stat().st_size if out.exists() else 0,
+                build_state="cold_compile",
+            )
             timings.report()
             print(f"Built {out} using {compiler[0]}")
         else:
@@ -875,6 +933,12 @@ def main() -> int:
             )
             if cached:
                 timings.mark("build")
+                timings.set_metadata(
+                    generated_bytes=c_path.stat().st_size,
+                    generated_kind="c_source",
+                    output_bytes=out.stat().st_size if out.exists() else 0,
+                    build_state="warm_cache_hit",
+                )
                 timings.report()
                 print(f"Built {out} using {compiler[0]} (reused build cache)")
             else:
@@ -909,6 +973,12 @@ def main() -> int:
                     deps_tmp.unlink(missing_ok=True)
                     libs_tmp.unlink(missing_ok=True)
                 timings.mark("build")
+                timings.set_metadata(
+                    generated_bytes=c_path.stat().st_size,
+                    generated_kind="c_source",
+                    output_bytes=out.stat().st_size if out.exists() else 0,
+                    build_state="cold_compile",
+                )
                 timings.report()
                 print(f"Built {out} using {compiler[0]}")
         _place_extension_dlls(out)

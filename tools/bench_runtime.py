@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import platform
 import statistics
@@ -534,6 +535,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--write-budgets", action="store_true", help="record measured budgets")
     parser.add_argument("--runs", type=int, default=3, help="repetitions per scene (default 3)")
     parser.add_argument("--scene", action="append", choices=sorted(SCENES), help="limit to a scene")
+    parser.add_argument("--json", type=pathlib.Path, help="write versioned runtime profile JSON")
     args = parser.parse_args(argv)
 
     names = args.scene or sorted(SCENES)
@@ -568,6 +570,35 @@ def main(argv: list[str] | None = None) -> int:
                     failures.append(
                         f"{name} {key} {stats[key]:.2f} > budget {budget[key]:.2f}"
                     )
+
+    if args.json:
+        report = {
+            "schema": "anvil.runtime-profile",
+            "version": 1,
+            "environment": {
+                "platform": platform.platform(),
+                "python": sys.version.split()[0],
+                "processor": platform.processor() or None,
+                "cpu_count": os.cpu_count(),
+            },
+            "sampling": {
+                "runs": args.runs,
+                "warmup_frames_per_run": WARMUP,
+                "sample_frames_per_run": SAMPLES,
+                "steady_state": True,
+                "bucket_width_ms": 0.25,
+            },
+            "scenes": {
+                name: {
+                    "measurements": {key: {"value": value, "unit": "ms"} for key, value in stats.items()},
+                    "budget": budgets.get(name),
+                }
+                for name, stats in measured.items()
+            },
+        }
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        print(f"wrote runtime profile to {args.json}")
 
     if args.write_budgets:
         document = load_budgets()

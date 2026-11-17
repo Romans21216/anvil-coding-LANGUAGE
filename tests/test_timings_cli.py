@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+import json
 import re
 import subprocess
 import sys
@@ -61,6 +62,27 @@ class TimingsCliTests(unittest.TestCase):
         lines = [line for line in result.stderr.splitlines() if line.startswith("timings:")]
         self.assertEqual(len(lines), 1, result.stderr)
         self.assertRegex(lines[0], CHECK_LINE)
+
+    def test_profile_json_records_phases_and_artifact_sizes_without_text_timings(self) -> None:
+        profile = self.root / "profile.json"
+        result = run(
+            [str(self.source), "--check", "--profile-json", str(profile)]
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("timings:", result.stderr)
+        report = json.loads(profile.read_text(encoding="utf-8"))
+        self.assertEqual(report["schema"], "anvil.build-profile")
+        self.assertEqual(report["version"], 1)
+        self.assertEqual(report["artifacts"]["backend"], "c")
+        self.assertEqual(report["artifacts"]["source_bytes"], self.source.stat().st_size)
+        self.assertGreater(report["artifacts"]["generated_bytes"], 0)
+        self.assertEqual(report["artifacts"]["generated_kind"], "c_source")
+        self.assertEqual(report["artifacts"]["output_bytes"], 0)
+        self.assertEqual(report["artifacts"]["build_state"], "not_built")
+        self.assertEqual(
+            [phase["name"] for phase in report["phases"]],
+            ["read", "parse", "generate"],
+        )
 
 
 if __name__ == "__main__":

@@ -49,6 +49,40 @@ class RuntimeBudgetTests(unittest.TestCase):
                 self.assertIn(key, entry, f"{name} has no {key} budget")
                 self.assertGreater(entry[key], 0.0, f"{name} {key} is not positive")
 
+    def test_runtime_profile_json_is_versioned_and_describes_sampling(self) -> None:
+        import json
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = pathlib.Path(temporary) / "profile.json"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOL),
+                    "--scene",
+                    "idle_2d",
+                    "--runs",
+                    "1",
+                    "--json",
+                    str(output),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            report = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(report["schema"], "anvil.runtime-profile")
+            self.assertEqual(report["version"], 1)
+            self.assertEqual(report["sampling"]["warmup_frames_per_run"], 30)
+            self.assertEqual(report["sampling"]["sample_frames_per_run"], 120)
+            self.assertEqual(report["sampling"]["runs"], 1)
+            self.assertIn("platform", report["environment"])
+            self.assertIn("idle_2d", report["scenes"])
+            metric = report["scenes"]["idle_2d"]["measurements"]["work_p50_ms"]
+            self.assertEqual(metric["unit"], "ms")
+            self.assertGreaterEqual(metric["value"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

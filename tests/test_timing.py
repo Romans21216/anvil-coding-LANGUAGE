@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import io
+import json
 import pathlib
 import re
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -70,6 +72,27 @@ class TimingTests(unittest.TestCase):
         timings.report(out)
         entries = dict(parse_line(out.getvalue()))
         self.assertGreaterEqual(entries["build"], 240)
+
+    def test_json_profile_is_versioned_and_keeps_phase_units(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / "profile.json"
+            timings = Timings(False, path)
+            timings.set_metadata(backend="c", source_bytes=23)
+            timings._started -= 0.01  # noqa: SLF001 - deterministic phase in this test
+            timings.mark("read")
+            timings._started -= 0.02  # noqa: SLF001
+            timings.mark("parse")
+            timings.report()
+            report = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(report["schema"], "anvil.build-profile")
+        self.assertEqual(report["version"], 1)
+        self.assertEqual([phase["name"] for phase in report["phases"]], ["read", "parse"])
+        self.assertTrue(all(phase["unit"] == "ms" for phase in report["phases"]))
+        self.assertEqual(report["artifacts"], {"backend": "c", "source_bytes": 23})
+        self.assertEqual(report["memory"]["peak_bytes"], None)
+
+    def test_disabled_timing_without_json_does_not_start_a_clock(self) -> None:
+        self.assertEqual(Timings(False)._started, 0.0)  # noqa: SLF001
 
 
 if __name__ == "__main__":

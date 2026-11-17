@@ -70,6 +70,8 @@ the build cache.
 
 `--timings` reports each phase separately so a slow step is identifiable: a cold C build on this machine measured about 0.4-0.6 s depending on load (parse and generate are ~3 ms each; the rest is `cl.exe`), while a cache hit replaces the build with a ~0.11-0.18 s copy plus the dependency-sidecar digests. The build phase was 1,597 ms before the Visual Studio environment was cached: `VsDevCmd.bat -arch=x64` costs 1.3-1.7 s and is now run once per toolset, with the captured environment reused for later builds. Published ceilings for compile time and executable size live in `tools/bench_budgets.json` and are enforced by `python tools/bench_anvil.py --check`.
 
+`--profile-json <path>` writes a versioned `anvil.build-profile` JSON record with phase durations, platform metadata, and source/generated/output byte counts. Its `artifacts.build_state` distinguishes check-only, C-only emission, native output, cold compile, and warm cache hit. Peak Python allocation memory is measured with `tracemalloc` and recorded in bytes; native allocations from external compiler processes are not included.
+
 The cache key covers the generated C, every runtime source and header, the compiler
 Python sources, the **contents** of `cl.exe`, the contents of the `link.exe` beside it,
 and a content fingerprint of the selected Windows SDK (every file under the newest
@@ -169,7 +171,8 @@ tools and reports.
 | `--no-cache` | ignore the build cache and do not store a new entry |
 | `--diagnostics caret\|editor` | caret blocks (default) or one-line `path:line:column` messages for editors |
 | `--explain CODE` | print the cause and fix for a stable diagnostic code (see [diagnostic codes](ERRORS.md)) |
-| `--timings` | print `read/parse/generate/build` milliseconds to stderr (C backend; `--check` has no build phase) |
+| `--timings` | print `read/parse/generate/build` milliseconds to stderr |
+| `--profile-json <path>` | write versioned phase timings and artifact metadata as JSON |
 | `--package <dir>` | copy the program and its assets into `dir` with `anvil-package.json` |
 | `--package-dry-run` | validate assets and print the package manifest without writing |
 | `--run` | build and run from the project directory (manifest directory, or source directory for standalone files), returning its exit code |

@@ -1693,3 +1693,17 @@ scene work and present cost. Compile phase, asset import and peak-memory
 consolidation from P8-166-F2 remain open.
 
 Validation: `python -m pytest tests/test_runtime_budget.py::RuntimeBudgetTests::test_runtime_profile_json_is_versioned_and_describes_sampling -q` — 1 passed in 4.19 s. Python compile checks and scoped `git diff --check` passed.
+
+8.182 EXPORT VERSIONED COMPILER BUILD PROFILES (2026-11-17)
+
+Added `--profile-json <path>` for compiler invocations. It writes the versioned
+`anvil.build-profile` schema with ordered phase durations, environment metadata,
+and source/generated/output byte counts. Artifact state labels distinguish
+check-only, generated-C-only, native emission, cold compile, and warm cache hit.
+The existing `--timings` text output remains available and now covers all
+backends. Peak memory is explicitly unavailable (`null`); asset-import timing
+and the remaining P8-166-F2 profile consolidation are still open.
+
+Validation: `python -m pytest tests/test_timing.py tests/test_timings_cli.py -q`
+— 11 passed. `python -m py_compile compiler/cli.py compiler/timing.py` and
+`git diff --check` passed.
