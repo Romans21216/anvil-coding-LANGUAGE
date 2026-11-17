@@ -151,7 +151,7 @@ to the origin.
 `tests/test_gltf_skins.py` measures ink: a fully weighted joint moves the mesh
 by the joint's animated translation, a 50/50 blend between a moving joint and a
 static one lands half way, a clip-less rig draws at rest, and malformed inputs plus the unsupported wasm `ray_mesh` case report the source
-line. Browser parity compares a 50/50 animated skinned joint blend in `model_draw` against C with an offset, 58-degree, yawed and pitched camera plus custom light direction, ambient floor and intensity.
+line. Browser parity compares a 50/50 animated skinned joint blend in `model_draw` against C with an offset, 58-degree, yawed and pitched camera plus custom light direction, ambient floor and intensity, while the skinned instance is translated, scaled and rotated.
 
 ## Morph targets
 

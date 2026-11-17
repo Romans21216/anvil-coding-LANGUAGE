@@ -386,7 +386,7 @@ class WasmBrowserParityTests(unittest.TestCase):
                     "  set var(ambient_old) = light_ambient(0.22)",
                     "  set var(intensity_old) = light_intensity(0.78)",
                     '  set var(t) = model_animate("skin.gltf", 0.5)',
-                    '  set var(ok) = model_draw("skin.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                    '  set var(ok) = model_draw("skin.gltf", 0.25, -0.1, 0, 1.25, 15, -8, 23)',
                     "end",
                     "",
                 )

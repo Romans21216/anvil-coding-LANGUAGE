@@ -1281,3 +1281,10 @@ Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserPari
 Added an exact shared-budget test for skinned `model_draw`: 16,384 one-triangle submissions are accepted, the next submission is rejected, and the next frame receives a fresh budget. This closes the direct budget-coverage gap introduced when skinned draws were added. The wasm guide and Part Eight evidence now explicitly include skinned submissions in the shared cap.
 
 Validation: `python -m pytest tests/test_wasm.py::WasmModelTests::test_skinned_model_draw_obeys_the_shared_triangle_budget -q` — 1 passed in 1.60 s. `git diff --check` passes. The full roadmap remains active; broader camera/depth parity and unsupported skinned `ray_mesh` remain open.
+
+
+8.153 COMPARE PLACED SKINNED MODELS ACROSS BACKENDS (2026-11-17)
+
+Extended the oblique C/Chrome skin fixture with nonzero translation, non-unit scale, and rotation on all three axes. The comparison still passes with the animated half-weight joint blend and custom lighting, exercising the full skin-to-placement transform chain.
+
+Validation: `python -m pytest tests/test_wasm_browser_parity.py::WasmBrowserParityTests::test_animated_skinned_model_draw_matches_c -q` — 1 passed in 3.86 s. `git diff --check` passes. Wider model/depth scenarios remain open; this change is local and unpublished.
