@@ -263,6 +263,23 @@ def scene_statements_without_scene(functions, top):
     ]
 
 
+def outputs_inside_loops(functions):
+    """Output statements nested in a loop, which return on the first visit."""
+    found = []
+
+    def visit(nodes, inside_loop=False):
+        for node in nodes:
+            if node.kind == "output" and inside_loop:
+                found.append(node)
+            nested = inside_loop or node.kind in ("while", "for")
+            visit(_children(node), nested)
+            visit(getattr(node, "otherwise", []) or [], inside_loop)
+
+    for function in functions.values():
+        visit(function.body)
+    return found
+
+
 def _every_node(nodes):
     """Every node, including both branches, for whole-function lint checks."""
     for node in nodes:
@@ -314,6 +331,10 @@ def report(functions, top=(), entry=None) -> list[tuple[str, object]]:
     warnings.extend(empty_for_loops(functions, top))
     warnings.extend(bad_number_literals(functions, top))
     warnings.extend(scene_statements_without_scene(functions, top))
+    for node in outputs_inside_loops(functions):
+        warnings.append(
+            ("output returns from the function on the first loop iteration", node)
+        )
     for node, name in unused_globals(functions, top):
         warnings.append((f"global '{name}' is never read", node))
     warnings.extend(unknown_calls_in_unused_functions(functions, top, entry))

@@ -1090,3 +1090,9 @@ Validation: `python -m pytest tests/test_compiler.py tests/test_wasm.py tests/te
 The C emitter rejects `display ... 7` with a diagnostic explaining that the suffix has no effect and draw order follows source order. Removed the apparent layer numbers from the `first_world` and `window_controls` examples and updated the language specification. The rendered order and images are unchanged because the removed integers were ignored.
 
 Validation: `python -m pytest tests/test_compiler.py -q` — 73 passed in 72.08 s. `python tools/visual_smoke.py --check` passed all seven examples at 960x600, including the two updated sources.
+
+8.125 WARN WHEN OUTPUT RETURNS FROM INSIDE A LOOP (PART 4 B12)
+
+The compiler lint pass now locates each `output` nested under a `while` or `for` and warns that it returns from the function on the first loop iteration. Nested conditionals inside the loop are included; a branch-only `output` outside a loop stays quiet. The CLI regression confirms the warning includes the source line and caret and still allows `--check` to succeed. Both language references now state the early-return behavior.
+
+Validation: `python -m pytest tests/test_lints.py -q` — 27 passed in 0.76 s.

@@ -99,9 +99,9 @@ for_statement   = "for local(", IDENT, ") =", expression, "to", expression,
 ```
 
 Semantic constraint for the grammar above: when `display_call` is `text(STRING)`, `display_tail` must contain at least one `-l(x,y)` location style; without it the compiler rejects the command.
-At most one `-l(x,y)` and one `-rotate(x,y,z)` modifier may appear on a display command; a repeated location or rotation modifier is invalid. Multiple `-rgb`/`-rgba` modifiers are accepted by the current compiler, and the first color modifier supplies the color while later color modifiers are ignored. The optional legacy integer suffix may appear before or after style modifiers, but at most one suffix is accepted.
+At most one `-l(x,y)`, one `-rotate(x,y,z)`, and one color modifier (`-rgb` or `-rgba`) may appear on a display command. Repeating any of them is invalid. An unknown `-name(...)` suffix receives an unknown display modifier diagnostic. A trailing integer suffix is rejected because it has no effect; draw order follows source order.
 
-The statements that may appear at file top level are limited to global `set var`, global array declarations, engine/project setup statements, `seed(expression)`, and `call fn(...)`. `add`, `sub`, `output`, local declarations, array writes, display commands, `if`, `while`, and `for` belong inside a function. Although the parser can form a top-level branch node, top-level control-flow blocks are rejected by C emission; they are not part of the accepted language.
+The statements that may appear at file top level are limited to global `set var`, global array declarations, engine/project setup statements, `seed(expression)`, and `call fn(...)`. `add`, `sub`, `output`, local declarations, array writes, display commands, `if`, `while`, and `for` belong inside a function. `output` returns from that function immediately even when nested in a loop; the compiler warns when it appears inside `while` or `for`. Although the parser can form a top-level branch node, top-level control-flow blocks are rejected by C emission; they are not part of the accepted language.
 
 The compatibility form `set var(name) = null` is accepted as a no-op (it neither clears nor changes the numeric variable). It remains in older examples as cleanup syntax; Anvil has no nullable scalar values.
 

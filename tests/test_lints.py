@@ -145,6 +145,26 @@ call fn(main)
         self.assertIn("warning: unused local 'spare'", result.stderr)
         self.assertIn("^", result.stderr)
 
+    def test_the_cli_locates_output_inside_a_loop(self) -> None:
+        path, _, _ = parse_source(
+            "fn(main)\n  set local(index) = 0\n  while local(index) < 10\n"
+            "    output local(index)\n  end\nend\ncall fn(main)\n",
+            self.base,
+        )
+        result = subprocess.run(
+            [sys.executable, str(ANVIL), str(path), "--check"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "warning: output returns from the function on the first loop iteration",
+            result.stderr,
+        )
+        self.assertIn(f"{path}:4:", result.stderr)
+        self.assertIn("^", result.stderr)
+
     def test_deny_warnings_turns_lints_into_failures(self) -> None:
         path, _, _ = parse_source(
             "fn(main)\n  set local(spare) = 1\n  say 2\nend\ncall fn(main)\n", self.base
@@ -323,6 +343,27 @@ call fn(main)
         path, functions, top = parse_source(source, self.base)
         messages = [m for m, _ in report(functions, top, path)]
         self.assertEqual([m for m in messages if "scene 2d" in m], [])
+
+    def test_output_inside_a_loop_warns_that_it_returns_early(self) -> None:
+        source = (
+            "fn(main)\n  set local(index) = 0\n  while local(index) < 10\n"
+            "    output local(index)\n  end\nend\ncall fn(main)\n"
+        )
+        path, functions, top = parse_source(source, self.base)
+        warnings = report(functions, top, path)
+        finding = next(
+            (message, node) for message, node in warnings
+            if message == "output returns from the function on the first loop iteration"
+        )
+        self.assertEqual(finding[1].line, 4)
+
+    def test_output_outside_a_loop_does_not_get_the_loop_warning(self) -> None:
+        source = "fn(main)\n  output 7\nend\ncall fn(main)\n"
+        path, functions, top = parse_source(source, self.base)
+        messages = [message for message, _ in report(functions, top, path)]
+        self.assertNotIn(
+            "output returns from the function on the first loop iteration", messages
+        )
 
 
 if __name__ == "__main__":
