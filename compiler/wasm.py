@@ -742,6 +742,25 @@ def validate(
             f"{source_path}:{line}: 'engine' statements are not available in "
             "the wasm backend yet"
         )
+    # An animated model bakes node-local triangles and is posed by the C
+    # runtime; the browser bakes world-space triangles and has no pose code.
+    for match in re.finditer(r'\bmodel_draw\s*\(\s*"((?:[^"\\]|\\.)*)"', text):
+        try:
+            asset = json.loads('"' + match.group(1) + '"')
+        except ValueError:
+            continue
+        from compiler import gltf
+
+        try:
+            model = gltf.ensure_model(asset, pathlib.Path(source_path))
+        except gltf.ModelError:
+            continue  # the C generator reports the real problem with the file
+        if model.get("animated"):
+            line = text.count("\n", 0, match.start()) + 1
+            raise CompileError(
+                f"{source_path}:{line}: animated models are not available in the "
+                "wasm backend yet (the browser draws a baked static pose)"
+            )
     used = used_builtins(functions, top)
     for name in used:
         if name in ALLOWED_BUILTINS:

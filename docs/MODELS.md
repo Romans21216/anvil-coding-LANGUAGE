@@ -69,3 +69,38 @@ Measured here with 20 off-screen models of 2,048 triangles each (40,960
 triangles): 3.83 ms per frame with culling off, 0.20 ms with it on, an 18.9x
 reduction in render time for that scene. Culling only helps when models are
 outside the view; visible models take the normal path.
+
+## Animation
+
+A model whose file has an `animations` clip is baked in **node-local** space:
+the node hierarchy (parent index plus base translation/rotation/scale) and the
+keyframes ship with the model, and `model_draw` poses the hierarchy on the CPU
+for that draw. A static model keeps the cheaper world-space bake.
+
+```
+set var(t) = model_animate("walk.gltf", 0.6)
+set var(ok) = model_draw("walk.gltf", 0, 0, 0, 1, 0, 0, 0)
+```
+
+- One clip (the first) is imported. Channels may target any node with
+  `translation`, `rotation` or `scale`; `LINEAR` and `STEP` samplers are
+  supported, and rotations interpolate with slerp. `CUBICSPLINE` is refused at
+  compile time.
+- A node that uses a `matrix` instead of TRS is decomposed into TRS; a matrix
+  that collapses an axis is refused, because it cannot be posed.
+- `model_animate(path, seconds)` stores that model's clip clock and returns it.
+  The clock wraps at the clip length, so playback loops: a draw at exactly the
+  length shows the first key. `model_animation_length(path)` is the length in
+  seconds, resolved at compile time.
+- The clock starts at 0, which is the rest pose at the first key. Calling
+  `model_animate` on a model with no clip is a compile error naming the line.
+- Animated models skip the bounding-sphere culling test and overhead shadows;
+  the whole hierarchy is drawn every frame.
+- The browser backend bakes world-space triangles and has no pose code, so
+  `--backend wasm` refuses an animated model with a located error.
+
+`tests/test_gltf_animation.py` measures ink bounds: a translation track moves
+the triangle by the expected amount at half a second and a quarter of the way,
+a rotation track changes its silhouette, a STEP track holds its left key until
+the next one, and the clip wraps at its length.
+

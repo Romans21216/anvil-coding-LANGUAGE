@@ -904,3 +904,11 @@ Animated scenes made the visual gate flaky at exact budgets (particles 22.8% aga
 - **Wasm:** the shim imports `fade` and the page applies the same overlay above the canvas (including the 3D blit) inside `present()`, which previously returned early when a frame had no triangles.
 - **Tests:** `tests/test_screen_fade.py` reads real window pixels at alpha 0/128/255 and through a 0.5 s ramp (the first attempt read a dark pixel because `GetPixel` samples the screen, so the window is raised first); the wasm case asserts the `fade` op lands after `rect` and before `present`.
 
+## Batch 92 — glTF animation: node TRS clips posed at runtime (8.13)
+
+- **Import:** a model whose file has an `animations` clip is baked in node-local space with its node table (parent + base TRS), per-node triangle groups and the first clip's keyframes; a static model keeps the world-space bake. Translation, rotation and scale channels, `LINEAR` and `STEP` samplers, slerp for rotations; `CUBICSPLINE` and a matrix that collapses an axis are refused at compile time. A node that uses a `matrix` is decomposed into TRS so its parents still work.
+- **Runtime:** `anvil_mesh_draw_animated` samples the clip at `anvil_model_clock(id)`, composes the hierarchy per node (memoised, depth-capped), and transforms each group's triangles before the existing placement and shading. `model_animate(path, seconds)` stores the clock and returns it; the time wraps at the clip length, so playback loops. `model_animation_length` is a compile-time constant.
+- **Not applied:** culling and overhead shadows for animated models, documented in `docs/MODELS.md`.
+- **Wasm:** the browser bakes world-space triangles and has no pose code, so an animated `model_draw` is refused with a located error instead of failing at link time.
+- **Tests:** `tests/test_gltf_animation.py` measures ink bounds from captured frames — translation moves the triangle at 0.5 s and a quarter of the way, rotation changes the silhouette, STEP holds the left key until 1.0 s, the clip wraps at its length, the length is reported, a static model refuses `model_animate`, and wasm refuses an animated model.
+

@@ -251,6 +251,8 @@ BUILTINS = {
     "window_scale": (1, 1),
     "camera_angle": (2, 2),
     "model_draw": (8, 8),
+    "model_animate": (2, 2),
+    "model_animation_length": (1, 1),
     "particle_emit": (9, 9),
     "particle_count": (0, 0),
     "particle_clear": (0, 0),
@@ -816,24 +818,86 @@ class ExpressionParser:
                 ) from None
             from compiler import gltf
             try:
-                symbol, count, bounds = gltf.ensure_emitted(
-                    asset, pathlib.Path(self.path)
-                )
+                model = gltf.ensure_model(asset, pathlib.Path(self.path))
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
+            symbol, count, bounds = model["symbol"], model["count"], model["bounds"]
             mesh_args = []
             for _ in range(7):
                 self.expect(",")
                 mesh_args.append(self.require_number(self.parse()))
             self.expect(")")
-            call = (
-                f"anvil_mesh_draw((const double *){symbol}, {count}, "
-                + ", ".join(f"{value:.6g}" for value in bounds)
-                + ", "
-                + ", ".join(mesh_args)
-                + ")"
-            )
+            placement = ", ".join(mesh_args)
+            if model.get("animated"):
+                # The clip is evaluated per draw: node-local triangles plus the
+                # hierarchy and keyframes, sampled at the model's clock.
+                call = (
+                    f"anvil_mesh_draw_animated((const double *){symbol}, {count}, "
+                    f"(const double *){symbol}_nodes, {len(model['nodes']) // 10}, "
+                    f"(const int *){symbol}_parents, (const int *){symbol}_groups, "
+                    f"{len(model['groups']) // 3}, (const double *){symbol}_times, "
+                    f"(const double *){symbol}_values, (const int *){symbol}_tracks, "
+                    f"{len(model['tracks']) // 6}, {model['length']:.6g}, "
+                    f"anvil_model_clock({model['id']}), {placement})"
+                )
+            else:
+                call = (
+                    f"anvil_mesh_draw((const double *){symbol}, {count}, "
+                    + ", ".join(f"{value:.6g}" for value in bounds)
+                    + ", "
+                    + placement
+                    + ")"
+                )
             left = (self.checked_number(call), "number")
+        elif kind == "word" and value == "model_animate":
+            # Literal-path lowering, like model_draw: the clip index and its
+            # length are compile-time facts.
+            self.expect("(")
+            literal = self.require_string(self.parse())
+            try:
+                asset = json.loads(literal)
+            except ValueError:
+                raise CompileError(
+                    f"{self.path}:{self.line}: model_animate needs a string literal path"
+                ) from None
+            from compiler import gltf
+            try:
+                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+            except gltf.ModelError as error:
+                raise CompileError(f"{self.path}:{self.line}: {error}") from None
+            if not model.get("animated"):
+                raise CompileError(
+                    f"{self.path}:{self.line}: the model has no animation clip to play"
+                )
+            self.expect(",")
+            seconds = self.require_number(self.parse())
+            self.expect(")")
+            left = (
+                self.checked_number(
+                    f"anvil_model_animate({model['id']}, {seconds})"
+                ),
+                "number",
+            )
+        elif kind == "word" and value == "model_animation_length":
+            self.expect("(")
+            literal = self.require_string(self.parse())
+            try:
+                asset = json.loads(literal)
+            except ValueError:
+                raise CompileError(
+                    f"{self.path}:{self.line}: model_animation_length needs a string literal path"
+                ) from None
+            from compiler import gltf
+            try:
+                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+            except gltf.ModelError as error:
+                raise CompileError(f"{self.path}:{self.line}: {error}") from None
+            if not model.get("animated"):
+                raise CompileError(
+                    f"{self.path}:{self.line}: the model has no animation clip"
+                )
+            self.expect(")")
+            left = (f"{model['length']:.6g}", "number")
         elif kind == "word" and value in BUILTINS:
             self.expect("(")
             args = []

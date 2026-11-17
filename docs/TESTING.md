@@ -123,6 +123,10 @@ remote desktop can prevent window creation:
 - `test_parallax` — clamps the factor and returns the previous value, then pans
   the camera 100 px and proves with captured pixels that a factor-1 layer
   lands at x=0 and a 0.5 layer at x=50.
+- `test_gltf_animation` — builds a one-triangle animated glTF and measures the
+  drawn ink bounds across poses: translation moves it by half the key at 0.5 s,
+  rotation changes the silhouette, STEP holds the left key until 1.0 s, the clip
+  wraps at its length, and the static/wasm refusals name the source line.
 - `test_screen_fade` — draws a white rectangle, then samples the live window
   while `screen_fade` runs: white at alpha 0, 127 grey at 128, black at 255
   (a 300 argument clamps), and `screen_fade_to(0, 0.5)` ramps through a mid

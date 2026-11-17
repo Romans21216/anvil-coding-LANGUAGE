@@ -863,6 +863,237 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
   return 1.0;
 }
 
+/* ---- Animated models ---------------------------------------------------- */
+
+#define ANVIL_MODEL_STATES 32
+#define ANVIL_MODEL_NODES 128
+static double anvil_model_times[ANVIL_MODEL_STATES];
+
+/* model_animate() stores a per-model clip clock; model_draw() reads it back
+   through the generated anvil_model_clock(n) argument. */
+double anvil_model_animate(int id, double seconds) {
+  if (id < 0 || id >= ANVIL_MODEL_STATES || !isfinite(seconds))
+    return 0.0;
+  anvil_model_times[id] = seconds;
+  return seconds;
+}
+
+double anvil_model_clock(int id) {
+  return id >= 0 && id < ANVIL_MODEL_STATES ? anvil_model_times[id] : 0.0;
+}
+
+static void anvil_mat_trs(const double t[3], const double q[4],
+                          const double s[3], double *m) {
+  const double x = q[0], y = q[1], z = q[2], w = q[3];
+  /* Column-major rotation * scale, then translation, like the importer. */
+  m[0] = (1 - 2 * (y * y + z * z)) * s[0];
+  m[1] = (2 * (x * y + z * w)) * s[0];
+  m[2] = (2 * (x * z - y * w)) * s[0];
+  m[3] = 0.0;
+  m[4] = (2 * (x * y - z * w)) * s[1];
+  m[5] = (1 - 2 * (x * x + z * z)) * s[1];
+  m[6] = (2 * (y * z + x * w)) * s[1];
+  m[7] = 0.0;
+  m[8] = (2 * (x * z + y * w)) * s[2];
+  m[9] = (2 * (y * z - x * w)) * s[2];
+  m[10] = (1 - 2 * (x * x + y * y)) * s[2];
+  m[11] = 0.0;
+  m[12] = t[0];
+  m[13] = t[1];
+  m[14] = t[2];
+  m[15] = 1.0;
+}
+
+static void anvil_mat_mul(const double *a, const double *b, double *out) {
+  for (int column = 0; column < 4; ++column)
+    for (int row = 0; row < 4; ++row)
+      out[column * 4 + row] = a[0 * 4 + row] * b[column * 4 + 0] +
+                              a[1 * 4 + row] * b[column * 4 + 1] +
+                              a[2 * 4 + row] * b[column * 4 + 2] +
+                              a[3 * 4 + row] * b[column * 4 + 3];
+}
+
+static void anvil_mat_point(const double *m, double x, double y, double z,
+                            double out[3]) {
+  out[0] = m[0] * x + m[4] * y + m[8] * z + m[12];
+  out[1] = m[1] * x + m[5] * y + m[9] * z + m[13];
+  out[2] = m[2] * x + m[6] * y + m[10] * z + m[14];
+}
+
+static void anvil_slerp(const double *a, const double *b, double u,
+                        double *out) {
+  double dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+  double sign = 1.0;
+  if (dot < 0.0) {
+    sign = -1.0;
+    dot = -dot;
+  }
+  if (dot > 0.9995) {
+    for (int i = 0; i < 4; ++i)
+      out[i] = a[i] + (sign * b[i] - a[i]) * u;
+  } else {
+    double theta = acos(dot);
+    double sin_theta = sin(theta);
+    double wa = sin((1.0 - u) * theta) / sin_theta;
+    double wb = sin(u * theta) / sin_theta;
+    for (int i = 0; i < 4; ++i)
+      out[i] = a[i] * wa + sign * b[i] * wb;
+  }
+  double norm = (out[0] * out[0] + out[1] * out[1] + out[2] * out[2] +
+                 out[3] * out[3]);
+  if (norm > 0.0) {
+    norm = sqrt(norm);
+    for (int i = 0; i < 4; ++i)
+      out[i] /= norm;
+  }
+}
+
+/* One channel at a clip time: STEP holds the left key, LINEAR interpolates,
+   and a rotation interpolates by slerp so a 180-degree step does not shrink
+   through the origin. */
+static void anvil_track_sample(const double *times, const double *values,
+                               int first_time, int first_value, int count,
+                               int path, int interpolation, double t,
+                               double *out) {
+  int width = path == 1 ? 4 : 3;
+  const double *row;
+  if (t <= times[first_time]) {
+    row = values + first_value;
+  } else if (t >= times[first_time + count - 1]) {
+    row = values + first_value + (size_t)(count - 1) * (size_t)width;
+  } else {
+    int index = 0;
+    while (index + 2 < count && times[first_time + index + 1] <= t)
+      ++index;
+    if (interpolation == 1) {
+      row = values + first_value + (size_t)index * (size_t)width;
+    } else {
+      double t0 = times[first_time + index];
+      double t1 = times[first_time + index + 1];
+      double u = t1 > t0 ? (t - t0) / (t1 - t0) : 0.0;
+      const double *left = values + first_value + (size_t)index * (size_t)width;
+      const double *right = left + width;
+      if (path == 1) {
+        anvil_slerp(left, right, u, out);
+        return;
+      }
+      for (int i = 0; i < width; ++i)
+        out[i] = left[i] + (right[i] - left[i]) * u;
+      return;
+    }
+  }
+  for (int i = 0; i < width; ++i)
+    out[i] = row[i];
+}
+
+static double anvil_model_local_t[ANVIL_MODEL_NODES][3];
+static double anvil_model_local_r[ANVIL_MODEL_NODES][4];
+static double anvil_model_local_s[ANVIL_MODEL_NODES][3];
+static double anvil_model_world[ANVIL_MODEL_NODES][16];
+static int anvil_model_resolving[ANVIL_MODEL_NODES];
+
+static void anvil_model_resolve(int index, const int *parents, int depth) {
+  if (anvil_model_resolving[index] == 2)
+    return;
+  if (anvil_model_resolving[index] == 1 || depth > 64) {
+    anvil_mat_trs(anvil_model_local_t[index], anvil_model_local_r[index],
+                  anvil_model_local_s[index], anvil_model_world[index]);
+    anvil_model_resolving[index] = 2;
+    return;
+  }
+  anvil_model_resolving[index] = 1;
+  double local[16];
+  anvil_mat_trs(anvil_model_local_t[index], anvil_model_local_r[index],
+                anvil_model_local_s[index], local);
+  int parent = parents[index];
+  if (parent >= 0 && parent != index) {
+    anvil_model_resolve(parent, parents, depth + 1);
+    anvil_mat_mul(anvil_model_world[parent], local, anvil_model_world[index]);
+  } else {
+    for (int i = 0; i < 16; ++i)
+      anvil_model_world[index][i] = local[i];
+  }
+  anvil_model_resolving[index] = 2;
+}
+
+double anvil_mesh_draw_animated(
+    const double *data, int triangle_count, const double *nodes, int node_count,
+    const int *parents, const int *groups, int group_count, const double *times,
+    const double *values, const int *tracks, int track_count, double clip_length,
+    double clip_time, double x, double y, double z, double scale, double rx,
+    double ry, double rz) {
+  if (!data || !nodes || !parents || !groups || triangle_count <= 0 ||
+      node_count <= 0 || node_count > ANVIL_MODEL_NODES || group_count <= 0 ||
+      !isfinite(x) || !isfinite(y) || !isfinite(z) || !isfinite(scale) ||
+      !isfinite(rx) || !isfinite(ry) || !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  for (int node = 0; node < node_count; ++node) {
+    for (int i = 0; i < 3; ++i) {
+      anvil_model_local_t[node][i] = nodes[node * 10 + i];
+      anvil_model_local_r[node][i] = nodes[node * 10 + 3 + i];
+      anvil_model_local_s[node][i] = nodes[node * 10 + 7 + i];
+    }
+    anvil_model_local_r[node][3] = nodes[node * 10 + 6];
+  }
+  double t = 0.0;
+  if (clip_length > 0.0 && isfinite(clip_length)) {
+    t = fmod(clip_time, clip_length);
+    if (t < 0.0)
+      t += clip_length;
+  }
+  for (int i = 0; i < track_count; ++i) {
+    const int *track = tracks + i * 6;
+    int node = track[0];
+    int path = track[1];
+    if (node < 0 || node >= node_count)
+      continue;
+    double sampled[4] = {0.0, 0.0, 0.0, 0.0};
+    anvil_track_sample(times, values, track[3], track[4], track[5], path,
+                       track[2], t, sampled);
+    if (path == 0)
+      for (int k = 0; k < 3; ++k)
+        anvil_model_local_t[node][k] = sampled[k];
+    else if (path == 2)
+      for (int k = 0; k < 3; ++k)
+        anvil_model_local_s[node][k] = sampled[k];
+    else
+      for (int k = 0; k < 4; ++k)
+        anvil_model_local_r[node][k] = sampled[k];
+  }
+  for (int node = 0; node < node_count; ++node) {
+    anvil_model_resolving[node] = 0;
+    anvil_model_resolve(node, parents, 0);
+  }
+  anvil_mesh_drawn_frame++;
+  for (int group = 0; group < group_count; ++group) {
+    const int *entry = groups + group * 3;
+    int node = entry[0];
+    int first = entry[1];
+    int count = entry[2];
+    if (node < 0 || node >= node_count)
+      continue;
+    const double *matrix = anvil_model_world[node];
+    for (int triangle = first; triangle < first + count; ++triangle) {
+      const double *p = data + (size_t)triangle * 12;
+      AnvilVec3 v[3];
+      for (int corner = 0; corner < 3; ++corner) {
+        double point[3];
+        anvil_mat_point(matrix, p[corner * 3], p[corner * 3 + 1],
+                        p[corner * 3 + 2], point);
+        AnvilVec3 q = {point[0] * scale, point[1] * scale, point[2] * scale};
+        q = anvil_rotate(q, rx, ry, rz);
+        v[corner] = (AnvilVec3){x + q.x, y + q.y, z + q.z};
+      }
+      AnvilVec3 n = anvil_normalize(
+          anvil_cross(anvil_sub(v[1], v[0]), anvil_sub(v[2], v[0])));
+      double brightness = anvil_light_level(n, 1);
+      uint32_t base = anvil_color((int)p[9], (int)p[10], (int)p[11]);
+      anvil_world_triangle(v, base, brightness, 255);
+    }
+  }
+  return 1.0;
+}
+
 void anvil_sphere(double x, double y, double z, double radius, int r, int g,
                   int b, int a) {
   if (radius <= 0.0 || !isfinite(radius))

@@ -7,9 +7,13 @@ the file during compilation and returns flat triangles.
 
 Supported: .gltf (JSON) with a .bin file or base64 data URI buffers, node
 hierarchies with matrix or TRS transforms, triangle/triangle-strip/triangle-fan
-primitives, POSITION and optional COLOR_0 attributes, and per-material
-baseColorFactor. Not supported yet: .glb containers, skins, morph targets,
-animations, textures and sparse accessors.
+primitives, POSITION and optional COLOR_0 attributes, per-material
+baseColorFactor, and node TRS animation clips (translation/rotation/scale,
+LINEAR and STEP keys). A model with an animation clip bakes its triangles in
+node-local space plus the node hierarchy and keyframes, and the runtime
+evaluates the pose; a static model keeps the cheaper world-space bake.
+Not supported yet: skins, morph targets, CUBICSPLINE keys, textures and sparse
+accessors.
 """
 
 from __future__ import annotations
@@ -297,11 +301,203 @@ def load_triangles(path: pathlib.Path) -> list[float]:
     return triangles
 
 
+# ---- Animation -------------------------------------------------------------
+
+# glTF animation channel paths, in the order the runtime switches on them.
+PATHS = {"translation": 0, "rotation": 1, "scale": 2}
+INTERPOLATIONS = {"LINEAR": 0, "STEP": 1}
+
+
+def _node_trs(node: dict) -> tuple[list[float], list[float], list[float]]:
+    """Base translation/rotation/scale for a node, decomposing a matrix if one
+    is present (an animated node must use TRS in glTF, but its parents may use
+    a matrix)."""
+    if "matrix" not in node:
+        translation = [float(v) for v in node.get("translation", (0.0, 0.0, 0.0))]
+        rotation = [float(v) for v in node.get("rotation", (0.0, 0.0, 0.0, 1.0))]
+        scale = [float(v) for v in node.get("scale", (1.0, 1.0, 1.0))]
+        if len(translation) != 3 or len(rotation) != 4 or len(scale) != 3:
+            raise ModelError("a node transform has the wrong number of components")
+        x, y, z, w = rotation
+        norm = (x * x + y * y + z * z + w * w) ** 0.5
+        if norm > 0.0:
+            rotation = [x / norm, y / norm, z / norm, w / norm]
+        return translation, rotation, scale
+    matrix = [float(value) for value in node["matrix"]]
+    if len(matrix) != 16:
+        raise ModelError("a node matrix must have 16 entries")
+    translation = [matrix[12], matrix[13], matrix[14]]
+    columns = [
+        [matrix[0], matrix[1], matrix[2]],
+        [matrix[4], matrix[5], matrix[6]],
+        [matrix[8], matrix[9], matrix[10]],
+    ]
+    scale = [
+        (column[0] ** 2 + column[1] ** 2 + column[2] ** 2) ** 0.5
+        for column in columns
+    ]
+    if min(scale) <= 1.0e-12:
+        raise ModelError("a node matrix collapses an axis and cannot be used with animation")
+    r = [[columns[column][row] / scale[column] for column in range(3)] for row in range(3)]
+    trace = r[0][0] + r[1][1] + r[2][2]
+    if trace > 0.0:
+        s = (trace + 1.0) ** 0.5 * 2.0
+        w = 0.25 * s
+        x = (r[2][1] - r[1][2]) / s
+        y = (r[0][2] - r[2][0]) / s
+        z = (r[1][0] - r[0][1]) / s
+    elif r[0][0] > r[1][1] and r[0][0] > r[2][2]:
+        s = (1.0 + r[0][0] - r[1][1] - r[2][2]) ** 0.5 * 2.0
+        w = (r[2][1] - r[1][2]) / s
+        x = 0.25 * s
+        y = (r[0][1] + r[1][0]) / s
+        z = (r[0][2] + r[2][0]) / s
+    elif r[1][1] > r[2][2]:
+        s = (1.0 + r[1][1] - r[0][0] - r[2][2]) ** 0.5 * 2.0
+        w = (r[0][2] - r[2][0]) / s
+        x = (r[0][1] + r[1][0]) / s
+        y = 0.25 * s
+        z = (r[1][2] + r[2][1]) / s
+    else:
+        s = (1.0 + r[2][2] - r[0][0] - r[1][1]) ** 0.5 * 2.0
+        w = (r[1][0] - r[0][1]) / s
+        x = (r[0][2] + r[2][0]) / s
+        y = (r[1][2] + r[2][1]) / s
+        z = 0.25 * s
+    norm = (x * x + y * y + z * z + w * w) ** 0.5
+    if norm > 0.0:
+        x, y, z, w = x / norm, y / norm, z / norm, w / norm
+    return translation, [x, y, z, w], scale
+
+
+def load_animated(path: pathlib.Path) -> dict:
+    """Bake a model with its node hierarchy and one animation clip.
+
+    Triangles stay in node-local space so the runtime can pose the hierarchy
+    each frame; a static model is still baked in world space, which is cheaper.
+    """
+    document, binary = _container(path)
+    if not isinstance(document, dict) or "asset" not in document:
+        raise ModelError(f"{path.name} has no glTF 'asset' block")
+    animations = document.get("animations") or []
+    if not animations:
+        raise ModelError("the model has no animation clips")
+    if len(animations) > 1:
+        raise ModelError("only the first animation clip is supported")
+    nodes_doc = document.get("nodes", [])
+    if len(nodes_doc) > 128:
+        raise ModelError("the model has more than 128 nodes")
+    base_dir = path.parent
+
+    parents = [-1] * len(nodes_doc)
+    for index, node in enumerate(nodes_doc):
+        for child in node.get("children", []):
+            if not isinstance(child, int) or child < 0 or child >= len(nodes_doc):
+                raise ModelError("a node index is out of range")
+            parents[child] = index
+
+    nodes: list[float] = []
+    for node in nodes_doc:
+        translation, rotation, scale = _node_trs(node)
+        nodes.extend(translation)
+        nodes.extend(rotation)
+        nodes.extend(scale)
+
+    scenes = document.get("scenes")
+    if scenes:
+        roots = scenes[document.get("scene", 0)].get("nodes", [])
+    else:
+        roots = list(range(len(nodes_doc)))
+
+    vertices: list[float] = []
+    groups: list[int] = []
+
+    def visit(index: int, depth: int) -> None:
+        if depth > 64:
+            raise ModelError("the node hierarchy is deeper than 64 levels")
+        if index < 0 or index >= len(nodes_doc):
+            raise ModelError("a node index is out of range")
+        node = nodes_doc[index]
+        if "mesh" in node:
+            mesh_index = node["mesh"]
+            if not isinstance(mesh_index, int) or mesh_index >= len(document["meshes"]):
+                raise ModelError("a mesh index is out of range")
+            first = len(vertices) // 12
+            for primitive in document["meshes"][mesh_index].get("primitives", []):
+                vertices.extend(_primitive(document, primitive, _identity(), base_dir, binary))
+            count = len(vertices) // 12 - first
+            if count:
+                groups.extend((index, first, count))
+            if len(vertices) // 12 > MAX_TRIANGLES:
+                raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
+        for child in node.get("children", []):
+            visit(child, depth + 1)
+
+    for root in roots:
+        visit(root, 0)
+    if not vertices:
+        raise ModelError("the model has no triangle geometry")
+
+    clip = animations[0]
+    samplers = clip.get("samplers", [])
+    tracks: list[int] = []
+    times: list[float] = []
+    values: list[float] = []
+    length = 0.0
+    for channel in clip.get("channels", []):
+        target = channel.get("target", {})
+        path_name = target.get("path")
+        if path_name not in PATHS:
+            continue
+        node_index = target.get("node")
+        if not isinstance(node_index, int) or not 0 <= node_index < len(nodes_doc):
+            raise ModelError("an animation targets a node that does not exist")
+        sampler_index = channel.get("sampler")
+        if not isinstance(sampler_index, int) or not 0 <= sampler_index < len(samplers):
+            raise ModelError("an animation refers to a missing sampler")
+        sampler = samplers[sampler_index]
+        interpolation = sampler.get("interpolation", "LINEAR")
+        if interpolation not in INTERPOLATIONS:
+            raise ModelError(f"animation interpolation {interpolation!r} is not supported")
+        key_times = [float(row[0]) for row in _accessor(document, sampler["input"], base_dir, binary)]
+        key_values = _accessor(document, sampler["output"], base_dir, binary)
+        if not key_times or not key_values:
+            raise ModelError("an animation sampler is empty")
+        width = 4 if path_name == "rotation" else 3
+        if len(key_values[0]) != width:
+            raise ModelError("an animation sampler has the wrong component count")
+        if len(key_times) != len(key_values):
+            raise ModelError("an animation sampler's keys and values differ in length")
+        tracks.extend(
+            (node_index, PATHS[path_name], INTERPOLATIONS[interpolation],
+             len(times), len(values), len(key_times))
+        )
+        times.extend(key_times)
+        for row in key_values:
+            values.extend(float(v) for v in row)
+        length = max(length, key_times[-1])
+    if not tracks:
+        raise ModelError("the animation clip has no translation, rotation or scale channels")
+
+    return {
+        "vertices": vertices,
+        "nodes": nodes,
+        "parents": parents,
+        "groups": groups,
+        "tracks": tracks,
+        "times": times,
+        "values": values,
+        "length": length,
+    }
+
+
 # ---- Compiler integration -------------------------------------------------
 
 _registry: dict[str, tuple[str, int, list[float], tuple[float, float, float, float]]] = {}
 _prescan: set[str] = set()
-PATTERN = re.compile(r'\bmodel_draw\s*\(\s*"((?:[^"\\]|\\.)*)"')
+PATTERN = re.compile(
+    r'\b(?:model_draw|model_animate|model_animation_length)\s*\(\s*"((?:[^"\\]|\\.)*)"'
+)
 
 
 def reset() -> None:
@@ -310,13 +506,13 @@ def reset() -> None:
 
 
 def prescan(source_text: str, source_path: pathlib.Path) -> None:
-    """Register every literal model_draw path before C emission starts."""
+    """Register every literal model path before C emission starts."""
     for match in PATTERN.finditer(source_text):
         try:
             asset = json.loads('"' + match.group(1) + '"')
         except ValueError:
             continue
-        ensure_emitted(asset, source_path)
+        ensure_model(asset, source_path)
         _prescan.add(str(_resolve(asset, source_path)))
 
 
@@ -349,37 +545,87 @@ def bounds_of(data: list[float]) -> tuple[float, float, float, float]:
     return (cx, cy, cz, radius)
 
 
-def ensure_emitted(
-    asset: str, source_path: pathlib.Path
-) -> tuple[str, int, tuple[float, float, float, float]]:
+def _has_animation(path: pathlib.Path) -> bool:
+    try:
+        document, _ = _container(path)
+    except ModelError:
+        return False
+    return bool(isinstance(document, dict) and document.get("animations"))
+
+
+def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
+    """Register a model and return everything code generation needs.
+
+    The returned dict always has symbol/count/bounds/id; an animated model also
+    has the clip arrays and its length.
+    """
     path = _resolve(asset, source_path)
     key = str(path)
     if key in _registry:
-        symbol, count, _, bounds = _registry[key]
-        return symbol, count, bounds
+        return _registry[key]
     if not path.is_file():
         raise ModelError(f"cannot find model {asset!r} (resolved to {path})")
     if not key.endswith((".gltf", ".glb")):
         raise ModelError("only .gltf and .glb models are supported")
-    data = load_triangles(path)
-    symbol = f"anvil_model_{len(_registry)}"
-    count = len(data) // 12
-    bounds = bounds_of(data)
-    _registry[key] = (symbol, count, data, bounds)
-    return symbol, count, bounds
+    entry: dict = {"id": len(_registry), "symbol": f"anvil_model_{len(_registry)}"}
+    if _has_animation(path):
+        clip = load_animated(path)
+        entry.update(clip)
+        entry["animated"] = True
+        entry["count"] = len(clip["vertices"]) // 12
+        entry["data"] = clip["vertices"]
+        entry["bounds"] = bounds_of(clip["vertices"])
+    else:
+        data = load_triangles(path)
+        entry.update({"animated": False, "count": len(data) // 12, "data": data})
+        entry["bounds"] = bounds_of(data)
+    _registry[key] = entry
+    return entry
+
+
+def ensure_emitted(
+    asset: str, source_path: pathlib.Path
+) -> tuple[str, int, tuple[float, float, float, float]]:
+    entry = ensure_model(asset, source_path)
+    return entry["symbol"], entry["count"], entry["bounds"]
+
+
+def _double_array(lines: list[str], symbol: str, values: list[float], per_line: int) -> None:
+    lines.append(f"static const double {symbol}[{len(values)}] = {{")
+    for start in range(0, len(values), per_line):
+        chunk = values[start : start + per_line]
+        lines.append("    " + ", ".join(f"{value:.6g}" for value in chunk) + ",")
+    lines.append("};")
+
+
+def _int_array(lines: list[str], symbol: str, values: list[int], per_line: int) -> None:
+    lines.append(f"static const int {symbol}[{len(values)}] = {{")
+    for start in range(0, len(values), per_line):
+        chunk = values[start : start + per_line]
+        lines.append("    " + ", ".join(str(value) for value in chunk) + ",")
+    lines.append("};")
 
 
 def definitions() -> list[str]:
     lines: list[str] = []
-    for key, (symbol, count, data, _) in _registry.items():
-        lines.append(f"/* model: {pathlib.Path(key).name}, {count} triangles */")
-        rows = []
-        for start in range(0, len(data), 12):
-            chunk = data[start : start + 12]
-            rows.append("    " + ", ".join(f"{value:.6g}" for value in chunk) + ",")
-        lines.append(f"static const double {symbol}[{len(data)}] = {{")
-        lines.extend(rows)
-        lines.append("};")
+    for key, entry in _registry.items():
+        symbol = entry["symbol"]
+        count = entry["count"]
+        if entry.get("animated"):
+            lines.append(
+                f"/* model: {pathlib.Path(key).name}, {count} animated triangles, "
+                f"{entry['length']:.6g} s clip */"
+            )
+            _double_array(lines, symbol, entry["data"], 12)
+            _double_array(lines, symbol + "_nodes", entry["nodes"], 10)
+            _int_array(lines, symbol + "_parents", entry["parents"], 16)
+            _int_array(lines, symbol + "_groups", entry["groups"], 12)
+            _double_array(lines, symbol + "_times", entry["times"], 8)
+            _double_array(lines, symbol + "_values", entry["values"], 8)
+            _int_array(lines, symbol + "_tracks", entry["tracks"], 6)
+        else:
+            lines.append(f"/* model: {pathlib.Path(key).name}, {count} triangles */")
+            _double_array(lines, symbol, entry["data"], 12)
         lines.append("")
     return lines
 
