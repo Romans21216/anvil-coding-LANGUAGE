@@ -43,6 +43,12 @@ extern void anvil_host_triangle(double x1, double y1, double z1, double x2,
                                 double y2, double z2, double x3, double y3,
                                 double z3, int r, int g, int b, int a,
                                 int layer);
+__attribute__((import_module("env"), import_name("sphere_impostor_available")))
+extern int anvil_host_sphere_impostor_available(void);
+__attribute__((import_module("env"), import_name("sphere_impostor")))
+extern void anvil_host_sphere_impostor(
+    double x, double y, double z, double radius, int r, int g, int b, int a,
+    double light_x, double light_y, double light_z, double focal);
 
 __attribute__((import_module("env"), import_name("image_region")))
 extern void anvil_host_image_region(const unsigned int *pixels, int width,
@@ -882,6 +888,19 @@ static AnvilWasmVec3 anvil_wasm_to_camera(AnvilWasmVec3 p) {
                          anvil_wasm_dot(relative, forward)};
 }
 
+static AnvilWasmVec3 anvil_wasm_direction_to_camera(AnvilWasmVec3 direction) {
+  const double radians = 0.017453292519943295769;
+  double yaw = anvil_camera_yaw * radians;
+  double pitch = anvil_camera_pitch * radians;
+  AnvilWasmVec3 right = {cos(yaw), 0.0, sin(yaw)};
+  AnvilWasmVec3 forward = {sin(yaw) * cos(pitch), sin(pitch),
+                           -cos(yaw) * cos(pitch)};
+  AnvilWasmVec3 up = anvil_wasm_normalize(anvil_wasm_cross(right, forward));
+  return (AnvilWasmVec3){anvil_wasm_dot(direction, right),
+                         anvil_wasm_dot(direction, up),
+                         anvil_wasm_dot(direction, forward)};
+}
+
 static int anvil_wasm_project(AnvilWasmVec3 p, double *sx, double *sy,
                               double *depth) {
   AnvilWasmVec3 camera = anvil_wasm_to_camera(p);
@@ -1126,6 +1145,21 @@ void anvil_wasm_trace_flush(void) {
   const double tau = 6.283185307179586476925;
   const AnvilWasmVec3 light =
       anvil_wasm_normalize((AnvilWasmVec3){-0.4, 0.75, 0.55});
+  if (anvil_host_sphere_impostor_available()) {
+    AnvilWasmVec3 camera_light = anvil_wasm_direction_to_camera(light);
+    for (int index = 0; index < anvil_wasm_trace_count; ++index) {
+      const AnvilWasmTraceSphere *sphere = &anvil_wasm_trace_spheres[index];
+      AnvilWasmVec3 center = anvil_wasm_to_camera(sphere->center);
+      if (center.z + sphere->radius <= 0.05)
+        continue;
+      anvil_host_sphere_impostor(
+          center.x, center.y, center.z, sphere->radius, sphere->r, sphere->g,
+          sphere->b, sphere->a, camera_light.x, camera_light.y,
+          camera_light.z, anvil_camera_focal);
+    }
+    anvil_wasm_trace_count = 0;
+    return;
+  }
   const AnvilWasmVec3 eye = {anvil_camera_x, anvil_camera_y, anvil_camera_z};
   int remaining_budget = ANVIL_WASM_TRACE_TRIANGLE_BUDGET;
   for (int index = 0; index < anvil_wasm_trace_count; ++index) {
@@ -1218,6 +1252,9 @@ void anvil_wasm_trace_flush(void) {
 __attribute__((import_module("env"), import_name("music_play")))
 extern int anvil_host_music_play(const short *pcm, int frames, int channels,
                                  int rate, double volume, int loop);
+__attribute__((import_module("env"), import_name("music_stream")))
+extern int anvil_host_music_stream(const char *url, double duration,
+                                   double volume, int loop);
 __attribute__((import_module("env"), import_name("music_stop")))
 extern void anvil_host_music_stop(void);
 __attribute__((import_module("env"), import_name("music_playing")))
@@ -1227,11 +1264,9 @@ extern void anvil_host_music_volume(double volume);
 __attribute__((import_module("env"), import_name("music_position")))
 extern double anvil_host_music_position(void);
 
-/* ---- Music, baked at compile time --------------------------------------
-   One looping track, like the desktop runtime's streaming player, except the
-   browser build carries the decoded samples in the module: a browser cannot
-   stream from disk without an async fetch contract, and the music API is
-   synchronous. The host owns playback position. */
+/* ---- Music, streamed by the browser or played by the Node test host -------
+   Browser builds publish one WAV beside the HTML host and use an
+   HTMLMediaElement so samples are fetched and decoded incrementally. */
 static const AnvilWasmMusic *anvil_baked_music_value;
 static int anvil_music_loaded;
 static int anvil_music_ready;
@@ -1272,6 +1307,12 @@ double anvil_music_load(const char *path) {
 static double anvil_music_start(int loop) {
   if (!anvil_music_loaded || !anvil_baked_music_value)
     return 0.0;
+  if (anvil_baked_music_value->stream_url)
+    return anvil_host_music_stream(anvil_baked_music_value->stream_url,
+                                   anvil_baked_music_value->duration,
+                                   anvil_music_volume_value, loop) > 0
+               ? 1.0
+               : 0.0;
   int voice = anvil_host_music_play(
       anvil_baked_music_value->pcm, anvil_baked_music_value->frames,
       anvil_baked_music_value->channels, anvil_baked_music_value->rate,
@@ -1303,6 +1344,8 @@ double anvil_music_volume(double volume) {
 double anvil_music_position(void) { return anvil_host_music_position(); }
 
 double anvil_music_length(void) {
+  if (anvil_baked_music_value && anvil_baked_music_value->stream_url)
+    return anvil_baked_music_value->duration;
   if (!anvil_baked_music_value || anvil_baked_music_value->rate <= 0)
     return 0.0;
   return (double)anvil_baked_music_value->frames /

@@ -9,19 +9,24 @@ slots would silently read clock 0 forever.
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import pathlib
 import re
 import struct
 import subprocess
 import sys
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPILER = ROOT / "compiler" / "anvil.py"
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from test_gltf_animation import pose_program, run_poses, tempfile_dir  # noqa: E402
+from test_gltf_model import write_glb  # noqa: E402
 from test_gltf_morph import write_morph_model  # noqa: E402
 from test_gltf_skins import write_skinned_model  # noqa: E402
 
@@ -80,6 +85,294 @@ def draw_program(models: list[str]) -> str:
 
 
 class GltfImportBoundsTests(unittest.TestCase):
+    def test_nodes_without_scenes_walk_only_parentless_roots(self) -> None:
+        from compiler import gltf
+
+        with tempfile_dir() as root:
+            write_static_model(root, "hierarchy.gltf")
+            path = root / "hierarchy.gltf"
+            document = json.loads(path.read_text(encoding="utf-8"))
+            document.pop("scenes")
+            document.pop("scene")
+            document["nodes"] = [
+                {"translation": [3, 0, 0], "children": [1]},
+                {"mesh": 0, "translation": [2, 0, 0]},
+            ]
+            path.write_text(json.dumps(document), encoding="utf-8")
+            gltf.reset()
+            gltf.set_asset_root(root)
+            triangles = gltf.load_triangles(path)
+            gltf.reset()
+        self.assertEqual(len(triangles), 12)
+        self.assertEqual(min(triangles[0::12]), 5.0)
+
+    def test_model_and_buffer_paths_cannot_escape_project_root(self) -> None:
+        with tempfile_dir() as parent:
+            project = parent / "project"
+            outside_dir = parent / "outside_dir"
+            project.mkdir()
+            outside_dir.mkdir()
+            write_static_model(parent, "outside.gltf")
+            write_static_model(outside_dir, "outside.gltf")
+            model_escape = build(project, draw_program(["../outside.gltf"]))
+            self.assertNotEqual(model_escape.returncode, 0)
+            self.assertIn("inside the project folder", model_escape.stdout + model_escape.stderr)
+            absolute_escape = build(
+                project,
+                draw_program([str(parent / "outside.gltf").replace("\\", "/")]),
+            )
+            self.assertNotEqual(absolute_escape.returncode, 0)
+            self.assertIn("inside the project folder", absolute_escape.stdout + absolute_escape.stderr)
+
+            models = project / "models"
+            models.mkdir()
+            write_static_model(models, "inside.gltf")
+            allowed = build(project, draw_program(["models/inside.gltf"]))
+            self.assertEqual(allowed.returncode, 0, allowed.stdout + allowed.stderr)
+
+            try:
+                os.symlink(parent / "outside.gltf", project / "escape.gltf")
+            except (OSError, NotImplementedError):
+                if os.name == "nt":
+                    junction = project / "escape_dir"
+                    linked = subprocess.run(
+                        ["cmd.exe", "/c", "mklink", "/J", str(junction), str(outside_dir)],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if linked.returncode == 0:
+                        symlink_escape = build(
+                            project, draw_program(["escape_dir/outside.gltf"])
+                        )
+                        self.assertNotEqual(symlink_escape.returncode, 0)
+                        self.assertIn(
+                            "inside the project folder",
+                            symlink_escape.stdout + symlink_escape.stderr,
+                        )
+            else:
+                symlink_escape = build(project, draw_program(["escape.gltf"]))
+                self.assertNotEqual(symlink_escape.returncode, 0)
+                self.assertIn("inside the project folder", symlink_escape.stdout + symlink_escape.stderr)
+
+            write_static_model(project, "mesh.gltf")
+            model = project / "mesh.gltf"
+            document = json.loads(model.read_text(encoding="utf-8"))
+            document["buffers"][0]["uri"] = "../outside.bin"
+            model.write_text(json.dumps(document), encoding="utf-8")
+            buffer_escape = build(project, draw_program(["mesh.gltf"]))
+            self.assertNotEqual(buffer_escape.returncode, 0)
+            self.assertIn("inside the project folder", buffer_escape.stdout + buffer_escape.stderr)
+            document["buffers"][0]["uri"] = "%2e%2e/outside.bin"
+            model.write_text(json.dumps(document), encoding="utf-8")
+            encoded_escape = build(project, draw_program(["mesh.gltf"]))
+            self.assertNotEqual(encoded_escape.returncode, 0)
+            self.assertIn("inside the project folder", encoded_escape.stdout + encoded_escape.stderr)
+
+    def test_malformed_buffer_uri_is_a_located_model_error(self) -> None:
+        with tempfile_dir() as root:
+            write_static_model(root, "mesh.gltf")
+            model = root / "mesh.gltf"
+            document = json.loads(model.read_text(encoding="utf-8"))
+            document["buffers"][0]["uri"] = 7
+            model.write_text(json.dumps(document), encoding="utf-8")
+            result = build(root, draw_program(["mesh.gltf"]))
+        self.assertNotEqual(result.returncode, 0)
+        combined = result.stdout + result.stderr
+        self.assertIn("uri must be a string", combined)
+        self.assertIn("bounds.ANVL:5:", combined)
+        self.assertNotIn("Traceback", combined)
+
+    def test_index_accessors_require_unsigned_integer_scalar_data(self) -> None:
+        for component, normalized, diagnostic in (
+            (5126, False, "unsigned byte, short or int"),
+            (5122, False, "unsigned byte, short or int"),
+            (5123, True, "cannot be normalized"),
+        ):
+            with self.subTest(component=component, normalized=normalized), tempfile_dir() as root:
+                write_static_model(root, "mesh.gltf")
+                model = root / "mesh.gltf"
+                document = json.loads(model.read_text(encoding="utf-8"))
+                accessor = document["accessors"][1]
+                accessor["componentType"] = component
+                if normalized:
+                    accessor["normalized"] = True
+                model.write_text(json.dumps(document), encoding="utf-8")
+                result = build(root, draw_program(["mesh.gltf"]))
+                combined = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(diagnostic, combined)
+                self.assertIn("bounds.ANVL:5:", combined)
+
+    def test_triangle_budget_is_checked_before_index_accessor_expansion(self) -> None:
+        from compiler import gltf
+
+        doc = {
+            "accessors": [{"type": "SCALAR", "componentType": 5123,
+                           "count": (gltf.MAX_TRIANGLES + 1) * 3}],
+        }
+        with self.assertRaisesRegex(gltf.ModelError, "triangle budget"):
+            gltf._primitive(
+                doc,
+                {"attributes": {"POSITION": 0}, "indices": 0},
+                gltf._identity(), pathlib.Path("."),
+            )
+
+    def test_triangle_budget_accepts_exact_limit_and_locates_over_limit(self) -> None:
+        from compiler import gltf
+
+        exact_count = gltf.MAX_TRIANGLES * 3
+        document = {
+            "scene": 0,
+            "scenes": [{"nodes": [0]}],
+            "nodes": [{"mesh": 0}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+            "accessors": [{"count": exact_count}],
+        }
+        with mock.patch.object(
+            gltf, "_primitive", return_value=[0.0] * (gltf.MAX_TRIANGLES * 12)
+        ):
+            triangles, _ = gltf._static_walk(document, None, pathlib.Path("."))
+        self.assertEqual(len(triangles) // 12, gltf.MAX_TRIANGLES)
+
+        with tempfile_dir() as root:
+            write_static_model(root, "over.gltf")
+            path = root / "over.gltf"
+            over = json.loads(path.read_text(encoding="utf-8"))
+            over["accessors"][1]["count"] = (gltf.MAX_TRIANGLES + 1) * 3
+            path.write_text(json.dumps(over), encoding="utf-8")
+            result = build(root, draw_program(["over.gltf"]))
+        self.assertNotEqual(result.returncode, 0)
+        combined = result.stdout + result.stderr
+        self.assertIn("triangle budget", combined)
+        self.assertIn("bounds.ANVL:5:", combined)
+        self.assertNotIn("Traceback", combined)
+
+    def test_model_container_and_external_buffer_are_read_once_per_import(self) -> None:
+        from compiler import gltf
+
+        with tempfile_dir() as root:
+            write_static_model(root, "cached.gltf")
+            model = (root / "cached.gltf").resolve()
+            buffer = (root / "cached.gltf.bin").resolve()
+            original = pathlib.Path.read_bytes
+            reads: dict[pathlib.Path, int] = {}
+
+            def counted_read(path: pathlib.Path) -> bytes:
+                resolved = path.resolve()
+                reads[resolved] = reads.get(resolved, 0) + 1
+                return original(path)
+
+            gltf.reset()
+            gltf.set_asset_root(root)
+            try:
+                with mock.patch.object(pathlib.Path, "read_bytes", counted_read):
+                    gltf.ensure_model("cached.gltf", root / "main.ANVL")
+            finally:
+                gltf.reset()
+        self.assertEqual(reads.get(model), 1)
+        self.assertEqual(reads.get(buffer), 1)
+
+    def test_container_and_buffer_size_limits_reject_before_reading(self) -> None:
+        from compiler import gltf
+
+        with tempfile_dir() as root:
+            model = root / "large.gltf"
+            buffer = root / "large.bin"
+            model.write_bytes(b"{}")
+            buffer.write_bytes(b"")
+            original_stat = pathlib.Path.stat
+
+            def oversized_stat(path: pathlib.Path, *args, **kwargs):
+                if path.resolve() in {model.resolve(), buffer.resolve()}:
+                    return SimpleNamespace(st_size=(
+                        gltf.MAX_CONTAINER_BYTES + 1
+                        if path.resolve() == model.resolve()
+                        else gltf.MAX_BUFFER_BYTES + 1
+                    ))
+                return original_stat(path, *args, **kwargs)
+
+            gltf.reset()
+            gltf.set_asset_root(root)
+            try:
+                with mock.patch.object(pathlib.Path, "stat", oversized_stat), \
+                     mock.patch.object(pathlib.Path, "read_bytes", side_effect=AssertionError("must not read")):
+                    with self.assertRaisesRegex(gltf.ModelError, "model import limit"):
+                        gltf._container(model)
+                    with self.assertRaisesRegex(gltf.ModelError, "buffer exceeds"):
+                        gltf._buffer_bytes(
+                            {"buffers": [{"uri": "large.bin", "byteLength": 1}]},
+                            0,
+                            root,
+                        )
+                    accessor_document = {
+                        "buffers": [{"uri": "large.bin", "byteLength": 4}],
+                        "bufferViews": [{"buffer": 0, "byteLength": 4}],
+                        "accessors": [{
+                            "bufferView": 0, "componentType": 5126,
+                            "count": gltf.MAX_TRIANGLES * 3 + 3, "type": "VEC3",
+                        }],
+                    }
+                    with self.assertRaisesRegex(gltf.ModelError, "element import limit"):
+                        gltf._accessor(accessor_document, 0, root)
+            finally:
+                gltf.reset()
+
+    def test_model_path_resolution_failures_use_model_error_contract(self) -> None:
+        from compiler import gltf
+
+        with tempfile_dir() as root:
+            gltf.reset()
+            gltf.set_asset_root(root)
+            original_resolve = pathlib.Path.resolve
+
+            def broken_resolve(path: pathlib.Path, *args, **kwargs):
+                if path.name == "loop.gltf":
+                    raise RuntimeError("symlink loop")
+                return original_resolve(path, *args, **kwargs)
+
+            try:
+                with mock.patch.object(pathlib.Path, "resolve", broken_resolve):
+                    with self.assertRaisesRegex(gltf.ModelError, "cannot resolve model path"):
+                        gltf._resolve("loop.gltf", root / "main.ANVL")
+            finally:
+                gltf.reset()
+
+    def test_data_buffer_uri_scheme_and_base64_marker_are_case_insensitive(self) -> None:
+        from compiler import gltf
+
+        payload = b"glb-binary-payload"
+        encoded = base64.b64encode(payload).decode("ascii")
+        document = {
+            "buffers": [{
+                "uri": f"DATA:application/octet-stream;BASE64,{encoded}",
+                "byteLength": len(payload),
+            }],
+        }
+        self.assertEqual(gltf._buffer_bytes(document, 0, pathlib.Path(".")), payload)
+
+    def test_manifest_nested_entry_resolves_glb_assets_from_project_root(self) -> None:
+        with tempfile_dir() as root:
+            (root / "src").mkdir()
+            models = root / "models"
+            models.mkdir()
+            write_glb(models, "mesh.glb", (1.0, 0.0, 0.0))
+            (root / "src" / "main.ANVL").write_text(
+                draw_program(["models/mesh.glb"]), encoding="utf-8"
+            )
+            manifest = root / "game.ANVLproj"
+            manifest.write_text('entry = "src/main.ANVL"\n', encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable, str(COMPILER), str(manifest),
+                    "--backend", "wasm", "--check",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("main.ANVL: ok", result.stdout)
+
     def test_a_skin_without_inverse_bind_matrices_binds_identity(self) -> None:
         # Khronos marks inverseBindMatrices optional. Without it every joint
         # binds in mesh space, so a joint that moves must still carry the mesh.

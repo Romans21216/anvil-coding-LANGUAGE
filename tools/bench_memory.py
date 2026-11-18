@@ -134,6 +134,11 @@ AUDIO_PROGRAM = "\n".join(
 NETWORK_SCENE = "network"
 NETWORK_PORT = 39471
 NETWORK_PACKETS = 200
+RAY_MESH_ASSETS = {
+    "ray_mesh_32x32": ("ray_mesh.glb", "mesh.glb"),
+    "ray_mesh_morph": ("ray_mesh_morph.glb", "morph.glb"),
+    "ray_mesh_animated": ("ray_mesh_animated.glb", "anim.glb"),
+}
 
 # A UDP socket's buffers live in the kernel, so this scene measures the process
 # side: the transport running flat out with a peer feeding it, against the same
@@ -170,6 +175,18 @@ def write_audio_files(root: pathlib.Path) -> None:
         (root / f"a{index}.wav").write_bytes(
             riff + fmt + b"data" + struct.pack("<I", len(samples)) + samples
         )
+
+
+def write_scene_assets(name: str, root: pathlib.Path) -> None:
+    """Copy checked-in model fixtures needed by model-backed scenes."""
+    asset = RAY_MESH_ASSETS.get(name)
+    if asset is None:
+        return
+    source_name, target_name = asset
+    source = ROOT / "examples" / source_name
+    if not source.is_file():
+        raise SystemExit(f"{name}: required benchmark model is missing: {source}")
+    (root / target_name).write_bytes(source.read_bytes())
 
 
 def send_packets(port: int, count: int) -> None:
@@ -322,6 +339,7 @@ def measure(name: str) -> dict[str, float]:
         elif name == NETWORK_SCENE:
             build = measure_compile(name, root, NETWORK_PROGRAM)
         else:
+            write_scene_assets(name, root)
             build = measure_compile(name, root)
         executable = pathlib.Path(build.pop("executable"))
         run = measure_run(

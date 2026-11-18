@@ -8,7 +8,20 @@
     "cubes_3d": 60.0,
     "assets": 60.0,
     "audio": 60.0,
-    "network": 60.0
+    "network": 60.0,
+    "tilemap_large": 60.0,
+    "ray_spheres_1": 60.0,
+    "ray_spheres_8": 60.0,
+    "ray_spheres_32": 60.0,
+    "ray_spheres_36": 60.0,
+    "ray_spheres_40": 60.0,
+    "ray_spheres_40_step2": 60.0,
+    "ray_spheres_40_samples4": 60.0,
+    "ray_triangles_8": 60.0,
+    "ray_triangles_40": 60.0,
+    "ray_mesh_32x32": 60.0,
+    "ray_mesh_morph": 60.0,
+    "ray_mesh_animated": 60.0
   },
   "note": "2.5x the measured peak with floors; re-baseline on new hardware",
   "assets": {

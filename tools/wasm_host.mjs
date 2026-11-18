@@ -116,6 +116,11 @@ const imports = {
       ops.push(["music_play", frames, channels, rate, volume, loop ? 1 : 0]);
       return 1;
     },
+    music_stream(urlPointer, duration, volume, loop) {
+      musicPlaying = true;
+      ops.push(["music_stream", readCString(urlPointer), duration, volume, loop ? 1 : 0]);
+      return 1;
+    },
     music_stop() {
       musicPlaying = false;
       ops.push(["music_stop"]);
@@ -181,6 +186,12 @@ const imports = {
     },
     triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
       triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
+    },
+    sphere_impostor_available() {
+      return 0;
+    },
+    sphere_impostor(x, y, z, radius, r, g, b, a, lightX, lightY, lightZ, focal) {
+      ops.push(["sphere_impostor", x, y, z, radius, r, g, b, a, lightX, lightY, lightZ, focal]);
     },
     scene_mode(enabled) {
       ops.push(["scene_mode", enabled ? 1 : 0]);

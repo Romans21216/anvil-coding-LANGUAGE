@@ -14,6 +14,7 @@ Run:    node tools/wasm_host.mjs hello.wasm
 from __future__ import annotations
 
 import json
+import hashlib
 
 import pathlib
 import re
@@ -21,6 +22,7 @@ import shutil
 import subprocess
 import time
 from functools import wraps
+from urllib.parse import quote
 
 from compiler.builtin_usage import used_builtins
 from compiler.codegen import emit_c
@@ -291,6 +293,10 @@ async function start() {
     const pageParams = new URLSearchParams(location.search);
     const forcePainter = pageParams.has("painter");
     const skipSort = pageParams.has("nosort");
+    const gpuTimerRequested = pageParams.get("anvil_gpu_timer") === "1";
+    let gpuTimerExt = null;
+    const gpuTimerQueries = [];
+    let gpuTimerDisjoint = false;
     let glRenderer = null;
     const createGlRenderer = () => {
       if (glRenderer !== null) return glRenderer;
@@ -300,6 +306,8 @@ async function start() {
         canvas.height = 600;
         const gl = canvas.getContext("webgl", { antialias: false, premultipliedAlpha: false });
         if (!gl) return (glRenderer = false);
+        const fragmentDepth = gl.getExtension("EXT_frag_depth");
+        gpuTimerExt = gpuTimerRequested ? gl.getExtension("EXT_disjoint_timer_query") : null;
         const compile = (type, source) => {
           const shader = gl.createShader(type);
           gl.shaderSource(shader, source);
@@ -325,6 +333,84 @@ async function start() {
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
           throw new Error(gl.getProgramInfoLog(program));
         }
+        let sphereProgram = null;
+        if (fragmentDepth) {
+          try {
+            sphereProgram = gl.createProgram();
+            gl.attachShader(sphereProgram, compile(gl.VERTEX_SHADER,
+              "attribute vec2 pos;" +
+              "attribute vec4 centerRadius;" +
+              "attribute vec4 colour;" +
+              "varying vec4 v_centerRadius;" +
+              "varying vec4 v_colour;" +
+              "void main() {" +
+              "  gl_Position = vec4(pos.x / 480.0 - 1.0, 1.0 - pos.y / 300.0, 0.0, 1.0);" +
+              "  v_centerRadius = centerRadius;" +
+              "  v_colour = colour;" +
+              "}"));
+            gl.attachShader(sphereProgram, compile(gl.FRAGMENT_SHADER,
+              "#extension GL_EXT_frag_depth : require\\n" +
+              "precision highp float;" +
+              "varying vec4 v_centerRadius;" +
+              "varying vec4 v_colour;" +
+              "uniform vec3 u_light;" +
+              "uniform float u_focal;" +
+              "uniform vec4 u_shadows[32];" +
+              "uniform int u_sphereCount;" +
+              "void main() {" +
+              "  float py = 600.0 - gl_FragCoord.y;" +
+              "  vec3 ray = normalize(vec3((gl_FragCoord.x - 480.0) / u_focal, (324.0 - py) / u_focal, 1.0));" +
+              "  vec3 center = v_centerRadius.xyz;" +
+              "  float radius = v_centerRadius.w;" +
+              "  vec3 offset = -center;" +
+              "  float halfB = dot(offset, ray);" +
+              "  float c = dot(offset, offset) - radius * radius;" +
+              "  float discriminant = halfB * halfB - c;" +
+              "  if (discriminant < 0.0) discard;" +
+              "  float root = sqrt(discriminant);" +
+              "  float t = -halfB - root;" +
+              "  if (t <= 0.001) t = -halfB + root;" +
+              "  if (t <= 0.001) discard;" +
+              "  vec3 point = ray * t;" +
+              "  if (point.z <= 0.05) discard;" +
+              "  vec3 normal = normalize(point - center);" +
+              "  float diffuse = max(0.0, dot(normal, u_light));" +
+              "  float shadowed = 0.0;" +
+              "  if (diffuse > 0.0) {" +
+              "    vec3 shadowOrigin = point + normal * 0.002;" +
+              "    for (int i = 0; i < 32; ++i) {" +
+              "      if (i >= u_sphereCount) break;" +
+              "      vec3 shadowOffset = shadowOrigin - u_shadows[i].xyz;" +
+              "      float shadowB = dot(shadowOffset, u_light);" +
+              "      if (shadowB < 0.0) {" +
+              "        float shadowC = dot(shadowOffset, shadowOffset) - u_shadows[i].w * u_shadows[i].w;" +
+              "        float shadowD = shadowB * shadowB - shadowC;" +
+              "        if (shadowD >= 0.0) {" +
+              "          float shadowRoot = sqrt(shadowD);" +
+              "          float shadowT = -shadowB - shadowRoot;" +
+              "          if (shadowT <= 0.001) shadowT = -shadowB + shadowRoot;" +
+              "          if (shadowT > 0.001) shadowed = 1.0;" +
+              "        }" +
+              "      }" +
+              "      if (shadowed > 0.5) break;" +
+              "    }" +
+              "  }" +
+              "  float brightness = shadowed > 0.5 ? 0.13 : 0.16 + 0.78 * diffuse;" +
+              "  vec3 view = -ray;" +
+              "  vec3 halfway = normalize(u_light + view);" +
+              "  float specular = pow(max(0.0, dot(normal, halfway)), 28.0) * 0.22;" +
+              "  vec3 rgb = min(v_colour.rgb * brightness + vec3(specular), vec3(1.0));" +
+              "  gl_FragDepthEXT = clamp(point.z / 500.0, 0.0, 1.0);" +
+              "  gl_FragColor = vec4(rgb, v_colour.a);" +
+              "}"));
+            gl.linkProgram(sphereProgram);
+            if (!gl.getProgramParameter(sphereProgram, gl.LINK_STATUS)) {
+              throw new Error(gl.getProgramInfoLog(sphereProgram));
+            }
+          } catch (error) {
+            sphereProgram = null;
+          }
+        }
         gl.useProgram(program);
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
@@ -333,16 +419,27 @@ async function start() {
         glRenderer = {
           canvas,
           gl,
+          program,
           pos: gl.getAttribLocation(program, "pos"),
           depth: gl.getAttribLocation(program, "depth"),
           colour: gl.getAttribLocation(program, "colour"),
+          sphere: sphereProgram ? {
+            program: sphereProgram,
+            pos: gl.getAttribLocation(sphereProgram, "pos"),
+            centerRadius: gl.getAttribLocation(sphereProgram, "centerRadius"),
+            colour: gl.getAttribLocation(sphereProgram, "colour"),
+            light: gl.getUniformLocation(sphereProgram, "u_light"),
+            focal: gl.getUniformLocation(sphereProgram, "u_focal"),
+            shadows: gl.getUniformLocation(sphereProgram, "u_shadows[0]"),
+            sphereCount: gl.getUniformLocation(sphereProgram, "u_sphereCount"),
+          } : null,
         };
       } catch (error) {
         glRenderer = false;
       }
       return glRenderer;
     };
-    const drawGl = (list) => {
+    const drawGl = (list, spheres) => {
       const renderer = createGlRenderer();
       if (!renderer) return false;
       const { canvas, gl } = renderer;
@@ -352,6 +449,7 @@ async function start() {
       const stride = 7 * 4;
       const upload = (entries, depthTest) => {
         if (!entries.length) return;
+        gl.useProgram(renderer.program);
         const data = new Float32Array(entries.length * 3 * 7);
         let at = 0;
         for (const entry of entries) {
@@ -380,14 +478,125 @@ async function start() {
         gl.deleteBuffer(buffer);
       };
       upload(list.filter((entry) => entry[13] !== 1), true);
+      if (spheres.length && renderer.sphere) {
+        const shader = renderer.sphere;
+        const shadowData = new Float32Array(32 * 4);
+        for (let index = 0; index < Math.min(32, spheres.length); index++) {
+          const sphere = spheres[index];
+          shadowData.set([sphere[0], sphere[1], sphere[2], sphere[3]], index * 4);
+        }
+        const drawSpheres = spheres.sort((a, b) => b[2] - a[2]);
+        const vertices = new Float32Array(drawSpheres.length * 60);
+        let vertexCount = 0;
+        const appendVertex = (x, y, centerRadius, colour) => {
+          let at = vertexCount++ * 10;
+          vertices[at++] = x;
+          vertices[at++] = y;
+          vertices[at++] = centerRadius[0];
+          vertices[at++] = centerRadius[1];
+          vertices[at++] = centerRadius[2];
+          vertices[at++] = centerRadius[3];
+          vertices[at++] = colour[0];
+          vertices[at++] = colour[1];
+          vertices[at++] = colour[2];
+          vertices[at] = colour[3];
+        };
+        for (const sphere of drawSpheres) {
+          const [cx, cy, cz, radius, r, g, b, a, , , , focal] = sphere;
+          if (cz + radius <= 0.05) continue;
+          const denominator = cz * cz - radius * radius;
+          let left = 0, right = 960, top = 0, bottom = 600;
+          if (denominator > 1e-9) {
+            const xRoot = radius * Math.sqrt(Math.max(0, cx * cx + cz * cz - radius * radius));
+            const yRoot = radius * Math.sqrt(Math.max(0, cy * cy + cz * cz - radius * radius));
+            const minX = (cx * cz - xRoot) / denominator;
+            const maxX = (cx * cz + xRoot) / denominator;
+            const minY = (cy * cz - yRoot) / denominator;
+            const maxY = (cy * cz + yRoot) / denominator;
+            left = Math.max(0, 480 + focal * minX);
+            right = Math.min(960, 480 + focal * maxX);
+            top = Math.max(0, 324 - focal * maxY);
+            bottom = Math.min(600, 324 - focal * minY);
+          }
+          if (left >= right || top >= bottom) continue;
+          const color = [r / 255, g / 255, b / 255, a / 255];
+          const centerRadius = [cx, cy, cz, radius];
+          appendVertex(left, top, centerRadius, color);
+          appendVertex(right, top, centerRadius, color);
+          appendVertex(right, bottom, centerRadius, color);
+          appendVertex(left, top, centerRadius, color);
+          appendVertex(right, bottom, centerRadius, color);
+          appendVertex(left, bottom, centerRadius, color);
+        }
+        if (vertexCount) {
+          const first = spheres[0];
+          gl.useProgram(shader.program);
+          gl.uniform3f(shader.light, first[8], first[9], first[10]);
+          gl.uniform1f(shader.focal, first[11]);
+          gl.uniform4fv(shader.shadows, shadowData);
+          gl.uniform1i(shader.sphereCount, Math.min(32, spheres.length));
+          const buffer = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+          gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, vertexCount * 10), gl.DYNAMIC_DRAW);
+          const stride = 10 * 4;
+          gl.enableVertexAttribArray(shader.pos);
+          gl.vertexAttribPointer(shader.pos, 2, gl.FLOAT, false, stride, 0);
+          gl.enableVertexAttribArray(shader.centerRadius);
+          gl.vertexAttribPointer(shader.centerRadius, 4, gl.FLOAT, false, stride, 2 * 4);
+          gl.enableVertexAttribArray(shader.colour);
+          gl.vertexAttribPointer(shader.colour, 4, gl.FLOAT, false, stride, 6 * 4);
+          gl.enable(gl.DEPTH_TEST);
+          gl.depthFunc(gl.LEQUAL);
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+          if (gpuTimerExt && gpuTimerRequested) {
+            const query = gpuTimerExt.createQueryEXT();
+            gpuTimerExt.beginQueryEXT(gpuTimerExt.TIME_ELAPSED_EXT, query);
+            gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+            gpuTimerExt.endQueryEXT(gpuTimerExt.TIME_ELAPSED_EXT);
+            gpuTimerQueries.push(query);
+          } else {
+            gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+          }
+          gl.deleteBuffer(buffer);
+        }
+      }
       upload(list.filter((entry) => entry[13] === 1), false);
       context.drawImage(canvas, 0, 0);
       return true;
     };
     const imageCache = new Map();
     const audioState = { ctx: null, voices: new Map(), nextVoice: 0, active: 0 };
-    const musicState = { source: null, gain: null, startedAt: 0, loop: false, length: 0 };
+    const musicState = { source: null, mediaNode: null, gain: null, startedAt: 0, loop: false, length: 0, error: "" };
+    const readCString = (pointer) => {
+      const bytes = new Uint8Array(memory.buffer);
+      let end = pointer;
+      while (end < bytes.length && bytes[end] !== 0) end++;
+      return utf8.decode(bytes.subarray(pointer, end));
+    };
     const triangles = [];
+    const sphereImpostors = [];
+    let rendererDiagnostics = new URLSearchParams(location.search).get("anvil_debug") === "1";
+    if (gpuTimerRequested) {
+      window.__anvilGpuTimer = {
+        available: () => !!(createGlRenderer() && gpuTimerExt),
+        collect: () => {
+          const renderer = createGlRenderer();
+          if (!renderer || !gpuTimerExt) return { available: false, samples_ms: [], disjoint: false };
+          if (renderer.gl.getParameter(gpuTimerExt.GPU_DISJOINT_EXT)) gpuTimerDisjoint = true;
+          const samples = [];
+          for (let index = gpuTimerQueries.length - 1; index >= 0; index--) {
+            const query = gpuTimerQueries[index];
+            if (!gpuTimerExt.getQueryObjectEXT(query, gpuTimerExt.QUERY_RESULT_AVAILABLE_EXT)) continue;
+            const ns = gpuTimerExt.getQueryObjectEXT(query, gpuTimerExt.QUERY_RESULT_EXT);
+            gpuTimerExt.deleteQueryEXT(query);
+            gpuTimerQueries.splice(index, 1);
+            samples.push(ns / 1e6);
+          }
+          return { available: true, samples_ms: samples, pending: gpuTimerQueries.length, disjoint: gpuTimerDisjoint };
+        },
+      };
+    }
     const audioContext = () => {
       if (!audioState.ctx) {
         const Ctor = window.AudioContext || window.webkitAudioContext;
@@ -457,11 +666,23 @@ async function start() {
       imageCache.set(key, offscreen);
       return offscreen;
     };
-    const readCString = (pointer) => {
-      const bytes = new Uint8Array(memory.buffer);
-      let end = pointer;
-      while (end < bytes.length && bytes[end] !== 0) end++;
-      return utf8.decode(bytes.subarray(pointer, end));
+    const stopMusicPlayback = () => {
+      const source = musicState.source;
+      if (source) {
+        try {
+          if (typeof source.pause === "function") {
+            source.pause();
+            source.currentTime = 0;
+          } else {
+            source.stop();
+          }
+        } catch (error) { /* playback already ended */ }
+      }
+      musicState.source = null;
+      musicState.mediaNode = null;
+      musicState.gain = null;
+      musicState.startedAt = 0;
+      musicState.length = 0;
     };
     let pendingFade = 0;
     // Saves live in IndexedDB so a project is not capped by localStorage's small
@@ -659,10 +880,7 @@ async function start() {
       music_play(pointer, frames, channels, rate, volume, loop) {
         const ctx = audioContext();
         if (!ctx || frames <= 0) return 0;
-        if (musicState.source) {
-          try { musicState.source.stop(); } catch (error) { /* ended */ }
-          musicState.source = null;
-        }
+        stopMusicPlayback();
         const samples = new Int16Array(memory.buffer, pointer, frames * channels);
         const buffer = ctx.createBuffer(channels, frames, rate);
         for (let channel = 0; channel < channels; channel++) {
@@ -688,20 +906,64 @@ async function start() {
         musicState.length = frames / rate;
         return 1;
       },
+      music_stream(urlPointer, duration, volume, loop) {
+        const ctx = audioContext();
+        if (!ctx || !(duration > 0)) return 0;
+        stopMusicPlayback();
+        const audio = new Audio();
+        audio.preload = "metadata";
+        audio.loop = !!loop;
+        audio.src = new URL(readCString(urlPointer), document.baseURI).href;
+        const mediaNode = ctx.createMediaElementSource(audio);
+        const gain = ctx.createGain();
+        gain.gain.value = volume;
+        mediaNode.connect(gain).connect(audioGroup(1));
+        musicState.source = audio;
+        musicState.mediaNode = mediaNode;
+        musicState.gain = gain;
+        musicState.length = duration;
+        musicState.loop = !!loop;
+        musicState.error = "";
+        audio.onplaying = () => {
+          if (musicState.source === audio && errors.textContent === musicState.error)
+            errors.textContent = "";
+        };
+        audio.onended = () => {
+          if (musicState.source === audio) musicState.source = null;
+        };
+        audio.onerror = () => {
+          if (musicState.source === audio) {
+            musicState.error = "the streamed music file could not be loaded or decoded";
+            errors.textContent = musicState.error;
+            musicState.source = null;
+          }
+        };
+        audio.play().catch(() => {
+          if (musicState.source === audio) {
+            musicState.error = "browser playback was blocked; start music after a user gesture";
+            errors.textContent = musicState.error;
+            musicState.source = null;
+          }
+        });
+        return 1;
+      },
       music_stop() {
-        if (musicState.source) {
-          try { musicState.source.stop(); } catch (error) { /* ended */ }
-          musicState.source = null;
-        }
+        stopMusicPlayback();
       },
       music_playing() {
-        return musicState.source ? 1 : 0;
+        if (!musicState.source) return 0;
+        if (typeof musicState.source.paused === "boolean")
+          return !musicState.source.paused && !musicState.source.ended ? 1 : 0;
+        return 1;
       },
       music_volume(volume) {
         if (musicState.gain) musicState.gain.gain.value = volume;
       },
       music_position() {
-        if (!musicState.source || !audioState.ctx) return 0;
+        if (!musicState.source) return 0;
+        if (typeof musicState.source.currentTime === "number")
+          return musicState.source.currentTime;
+        if (!audioState.ctx) return 0;
         const elapsed = audioState.ctx.currentTime - musicState.startedAt;
         if (musicState.loop && musicState.length > 0) {
           return elapsed % musicState.length;
@@ -793,13 +1055,30 @@ async function start() {
       triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
         triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
       },
+      sphere_impostor_available() {
+        if (forcePainter || !scene3dState.active) return 0;
+        const renderer = createGlRenderer();
+        const available = !!(renderer && renderer.sphere);
+        if (rendererDiagnostics && window.__anvilSphereImpostorAvailable === undefined)
+          window.__anvilSphereImpostorAvailable = available;
+        return available ? 1 : 0;
+      },
+      sphere_impostor(x, y, z, radius, r, g, b, a, lightX, lightY, lightZ, focal) {
+        sphereImpostors.push([x, y, z, radius, r, g, b, a, lightX, lightY, lightZ, focal]);
+      },
       scene_mode(enabled) {
         scene3dState.active = enabled !== 0;
       },
       present() {
-        if (triangles.length) {
-          if (!forcePainter && scene3dState.active && drawGl(triangles)) {
+        if (rendererDiagnostics && sphereImpostors.length) {
+          window.__anvilSphereImpostorCalls =
+            (window.__anvilSphereImpostorCalls || 0) + sphereImpostors.length;
+          rendererDiagnostics = false;
+        }
+        if (triangles.length || sphereImpostors.length) {
+          if (!forcePainter && scene3dState.active && drawGl(triangles, sphereImpostors)) {
             triangles.length = 0;
+            sphereImpostors.length = 0;
           } else {
             if (!skipSort) triangles.sort(
               (first, second) =>
@@ -816,6 +1095,16 @@ async function start() {
               context.fill();
             }
             triangles.length = 0;
+            for (const sphere of sphereImpostors) {
+              const depth = Math.max(0.05, sphere[2]);
+              const radius = sphere[3] * sphere[11] / depth;
+              context.fillStyle = rgba(sphere[4], sphere[5], sphere[6], sphere[7]);
+              context.beginPath();
+              context.ellipse(480 + sphere[0] * sphere[11] / depth,
+                324 - sphere[1] * sphere[11] / depth, radius, radius, 0, 0, Math.PI * 2);
+              context.fill();
+            }
+            sphereImpostors.length = 0;
           }
         }
         // The fade sits above everything the frame drew, including 3D.
@@ -1007,12 +1296,6 @@ def validate(
         # Static morph targets are supported by both model_draw and ray_mesh;
         # animated node groups use the same baked data and the runtime pose
         # evaluator; both lowerings submit their effective weights per group.
-        if model.get("skinned") and is_ray_mesh:
-            line = text.count("\n", 0, match.start()) + 1
-            raise CompileError(
-                f"{source_path}:{line}: ray_mesh(...) does not support skinned "
-                "models in the wasm backend; use model_draw(...)"
-            )
         if is_instance_draw and (model.get("skinned") or not model.get("morph_count")):
             line = text.count("\n", 0, match.start()) + 1
             raise CompileError(
@@ -1183,6 +1466,10 @@ def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
     bits = int.from_bytes(fmt[14:16], "little")
     if tag not in (1, 0xFFFE):
         raise ValueError("compressed WAVs are not supported (PCM only)")
+    if tag == 0xFFFE and (
+        len(fmt) < 40 or int.from_bytes(fmt[24:28], "little") != 1
+    ):
+        raise ValueError("WAVE_FORMAT_EXTENSIBLE must contain PCM samples")
     if channels not in (1, 2):
         raise ValueError("only mono or stereo WAVs are supported")
     if bits not in (8, 16):
@@ -1190,6 +1477,11 @@ def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
     if not 8000 <= rate <= 192000:
         raise ValueError("the sample rate is outside 8,000-192,000")
     frame_bytes = channels * (bits // 8)
+    if (
+        int.from_bytes(fmt[8:12], "little") != rate * frame_bytes
+        or int.from_bytes(fmt[12:14], "little") != frame_bytes
+    ):
+        raise ValueError("the WAV byte rate or block alignment does not match its format")
     frames = len(payload) // frame_bytes
     if frames == 0:
         raise ValueError("the WAV holds no samples")
@@ -1203,9 +1495,74 @@ def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
     return channels, rate, frames, samples
 
 
+def _wav_stream_info(path: pathlib.Path) -> tuple[int, int, int]:
+    """Read PCM metadata without decoding or retaining the music sample data."""
+    size = path.stat().st_size
+    with path.open("rb") as stream:
+        header = stream.read(12)
+        if len(header) < 12 or header[:4] != b"RIFF" or header[8:12] != b"WAVE":
+            raise ValueError("not a RIFF WAVE file")
+        riff_end = int.from_bytes(header[4:8], "little") + 8
+        if riff_end > size:
+            raise ValueError("the RIFF container is truncated")
+        position = 12
+        fmt = None
+        data_size = None
+        while position + 8 <= riff_end:
+            stream.seek(position)
+            chunk_header = stream.read(8)
+            if len(chunk_header) != 8:
+                break
+            chunk = chunk_header[:4]
+            chunk_size = int.from_bytes(chunk_header[4:], "little")
+            body = position + 8
+            chunk_end = body + chunk_size
+            if chunk_end > riff_end:
+                raise ValueError("a RIFF chunk is truncated")
+            if chunk == b"fmt ":
+                stream.seek(body)
+                fmt = stream.read(min(chunk_size, 64))
+            elif chunk == b"data":
+                data_size = chunk_size
+            position = chunk_end + (chunk_size & 1)
+        if fmt is None or data_size is None or len(fmt) < 16:
+            raise ValueError("the file has no fmt or data chunk")
+    tag = int.from_bytes(fmt[0:2], "little")
+    channels = int.from_bytes(fmt[2:4], "little")
+    rate = int.from_bytes(fmt[4:8], "little")
+    bits = int.from_bytes(fmt[14:16], "little")
+    if tag not in (1, 0xFFFE):
+        raise ValueError("compressed WAVs are not supported (PCM only)")
+    if channels not in (1, 2):
+        raise ValueError("only mono or stereo WAVs are supported")
+    if bits not in (8, 16):
+        raise ValueError("only 8- or 16-bit PCM WAVs are supported")
+    if not 8000 <= rate <= 192000:
+        raise ValueError("the sample rate is outside 8,000-192,000")
+    frame_bytes = channels * (bits // 8)
+    frames = data_size // frame_bytes
+    if frames == 0:
+        raise ValueError("the WAV holds no samples")
+    return channels, rate, frames
+
+
+def _music_stream_target(source_path: pathlib.Path, text: str, out: pathlib.Path):
+    match = MUSIC_LOAD.search(text)
+    if not match:
+        return None
+    literal = match.group(1).replace("\\\\", "\\")
+    source = (source_path.parent / literal).resolve()
+    digest = hashlib.sha256(literal.encode("utf-8")).hexdigest()[:16]
+    relative = pathlib.Path(f"{out.stem}_assets") / f"music-{digest}.wav"
+    url = quote(relative.as_posix(), safe="/-_.")
+    return source, out.parent / relative, url
+
+
 @_timed_asset_import
-def bake_music(source_path: pathlib.Path, text: str) -> str:
-    """Bake the single literal music_load() track into a C array."""
+def bake_music(
+    source_path: pathlib.Path, text: str, *, stream_url: str | None = None
+) -> str:
+    """Emit metadata for browser-streamed music or PCM for host-only callers."""
     match = MUSIC_LOAD.search(text)
     if not match:
         return "\nvoid anvil_wasm_register_music(void) {}\n"
@@ -1213,7 +1570,11 @@ def bake_music(source_path: pathlib.Path, text: str) -> str:
     target = (source_path.parent / literal).resolve()
     line = text.count("\n", 0, match.start()) + 1
     try:
-        channels, rate, frames, samples = _wav_pcm(target)
+        if stream_url is not None:
+            channels, rate, frames = _wav_stream_info(target)
+            samples = None
+        else:
+            channels, rate, frames, samples = _wav_pcm(target)
     except FileNotFoundError:
         raise CompileError(
             f'{source_path}:{line}: music_load cannot read "{literal}"'
@@ -1222,25 +1583,34 @@ def bake_music(source_path: pathlib.Path, text: str) -> str:
         raise CompileError(
             f'{source_path}:{line}: music_load "{literal}": {error}'
         ) from None
-    if len(samples) * 2 > MAX_BAKED_MUSIC_BYTES:
+    if samples is not None and len(samples) * 2 > MAX_BAKED_MUSIC_BYTES:
         raise CompileError(
             f"{source_path}:{line}: baked music exceeds the 16 MiB budget"
         )
-    chunks = ["\n/* Baked music: one looping track, decoded once at load. */"]
-    chunks.append("static const short anvil_baked_music_pcm[] = {")
-    row: list[str] = []
-    for sample in samples:
-        row.append(str(sample))
-        if len(row) == 16:
+    chunks = ["\n/* Music metadata; linked WASM builds stream the sidecar WAV. */"]
+    if samples is not None:
+        chunks.append("static const short anvil_baked_music_pcm[] = {")
+    if samples is not None:
+        row: list[str] = []
+        for sample in samples:
+            row.append(str(sample))
+            if len(row) == 16:
+                chunks.append("  " + ", ".join(row) + ",")
+                row = []
+        if row:
             chunks.append("  " + ", ".join(row) + ",")
-            row = []
-    if row:
-        chunks.append("  " + ", ".join(row) + ",")
-    chunks.append("};")
-    escaped = literal.replace("\\", "\\\\")
+        chunks.append("};")
+    escaped = literal.replace("\\", "\\\\").replace('"', '\\"')
+    escaped_url = (
+        '"' + stream_url.replace("\\", "\\\\").replace('"', '\\"') + '"'
+        if stream_url is not None
+        else "NULL"
+    )
+    pcm_pointer = "anvil_baked_music_pcm" if samples is not None else "NULL"
     chunks.append(
         "static const AnvilWasmMusic anvil_baked_music = "
-        f'{{"{escaped}", {channels}, {rate}, {frames}, anvil_baked_music_pcm}};'
+        f'{{"{escaped}", {escaped_url}, {channels}, {rate}, {frames}, '
+        f"{frames / rate:.17g}, {pcm_pointer}}};"
     )
     chunks.append(
         "void anvil_wasm_register_music(void) {\n"
@@ -1321,6 +1691,7 @@ def build(
     project_name: str,
     emit_c_path: pathlib.Path | None = None,
     phase_callback=None,
+    debug_info: bool = False,
 ) -> None:
     global _toolchain_peak_working_set_bytes, _toolchain_process_tree_peak_working_set_bytes
     validate(source_path, functions, top)
@@ -1334,11 +1705,17 @@ def build(
         project_name,
         runtime_header="anvil_wasm.h",
         minimal_includes=True,
+        debug_line_tables=debug_info,
     )
     source_text = source_path.read_text(encoding="utf-8")
+    music_asset = _music_stream_target(source_path, source_text, out)
     generated += bake_images(source_path, source_text)
     generated += bake_sounds(source_path, source_text)
-    generated += bake_music(source_path, source_text)
+    generated += bake_music(
+        source_path,
+        source_text,
+        stream_url=music_asset[2] if music_asset else None,
+    )
     if phase_callback is not None:
         phase_callback("generated")
     source_map = {
@@ -1378,6 +1755,11 @@ def build(
         str(c_path),
         str(ROOT / "runtime" / "anvil_wasm.c"),
     ]
+    if debug_info:
+        # Retain DWARF line tables in the WebAssembly module so browser
+        # debuggers can map instruction addresses through the #line directives
+        # emitted for Anvil statements.
+        command.insert(3, "-gline-tables-only")
     if _measure_asset_imports:
         from tempfile import TemporaryFile
 
@@ -1404,6 +1786,11 @@ def build(
         raise CompileError(
             "wasm build failed:\n" + (stderr or stdout).strip()
         )
+    if music_asset:
+        music_source, music_destination, _music_url = music_asset
+        music_destination.parent.mkdir(parents=True, exist_ok=True)
+        if music_source.resolve() != music_destination.resolve():
+            shutil.copy2(music_source, music_destination)
     page = out.with_suffix(".html")
     page.write_text(
         HOST_PAGE.replace("__TITLE__", out.stem)

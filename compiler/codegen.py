@@ -24,6 +24,7 @@ from compiler.expressions import (
     STRING_VARIABLES,
     TEXT_LISTS,
     TEXT_LIST_CAP,
+    expression_backend,
     expr,
     set_string_variables,
     split_args,
@@ -366,6 +367,7 @@ def emit_nodes(
     arrays: dict[str, int] | None = None,
     loops: list[dict] | None = None,
     track_source_lines: bool = False,
+    debug_line_tables: bool = False,
 ) -> list[str]:
     arrays = arrays or {}
     loops = loops if loops is not None else []
@@ -386,8 +388,14 @@ def emit_nodes(
     for n in nodes:
         path = n.source or original_path
         source_path = json.dumps(str(path))
-        if track_source_lines:
-            out.append(f"{indent}anvil_wasm_source_line({n.line});")
+        if track_source_lines or debug_line_tables:
+            if track_source_lines:
+                out.append(f"{indent}anvil_wasm_source_line({n.line});")
+        if debug_line_tables:
+            # DWARF line tables then map the generated WASM instruction ranges
+            # back to the original Anvil file and statement line.
+            mapped_path = pathlib.Path(path).resolve()
+            out.append(f"#line {n.line} {json.dumps(str(mapped_path))}")
         if n.kind == "set":
             if n.string:
                 buffer = f"anvil_str_{c_name(n.name)}"
@@ -467,6 +475,8 @@ def emit_nodes(
                     out.append(f"{indent}}}")
                 else:
                     out.append(f"{indent}return {value};")
+                if debug_line_tables:
+                    out.append('#line 1 "anvil-generated-wasm.c"')
                 continue
             value = lower(n)
             if scope is not None and scope.local_arrays:
@@ -598,14 +608,17 @@ def emit_nodes(
                         arrays,
                         loops,
                         track_source_lines,
+                        debug_line_tables,
                     )
                 )
+                if debug_line_tables:
+                    out.append('#line 1 "anvil-generated-wasm.c"')
                 continue
             out.append(f"{indent}if ({lower(n)} != 0.0) {{")
             out.extend(
                 emit_nodes(
                     path, n.body, functions, indent + "    ", scope, arrays, loops,
-                    track_source_lines,
+                    track_source_lines, debug_line_tables,
                 )
             )
             if n.otherwise:
@@ -614,12 +627,15 @@ def emit_nodes(
                     emit_nodes(
                         path, n.otherwise, functions, indent + "    ", scope, arrays,
                         track_source_lines=track_source_lines,
+                        debug_line_tables=debug_line_tables,
                     )
                 )
             out.append(f"{indent}}}")
         elif n.kind == "while":
             truth = constant_truth(n.value)
             if truth is False:
+                if debug_line_tables:
+                    out.append('#line 1 "anvil-generated-wasm.c"')
                 continue
             out.append(f"{indent}while ({lower(n)} != 0.0) {{")
             loops.append({})
@@ -627,7 +643,7 @@ def emit_nodes(
                 out.extend(
                     emit_nodes(
                         path, n.body, functions, indent + "    ", scope, arrays, loops,
-                        track_source_lines,
+                        track_source_lines, debug_line_tables,
                     )
                 )
             finally:
@@ -666,7 +682,7 @@ def emit_nodes(
                 out.extend(
                     emit_nodes(
                         path, n.body, functions, inner + "        ", scope, arrays, loops,
-                        track_source_lines,
+                        track_source_lines, debug_line_tables,
                     )
                 )
             finally:
@@ -750,6 +766,10 @@ def emit_nodes(
                 f"{indent}anvil_net_ok = "
                 f"(double)anvil_net_join({address}, {port});"
             )
+        if debug_line_tables:
+            # Generated control-flow scaffolding is not an Anvil statement.
+            # Keep it out of the user's source line range.
+            out.append('#line 1 "anvil-generated-wasm.c"')
     return out
 
 
@@ -776,7 +796,7 @@ def _walk_kinds(nodes):
                 yield from _walk_kinds(branch)
 
 
-def emit_c(
+def _emit_c(
     path: pathlib.Path,
     functions: dict[str, Node],
     top: list[Node],
@@ -786,11 +806,12 @@ def emit_c(
     project_name: str = "Anvil Game",
     runtime_header: str = "anvil_runtime.h",
     minimal_includes: bool = False,
+    debug_line_tables: bool = False,
 ) -> str:
     arrays = arrays or {}
     from compiler import gltf as _gltf
 
-    _gltf.reset()
+    _gltf.reset(clear_asset_root=False)
     # Emit only functions reachable from the real entry points (top-level calls,
     # main, and active engine callbacks), exactly like the native backend. A
     # helper that is never called should not reach the generated C at all.
@@ -941,6 +962,7 @@ def emit_c(
             body = emit_nodes(
                 path, fn.body, functions, "    ", fn, arrays,
                 track_source_lines=minimal_includes,
+                debug_line_tables=debug_line_tables,
             )
         finally:
             set_string_variables(previous_strings)
@@ -1053,6 +1075,7 @@ def emit_c(
         emit_nodes(
             path, setup, functions, "    ", arrays=arrays,
             track_source_lines=minimal_includes,
+            debug_line_tables=debug_line_tables,
         )
     )
     if has_engine:
@@ -1094,3 +1117,30 @@ def emit_c(
     if model_lines:
         lines[model_declaration_index:model_declaration_index] = model_lines
     return "\n".join(lines)
+
+
+def emit_c(
+    path: pathlib.Path,
+    functions: dict[str, Node],
+    top: list[Node],
+    variables: set[str],
+    arrays: dict[str, int] | None = None,
+    fixed_hz: int = 60,
+    project_name: str = "Anvil Game",
+    runtime_header: str = "anvil_runtime.h",
+    minimal_includes: bool = False,
+    debug_line_tables: bool = False,
+) -> str:
+    with expression_backend(wasm=runtime_header == "anvil_wasm.h"):
+        return _emit_c(
+            path,
+            functions,
+            top,
+            variables,
+            arrays,
+            fixed_hz,
+            project_name,
+            runtime_header,
+            minimal_includes,
+            debug_line_tables,
+        )

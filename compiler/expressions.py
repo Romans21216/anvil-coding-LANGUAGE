@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from contextvars import ContextVar
 import math
 import pathlib
@@ -35,6 +36,17 @@ def _next_join_slots() -> tuple[int, int, int]:
     _CAT_SLOT_COUNTER += 1
     return slot % 128, 128 + (slot * 2) % 126, 128 + (slot * 2 + 1) % 126
 _PARSE_DEPTH = ContextVar("anvil_expression_parse_depth", default=0)
+_WASM_BACKEND = ContextVar("anvil_expression_wasm_backend", default=False)
+
+
+@contextmanager
+def expression_backend(*, wasm: bool):
+    """Set the target backend while lowering nested expressions."""
+    token = _WASM_BACKEND.set(wasm)
+    try:
+        yield
+    finally:
+        _WASM_BACKEND.reset(token)
 # Which variables hold text. Set by the code generators before lowering; the
 # compiler is single-threaded, so a module-level registry is safe.
 STRING_VARIABLES: set[str] = set()
@@ -899,10 +911,11 @@ class ExpressionParser:
                     )
                 state_id = f"(-(int)({instance_handle}))"
             if value == "ray_mesh" and model.get("skinned"):
-                raise CompileError(
-                    f"{self.path}:{self.line}: ray_mesh does not support skinned "
-                    "meshes yet"
-                )
+                if not _WASM_BACKEND.get():
+                    raise CompileError(
+                        f"{self.path}:{self.line}: ray_mesh does not support skinned "
+                        "meshes yet"
+                    )
             mesh_args = []
             for _ in range(7):
                 self.expect(",")
@@ -919,7 +932,18 @@ class ExpressionParser:
                      f"{model.get('morph_count', 0)})"
             )
             if value == "ray_mesh":
-                if model.get("animated"):
+                if model.get("skinned"):
+                    call = (
+                        f"anvil_mesh_draw_skinned((const double *){symbol}, {count}, "
+                        f"(const double *){symbol}_nodes, {len(model['nodes']) // 10}, "
+                        f"(const int *){symbol}_parents, (const int *){symbol}_joints, "
+                        f"{len(model['joint_nodes'])}, (const double *){symbol}_bind, "
+                        f"(const double *){symbol}_times, (const double *){symbol}_values, "
+                        f"(const int *){symbol}_tracks, {len(model['tracks']) // 6}, "
+                        f"{model['length']:.6g}, anvil_model_clock({model['id']}), "
+                        f"{placement})"
+                    )
+                elif model.get("animated"):
                     call = (
                         f"anvil_trace_mesh_animated((const double *){symbol}, "
                         f"{count}, (const double *){symbol}_nodes, "

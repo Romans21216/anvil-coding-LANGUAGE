@@ -1,21 +1,22 @@
 """Compile-time glTF import.
 
-`model_draw("file.gltf", x, y, z, scale, rx, ry, rz)` is lowered by the C
-backend into a static triangle array plus `anvil_mesh_draw`, so the runtime
-never parses JSON and the model ships inside the executable. This module reads
-the file during compilation and returns flat triangles.
+`model_draw("file.gltf" or "file.glb", x, y, z, scale, rx, ry, rz)` is lowered
+by the C and WebAssembly backends into baked triangle data, so the runtime never
+parses model JSON and the model ships inside the executable. This module reads
+the source during compilation and returns flat triangles plus any supported
+animation, skin or morph data.
 
-Supported: .gltf (JSON) with a .bin file or base64 data URI buffers, node
+Supported containers are glTF JSON and binary GLB 2. Buffers can come from
+external files, base64 data URIs or the GLB BIN chunk. The importer handles node
 hierarchies with matrix or TRS transforms, triangle/triangle-strip/triangle-fan
 primitives, POSITION and optional COLOR_0 attributes, per-material
 baseColorFactor, and node TRS animation clips (translation/rotation/scale,
-LINEAR and STEP keys). A model with an animation clip bakes its triangles in
-node-local space plus the node hierarchy and keyframes, and the runtime
-evaluates the pose; a static model keeps the cheaper world-space bake.
-A model with one skin bakes mesh-space vertices with four joint indices and
-weights each, plus the skin's inverse bind matrices, so the runtime can blend
-the joints. Not supported yet: morph targets, multiple skins, CUBICSPLINE keys,
-textures and sparse accessors.
+LINEAR and STEP keys). Animated models bake node-local triangles and hierarchy
+data for runtime posing; static models use a cheaper world-space bake. One skin
+can bake mesh-space vertices with four joint indices and weights per vertex,
+plus inverse bind matrices. Morph targets are supported for unskinned static
+and animated models. Base-color texture images and sparse accessors are not
+supported yet.
 """
 
 from __future__ import annotations
@@ -27,8 +28,13 @@ import math
 import pathlib
 import struct
 import time
+from urllib.parse import unquote
 
 MAX_TRIANGLES = 200_000
+MAX_CONTAINER_BYTES = 64 * 1024 * 1024
+MAX_BUFFER_BYTES = 256 * 1024 * 1024
+MAX_ACCESSOR_DECODED_BYTES = 64 * 1024 * 1024
+MAX_GEOMETRY_BYTES = 512 * 1024 * 1024
 # The C runtime keeps one clip clock per model in ANVIL_MODEL_STATES slots; a
 # posed model (animated or skinned) past this index would silently read 0 and
 # never move, so the importer refuses it at the model_draw line instead.
@@ -50,16 +56,29 @@ class ModelError(Exception):
     pass
 
 
+def _safe_resolve(path: pathlib.Path, label: str) -> pathlib.Path:
+    try:
+        return path.resolve()
+    except (OSError, RuntimeError, ValueError) as error:
+        raise ModelError(f"cannot resolve {label}: {error}") from None
+
+
 def _translate_malformed_structure(loader):
     """Keep malformed JSON failures inside the importer's diagnostic contract."""
     @functools.wraps(loader)
     def wrapped(*args, **kwargs):
+        owns_cache_scope = not _cache_import_reads
+        if owns_cache_scope:
+            _begin_import_cache()
         try:
             return loader(*args, **kwargs)
         except ModelError:
             raise
-        except (KeyError, IndexError, TypeError, ValueError, OverflowError) as error:
+        except (KeyError, IndexError, TypeError, ValueError, OverflowError, AttributeError) as error:
             raise ModelError(f"malformed glTF structure: {error}") from None
+        finally:
+            if owns_cache_scope:
+                _end_import_cache()
 
     return wrapped
 
@@ -67,23 +86,52 @@ def _translate_malformed_structure(loader):
 def _buffer_bytes(
     document: dict, index: int, base_dir: pathlib.Path, binary: bytes | None = None
 ) -> bytes:
+    cache_key = (id(document), index)
+    cached = _buffer_cache.get(cache_key) if _cache_import_reads else None
+    if cached is not None:
+        return cached
     buffer = document["buffers"][index]
     uri = buffer.get("uri")
-    if not uri:
+    if uri is None:
         if index == 0 and binary is not None:
             return binary
         raise ModelError("a buffer has no uri and the file has no GLB binary chunk")
-    if uri.startswith("data:"):
+    if not isinstance(uri, str):
+        raise ModelError("a buffer uri must be a string")
+    if uri[:5].lower() == "data:":
         header, _, payload = uri.partition(",")
-        if ";base64" not in header:
+        if not payload or ";base64" not in header.lower():
             raise ModelError("only base64 data URIs are supported")
         try:
-            return base64.b64decode(payload)
+            declared = buffer.get("byteLength")
+            if isinstance(declared, int) and declared > MAX_BUFFER_BYTES:
+                raise ModelError(f"a buffer exceeds the {MAX_BUFFER_BYTES} byte import limit")
+            if len(payload) > ((MAX_BUFFER_BYTES + 2) // 3) * 4 + 8:
+                raise ModelError(f"a buffer exceeds the {MAX_BUFFER_BYTES} byte import limit")
+            decoded = base64.b64decode(payload, validate=True)
+            if len(decoded) > MAX_BUFFER_BYTES:
+                raise ModelError(f"a buffer exceeds the {MAX_BUFFER_BYTES} byte import limit")
+            if _cache_import_reads:
+                _buffer_cache[cache_key] = decoded
+            return decoded
         except ValueError as error:
             raise ModelError(f"invalid base64 buffer: {error}") from error
-    path = (base_dir / uri).resolve()
+    root = _asset_root or _safe_resolve(base_dir, "project folder")
+    path = pathlib.Path(unquote(uri))
+    if not path.is_absolute():
+        path = base_dir / path
+    path = _safe_resolve(path, f"buffer uri {uri!r}")
     try:
-        return path.read_bytes()
+        path.relative_to(_safe_resolve(root, "project folder"))
+    except ValueError:
+        raise ModelError("a buffer uri must resolve inside the project folder") from None
+    try:
+        if path.stat().st_size > MAX_BUFFER_BYTES:
+            raise ModelError(f"a buffer exceeds the {MAX_BUFFER_BYTES} byte import limit")
+        data = path.read_bytes()
+        if _cache_import_reads:
+            _buffer_cache[cache_key] = data
+        return data
     except OSError as error:
         raise ModelError(f"cannot read buffer {uri!r}: {error}") from error
 
@@ -144,9 +192,6 @@ def _accessor(
     view_length = nonnegative_integer(view.get("byteLength"), "a bufferView byteLength", positive=True)
     if view_offset + view_length > declared_buffer_length:
         raise ModelError("a bufferView reads past its declared buffer")
-    buffer = _buffer_bytes(document, buffer_index, base_dir, binary)
-    if len(buffer) < declared_buffer_length:
-        raise ModelError("a buffer is shorter than its declared byteLength")
 
     component = accessor.get("componentType")
     if component not in COMPONENTS:
@@ -161,6 +206,14 @@ def _accessor(
         accessor.get("byteOffset", 0), "an accessor byteOffset"
     )
     count = nonnegative_integer(accessor.get("count"), "an accessor count", positive=True)
+    if count > MAX_TRIANGLES * 3 + 2:
+        raise ModelError(f"an accessor exceeds the {MAX_TRIANGLES * 3 + 2} element import limit")
+    # Account for the unpacked Python number and tuple/list references, not
+    # only the tightly packed bytes in the source buffer.
+    if count * width * 16 > MAX_ACCESSOR_DECODED_BYTES:
+        raise ModelError(
+            f"an accessor exceeds the {MAX_ACCESSOR_DECODED_BYTES} byte decoded import limit"
+        )
     if "byteStride" in view:
         if not vertex_attribute:
             raise ModelError("byteStride is only valid for vertex attribute accessors")
@@ -183,6 +236,10 @@ def _accessor(
         raise ModelError("normalized is only valid for BYTE, UNSIGNED_BYTE, SHORT, or UNSIGNED_SHORT accessors")
     if normalized and semantic == "JOINTS_0":
         raise ModelError("JOINTS_0 accessors cannot be normalized")
+    # Validate metadata and decode/allocation bounds before opening the buffer.
+    buffer = _buffer_bytes(document, buffer_index, base_dir, binary)
+    if len(buffer) < declared_buffer_length:
+        raise ModelError("a buffer is shorter than its declared byteLength")
     values = []
     for i in range(count):
         base = offset + i * stride
@@ -260,6 +317,33 @@ def _triangle_indices(mode: int, count: int) -> list[tuple[int, int, int]]:
     raise ModelError(f"unsupported primitive mode {mode}; only triangles, strips and fans are supported")
 
 
+def _triangle_count(mode: int, count: int) -> int:
+    if mode == 4:
+        return count // 3
+    if mode in (5, 6):
+        return max(0, count - 2)
+    raise ModelError(f"unsupported primitive mode {mode}; only triangles, strips and fans are supported")
+
+
+def _validate_index_accessor(document: dict, index: int) -> int:
+    accessors = document.get("accessors", [])
+    if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < len(accessors):
+        raise ModelError("an accessor index is out of range")
+    accessor = accessors[index]
+    if accessor.get("type") != "SCALAR":
+        raise ModelError("an index accessor must have SCALAR type")
+    if accessor.get("componentType") not in (5121, 5123, 5125):
+        raise ModelError("an index accessor must use an unsigned byte, short or int component type")
+    normalized = accessor.get("normalized", False)
+    if not isinstance(normalized, bool):
+        raise ModelError("an accessor normalized value must be a boolean")
+    if normalized and accessor.get("componentType") not in (5120, 5121, 5122, 5123):
+        raise ModelError("normalized is only valid for BYTE, UNSIGNED_BYTE, SHORT, or UNSIGNED_SHORT accessors")
+    if normalized:
+        raise ModelError("an index accessor cannot be normalized")
+    return accessor.get("count", 0)
+
+
 def _material_colour(document: dict, primitive: dict) -> tuple[int, int, int]:
     index = primitive.get("material")
     if index is None:
@@ -280,20 +364,28 @@ def _primitive(
     base_dir: pathlib.Path,
     binary: bytes | None = None,
     morph_out: list[float] | None = None,
+    max_triangles: int = MAX_TRIANGLES,
 ) -> list[float]:
     attributes = primitive.get("attributes", {})
     if "POSITION" not in attributes:
         raise ModelError("a primitive has no POSITION attribute")
+    if primitive.get("indices") is not None:
+        index_count = _validate_index_accessor(document, primitive["indices"])
+    else:
+        position_index = attributes["POSITION"]
+        accessors = document.get("accessors", [])
+        if not isinstance(position_index, int) or isinstance(position_index, bool) or not 0 <= position_index < len(accessors):
+            raise ModelError("an accessor index is out of range")
+        index_count = accessors[position_index].get("count", 0)
+    if _triangle_count(primitive.get("mode", 4), index_count) > max_triangles:
+        raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
     positions = _accessor(document, attributes["POSITION"], base_dir, binary, vertex_attribute=True, semantic="POSITION")
     if attributes.get("POSITION") is not None and len(positions) and len(positions[0]) != 3:
         raise ModelError("POSITION must be a VEC3 accessor")
     if any(not math.isfinite(float(value)) for row in positions for value in row):
         raise ModelError("POSITION contains a non-finite value")
     if primitive.get("indices") is not None:
-        indices = [
-            int(row[0])
-            for row in _accessor(document, primitive["indices"], base_dir, binary)
-        ]
+        indices = [row[0] for row in _accessor(document, primitive["indices"], base_dir, binary)]
     else:
         indices = list(range(len(positions)))
 
@@ -305,7 +397,9 @@ def _primitive(
 
     targets = primitive.get("targets", [])
     deltas: list[list[tuple[float, float, float]]] = []
-    for target in targets:
+    if morph_out is not None and len(targets) > MAX_MORPH_TARGETS:
+        raise ModelError(f"a model may use at most {MAX_MORPH_TARGETS} morph targets")
+    for target in (targets if morph_out is not None else ()):
         if "POSITION" not in target:
             raise ModelError("a morph target needs a POSITION delta")
         raw = _accessor(document, target["POSITION"], base_dir, binary, vertex_attribute=True, semantic="POSITION")
@@ -357,8 +451,14 @@ def _primitive(
 
 def _container(path: pathlib.Path) -> tuple[dict, bytes | None]:
     """Return (document, GLB binary chunk) for a .gltf or .glb file."""
+    path = _safe_resolve(path, f"model {path}")
+    cached = _container_cache.get(path) if _cache_import_reads else None
+    if cached is not None:
+        return cached
     suffix = path.suffix.lower()
     try:
+        if path.stat().st_size > MAX_CONTAINER_BYTES:
+            raise ModelError(f"{path.name} exceeds the {MAX_CONTAINER_BYTES} byte model import limit")
         raw = path.read_bytes()
     except OSError as error:
         raise ModelError(f"cannot read {path.name}: {error}") from error
@@ -368,7 +468,10 @@ def _container(path: pathlib.Path) -> tuple[dict, bytes | None]:
         except (UnicodeDecodeError, ValueError) as error:
             raise ModelError(f"{path.name} is not valid glTF JSON: {error}") from error
         _validate_document(document, path.name)
-        return document, None
+        result = (document, None)
+        if _cache_import_reads:
+            _container_cache[path] = result
+        return result
     if suffix != ".glb":
         raise ModelError("only .gltf and .glb models are supported")
     if len(raw) < 12 or raw[:4] != b"glTF":
@@ -398,7 +501,10 @@ def _container(path: pathlib.Path) -> tuple[dict, bytes | None]:
     if document is None:
         raise ModelError("the GLB file has no JSON chunk")
     _validate_document(document, path.name)
-    return document, binary
+    result = (document, binary)
+    if _cache_import_reads:
+        _container_cache[path] = result
+    return result
 
 
 def _validate_document(document: object, name: str) -> None:
@@ -426,6 +532,13 @@ def _validate_document(document: object, name: str) -> None:
     for index, value in enumerate(buffers):
         if not isinstance(value, dict):
             raise ModelError(f"glTF buffer {index} must be an object")
+        if "uri" in value and not isinstance(value["uri"], str):
+            raise ModelError(f"glTF buffer {index} uri must be a string")
+        byte_length = value.get("byteLength")
+        if not isinstance(byte_length, int) or isinstance(byte_length, bool) or byte_length < 0:
+            raise ModelError(f"glTF buffer {index} byteLength must be a non-negative integer")
+        if byte_length > MAX_BUFFER_BYTES:
+            raise ModelError(f"a buffer exceeds the {MAX_BUFFER_BYTES} byte import limit")
     for index, view in enumerate(views):
         if not isinstance(view, dict):
             raise ModelError(f"glTF bufferView {index} must be an object")
@@ -554,7 +667,12 @@ def _static_walk(
     if scenes:
         roots = scenes[document.get("scene", 0)].get("nodes", [])
     else:
-        roots = list(range(len(nodes)))
+        child_nodes = {
+            child
+            for node in nodes
+            for child in node.get("children", [])
+        }
+        roots = [index for index in range(len(nodes)) if index not in child_nodes]
     triangles: list[float] = []
     target_counts: list[int] = []
 
@@ -568,9 +686,35 @@ def _static_walk(
         if "mesh" in node:
             mesh = _mesh_for_node(document, node)
             for primitive in mesh.get("primitives", []):
+                attributes = primitive.get("attributes", {})
+                index = primitive.get("indices")
+                if index is not None:
+                    item_count = _validate_index_accessor(document, index)
+                else:
+                    item_count = document["accessors"][attributes["POSITION"]]["count"]
+                primitive_triangles = _triangle_count(
+                    primitive.get("mode", 4), item_count
+                )
+                if len(triangles) // 12 + primitive_triangles > MAX_TRIANGLES:
+                    raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
+                morph_targets = len(primitive.get("targets", []))
+                if morph_out is not None and morph_targets > MAX_MORPH_TARGETS:
+                    raise ModelError(f"a model may use at most {MAX_MORPH_TARGETS} morph targets")
+                generated_components = (
+                    len(triangles) + primitive_triangles * 12
+                    + (len(morph_out) if morph_out is not None else 0)
+                    + primitive_triangles * 9 * morph_targets
+                )
+                if generated_components * 32 > MAX_GEOMETRY_BYTES:
+                    raise ModelError(
+                        f"generated model geometry exceeds the {MAX_GEOMETRY_BYTES} byte import limit"
+                    )
                 first = len(triangles) // 12
                 triangles.extend(
-                    _primitive(document, primitive, world, base_dir, binary, morph_out)
+                    _primitive(
+                        document, primitive, world, base_dir, binary, morph_out,
+                        MAX_TRIANGLES - len(triangles) // 12,
+                    )
                 )
                 target_counts.append(len(primitive.get("targets", [])))
                 if morph_defaults_out is not None and primitive.get("targets"):
@@ -579,8 +723,6 @@ def _static_walk(
                     )
                     if morph_groups_out is not None:
                         morph_groups_out.extend((first, len(triangles) // 12 - first))
-                if len(triangles) // 12 > MAX_TRIANGLES:
-                    raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
         for child in node.get("children", []):
             visit(child, world, depth + 1)
 
@@ -908,9 +1050,22 @@ def load_skinned(path: pathlib.Path) -> dict:
         if "mesh" not in node:
             continue
         for primitive in _mesh_for_node(document, node).get("primitives", []):
-            vertices.extend(_skinned_primitive(document, primitive, path.parent, binary))
-        if len(vertices) // 14 > MAX_TRIANGLES * 3:
-            raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
+            index = primitive.get("indices")
+            if index is not None:
+                item_count = _validate_index_accessor(document, index)
+            else:
+                item_count = document["accessors"][primitive["attributes"]["POSITION"]]["count"]
+            primitive_triangles = _triangle_count(primitive.get("mode", 4), item_count)
+            if len(vertices) // 42 + primitive_triangles > MAX_TRIANGLES:
+                raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
+            if (len(vertices) + primitive_triangles * 42) * 32 > MAX_GEOMETRY_BYTES:
+                raise ModelError(
+                    f"generated model geometry exceeds the {MAX_GEOMETRY_BYTES} byte import limit"
+                )
+            vertices.extend(_skinned_primitive(
+                document, primitive, path.parent, binary,
+                MAX_TRIANGLES - len(vertices) // 42,
+            ))
     if not vertices:
         raise ModelError("the skinned model has no triangle geometry")
 
@@ -929,7 +1084,8 @@ def load_skinned(path: pathlib.Path) -> dict:
 
 
 def _skinned_primitive(
-    document: dict, primitive: dict, base_dir: pathlib.Path, binary: bytes | None
+    document: dict, primitive: dict, base_dir: pathlib.Path, binary: bytes | None,
+    max_triangles: int = MAX_TRIANGLES,
 ) -> list[float]:
     if primitive.get("targets"):
         # The skinned draw path has no morph input, so a combined mesh would
@@ -941,11 +1097,21 @@ def _skinned_primitive(
     for required in ("POSITION", "JOINTS_0", "WEIGHTS_0"):
         if required not in attributes:
             raise ModelError(f"a skinned primitive needs {required}")
+    if primitive.get("indices") is not None:
+        index_count = _validate_index_accessor(document, primitive["indices"])
+    else:
+        accessor_index = attributes["POSITION"]
+        accessors = document.get("accessors", [])
+        if not isinstance(accessor_index, int) or isinstance(accessor_index, bool) or not 0 <= accessor_index < len(accessors):
+            raise ModelError("an accessor index is out of range")
+        index_count = accessors[accessor_index].get("count", 0)
+    if _triangle_count(primitive.get("mode", 4), index_count) > max_triangles:
+        raise ModelError(f"the model exceeds the {MAX_TRIANGLES} triangle budget")
     positions = _accessor(document, attributes["POSITION"], base_dir, binary, vertex_attribute=True, semantic="POSITION")
     joints = _accessor(document, attributes["JOINTS_0"], base_dir, binary, vertex_attribute=True, semantic="JOINTS_0")
     weights = _accessor(document, attributes["WEIGHTS_0"], base_dir, binary, vertex_attribute=True, semantic="WEIGHTS_0")
     if primitive.get("indices") is not None:
-        indices = [int(row[0]) for row in _accessor(document, primitive["indices"], base_dir, binary)]
+        indices = [row[0] for row in _accessor(document, primitive["indices"], base_dir, binary)]
     else:
         indices = list(range(len(positions)))
     colours = None
@@ -1099,12 +1265,42 @@ def load_animated(path: pathlib.Path) -> dict:
 # ---- Compiler integration -------------------------------------------------
 
 _registry: dict[str, tuple[str, int, list[float], tuple[float, float, float, float]]] = {}
+_container_cache: dict[pathlib.Path, tuple[dict, bytes | None]] = {}
+_buffer_cache: dict[tuple[int, int], bytes] = {}
+_asset_root: pathlib.Path | None = None
+_cache_import_reads = False
 _import_seconds = 0.0
 _measure_import_time = False
 
 
-def reset() -> None:
+def reset(*, clear_asset_root: bool = True) -> None:
+    global _asset_root, _cache_import_reads
     _registry.clear()
+    _container_cache.clear()
+    _buffer_cache.clear()
+    if clear_asset_root:
+        _asset_root = None
+    _cache_import_reads = False
+
+
+def _begin_import_cache() -> None:
+    global _cache_import_reads
+    _container_cache.clear()
+    _buffer_cache.clear()
+    _cache_import_reads = True
+
+
+def _end_import_cache() -> None:
+    global _cache_import_reads
+    _container_cache.clear()
+    _buffer_cache.clear()
+    _cache_import_reads = False
+
+
+def set_asset_root(root: pathlib.Path) -> None:
+    """Set the project boundary used for model and external buffer paths."""
+    global _asset_root
+    _asset_root = _safe_resolve(pathlib.Path(root), "project folder")
 
 
 def reset_import_time() -> None:
@@ -1124,9 +1320,16 @@ def import_time_seconds() -> float:
 
 def _resolve(asset: str, source_path: pathlib.Path) -> pathlib.Path:
     path = pathlib.Path(asset)
+    source = _safe_resolve(pathlib.Path(source_path), "source file")
+    root = _asset_root or source.parent
     if not path.is_absolute():
-        path = pathlib.Path(source_path).parent / path
-    return path.resolve()
+        path = root / path
+    path = _safe_resolve(path, f"model path {asset!r}")
+    try:
+        path.relative_to(_safe_resolve(root, "project folder"))
+    except ValueError:
+        raise ModelError("a model path must resolve inside the project folder") from None
+    return path
 
 
 def bounds_of(data: list[float]) -> tuple[float, float, float, float]:
@@ -1153,10 +1356,7 @@ def bounds_of(data: list[float]) -> tuple[float, float, float, float]:
 
 def _kind(path: pathlib.Path) -> str:
     """Classify the model from one read: skinned, animated or static."""
-    try:
-        document, _ = _container(path)
-    except ModelError:
-        return "static"
+    document, _ = _container(path)
     if not isinstance(document, dict):
         return "static"
     nodes = document.get("nodes", [])
@@ -1192,13 +1392,17 @@ def _skinned_bounds(vertices: list[float]) -> tuple[float, float, float, float]:
 
 def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
     global _import_seconds
-    if not _measure_import_time:
-        return _ensure_model(asset, source_path)
-    started = time.perf_counter()
+    owns_cache_scope = not _cache_import_reads
+    if owns_cache_scope:
+        _begin_import_cache()
+    started = time.perf_counter() if _measure_import_time else None
     try:
         return _ensure_model(asset, source_path)
     finally:
-        _import_seconds += time.perf_counter() - started
+        if started is not None:
+            _import_seconds += time.perf_counter() - started
+        if owns_cache_scope:
+            _end_import_cache()
 
 
 def _ensure_model(asset: str, source_path: pathlib.Path) -> dict:

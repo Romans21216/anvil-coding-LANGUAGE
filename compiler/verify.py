@@ -199,6 +199,9 @@ def verify(source_arg: pathlib.Path) -> tuple[list[dict], pathlib.Path | None]:
     from compiler import gltf, wasm
 
     gltf.reset()
+    gltf.set_asset_root(
+        manifest_path.parent if manifest_path is not None else source_path.parent
+    )
     checked: set[tuple[str, pathlib.Path]] = set()
     for (call, literal, origin, _site_line), (line, _call) in sites.items():
         if literal is None:

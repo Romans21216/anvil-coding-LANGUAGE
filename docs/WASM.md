@@ -37,6 +37,11 @@ void text(double x, double y, const char *text, int length,
 void present(void);
 ```
 
+The browser page also provides `sphere_impostor_available()` and
+`sphere_impostor(...)` for the WebGL `ray_sphere` shader path. When WebGL or
+`EXT_frag_depth` is unavailable, the runtime keeps its triangle tessellation
+fallback; Node and painter mode always use that fallback.
+
 `anvil_run` stores the callbacks and returns; the host drives frames by calling
 the exported `anvil_frame(delta_ms)`, which runs one update, clears with the
 scene colour, draws and calls `present`.
@@ -75,11 +80,11 @@ Supported today:
   `sound_stop_all`, `sound_volume`, `sound_pan`, `sound_pitch`,
   `sound_duration`, `sound_group`, `sound_group_volume`, `sound_group_mute`,
   `sound_group_gain`, `sound_group_stop`, `sound_active`, `sound_destroy`,
-  `sound_error` (literal paths baked at build time; streaming music is not there
-  yet)
+  `sound_error` (literal sound paths baked at build time; music uses a streamed
+  WAV sidecar)
 - music: `music_load`, `music_play`, `music_play_loop`, `music_stop`,
   `music_playing`, `music_volume`, `music_position`, `music_length`,
-  `music_error` (one literal track, baked at build time)
+  `music_error` (one literal PCM WAV track streamed from a same-origin sidecar)
 - physics: `body_create`, `body_create_box`, `body_destroy`, `body_active`,
   `body_x/y/vx/vy`, `body_set_velocity`, `body_force`, `body_restitution`,
   `body_friction`, `body_collision`, `physics_capacity`, `physics_gravity`,
@@ -152,8 +157,9 @@ sets the 0–1 floor (default 0.28), and `light_intensity(level)` sets the 0–2
 scale for the lit part (default 1). Both setters return their previous value
 and ignore non-finite input. Shading is `ambient + (1 - ambient) * intensity *
 max(0, dot(normal, light))`, clamped to 0–1. Primitive triangles are one-sided;
-imported model triangles are two-sided. The C sphere's per-pixel shading and the
-wasm sphere's tessellated facets use the same scene-light settings.
+imported model triangles are two-sided. `ray_sphere` keeps its fixed tracer light
+and shading on both backends; the scene-light controls apply to primitives and
+models.
 
 Shadows are the same overhead projection as the desktop runtime: `shadow(on)`,
 `shadow_height(y)` and `shadow_alpha(a)` flatten a cube's bottom face and every
@@ -166,14 +172,16 @@ Bounding-sphere culling is implemented for `model_draw`: a model is skipped when
 its whole sphere is behind the near plane or outside the screen, and
 `mesh_culled()` reports it.
 
-`model_draw` and `ray_mesh` bake static or animated unskinned glTF triangles into
-the module and submit them through the depth-tested raster path. `model_draw` also
-supports one skin with up to 64 joints and four vertex influences; it samples the
-first animation clip or uses the bind pose when no clip exists. Skinned draws skip
-bounds culling and overhead shadows. In WebAssembly, `ray_mesh` is triangle
-submission, not the C runtime's software ray-tracing/BVH implementation, and
-skinned `ray_mesh` receives a located diagnostic. All wasm model submissions, including skinned `model_draw`, share a 16,384-triangle frame budget. Each call
-is checked as a whole and returns 0 without submitting geometry when the call
+`model_draw` and `ray_mesh` bake static or animated glTF triangles into the
+module and submit them through the depth-tested raster path. Both APIs support
+one skin with up to 64 joints and four vertex influences; they sample the first
+animation clip or use the bind pose when no clip exists. Static and animated
+unskinned models also support morph targets. Skinned draws skip bounds culling
+and overhead shadows. In WebAssembly, `ray_mesh` is triangle
+submission, not the C runtime's software ray-tracing/BVH implementation. All
+wasm model submissions, including skinned `model_draw` and `ray_mesh`, share a
+16,384-triangle frame budget. Each call is checked as a whole and returns 0
+without submitting geometry when the call
 would exceed the remaining budget. `mesh_drawn()` counts triangles from the most
 recent model submission; `mesh_culled()` reports whole-model frustum culling,
 and `mesh_culling(on)` controls that culling.
@@ -190,21 +198,57 @@ page opened with `?painter=1`. `?nosort=1` additionally skips the far-to-near
 sort, which is how the depth test is demonstrated — an unsorted painter shows
 the farther cube, WebGL shows the nearer one. 3D is still painted after any 2D
 drawing in the frame, and 2D primitives in a 3D scene are covered by the blit.
-Skinned `ray_mesh` is unsupported; textured geometry remains C-backend only. Unskinned animated
-`model_draw` and `ray_mesh` models support the first glTF clip with translation,
+Skinned `ray_mesh` uses the same WebGL raster submission as `model_draw`;
+glTF base-color textures are not decoded by either backend, so textured models
+use their material `baseColorFactor` fallback. `model_draw` and `ray_mesh`
+sample skinning and the first glTF clip with translation,
 rotation and scale tracks using LINEAR or STEP interpolation. `model_animate`
 sets a per-model clock; `model_animation_length` is baked as a compile-time
-constant. Static and animated unskinned models also support morph targets as
-described below.
+constant. Morph targets are supported on static and animated unskinned models,
+as described below.
 
-`display ray_sphere(...)` is supported in `scene 3d` as a tessellated,
-per-vertex shaded approximation, with sphere-to-sphere shadow checks. Tessellation
-adapts to projected sphere size and shares a 16,384 candidate-triangle frame
-budget across the 32-sphere queue. On Chrome 157 / SwiftShader, the checked-in
-benchmark measured maximum p95 work of 4.6 ms for 1 sphere, 4.9 ms for 8, and
-6.0 ms for 32; the maximum sampled JS heap peaks were 4.7, 17.0 and 72.6 MiB.
-The C backend still provides exact per-pixel sphere tracing; the browser path
-has polygonal silhouettes and facet lighting.
+`display ray_sphere(...)` is supported in `scene 3d`. When WebGL and
+`EXT_frag_depth` are available, the browser host draws an analytic sphere
+impostor: the fragment shader intersects the view ray with the sphere, writes
+per-pixel depth, and shades the surface with sphere-to-sphere shadows. Node,
+`?painter=1`, and browsers without the extension retain projected-size adaptive
+tessellation, capped at 16,384 candidate triangles across 32 queued spheres.
+The checked-in Chrome capture and the earlier 1/8/32 measurements predate the
+impostor path and describe the tessellation fallback. C/Chrome fixtures with two
+overlapping ray spheres pass under both the default and an oblique camera, both
+submission orders produce equivalent C and WASM images, and an isolated
+occluder visibly darkens the receiver in both backends: silhouette IoU >0.90,
+visible-pixel RGB MAE <20, and >90% of visible pixels within 32 channel levels
+(`tests/test_wasm_browser_parity.py`). Sphere lighting controls (`light`,
+`light_ambient`, and `light_intensity`, individually and combined) also pass
+under an oblique camera. On Chrome 157 / SwiftShader with 45 warmup frames and
+three 180-frame trials, one optimized shader-path run measured p95 work of
+4.7/4.9/7.9 ms for 1/8/32 spheres; sampled JS heap peaks were 1.96/2.65/3.70
+MiB and maximum frame times were 5.4/8.6/9.3 ms. A hardware-
+required run on Chrome 157 / NVIDIA GeForce RTX 5070 Ti confirmed impostor-path
+use and passed all configured budgets: p95 call duration was 0.2/0.3/0.3 ms, JS
+heap peaks were 1.47/1.64/1.96 MiB, and maximum call durations were 0.7/1.3/0.9
+ms. These are CPU-side `anvil_frame` call times and `performance.memory` JS heap
+readings; asynchronous WebGL GPU execution time is measured separately by the
+opt-in timer-query mode below. Later SwiftShader runs were variable and missed
+the 8- and 32-sphere p95 budgets and some maximum-call budgets. The harness
+checks that `EXT_frag_depth` and the actual impostor import path are active.
+These measurements do not replace the tessellation fallback baseline.
+
+![Earlier Chrome capture of the tessellation fallback](screenshots/ray_sphere_wasm.png)
+
+The reviewed 960×600 Chrome 157 / SwiftShader capture shows a round outer
+silhouette at this scale, with polygon facets in the tessellation fallback.
+The WebGL impostor removes the facets in the browser path. Overlapping-sphere
+C/Chrome image comparisons under default and oblique cameras, depth-order checks
+in both submission orders, an isolated occluder-shadow check, and sphere
+lighting checks for custom direction, ambient, intensity, and their combined
+settings under an oblique camera pass. A wider camera, lighting and shadow
+parity matrix remains open. Hardware-required 1/8/32 CPU-side call-time and
+JS-heap budgets passed; opt-in timer queries on Chrome 157 / NVIDIA RTX 5070 Ti
+measured sphere-draw GPU p95 at 0.0071 / 0.0080 / 0.0125 ms, with rare ~0.18 ms
+query maxima for 8 and 32 spheres. Timer queries cover only the sphere draw,
+not full presentation latency; SwiftShader results varied across runs.
 
 `model_draw(...)` and `ray_mesh(...)` are supported in `scene 3d` for static
 and animated unskinned models, including morph targets. Per-group glTF defaults
@@ -223,7 +267,8 @@ share a 16,384-triangle frame budget across
 static and animated submissions; each call is accepted whole or rejected before
 triangle submission. The Node and `?painter=1` fallbacks sort
 triangles and can show intersections. The browser path has no mesh BVH or
-ray-traced shadows; skinned `ray_mesh` remains a located unsupported case.
+ray-traced shadows; skinned `ray_mesh` uses the same animated skin transform
+and triangle budget as skinned `model_draw`.
 
 `tests/test_wasm_browser_parity.py` renders a static morphing GLTF and an
 animated-morph ray mesh through the C/Win32 and wasm/Chrome paths, then compares
@@ -240,7 +285,9 @@ comparison passes. A second crossing-depth fixture draws two tilted GLTF quads
 through `model_draw` in both orders and also passes the C/Chrome RGBA thresholds.
 An animated half-weight skinned model crossing a rotated GLTF mesh is also
 compared in both submission orders; C and Chrome output is order-independent and
-meets the visible-pixel parity thresholds.
+meets the visible-pixel parity thresholds. A separate oblique-camera fixture
+compares animated skinned WASM `ray_mesh` against C `model_draw`; its silhouette
+and visible-color metrics meet the skinned model thresholds.
 The animated+morphed ray-mesh comparison uses an offset, oblique camera. These
 fixtures do not establish parity across every camera, lighting setting,
 primitive combination, or crossing-depth scene.
@@ -287,8 +334,25 @@ Anvil runtime error in fn(update) at line 6: Anvil chr out of range
 ```
 
 `program.map.json` retains the function-to-declaration map for raw traps and
-unmapped wasm frames. Statement-level locations cover Anvil runtime errors;
-they are not a DWARF debugger or a mapping for arbitrary machine instructions.
+unmapped wasm frames. Statement-level locations cover Anvil runtime errors.
+
+For instruction-address-to-source-line mappings, build a linked module with
+`--backend wasm --debug-info`. The compiler emits C `#line` directives for each
+Anvil statement and Clang stores the resulting DWARF line tables in the WASM
+module's `.debug_line` sections. `llvm-objdump --source --line-numbers
+--disassemble program.wasm` can inspect those address-to-line mappings. To
+browse the authored `.ANVL` file and set source-line breakpoints, install
+Chrome's C/C++ DevTools Support (DWARF) extension described in the
+[official setup guide](https://developer.chrome.com/docs/devtools/wasm), and
+keep the source available at the recorded path. Without that extension, use
+`llvm-objdump` to inspect the embedded address-to-line table. `--debug-info` is
+WASM-only and increases module size; it is off by default. It adds line tables,
+not Anvil variable/type information. The
+existing `.map.json` remains the runtime error fallback for the Node host and
+raw traps. On Windows x64 with LLVM 23.1.4, the same minimal `fn(main)` / `say
+42` program measured 10,264 bytes without debug info and 73,865 bytes with it;
+sizes vary by program and toolchain. Debug modules record source paths, so keep
+them as development artifacts when those paths should not be published.
 
 ## Images
 
@@ -323,15 +387,18 @@ additions it needed were `isfinite` and `hypot`. The capability matrix's
 
 ## Music
 
-One looping track per build, like the desktop streaming player, with one
-difference worth stating plainly: the browser build cannot stream from disk
-without an async fetch contract, and the music API is synchronous, so the track
-is decoded at build time and baked into the module (16 MiB of samples, PCM WAV
-mono/stereo, 8/16-bit, 8,000-192,000 Hz). `music_length()` is the decoded
-duration, `music_position()` comes from the host's audio clock and wraps on a
-looping track, and `music_stop` stops and resets the source. A computed path
-cannot be baked and reports that through `music_error()`; a missing file is a
-located build error.
+One looping track per build. The WAV is copied beside the generated HTML into
+`<output>_assets/` and streamed by an `HTMLAudioElement`; its samples are not
+decoded or embedded in the WASM module. Serve the HTML, module, and asset folder
+from the same origin so the browser can fetch the sidecar. Supported tracks are
+PCM WAV mono/stereo, 8/16-bit, 8,000-192,000 Hz. The path must be a literal
+`music_load("...")`; a missing or unsupported file is a located build error.
+`music_length()` uses the WAV metadata, `music_position()` reads the media
+element's playback clock, and `music_stop` stops and resets it. Browser autoplay
+rules still apply, so start music from a user gesture when the page blocks
+automatic playback. Node's recording host records the stream request but does
+not play audio; `--emit-c` also does not copy the sidecar because it does not
+produce a linked browser build.
 
 ## Saves
 
@@ -386,22 +453,27 @@ identical.
   value is not an exact mathematical pole.
 - Audio uses Web Audio; browser saves use IndexedDB when available and fall
   back to `localStorage` when it is not. `tan` is available. IndexedDB, audio,
-  and trigonometry support do not imply full platform parity: instruction-level
-  source maps and true streaming music remain open browser-target work.
+  and trigonometry support do not imply full platform parity: Chrome DevTools
+  authored-source lookup/breakpoints for the opt-in DWARF maps still need
+  interactive verification with the C/C++ DWARF extension, and streaming music
+  uses a same-origin WAV sidecar.
 - Only literal `image_load()` paths are baked; computed asset paths cannot be
   resolved by the browser build. 4-bit BMPs are supported.
 - 3D uses WebGL with a depth buffer when available; Node and `?painter=1` use
   painter sorting and can show intersection artifacts. The browser supports
-  static and animated unskinned `model_draw`, `model_draw_instance` and `ray_mesh`, including morph
-  targets through the depth-tested triangle path, plus overhead shadows and tessellated
-  `ray_sphere`; both model APIs share the 16,384-triangle frame budget.
-  Skinned `ray_mesh` and textured geometry remain unsupported in wasm; skinned
-  `model_draw` supports one skin with up to 64 joints. Static morph groups use
+  static and animated `model_draw` and `ray_mesh` with morph targets and one
+  skin of up to 64 joints through the depth-tested triangle path. The separate
+  `model_draw_instance` API supports unskinned morph targets. The WebGL
+  `ray_sphere` impostor path has C/Chrome camera, depth-order, lighting and
+  shadow parity fixtures, plus measured hardware CPU/heap/GPU budgets and
+  variable SwiftShader runs. The checked-in screenshot remains a tessellation
+  fallback capture. Both model APIs share the 16,384-triangle frame budget.
+  Static morph groups use
   conservative per-group bounds spanning default weights and all 0–1 target
   overrides, and skip fully offscreen groups when mesh culling is enabled.
 - `chr` writes `Anvil chr out of range` to stderr and traps out of range, the
   same exit the C runtime gives; the Node host exits 1 and the page throws.
 - Text helpers truncate counts toward zero and clamp to the string length, the
   same as the C runtime; `char` returns empty text for out-of-range indexes.
-- `anvil_frame(delta_ms)` advances `time()` and `delta()`; unskinned model clips
+- `anvil_frame(delta_ms)` advances `time()` and `delta()`; model clips
   are sampled when `model_draw` or `ray_mesh` is submitted.

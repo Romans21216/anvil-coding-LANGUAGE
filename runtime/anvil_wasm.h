@@ -273,7 +273,9 @@ const char *anvil_sound_error(void);
 /* One music track, baked into the module by the compiler. */
 typedef struct {
   const char *path;
+  const char *stream_url;
   int channels, rate, frames;
+  double duration;
   const short *pcm;
 } AnvilWasmMusic;
 

@@ -21,9 +21,9 @@ class WasmDocsTests(unittest.TestCase):
         self.assertIn("share a 16,384-triangle frame budget across\nstatic and animated submissions", document)
         self.assertIn("`model_morph(path,index,weight)` overrides that target", document)
         self.assertIn("static\nand animated unskinned models", document)
-        self.assertIn("supports one skin with up to 64 joints", document)
-        self.assertIn("skinned `ray_mesh` receives a located diagnostic", document)
-        self.assertIn("unskinned model clips\n  are sampled", document)
+        self.assertIn("Both APIs support\none skin with up to 64 joints", document)
+        self.assertIn("A separate oblique-camera fixture\ncompares animated skinned WASM `ray_mesh`", document)
+        self.assertIn("model clips\n  are sampled", document)
         self.assertIn("`light(x,y,z)` vector points toward the light", document)
         self.assertIn("`light_ambient(level)`\nsets the 0–1 floor", document)
         self.assertIn("light, ambient and intensity setting", document)
@@ -38,11 +38,18 @@ class WasmDocsTests(unittest.TestCase):
         self.assertNotIn("No Web Audio, IndexedDB", limits)
         self.assertNotIn("`tan`, `asin`, `acos` and `atan` are not available", limits)
         self.assertNotIn("4-bit BMPs are not supported", limits)
+        self.assertIn("music uses a streamed", document)
+        self.assertIn("one literal PCM WAV track streamed from a same-origin sidecar", document)
+        self.assertNotIn("streaming music is not there yet", document)
 
     def test_runtime_diagnostics_describe_statement_level_locations(self) -> None:
         document = (ROOT / "docs" / "WASM.md").read_text(encoding="utf-8")
         self.assertIn("active Anvil function and statement line", document)
-        self.assertIn("not a DWARF debugger", document)
+        self.assertIn("`--backend wasm --debug-info`", document)
+        self.assertIn("DWARF line tables", document)
+        self.assertIn("authored `.ANVL` file and set source-line breakpoints", document)
+        self.assertIn("C/C++ DevTools Support (DWARF) extension", document)
+        self.assertIn("function-to-declaration map", document)
         self.assertNotIn("This is a function-level map, not instruction-level", document)
 
 

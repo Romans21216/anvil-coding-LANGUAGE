@@ -172,9 +172,25 @@ class MemoryBudgetTests(unittest.TestCase):
         budgets = json.loads(BUDGETS.read_text(encoding="utf-8"))
         self.assertGreater(budgets["compile_peak_mb"], 100.0)
         scenes = budgets["run_peak_mb"]
-        for name in ("idle_2d", "overdraw_2d", "text_ui", "particles_2d", "cubes_3d", "audio", "network"):
+        expected = set(bench_memory.SCENES) | {
+            bench_memory.ASSET_SCENE,
+            bench_memory.AUDIO_SCENE,
+            bench_memory.NETWORK_SCENE,
+        }
+        for name in expected:
             self.assertIn(name, scenes)
             self.assertGreater(scenes[name], 10.0)
+
+    def test_ray_mesh_memory_scenes_stage_their_glb_inputs(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            for name, (source_name, target_name) in bench_memory.RAY_MESH_ASSETS.items():
+                with self.subTest(scene=name):
+                    bench_memory.write_scene_assets(name, root)
+                    self.assertEqual(
+                        (root / target_name).read_bytes(),
+                        (ROOT / "examples" / source_name).read_bytes(),
+                    )
 
 
 if __name__ == "__main__":

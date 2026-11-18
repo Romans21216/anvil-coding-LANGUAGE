@@ -8,6 +8,7 @@ import { setTimeout as delay } from "node:timers/promises";
 const root = path.resolve(process.argv[2] || ".");
 const page = process.argv[3] || "program.html";
 const captureFrames = Number.parseInt(process.env.ANVIL_WASM_CAPTURE_FRAMES || "1", 10);
+const requireSphereImpostor = process.env.ANVIL_REQUIRE_SPHERE_IMPOSTOR === "1";
 if (!Number.isInteger(captureFrames) || captureFrames < 1 || captureFrames > 60)
   throw new Error("ANVIL_WASM_CAPTURE_FRAMES must be between 1 and 60");
 const chromePath = process.env.CHROME_PATH || "C:/Program Files/Google/Chrome/Application/chrome.exe";
@@ -98,7 +99,7 @@ try {
   }
   if (!devtoolsPort) throw new Error("Chrome did not create a readable DevTools port file");
   await pollJson(`http://127.0.0.1:${devtoolsPort}/json/version`);
-  const url = `http://127.0.0.1:${server.address().port}/${encodeURIComponent(page)}`;
+  const url = `http://127.0.0.1:${server.address().port}/${encodeURIComponent(page)}${requireSphereImpostor ? "?anvil_debug=1" : ""}`;
   const response = await fetch(`http://127.0.0.1:${devtoolsPort}/json/new?${url}`, { method: "PUT" });
   if (!response.ok) throw new Error(`Chrome page creation failed: ${response.status}`);
   const cdp = await connect(await response.json());
@@ -138,11 +139,13 @@ try {
       let binary = '';
       for (let start = 0; start < packed.length; start += 8192)
         binary += String.fromCharCode(...packed.subarray(start, start + 8192));
-      return { width: 960, height: 600, mask: btoa(binary), rgba: frames[frames.length - 1], frames };
+      return { width: 960, height: 600, mask: btoa(binary), rgba: frames[frames.length - 1], frames, sphere_impostor_available: !!window.__anvilSphereImpostorAvailable, sphere_impostor_calls: window.__anvilSphereImpostorCalls ?? 0 };
     })()` ,
     returnByValue: true,
   });
   if (evaluated.exceptionDetails) throw new Error(JSON.stringify(evaluated.exceptionDetails));
+  if (requireSphereImpostor && (!evaluated.result.value.sphere_impostor_available || evaluated.result.value.sphere_impostor_calls === 0))
+    throw new Error("The host did not select the WebGL sphere-impostor path");
   process.stdout.write(JSON.stringify(evaluated.result.value) + "\n");
   cdp.ws.close();
 } finally {

@@ -10,9 +10,11 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CLI = ROOT / "compiler" / "anvil.py"
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from compiler import expressions  # noqa: E402
 from compiler.verify import MODEL_CALLS, _asset_calls  # noqa: E402
+from test_gltf_model import write_glb  # noqa: E402
 
 
 def run_verify(source: pathlib.Path, *args: str) -> subprocess.CompletedProcess:
@@ -211,6 +213,27 @@ class VerifyCommandTests(unittest.TestCase):
             diagnostic = json.loads(result.stdout)["diagnostics"][0]
             self.assertEqual(diagnostic["asset"], "bad.bmp")
             self.assertIn("not a BMP", diagnostic["message"])
+
+    def test_nested_project_verify_resolves_embedded_glb_from_manifest_root(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
+            root = pathlib.Path(temporary)
+            (root / "src").mkdir()
+            models = root / "models"
+            models.mkdir()
+            write_glb(models, "quad.glb", (1.0, 0.0, 0.0))
+            (root / "src" / "main.ANVL").write_text(
+                'scene 3d\nfn(draw)\n'
+                '  set var(ok) = model_draw("models/quad.glb", 0, 0, 0, 1, 0, 0, 0)\n'
+                "end\n",
+                encoding="utf-8",
+            )
+            manifest = root / "game.ANVLproj"
+            manifest.write_text('entry = "src/main.ANVL"\n', encoding="utf-8")
+            result = run_verify(manifest, "--format", "json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        report = json.loads(result.stdout)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["diagnostics"], [])
 
 
 if __name__ == "__main__":

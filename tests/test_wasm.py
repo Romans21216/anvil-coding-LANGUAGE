@@ -17,12 +17,26 @@ HOST = ROOT / "tools" / "wasm_host.mjs"
 NEEDS = shutil.which("clang") and shutil.which("node") and shutil.which("wasm-ld")
 
 
-def build(root: pathlib.Path, source_text: str, name: str = "program.ANVL"):
+def build(
+    root: pathlib.Path,
+    source_text: str,
+    name: str = "program.ANVL",
+    extra_args: tuple[str, ...] = (),
+):
     source = root / name
     source.write_text(source_text, encoding="utf-8")
     out = root / "program.wasm"
     result = subprocess.run(
-        [sys.executable, str(COMPILER), str(source), "--backend", "wasm", "-o", str(out)],
+        [
+            sys.executable,
+            str(COMPILER),
+            str(source),
+            "--backend",
+            "wasm",
+            "-o",
+            str(out),
+            *extra_args,
+        ],
         capture_output=True,
         text=True,
         timeout=180,
@@ -36,6 +50,44 @@ def run_wasm(path: pathlib.Path) -> subprocess.CompletedProcess:
     )
 
 
+class WasmDebugInfoOptionTests(unittest.TestCase):
+    def test_debug_info_rejects_non_wasm_backend(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            source = pathlib.Path(temp) / "program.ANVL"
+            source.write_text("fn(main)\nend\n", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(COMPILER), str(source), "--debug-info"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--debug-info applies only to --backend wasm", result.stderr)
+
+    def test_debug_info_requires_a_linked_wasm_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            source = root / "program.ANVL"
+            source.write_text("fn(main)\nend\n", encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(COMPILER),
+                    str(source),
+                    "--backend",
+                    "wasm",
+                    "--debug-info",
+                    "--emit-c",
+                    str(root / "generated.c"),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("--debug-info requires a linked WASM output", result.stderr)
+
+
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmBuildTests(unittest.TestCase):
     def test_hello_prints_numbers_and_text(self) -> None:
@@ -47,12 +99,52 @@ class WasmBuildTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(out.is_file())
             self.assertGreater(out.stat().st_size, 500)
+            self.assertNotIn(b".debug_line", out.read_bytes())
             page = out.with_suffix(".html")
             self.assertTrue(page.is_file(), "a host page should be generated")
             self.assertIn("program.wasm", page.read_text(encoding="utf-8"))
             run = run_wasm(out)
             self.assertEqual(run.returncode, 0, run.stderr)
             self.assertEqual(run.stdout, "hello from wasm\n42\n")
+
+    def test_debug_info_contains_dwarf_lines_mapped_to_anvil_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = pathlib.Path(temp)
+            source_text = "fn(main)\n  say 42\nend\ncall fn(main)\n"
+            result, out = build(
+                root,
+                source_text,
+                name="program with spaces.ANVL",
+                extra_args=("--debug-info",),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            generated = (root / ".anvil-cache" / "program.wasm.c").read_text(
+                encoding="utf-8"
+            )
+            source = root / "program with spaces.ANVL"
+            self.assertIn(
+                f"#line 2 {json.dumps(str(source.resolve()))}", generated
+            )
+            module = out.read_bytes()
+            self.assertIn(b".debug_line", module)
+            self.assertIn(source.name.encode("utf-8"), module)
+            objdump = shutil.which("llvm-objdump")
+            if objdump:
+                lines = subprocess.run(
+                    [objdump, "--source", "--line-numbers", "--disassemble", str(out)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                self.assertEqual(lines.returncode, 0, lines.stderr)
+                self.assertIn(f"{source.resolve()}:2", lines.stdout)
+                self.assertIn("say 42", lines.stdout)
+
+            function_map = json.loads(
+                out.with_suffix(".map.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(function_map["anvil_main"], {"name": "main", "line": 1})
 
     def test_strings_arrays_loops_and_calls(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -1248,7 +1340,7 @@ class WasmScene3DTests(unittest.TestCase):
 
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from test_gltf_model import write_quad  # noqa: E402
+from test_gltf_model import write_glb, write_quad  # noqa: E402
 from test_gltf_morph import (  # noqa: E402
     write_morph_glb,
     write_morph_model,
@@ -1260,6 +1352,36 @@ from test_gltf_skins import write_skinned_model  # noqa: E402
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmModelTests(unittest.TestCase):
+    def test_static_glb_model_draw_reaches_the_wasm_renderer(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            write_glb(root, "quad.glb", (1.0, 0.0, 0.0))
+            program = "\n".join(
+                (
+                    "scene 3d",
+                    "camera perspective 0 0 5",
+                    "camera fov(60)",
+                    "fn(draw)",
+                    '  set var(ok) = model_draw("quad.glb", 0, 0, 0, 1, 0, 0, 0)',
+                    "end",
+                    "",
+                )
+            )
+            result, output = build(root, program, "static_glb.ANVL")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(output)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            records = json.loads(run.stdout.strip().splitlines()[-1])
+            summaries = [record for record in records if record[0] == "triangles"]
+            self.assertEqual(len(summaries), 1)
+            self.assertEqual(summaries[0][1], 2, "the embedded GLB quad has two triangles")
+
     def test_instance_capacity_matches_c_and_recovers_after_destroy(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
@@ -1416,41 +1538,43 @@ class WasmModelTests(unittest.TestCase):
             [],
         )
 
-    def test_skinned_model_draw_obeys_the_shared_triangle_budget(self) -> None:
+    def test_skinned_model_draw_and_ray_mesh_obey_the_shared_triangle_budget(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             write_skinned_model(root, "skin.gltf", with_clip=False)
-            program = "\n".join(
-                (
-                    "scene 3d",
-                    "camera perspective 0 0 12",
-                    "set var(ok) = 1",
-                    "fn(draw)",
-                    "  for local(i) = 1 to 16385",
-                    '    set var(ok) = model_draw("skin.gltf", 0, 0, 0, 1, 0, 0, 0)',
-                    "  end",
-                    "  say var(ok)",
-                    "end",
-                    "",
+            for draw in ("model_draw", "ray_mesh"):
+                program = "\n".join(
+                    (
+                        "scene 3d",
+                        "camera perspective 0 0 12",
+                        "set var(ok) = 1",
+                        "fn(draw)",
+                        "  for local(i) = 1 to 16385",
+                        f'    set var(ok) = {draw}("skin.gltf", 0, 0, 0, 1, 0, 0, 0)',
+                        "  end",
+                        "  say var(ok)",
+                        "end",
+                        "",
+                    )
                 )
-            )
-            result, out = build(root, program, "skinned_model_budget")
-            self.assertEqual(result.returncode, 0, result.stderr)
-            run = subprocess.run(
-                ["node", str(HOST), "--record", str(out)],
-                capture_output=True,
-                text=True,
-                timeout=90,
-                env={**os.environ, "ANVIL_WASM_FRAMES": "2"},
-            )
-            self.assertEqual(run.returncode, 0, run.stderr)
-            lines = run.stdout.strip().splitlines()
-            self.assertEqual(
-                lines[:2], ["0", "0"], "the over-budget skinned draw is refused per frame"
-            )
-            records = json.loads(lines[-1])
-            triangles = [record for record in records if record[0] == "triangles"]
-            self.assertEqual([record[1] for record in triangles], [16384, 16384])
+                result, out = build(root, program, f"skinned_{draw}_budget")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                run = subprocess.run(
+                    ["node", str(HOST), "--record", str(out)],
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    env={**os.environ, "ANVIL_WASM_FRAMES": "2"},
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                lines = run.stdout.strip().splitlines()
+                self.assertEqual(
+                    lines[:2], ["0", "0"],
+                    f"the over-budget skinned {draw} is refused per frame",
+                )
+                records = json.loads(lines[-1])
+                triangles = [record for record in records if record[0] == "triangles"]
+                self.assertEqual([record[1] for record in triangles], [16384, 16384])
 
     def test_skinned_model_draw_samples_joint_animation_and_weights(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
@@ -1462,6 +1586,7 @@ class WasmModelTests(unittest.TestCase):
                 animation_time: float | None,
                 weights: tuple[float, float] = (1.0, 0.0),
                 joints: int = 1,
+                draw: str = "model_draw",
             ) -> list:
                 model_dir = root / name
                 model_dir.mkdir()
@@ -1482,7 +1607,7 @@ class WasmModelTests(unittest.TestCase):
                     )
                 statements.extend(
                     (
-                        f'  set var(ok) = model_draw("{asset}", 0, 0, 0, 1, 0, 0, 0)',
+                        f'  set var(ok) = {draw}("{asset}", 0, 0, 0, 1, 0, 0, 0)',
                         "end",
                         "",
                     )
@@ -1502,12 +1627,16 @@ class WasmModelTests(unittest.TestCase):
 
             bind_pose = capture("bind_pose", animation_time=None)
             fully_weighted = capture("full_weight", animation_time=0.5)
+            skinned_ray_mesh = capture(
+                "ray_mesh", animation_time=0.5, draw="ray_mesh"
+            )
             half_weighted = capture(
                 "half_weight", animation_time=0.5, weights=(0.5, 0.5), joints=2
             )
 
         full_shift = fully_weighted[2] - bind_pose[2]
         half_shift = half_weighted[2] - bind_pose[2]
+        self.assertEqual(skinned_ray_mesh, fully_weighted)
         self.assertGreater(full_shift, 30, (bind_pose, fully_weighted))
         self.assertAlmostEqual(half_shift / full_shift, 0.5, delta=0.12)
 
@@ -2006,12 +2135,26 @@ _MUSIC_PROGRAM = "\n".join(
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmMusicTests(unittest.TestCase):
-    def test_a_baked_track_plays_and_reports_its_length(self) -> None:
+    def test_a_streamed_track_reports_its_length_and_uses_sidecar_url(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
             _write_tone(root / "song.wav", frames=1600)
             result, out = build(root, _MUSIC_PROGRAM)
             self.assertEqual(result.returncode, 0, result.stderr)
+            sidecars = list(root.glob("program_assets/music-*.wav"))
+            self.assertEqual(len(sidecars), 1)
+            self.assertEqual(sidecars[0].read_bytes(), (root / "song.wav").read_bytes())
+            generated = (root / ".anvil-cache" / "program.wasm.c").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('"program_assets/music-', generated)
+            self.assertIn(", NULL};", generated)
+            self.assertNotIn("anvil_baked_music_pcm", generated)
+            page = out.with_suffix(".html").read_text(encoding="utf-8")
+            self.assertIn("new Audio()", page)
+            self.assertIn("createMediaElementSource(audio)", page)
+            self.assertIn('audio.preload = "metadata"', page)
+            self.assertIn("music_stream(urlPointer, duration, volume, loop)", page)
             run = subprocess.run(
                 ["node", str(HOST), "--record", str(out)],
                 capture_output=True,
@@ -2023,7 +2166,11 @@ class WasmMusicTests(unittest.TestCase):
             lines = run.stdout.strip().splitlines()
             self.assertEqual(lines[:6], ["1", "0.2", "1", "1", "0.5", "0"])
             ops = json.loads(lines[-1])
-            self.assertIn(["music_play", 1600, 1, 8000, 1, 1], ops)
+            stream_ops = [op for op in ops if op[0] == "music_stream"]
+            self.assertEqual(len(stream_ops), 1)
+            self.assertEqual(stream_ops[0][1], sidecars[0].relative_to(root).as_posix())
+            self.assertAlmostEqual(stream_ops[0][2], 0.2)
+            self.assertEqual(stream_ops[0][3:], [1, 1])
             self.assertIn(["music_volume", 0.5], ops)
 
     def test_a_missing_track_is_a_located_build_error(self) -> None:

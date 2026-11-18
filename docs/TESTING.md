@@ -192,7 +192,7 @@ remote desktop can prevent window creation:
   backend, typed saves across separate Node runs, text helpers, `ord`/`chr`, `noise`/`fbm`, the `chr` failure path
   compared against the C backend, baked sprites and atlas regions through
   recorded draw streams, baked sounds through recorded play ops including loop, pan, pitch and group routing,
-  3D cubes/planes/spheres, baked glTF models, shadows and culling through
+  3D cubes/planes/spheres, baked glTF models (including skinned `ray_mesh`), shadows and culling through
   recorded triangle summaries, a baked music track through recorded music ops, source-mapped traps, 2D physics parity against the C backend, the wasm scene-mode
   handshake, and a save round trip through the generated page's localStorage
   fallback store), checks the generated host

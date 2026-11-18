@@ -535,6 +535,11 @@ def main() -> int:
         help="select the C toolchain, the x64 PE backend, or the WebAssembly console target",
     )
     ap.add_argument(
+        "--debug-info",
+        action="store_true",
+        help="include DWARF line tables in a linked WASM module for source-level debugging",
+    )
+    ap.add_argument(
         "--extension",
         action="append",
         metavar="MANIFEST",
@@ -560,6 +565,9 @@ def main() -> int:
         help="backend the interactive shell uses (default: native)",
     )
     args = ap.parse_args()
+    if args.debug_info and args.backend != "wasm":
+        print("--debug-info applies only to --backend wasm", file=sys.stderr)
+        return 2
     if args.debug and args.release:
         print("--debug and --release contradict each other", file=sys.stderr)
         return 2
@@ -704,6 +712,9 @@ def main() -> int:
                 raise CompileError(
                     f"{args.source}: entry must resolve inside the project folder"
                 ) from exc
+        profile_gltf.set_asset_root(
+            project_root if manifest_path is not None else source_path.resolve().parent
+        )
         timings = (
             Timings(args.timings, args.profile_json)
             if args.timings or args.profile_json is not None
@@ -817,6 +828,8 @@ def main() -> int:
                 raise CompileError("--package does not apply to the wasm backend")
             out = args.output or source_path.with_suffix(".wasm")
             emit_path = args.emit_c or args.generated_c
+            if args.debug_info and emit_path:
+                raise CompileError("--debug-info requires a linked WASM output, not --emit-c")
 
             def wasm_timing_boundary(boundary: str) -> None:
                 if boundary == "generated":
@@ -839,6 +852,7 @@ def main() -> int:
                 project_name,
                 emit_c_path=pathlib.Path(emit_path) if emit_path else None,
                 phase_callback=wasm_timing_boundary,
+                debug_info=args.debug_info,
             )
             generated_c = (
                 pathlib.Path(emit_path)
@@ -1029,4 +1043,5 @@ def main() -> int:
         from compiler import wasm as profile_wasm
 
         profile_gltf.measure_import_time(False)
+        profile_gltf.reset()
         profile_wasm.measure_asset_imports(False)

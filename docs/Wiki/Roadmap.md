@@ -29,6 +29,7 @@ Implemented in the current prototype:
 6. Replace numeric UDP with versioned bounded messages and peer/session lifecycle before expanding online play.
 7. Extend the initial circle physics with polygons, 3D bodies, friction, joints, and spatial acceleration only alongside tests and examples.
 8. Benchmark actual compiler, frame, memory, and ray-tracing performance before making speed claims.
+9. Validate the WebGL `ray_sphere` sphere-impostor prototype for smooth, per-pixel silhouettes and depth; retain tessellation as the non-WebGL fallback, then gate completion on C/WASM camera/depth/shadow parity plus 1/8/32-sphere performance and memory checks.
 
 Every feature should have source tests, executable integration evidence where practical, updated references/examples, and a release note. Planned features must not be described as implemented.
 
