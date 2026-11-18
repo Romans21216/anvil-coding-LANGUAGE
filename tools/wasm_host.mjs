@@ -188,8 +188,30 @@ const imports = {
     triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
       triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
     },
-    textured_triangle(x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,pointer,width,height) {
-      texturedTriangles.push([x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,width,height]);
+    textured_triangle(pointer, count, pixels, width, height, layer) {
+      const source = new Float64Array(memory.buffer, pointer, count * 19);
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      let red = 0, green = 0, blue = 0;
+      for (let triangle = 0; triangle < count; triangle++) {
+        const base = triangle * 19;
+        for (const corner of [0, 5, 10]) {
+          const x = source[base + corner], y = source[base + corner + 1];
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+        red += source[base + 15];
+        green += source[base + 16];
+        blue += source[base + 17];
+      }
+      const color = count > 0
+        ? [Math.round(red / count), Math.round(green / count), Math.round(blue / count)]
+        : [0, 0, 0];
+      const batch = { count, minX, maxX, minY, maxY, width, height, layer, color };
+      texturedTriangles.push(batch);
+      ops.push(["textured_triangle_batch", count, minX, maxX, minY, maxY,
+        width, height, layer, ...color]);
     },
     sphere_impostor_available() {
       return 0;
@@ -225,12 +247,10 @@ const imports = {
           }
         }
         for (const t of texturedTriangles) {
-          for (const [x, y] of [[t[0], t[1]], [t[5], t[6]], [t[10], t[11]]]) {
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          }
+          if (t.minX < minX) minX = t.minX;
+          if (t.maxX > maxX) maxX = t.maxX;
+          if (t.minY < minY) minY = t.minY;
+          if (t.maxY > maxY) maxY = t.maxY;
         }
         // Colour variety alongside the bounds: a shaded sphere must not come
         // out as one flat tone, and a cast shadow shows up as a much darker
@@ -245,14 +265,14 @@ const imports = {
           if (luminance > brightest) brightest = luminance;
         }
         for (const t of texturedTriangles) {
-          const luminance = t[15] + t[16] + t[17];
-          tones.add(t[15] + "," + t[16] + "," + t[17]);
+          const luminance = t.color[0] + t.color[1] + t.color[2];
+          tones.add(t.color.join(","));
           if (luminance < darkest) darkest = luminance;
           if (luminance > brightest) brightest = luminance;
         }
         ops.push([
           "triangles",
-          triangles.length + texturedTriangles.length,
+          triangles.length + texturedTriangles.reduce((total, item) => total + item.count, 0),
           Math.round(minX),
           Math.round(maxX),
           Math.round(minY),

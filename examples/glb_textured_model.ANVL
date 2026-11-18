@@ -1,0 +1,12 @@
+# Run from the repository root:
+#   python compiler/anvil.py examples/glb_textured_model.ANVL --run
+language version 1
+scene 3d
+camera perspective 0 0 6
+camera fov(60)
+set var(camera) = camera_angle(20, -12)
+clear rgba(11, 16, 27, 255)
+
+fn(draw)
+  set var(model_visible) = model_draw("glb_textured_quad.glb", 0, 0, 0, 1, 0, 20, 0)
+end

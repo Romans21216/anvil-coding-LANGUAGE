@@ -292,6 +292,7 @@ async function start() {
     const scene3dState = { active: false };
     const pageParams = new URLSearchParams(location.search);
     const forcePainter = pageParams.has("painter");
+    const forceNoWebGL = pageParams.has("no_webgl");
     const skipSort = pageParams.has("nosort");
     const gpuTimerRequested = pageParams.get("anvil_gpu_timer") === "1";
     let gpuTimerExt = null;
@@ -300,6 +301,7 @@ async function start() {
     let glRenderer = null;
     const createGlRenderer = () => {
       if (glRenderer !== null) return glRenderer;
+      if (forceNoWebGL) return (glRenderer = false);
       try {
         const canvas = document.createElement("canvas");
         canvas.width = 960;
@@ -345,7 +347,8 @@ async function start() {
           "precision highp float; varying vec2 v_uv_depth; varying float v_inv_depth;" +
           "varying vec4 v_tint; uniform sampler2D image;" +
           "void main(){ vec2 uv=v_uv_depth/max(v_inv_depth,0.000001);" +
-          "vec4 texel=texture2D(image,vec2(uv.x,1.0-uv.y)); gl_FragColor=texel*v_tint; }"));
+          "vec4 texel=texture2D(image,vec2(uv.x,1.0-uv.y));" +
+          "vec4 colour=texel*v_tint; if(colour.a<=0.0) discard; gl_FragColor=colour; }"));
         gl.linkProgram(texturedProgram);
         if (!gl.getProgramParameter(texturedProgram, gl.LINK_STATUS)) {
           throw new Error(gl.getProgramInfoLog(texturedProgram));
@@ -438,7 +441,16 @@ async function start() {
           gl,
           program,
           texturedProgram,
+          texturedPos: gl.getAttribLocation(texturedProgram, "pos"),
+          texturedDepth: gl.getAttribLocation(texturedProgram, "depth"),
+          texturedUv: gl.getAttribLocation(texturedProgram, "uv"),
+          texturedTint: gl.getAttribLocation(texturedProgram, "tint"),
+          texturedImage: gl.getUniformLocation(texturedProgram, "image"),
           textureCache: new Map(),
+          texturedBuffers: new Map(),
+      texturedVertexPool: new Float32Array(0),
+      texturedVertexPoolIndex: 0,
+      texturedCurrentRun: null,
           pos: gl.getAttribLocation(program, "pos"),
           depth: gl.getAttribLocation(program, "depth"),
           colour: gl.getAttribLocation(program, "colour"),
@@ -462,6 +474,11 @@ async function start() {
       const renderer = createGlRenderer();
       if (!renderer) return false;
       const { canvas, gl } = renderer;
+      if (rendererDiagnostics) {
+        const stats = window.__anvilTexturedRendererStats ||
+          (window.__anvilTexturedRendererStats = { triangles: 0, batches: 0, buffer_allocations: 0, draw_calls: 0, uploaded_bytes: 0 });
+        stats.triangles += texturedList.reduce((total, item) => total + (item.batch ? item.count : 1), 0);
+      }
       gl.viewport(0, 0, 960, 600);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -497,8 +514,31 @@ async function start() {
         gl.deleteBuffer(buffer);
       };
       upload(list.filter((entry) => entry[13] !== 1), true);
+      const texturedBatches = [];
+      let texturedBatch = null;
       for (const entry of texturedList) {
-        const [x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,pointer,width,height] = entry;
+        if (entry.batch && entry.run) {
+          texturedBatches.push({ key: entry.run.key, entries: [entry], run: entry.run });
+          continue;
+        }
+        const layer = entry.batch ? entry.layer : entry[19];
+        const pointer = entry.batch ? entry.pointer : entry[20];
+        const width = entry.batch ? entry.width : entry[21];
+        const height = entry.batch ? entry.height : entry[22];
+        const cacheKey = pointer + ":" + width + ":" + height + ":" + layer;
+        if (!texturedBatch || texturedBatch.key !== cacheKey) {
+          texturedBatch = { key: cacheKey, entries: [] };
+          texturedBatches.push(texturedBatch);
+        }
+        texturedBatch.entries.push(entry);
+      }
+      for (const batch of texturedBatches) {
+        const entries = batch.entries;
+        const first = entries[0];
+        const pointer = first.batch ? first.pointer : first[20];
+        const width = first.batch ? first.width : first[21];
+        const height = first.batch ? first.height : first[22];
+        const triangleCount = batch.run ? batch.run.count : entries.reduce((total, item) => total + (item.batch ? item.count : 1), 0);
         const cacheKey = pointer + ":" + width + ":" + height;
         let texture = renderer.textureCache.get(cacheKey);
         if (!texture) {
@@ -522,22 +562,37 @@ async function start() {
         gl.useProgram(renderer.texturedProgram);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.uniform1i(gl.getUniformLocation(renderer.texturedProgram, "image"), 0);
-        const vertices = new Float32Array([
-          x1,y1,z1,u1,v1,r/255,g/255,b/255,a/255,
-          x2,y2,z2,u2,v2,r/255,g/255,b/255,a/255,
-          x3,y3,z3,u3,v3,r/255,g/255,b/255,a/255,
-        ]);
-        const buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
-        const stride = 9 * 4;
-        for (const [name, size, offset] of [["pos",2,0],["depth",1,2*4],["uv",2,3*4],["tint",4,5*4]]) {
-          const location = gl.getAttribLocation(renderer.texturedProgram, name);
-          gl.enableVertexAttribArray(location);
-          gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset);
+        gl.uniform1i(renderer.texturedImage, 0);
+        const vertices = batch.run
+          ? renderer.texturedVertexPool.subarray(batch.run.start * 27, (batch.run.start + batch.run.count) * 27)
+          : entries[0].vertices;
+        const bufferKey = batch.key;
+        let buffer = renderer.texturedBuffers.get(bufferKey);
+        if (!buffer) {
+          buffer = gl.createBuffer();
+          if (!buffer) continue;
+          renderer.texturedBuffers.set(bufferKey, buffer);
+          if (rendererDiagnostics) window.__anvilTexturedRendererStats.buffer_allocations += 1;
         }
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, triangleCount * 27), gl.DYNAMIC_DRAW);
+        if (rendererDiagnostics) {
+          const stats = window.__anvilTexturedRendererStats;
+          stats.batches += 1;
+          stats.draw_calls += 1;
+          stats.uploaded_bytes += triangleCount * 27 * Float32Array.BYTES_PER_ELEMENT;
+        }
+        const stride = 9 * 4;
+        gl.enableVertexAttribArray(renderer.texturedPos);
+        gl.vertexAttribPointer(renderer.texturedPos, 2, gl.FLOAT, false, stride, 0);
+        gl.enableVertexAttribArray(renderer.texturedDepth);
+        gl.vertexAttribPointer(renderer.texturedDepth, 1, gl.FLOAT, false, stride, 2 * 4);
+        gl.enableVertexAttribArray(renderer.texturedUv);
+        gl.vertexAttribPointer(renderer.texturedUv, 2, gl.FLOAT, false, stride, 3 * 4);
+        gl.enableVertexAttribArray(renderer.texturedTint);
+        gl.vertexAttribPointer(renderer.texturedTint, 4, gl.FLOAT, false, stride, 5 * 4);
         gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
-        gl.drawArrays(gl.TRIANGLES, 0, 3); gl.deleteBuffer(buffer);
+        gl.drawArrays(gl.TRIANGLES, 0, triangleCount * 3);
       }
       if (spheres.length && renderer.sphere) {
         const shader = renderer.sphere;
@@ -1115,10 +1170,65 @@ async function start() {
         return audioState.active;
       },
       triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
+        if (glRenderer && glRenderer !== false) glRenderer.texturedCurrentRun = null;
         triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
       },
-      textured_triangle(x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,pointer,width,height) {
-        texturedTriangles.push([x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,pointer,width,height]);
+      textured_triangle(pointer, count, pixels, width, height, layer) {
+        const source = new Float64Array(memory.buffer, pointer, count * 19);
+        const renderer = createGlRenderer();
+        let vertices;
+        if (renderer && !forcePainter) {
+          const current = renderer.texturedCurrentRun;
+          const key = pixels + ":" + width + ":" + height + ":" + layer;
+          if (!current || current.key !== key) {
+            renderer.texturedCurrentRun = { key, start: renderer.texturedVertexPoolIndex, count: 0 };
+          }
+          const run = renderer.texturedCurrentRun;
+          const needed = (renderer.texturedVertexPoolIndex + count) * 27;
+          let pool = renderer.texturedVertexPool;
+          if (pool.length < needed) {
+            const maximumFloats = Math.floor(48 * 1024 * 1024 / Float32Array.BYTES_PER_ELEMENT);
+            if (needed > maximumFloats) throw new Error("textured vertex pool budget exceeded");
+            let capacity = Math.max(27, pool.length);
+            while (capacity < needed) capacity = Math.min(maximumFloats, Math.max(capacity + 27, capacity * 2));
+            const grown = new Float32Array(capacity);
+            grown.set(pool.subarray(0, renderer.texturedVertexPoolIndex * 27));
+            pool = renderer.texturedVertexPool = grown;
+          }
+          vertices = pool;
+          let at = renderer.texturedVertexPoolIndex * 27;
+          for (let triangle = 0; triangle < count; triangle++) {
+            const base = triangle * 19;
+            for (const corner of [0, 5, 10]) {
+              vertices[at++] = source[base + corner]; vertices[at++] = source[base + corner + 1];
+              vertices[at++] = source[base + corner + 2]; vertices[at++] = source[base + corner + 3];
+              vertices[at++] = source[base + corner + 4]; vertices[at++] = source[base + 15] / 255;
+              vertices[at++] = source[base + 16] / 255; vertices[at++] = source[base + 17] / 255;
+              vertices[at++] = source[base + 18] / 255;
+            }
+          }
+          run.count += count;
+          renderer.texturedVertexPoolIndex += count;
+          if (texturedTriangles.length && texturedTriangles[texturedTriangles.length - 1].run === run) {
+            texturedTriangles[texturedTriangles.length - 1] = { batch: true, count: run.count, pointer: pixels, width, height, layer, run };
+          } else texturedTriangles.push({ batch: true, count: run.count, pointer: pixels, width, height, layer, run });
+          return;
+        }
+        if (!vertices || vertices.length !== count * 27) {
+          vertices = new Float32Array(count * 27);
+        }
+        let at = 0;
+        for (let triangle = 0; triangle < count; triangle++) {
+          const base = triangle * 19;
+          for (const corner of [0, 5, 10]) {
+            vertices[at++] = source[base + corner]; vertices[at++] = source[base + corner + 1];
+            vertices[at++] = source[base + corner + 2]; vertices[at++] = source[base + corner + 3];
+            vertices[at++] = source[base + corner + 4]; vertices[at++] = source[base + 15] / 255;
+            vertices[at++] = source[base + 16] / 255; vertices[at++] = source[base + 17] / 255;
+            vertices[at++] = source[base + 18] / 255;
+          }
+        }
+        texturedTriangles.push({ batch: true, vertices, count, pointer: pixels, width, height, layer });
       },
       sphere_impostor_available() {
         if (forcePainter || !scene3dState.active) return 0;
@@ -1162,10 +1272,49 @@ async function start() {
             }
             triangles.length = 0;
             for (const t of texturedTriangles) {
-              context.fillStyle = "rgba(" + t[15] + "," + t[16] + "," + t[17] + "," + (t[18] / 255) + ")";
-              context.beginPath(); context.moveTo(t[0], t[1]);
-              context.lineTo(t[5], t[6]); context.lineTo(t[10], t[11]);
-              context.closePath(); context.fill();
+              if (t.batch) {
+                for (let triangle = 0; triangle < t.count; triangle++) {
+                  const base = triangle * 27;
+                  const vertex = (corner) => base + corner * 9;
+                  const i0 = vertex(0), i1 = vertex(1), i2 = vertex(2);
+                  const points = [[t.vertices[i0], t.vertices[i0 + 1]],
+                    [t.vertices[i1], t.vertices[i1 + 1]],
+                    [t.vertices[i2], t.vertices[i2 + 1]]];
+                  const source = [[t.vertices[i0 + 3] * t.width, (1 - t.vertices[i0 + 4]) * t.height],
+                    [t.vertices[i1 + 3] * t.width, (1 - t.vertices[i1 + 4]) * t.height],
+                    [t.vertices[i2 + 3] * t.width, (1 - t.vertices[i2 + 4]) * t.height]];
+                  const [s0, s1, s2] = source;
+                  const det = s0[0] * (s1[1] - s2[1]) + s1[0] * (s2[1] - s0[1]) + s2[0] * (s0[1] - s1[1]);
+                  if (!Number.isFinite(det) || Math.abs(det) < 1e-8) continue;
+                  const affine = (axis) => {
+                    const [p0, p1, p2] = points.map((point) => point[axis]);
+                    const a = (p0 * (s1[1] - s2[1]) + p1 * (s2[1] - s0[1]) + p2 * (s0[1] - s1[1])) / det;
+                    const c = (p0 * (s2[0] - s1[0]) + p1 * (s0[0] - s2[0]) + p2 * (s1[0] - s0[0])) / det;
+                    const e = (p0 * (s1[0] * s2[1] - s2[0] * s1[1]) + p1 * (s2[0] * s0[1] - s0[0] * s2[1]) + p2 * (s0[0] * s1[1] - s1[0] * s0[1])) / det;
+                    return [a, c, e];
+                  };
+                  const [a, c, e] = affine(0), [b, d, f] = affine(1);
+                  const image = tintedSurface(t.pointer, t.width, t.height,
+                    Math.round(t.vertices[i0 + 5] * 255),
+                    Math.round(t.vertices[i0 + 6] * 255),
+                    Math.round(t.vertices[i0 + 7] * 255));
+                  const pattern = context.createPattern(image, "repeat");
+                  pattern.setTransform(new DOMMatrix([a, b, c, d, e, f]));
+                  context.save();
+                  context.beginPath(); context.moveTo(...points[0]);
+                  context.lineTo(...points[1]); context.lineTo(...points[2]);
+                  context.closePath();
+                  context.globalAlpha = Math.max(0, Math.min(1, t.vertices[i0 + 8]));
+                  context.fillStyle = pattern;
+                  context.fill();
+                  context.restore();
+                }
+              } else {
+                context.fillStyle = "rgba(" + t[15] + "," + t[16] + "," + t[17] + "," + (t[18] / 255) + ")";
+                context.beginPath(); context.moveTo(t[0], t[1]);
+                context.lineTo(t[5], t[6]); context.lineTo(t[10], t[11]);
+                context.closePath(); context.fill();
+              }
             }
             texturedTriangles.length = 0;
             for (const sphere of sphereImpostors) {
@@ -1179,6 +1328,10 @@ async function start() {
             }
             sphereImpostors.length = 0;
           }
+        }
+        if (glRenderer && glRenderer !== false) {
+          glRenderer.texturedVertexPoolIndex = 0;
+          glRenderer.texturedCurrentRun = null;
         }
         // The fade sits above everything the frame drew, including 3D.
         if (pendingFade > 0) {
@@ -1513,6 +1666,42 @@ MAX_BAKED_MUSIC_BYTES = 16 * 1024 * 1024
 
 MUSIC_LOAD = re.compile(r'music_load\(\s*"((?:\\.|[^"\\])*)"')
 
+_WAV_PCM_SUBFORMAT_GUID = bytes.fromhex("0100000000001000800000aa00389b71")
+
+
+def _wav_pcm_info(fmt: bytes, data_size: int) -> tuple[int, int, int, int]:
+    """Validate supported PCM format metadata and return channels/rate/frames/stride."""
+    if len(fmt) < 16:
+        raise ValueError("the file has no fmt or data chunk")
+    tag = int.from_bytes(fmt[0:2], "little")
+    channels = int.from_bytes(fmt[2:4], "little")
+    rate = int.from_bytes(fmt[4:8], "little")
+    byte_rate = int.from_bytes(fmt[8:12], "little")
+    block_align = int.from_bytes(fmt[12:14], "little")
+    bits = int.from_bytes(fmt[14:16], "little")
+    if tag == 0xFFFE:
+        if (len(fmt) < 40 or int.from_bytes(fmt[16:18], "little") < 22 or
+                int.from_bytes(fmt[18:20], "little") != bits or
+                fmt[24:40] != _WAV_PCM_SUBFORMAT_GUID):
+            raise ValueError("WAVE_FORMAT_EXTENSIBLE must contain PCM samples")
+    elif tag != 1:
+        raise ValueError("compressed WAVs are not supported (PCM only)")
+    if channels not in (1, 2):
+        raise ValueError("only mono or stereo WAVs are supported")
+    if bits not in (8, 16):
+        raise ValueError("only 8- or 16-bit PCM is supported")
+    if not 8000 <= rate <= 192000:
+        raise ValueError("the sample rate is outside 8,000-192,000")
+    frame_bytes = channels * (bits // 8)
+    if byte_rate != rate * frame_bytes or block_align != frame_bytes:
+        raise ValueError("the WAV byte rate or block alignment does not match its format")
+    if data_size % frame_bytes:
+        raise ValueError("the WAV data size is not aligned to a complete sample frame")
+    frames = data_size // frame_bytes
+    if frames == 0:
+        raise ValueError("the WAV holds no samples")
+    return channels, rate, frames, frame_bytes
+
 
 def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
     """Decode a PCM WAV into (channels, rate, frames, interleaved int16)."""
@@ -1533,33 +1722,10 @@ def _wav_pcm(path: pathlib.Path) -> tuple[int, int, int, list[int]]:
             payload = body
         if fmt is not None and payload is not None:
             break
-    if fmt is None or payload is None or len(fmt) < 16:
+    if fmt is None or payload is None:
         raise ValueError("the file has no fmt or data chunk")
-    tag = int.from_bytes(fmt[0:2], "little")
-    channels = int.from_bytes(fmt[2:4], "little")
-    rate = int.from_bytes(fmt[4:8], "little")
+    channels, rate, frames, frame_bytes = _wav_pcm_info(fmt, len(payload))
     bits = int.from_bytes(fmt[14:16], "little")
-    if tag not in (1, 0xFFFE):
-        raise ValueError("compressed WAVs are not supported (PCM only)")
-    if tag == 0xFFFE and (
-        len(fmt) < 40 or int.from_bytes(fmt[24:28], "little") != 1
-    ):
-        raise ValueError("WAVE_FORMAT_EXTENSIBLE must contain PCM samples")
-    if channels not in (1, 2):
-        raise ValueError("only mono or stereo WAVs are supported")
-    if bits not in (8, 16):
-        raise ValueError("only 8- or 16-bit PCM is supported")
-    if not 8000 <= rate <= 192000:
-        raise ValueError("the sample rate is outside 8,000-192,000")
-    frame_bytes = channels * (bits // 8)
-    if (
-        int.from_bytes(fmt[8:12], "little") != rate * frame_bytes
-        or int.from_bytes(fmt[12:14], "little") != frame_bytes
-    ):
-        raise ValueError("the WAV byte rate or block alignment does not match its format")
-    frames = len(payload) // frame_bytes
-    if frames == 0:
-        raise ValueError("the WAV holds no samples")
     samples: list[int] = []
     for index in range(frames * channels):
         if bits == 8:
@@ -1600,24 +1766,9 @@ def _wav_stream_info(path: pathlib.Path) -> tuple[int, int, int]:
             elif chunk == b"data":
                 data_size = chunk_size
             position = chunk_end + (chunk_size & 1)
-        if fmt is None or data_size is None or len(fmt) < 16:
+    if fmt is None or data_size is None:
             raise ValueError("the file has no fmt or data chunk")
-    tag = int.from_bytes(fmt[0:2], "little")
-    channels = int.from_bytes(fmt[2:4], "little")
-    rate = int.from_bytes(fmt[4:8], "little")
-    bits = int.from_bytes(fmt[14:16], "little")
-    if tag not in (1, 0xFFFE):
-        raise ValueError("compressed WAVs are not supported (PCM only)")
-    if channels not in (1, 2):
-        raise ValueError("only mono or stereo WAVs are supported")
-    if bits not in (8, 16):
-        raise ValueError("only 8- or 16-bit PCM WAVs are supported")
-    if not 8000 <= rate <= 192000:
-        raise ValueError("the sample rate is outside 8,000-192,000")
-    frame_bytes = channels * (bits // 8)
-    frames = data_size // frame_bytes
-    if frames == 0:
-        raise ValueError("the WAV holds no samples")
+    channels, rate, frames, _frame_bytes = _wav_pcm_info(fmt, data_size)
     return channels, rate, frames
 
 

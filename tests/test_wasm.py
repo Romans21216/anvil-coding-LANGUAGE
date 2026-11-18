@@ -1352,6 +1352,80 @@ from test_gltf_skins import write_skinned_model  # noqa: E402
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmModelTests(unittest.TestCase):
+    def test_repeated_textured_glb_draws_record_independent_batches(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            shutil.copy2(ROOT / "examples" / "glb_textured_quad.glb", root / "quad.glb")
+            shutil.copy2(ROOT / "examples" / "glb_textured_quad.glb", root / "middle.glb")
+            program = "\n".join((
+                "scene 3d",
+                "camera perspective 0 0 6",
+                "camera fov(60)",
+                "fn(draw)",
+                '  set var(left) = model_draw("quad.glb", -1.25, 0, 0, 0.7, 0, 20, 0)',
+                '  set var(middle) = model_draw("middle.glb", 0, 0, 0, 0.7, 0, 20, 0)',
+                '  set var(right) = model_draw("quad.glb", 1.25, 0, 0, 0.7, 0, 20, 0)',
+                "end",
+                "",
+            ))
+            result, output = build(root, program, "repeated_textured_glb.ANVL")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(output)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            records = json.loads(run.stdout.strip().splitlines()[-1])
+        batches = [record for record in records if record[0] == "textured_triangle_batch"]
+        self.assertEqual(len(batches), 3)
+        self.assertEqual([record[1] for record in batches], [2, 2, 2])
+        self.assertTrue(all(all(isinstance(value, (int, float)) for value in record[2:]) for record in batches))
+        centers = [(record[2] + record[3]) / 2 for record in batches]
+        self.assertGreater(centers[1] - centers[0], 100, batches)
+        self.assertGreater(centers[2] - centers[1], 100, batches)
+        summaries = [record for record in records if record[0] == "triangles"]
+        self.assertEqual(summaries[0][1], 6)
+
+    def test_textured_material_run_budget_rejects_before_partial_model(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            asset = ROOT / "examples" / "glb_textured_quad.glb"
+            shutil.copy2(asset, root / "a.glb")
+            shutil.copy2(asset, root / "b.glb")
+            program = "\n".join((
+                "scene 3d",
+                "camera perspective 0 0 6",
+                "camera fov(60)",
+                "fn(draw)",
+                "  set var(last) = 0",
+                "  for local(i) = 1 to 128",
+                '    set var(last) = model_draw("a.glb", 0, 0, 0, 1, 0, 0, 0)',
+                '    set var(last) = model_draw("b.glb", 0, 0, 0, 1, 0, 0, 0)',
+                "  end",
+                '  set var(over) = model_draw("a.glb", 0, 0, 0, 1, 0, 0, 0)',
+                '  say "result " & var(last) & "," & var(over)',
+                "end",
+                "",
+            ))
+            result, output = build(root, program, "texture_runs.ANVL")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = subprocess.run(
+                ["node", str(HOST), "--record", str(output)],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={**os.environ, "ANVIL_WASM_FRAMES": "1"},
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            lines = run.stdout.strip().splitlines()
+            records = json.loads(lines[-1])
+        self.assertIn("result 1,0", lines)
+        batches = [record for record in records if record[0] == "textured_triangle_batch"]
+        self.assertEqual(len(batches), 256, "the 257th texture run is rejected before submission")
+
     def test_static_glb_model_draw_reaches_the_wasm_renderer(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)
@@ -2135,6 +2209,29 @@ _MUSIC_PROGRAM = "\n".join(
 
 @unittest.skipUnless(NEEDS, "clang, wasm-ld and node are required")
 class WasmMusicTests(unittest.TestCase):
+    def test_non_pcm_extensible_music_is_a_located_build_error(self) -> None:
+        import struct
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            guid = bytes.fromhex("0300000000001000800000aa00389b71")
+            fmt = (struct.pack("<HHIIHHHHI", 0xFFFE, 1, 16000, 32000,
+                               2, 16, 22, 16, 0) + guid)
+            samples = b"\x00\x00\x01\x00"
+            chunks = (b"fmt " + struct.pack("<I", len(fmt)) + fmt
+                      + b"data" + struct.pack("<I", len(samples)) + samples)
+            (root / "song.wav").write_bytes(
+                b"RIFF" + struct.pack("<I", 4 + len(chunks)) + b"WAVE" + chunks
+            )
+            result, out = build(
+                root,
+                'scene 2d\n\nfn(draw)\n  set var(m) = music_load("song.wav")\nend\n',
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('program.ANVL:4: music_load "song.wav"', result.stderr)
+            self.assertIn("WAVE_FORMAT_EXTENSIBLE must contain PCM samples", result.stderr)
+            self.assertFalse(out.exists())
+
     def test_a_streamed_track_reports_its_length_and_uses_sidecar_url(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             root = pathlib.Path(temp)

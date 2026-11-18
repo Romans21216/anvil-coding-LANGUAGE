@@ -21,12 +21,27 @@ container, 256 MiB per buffer, 64 MiB for decoded accessor data, 200,000
 triangles and 512 MiB of estimated generated geometry.
 
 The GLB path imports geometry, node transforms and supported material/vertex
-colours. Static unskinned `model_draw` calls on the C backend also render
-base-color PNG textures using `TEXCOORD_0`; images can be external, data-URI or
-embedded in a bufferView. Sampling uses nearest-neighbour filtering and REPEAT
-wrapping. WebAssembly `model_draw` and `ray_mesh`, plus C `ray_mesh`, still use
-`baseColorFactor` for textured models. `examples/glb_model.ANVL` shows the
+colours. `model_draw` calls on both C and WebAssembly render base-color PNG
+textures using `TEXCOORD_0` for static, animated, and skinned models; animated
+models can also use supported POSITION morph targets. Images can be external, data-URI or embedded
+in a bufferView. Sampling uses nearest-neighbour filtering and REPEAT wrapping.
+WebGL discards texels with zero combined alpha and source-over blends visible
+texels; visible fragments write depth, so partially transparent overlaps follow
+submission order. The C textured raster path uses the same alpha/depth policy.
+Textured WebAssembly triangles are clipped against the camera near plane with
+UVs interpolated at generated vertices, matching C. A browser parity regression
+covers visible, one-vertex/two-vertex crossing, fully-behind, UV-gradient and
+overlapping-depth cases. Static unskinned textured `ray_mesh` also samples the
+base-color PNG on C and WebAssembly; the wasm version uses the raster path,
+while C samples UVs at BVH ray hits. `examples/glb_model.ANVL` shows the
 `model_draw` path with the bundled `examples/ray_mesh.glb` asset.
+`examples/glb_textured_model.ANVL` renders `examples/glb_textured_quad.glb`, a
+self-contained GLB with an embedded PNG base-color texture, through the same
+API on both backends. `examples/glb_animated_textured_model.ANVL` shows an
+animated textured GLB using `model_animate` and `model_draw`.
+`examples/glb_skinned_textured_model.ANVL` demonstrates a skinned textured GLB.
+`examples/glb_textured_ray_mesh.ANVL` demonstrates static textured `ray_mesh`;
+`examples/glb_animated_textured_ray_mesh.ANVL` demonstrates the animated path.
 
 ```anvil
 scene 3d
@@ -54,14 +69,16 @@ around X, Y and Z. The order is scale, rotate, translate.
 | Positions | `POSITION` as VEC3 float |
 | Indices | ubyte/ushort/uint, or none (sequential) |
 | Colour | `COLOR_0` (averaged per triangle) or material `baseColorFactor` |
-| Base-color texture | Static unskinned `model_draw` on C and WebAssembly; PNG RGB/RGBA, `TEXCOORD_0`, REPEAT wrapping |
+| Base-color texture | `model_draw` on C and WebAssembly for static, animated, or skinned models; static and animated unskinned `ray_mesh` on both; PNG RGB/RGBA, `TEXCOORD_0`, REPEAT wrapping |
 | Animation | One clip; TRANSLATION/ROTATION/SCALE channels, `LINEAR` and `STEP` keys |
 | Skin | One skin, 1-64 joints, four influences per vertex, optional bind matrices |
 | Morph targets | Up to eight `POSITION` deltas, per-mesh default weights |
 | Budget | 200,000 triangles, checked at compile time |
 
-`ray_mesh` uses `baseColorFactor` for textured models. Textures on animated,
-skinned or morphed `model_draw` models are not supported yet.
+Skinned textured `ray_mesh` currently falls back to flat material color (and
+the C BVH backend does not accept skinned `ray_mesh`). Textured static,
+animated, and skinned models are supported through `model_draw`. Skinned meshes
+with morph targets remain unsupported.
 PNG textures must be non-interlaced 8-bit RGB/RGBA, use `TEXCOORD_0`, and use
 REPEAT wrapping; unsupported texture formats, UV sets, texture transforms or
 wrap modes produce a located compile error. `COLOR_0` multiplies texture RGB;
@@ -121,6 +138,10 @@ set var(ok) = model_draw("walk.gltf", 0, 0, 0, 1, 0, 0, 0)
   compile time.
 - A node that uses a `matrix` instead of TRS is decomposed into TRS; a matrix
   that collapses an axis is refused, because it cannot be posed.
+- Animated base-color PNG textures keep per-triangle UVs/material tint and are
+  posed with the same node hierarchy and morph weights before textured
+  submission. The existing near-plane clipping and texture filtering path is
+  used on both backends.
 - `model_animate(path, seconds)` stores that model's clip clock and returns it.
   The clock wraps at the clip length, so playback loops: a draw at exactly the
   length shows the first key. `model_animation_length(path)` is the length in
@@ -234,8 +255,11 @@ set var(ok) = model_draw("face.gltf", 0, 0, 0, 1, 0, 0, 0)
   `model_draw` and `ray_mesh` support static and animated unskinned morphs
   with per-group defaults and `model_morph` overrides. Skinned wasm
   `model_draw` and `ray_mesh` are supported; the C backend's skinned
-  `ray_mesh` remains unsupported. Both model APIs share the wasm 16,384-triangle frame
-  budget, with over-budget calls rejected before drawing.
+  `ray_mesh` remains unsupported. Untextured mesh APIs, static textured
+  `ray_mesh` and animated/skinned textured `model_draw` share the wasm
+  16,384-triangle frame budget. Static textured `model_draw` has a separate
+  200,000-triangle and 256-material-run per-frame budget, plus a 48 MiB
+  renderer staging pool; textured `ray_mesh` also uses the triangle cap.
 
 `tests/test_gltf_morph.py` measures ink: weight 1 moves the triangle the whole
 delta, 0.5 moves it half way, a mesh default of 1.0 is applied on the first

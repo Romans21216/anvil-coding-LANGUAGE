@@ -45,11 +45,8 @@ extern void anvil_host_triangle(double x1, double y1, double z1, double x2,
                                 int layer);
 __attribute__((import_module("env"), import_name("textured_triangle")))
 extern void anvil_host_textured_triangle(
-    double x1, double y1, double z1, double u1, double v1,
-    double x2, double y2, double z2, double u2, double v2,
-    double x3, double y3, double z3, double u3, double v3,
-    int red, int green, int blue, int alpha, int layer,
-    const uint32_t *pixels, int width, int height);
+    const double *vertices, int triangle_count,
+    const uint32_t *pixels, int width, int height, int layer);
 __attribute__((import_module("env"), import_name("sphere_impostor_available")))
 extern int anvil_host_sphere_impostor_available(void);
 __attribute__((import_module("env"), import_name("sphere_impostor")))
@@ -78,6 +75,67 @@ static int anvil_fixed_hz = 60;
 static int anvil_frame_depth;
 static int anvil_wasm_ray_mesh_triangles_frame;
 #define ANVIL_WASM_MODEL_TRIANGLE_BUDGET 16384
+#define ANVIL_WASM_TEXTURED_MODEL_TRIANGLE_BUDGET 200000
+static int anvil_wasm_textured_model_triangles_frame;
+#define ANVIL_WASM_TEXTURE_RUN_BUDGET 256
+static int anvil_wasm_texture_runs_frame;
+static const uint32_t *anvil_wasm_last_texture_pixels;
+static int anvil_wasm_last_texture_width, anvil_wasm_last_texture_height;
+#define ANVIL_WASM_TEXTURE_BATCH_TRIANGLES 16384
+static double anvil_wasm_texture_batch[ANVIL_WASM_TEXTURE_BATCH_TRIANGLES * 19];
+static int anvil_wasm_texture_batch_count;
+static int anvil_wasm_texture_batch_texture;
+static double anvil_wasm_animated_textured_data[
+    ANVIL_WASM_MODEL_TRIANGLE_BUDGET * 20];
+
+static void anvil_wasm_texture_batch_flush(
+    const uint32_t *const *textures, const int *texture_dimensions) {
+  if (anvil_wasm_texture_batch_count <= 0)
+    return;
+  int texture = anvil_wasm_texture_batch_texture;
+  anvil_host_textured_triangle(
+      anvil_wasm_texture_batch, anvil_wasm_texture_batch_count,
+      textures[texture], texture_dimensions[texture * 2],
+      texture_dimensions[texture * 2 + 1], 1);
+  anvil_wasm_texture_batch_count = 0;
+}
+
+static int anvil_wasm_texture_runs_preflight(
+    const double *data, int triangle_count,
+    const uint32_t *const *textures, const int *texture_dimensions,
+    int texture_count, int *runs_out, const uint32_t **last_pixels_out,
+    int *last_width_out, int *last_height_out) {
+  const uint32_t *last_pixels = anvil_wasm_last_texture_pixels;
+  int last_width = anvil_wasm_last_texture_width;
+  int last_height = anvil_wasm_last_texture_height;
+  int runs = 0;
+  for (int triangle = 0; triangle < triangle_count; ++triangle) {
+    int texture = (int)data[(size_t)triangle * 20 + 19];
+    if (texture < 0) {
+      last_pixels = NULL;
+      last_width = last_height = 0;
+      continue;
+    }
+    if (texture >= texture_count || !textures[texture])
+      continue;
+    const uint32_t *pixels = textures[texture];
+    int width = texture_dimensions[texture * 2];
+    int height = texture_dimensions[texture * 2 + 1];
+    if (pixels != last_pixels || width != last_width || height != last_height)
+      ++runs;
+    last_pixels = pixels;
+    last_width = width;
+    last_height = height;
+  }
+  if (runs > ANVIL_WASM_TEXTURE_RUN_BUDGET - anvil_wasm_texture_runs_frame)
+    return 0;
+  *runs_out = runs;
+  *last_pixels_out = last_pixels;
+  *last_width_out = last_width;
+  *last_height_out = last_height;
+  return 1;
+}
+
 #define ANVIL_WASM_MODEL_STATES 32
 #define ANVIL_WASM_MORPH_TARGETS 8
 #define ANVIL_WASM_MODEL_INSTANCES 64
@@ -324,8 +382,14 @@ void anvil_set_fixed_hz(int hz) { anvil_fixed_hz = hz; }
 void anvil_net_close(void) {}
 
 void anvil_frame_enter(void) {
-  if (anvil_frame_depth == 0)
+  if (anvil_frame_depth == 0) {
     anvil_wasm_ray_mesh_triangles_frame = 0;
+    anvil_wasm_textured_model_triangles_frame = 0;
+    anvil_wasm_texture_runs_frame = 0;
+    anvil_wasm_last_texture_pixels = NULL;
+    anvil_wasm_last_texture_width = 0;
+    anvil_wasm_last_texture_height = 0;
+  }
   anvil_frame_depth += 1;
   if (anvil_frame_depth > 1000)
     anvil_runtime_error("call depth exceeded the wasm frame budget");
@@ -863,36 +927,53 @@ static AnvilWasmVec3 anvil_wasm_normalize(AnvilWasmVec3 v) {
     return (AnvilWasmVec3){0, 1, 0};
   return (AnvilWasmVec3){v.x / length, v.y / length, v.z / length};
 }
+static AnvilWasmVec3 anvil_wasm_rotate_trig(
+    AnvilWasmVec3 p, double cx, double sx, double cy, double sy, double cz,
+    double sz) {
+  double c = cx, s = sx;
+  p = (AnvilWasmVec3){p.x, p.y * c - p.z * s, p.y * s + p.z * c};
+  c = cy;
+  s = sy;
+  p = (AnvilWasmVec3){p.x * c + p.z * s, p.y, -p.x * s + p.z * c};
+  c = cz;
+  s = sz;
+  p = (AnvilWasmVec3){p.x * c - p.y * s, p.x * s + p.y * c, p.z};
+  return p;
+}
 static AnvilWasmVec3 anvil_wasm_rotate(AnvilWasmVec3 p, double rx, double ry,
                                        double rz) {
   const double d = 0.017453292519943295769;
   rx *= d;
   ry *= d;
   rz *= d;
-  double c = cos(rx), s = sin(rx);
-  p = (AnvilWasmVec3){p.x, p.y * c - p.z * s, p.y * s + p.z * c};
-  c = cos(ry);
-  s = sin(ry);
-  p = (AnvilWasmVec3){p.x * c + p.z * s, p.y, -p.x * s + p.z * c};
-  c = cos(rz);
-  s = sin(rz);
-  p = (AnvilWasmVec3){p.x * c - p.y * s, p.x * s + p.y * c, p.z};
-  return p;
+  return anvil_wasm_rotate_trig(p, cos(rx), sin(rx), cos(ry), sin(ry),
+                                cos(rz), sin(rz));
 }
 
-static AnvilWasmVec3 anvil_wasm_to_camera(AnvilWasmVec3 p) {
+static void anvil_wasm_get_camera_basis(AnvilWasmVec3 *right,
+                                        AnvilWasmVec3 *up,
+                                        AnvilWasmVec3 *forward) {
   const double radians = 0.017453292519943295769;
   double yaw = anvil_camera_yaw * radians;
   double pitch = anvil_camera_pitch * radians;
-  AnvilWasmVec3 right = {cos(yaw), 0.0, sin(yaw)};
-  AnvilWasmVec3 forward = {sin(yaw) * cos(pitch), sin(pitch),
-                           -cos(yaw) * cos(pitch)};
-  AnvilWasmVec3 up = anvil_wasm_normalize(anvil_wasm_cross(right, forward));
+  *right = (AnvilWasmVec3){cos(yaw), 0.0, sin(yaw)};
+  *forward = (AnvilWasmVec3){sin(yaw) * cos(pitch), sin(pitch),
+                             -cos(yaw) * cos(pitch)};
+  *up = anvil_wasm_normalize(anvil_wasm_cross(*right, *forward));
+}
+static AnvilWasmVec3 anvil_wasm_to_camera_basis(
+    AnvilWasmVec3 p, AnvilWasmVec3 right, AnvilWasmVec3 up,
+    AnvilWasmVec3 forward) {
   AnvilWasmVec3 relative = {p.x - anvil_camera_x, p.y - anvil_camera_y,
                             p.z - anvil_camera_z};
   return (AnvilWasmVec3){anvil_wasm_dot(relative, right),
                          anvil_wasm_dot(relative, up),
                          anvil_wasm_dot(relative, forward)};
+}
+static AnvilWasmVec3 anvil_wasm_to_camera(AnvilWasmVec3 p) {
+  AnvilWasmVec3 right, up, forward;
+  anvil_wasm_get_camera_basis(&right, &up, &forward);
+  return anvil_wasm_to_camera_basis(p, right, up, forward);
 }
 
 static AnvilWasmVec3 anvil_wasm_direction_to_camera(AnvilWasmVec3 direction) {
@@ -2005,8 +2086,8 @@ double anvil_mesh_draw_textured(
     double cz, double radius, double x, double y, double z, double scale,
     double rx, double ry, double rz) {
   if (!data || !textures || !texture_dimensions || triangle_count <= 0 ||
-      texture_count <= 0 || triangle_count > ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
-          anvil_wasm_ray_mesh_triangles_frame ||
+      texture_count <= 0 || triangle_count > ANVIL_WASM_TEXTURED_MODEL_TRIANGLE_BUDGET -
+          anvil_wasm_textured_model_triangles_frame ||
       !anvil_wasm_finite(cx) || !anvil_wasm_finite(cy) ||
       !anvil_wasm_finite(cz) || !anvil_wasm_finite(radius) || radius < 0.0 ||
       !anvil_wasm_finite(scale) || scale == 0.0 || !anvil_wasm_finite(x) ||
@@ -2020,6 +2101,21 @@ double anvil_mesh_draw_textured(
   }
   anvil_mesh_culled_frame = 0;
   anvil_mesh_drawn_frame = 0;
+  const double radians = 0.017453292519943295769;
+  double rx_radians = rx * radians, ry_radians = ry * radians;
+  double rz_radians = rz * radians;
+  double cos_rx = cos(rx_radians), sin_rx = sin(rx_radians);
+  double cos_ry = cos(ry_radians), sin_ry = sin(ry_radians);
+  double cos_rz = cos(rz_radians), sin_rz = sin(rz_radians);
+  AnvilWasmVec3 camera_right, camera_up, camera_forward;
+  anvil_wasm_get_camera_basis(&camera_right, &camera_up, &camera_forward);
+  int texture_runs = 0, last_width = 0, last_height = 0;
+  const uint32_t *last_pixels = NULL;
+  if (!anvil_wasm_texture_runs_preflight(
+          data, triangle_count, textures, texture_dimensions, texture_count,
+          &texture_runs, &last_pixels, &last_width, &last_height))
+    return 0.0;
+  anvil_wasm_texture_batch_count = 0;
   for (int triangle = 0; triangle < triangle_count; ++triangle) {
     const double *p = data + (size_t)triangle * 20;
     AnvilWasmVec3 world[3];
@@ -2028,10 +2124,12 @@ double anvil_mesh_draw_textured(
       AnvilWasmVec3 local = {p[vertex * 5] * scale,
                              p[vertex * 5 + 1] * scale,
                              p[vertex * 5 + 2] * scale};
-      local = anvil_wasm_rotate(local, rx, ry, rz);
+      local = anvil_wasm_rotate_trig(local, cos_rx, sin_rx, cos_ry, sin_ry,
+                                     cos_rz, sin_rz);
       world[vertex] = (AnvilWasmVec3){local.x + x, local.y + y, local.z + z};
       camera[vertex] = (AnvilWasmTexturedVertex){
-          anvil_wasm_to_camera(world[vertex]), p[vertex * 5 + 3],
+          anvil_wasm_to_camera_basis(world[vertex], camera_right, camera_up,
+                                     camera_forward), p[vertex * 5 + 3],
           p[vertex * 5 + 4]};
     }
     AnvilWasmTexturedVertex clipped[4];
@@ -2063,27 +2161,54 @@ double anvil_mesh_draw_textured(
     if (shade < 0.0) shade = 0.0;
     if (shade > 1.0) shade = 1.0;
     int texture = (int)p[19];
-    if (texture < 0 || texture >= texture_count || !textures[texture]) continue;
+    if (texture < 0) {
+      anvil_wasm_texture_batch_flush(textures, texture_dimensions);
+      double alpha = p[18];
+      if (alpha < 0.0) alpha = 0.0;
+      if (alpha > 255.0) alpha = 255.0;
+      anvil_wasm_triangle(world[0], world[1], world[2], normal,
+                          (int)p[15], (int)p[16], (int)p[17], (int)alpha, 1,
+                          0.0, 1);
+      anvil_mesh_drawn_frame += 1;
+      continue;
+    }
+    if (texture >= texture_count || !textures[texture]) continue;
+    if (anvil_wasm_texture_batch_count &&
+        texture != anvil_wasm_texture_batch_texture) {
+      anvil_wasm_texture_batch_flush(textures, texture_dimensions);
+    }
+    anvil_wasm_texture_batch_texture = texture;
     double alpha = p[18];
     if (alpha < 0.0) alpha = 0.0;
     if (alpha > 255.0) alpha = 255.0;
     for (int vertex = 1; vertex + 1 < clipped_count; ++vertex) {
       const int fan[3] = {0, vertex, vertex + 1};
-      anvil_host_textured_triangle(
-          projected[fan[0]][0], projected[fan[0]][1],
-          projected[fan[0]][2], clipped[fan[0]].u, clipped[fan[0]].v,
-          projected[fan[1]][0], projected[fan[1]][1],
-          projected[fan[1]][2], clipped[fan[1]].u, clipped[fan[1]].v,
-          projected[fan[2]][0], projected[fan[2]][1],
-          projected[fan[2]][2], clipped[fan[2]].u, clipped[fan[2]].v,
-          (int)(p[15] * shade), (int)(p[16] * shade),
-          (int)(p[17] * shade), (int)alpha, 1, textures[texture],
-          texture_dimensions[texture * 2],
-          texture_dimensions[texture * 2 + 1]);
+      if (anvil_wasm_texture_batch_count >= ANVIL_WASM_TEXTURE_BATCH_TRIANGLES)
+        anvil_wasm_texture_batch_flush(textures, texture_dimensions);
+      double *batch = anvil_wasm_texture_batch +
+          (size_t)anvil_wasm_texture_batch_count * 19;
+      for (int corner = 0; corner < 3; ++corner) {
+        int source = fan[corner];
+        batch[corner * 5] = projected[source][0];
+        batch[corner * 5 + 1] = projected[source][1];
+        batch[corner * 5 + 2] = projected[source][2];
+        batch[corner * 5 + 3] = clipped[source].u;
+        batch[corner * 5 + 4] = clipped[source].v;
+      }
+      batch[15] = p[15] * shade;
+      batch[16] = p[16] * shade;
+      batch[17] = p[17] * shade;
+      batch[18] = alpha;
+      anvil_wasm_texture_batch_count++;
       anvil_mesh_drawn_frame += 1;
     }
   }
-  anvil_wasm_ray_mesh_triangles_frame += triangle_count;
+  anvil_wasm_texture_batch_flush(textures, texture_dimensions);
+  anvil_wasm_textured_model_triangles_frame += triangle_count;
+  anvil_wasm_texture_runs_frame += texture_runs;
+  anvil_wasm_last_texture_pixels = last_pixels;
+  anvil_wasm_last_texture_width = last_width;
+  anvil_wasm_last_texture_height = last_height;
   return 1.0;
 }
 
@@ -2111,6 +2236,38 @@ double anvil_trace_mesh(const double *data, int triangle_count, double cx,
   if (!anvil_mesh_draw(data, triangle_count, cx, cy, cz, radius, x, y, z,
                        scale, rx, ry, rz))
     return 0.0;
+  return 1.0;
+}
+
+double anvil_trace_mesh_textured(
+    const double *data, const double *textured_data,
+    const uint32_t *const *textures, const int *texture_dimensions,
+    int texture_count, int triangle_count, double cx, double cy, double cz,
+    double radius, double x, double y, double z, double scale, double rx,
+    double ry, double rz) {
+  if (!anvil_scene_is_3d || !data || !textured_data || !textures ||
+      !texture_dimensions || triangle_count <= 0 ||
+      triangle_count > ANVIL_WASM_MODEL_TRIANGLE_BUDGET || texture_count <= 0 ||
+      !anvil_wasm_finite(cx) || !anvil_wasm_finite(cy) ||
+      !anvil_wasm_finite(cz) || !anvil_wasm_finite(radius) || radius < 0.0 ||
+      !anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
+      !anvil_wasm_finite(z) || !anvil_wasm_finite(scale) || scale == 0.0 ||
+      !anvil_wasm_finite(rx) || !anvil_wasm_finite(ry) ||
+      !anvil_wasm_finite(rz))
+    return 0.0;
+  if (!anvil_wasm_sphere_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry,
+                                 rz)) {
+    anvil_mesh_culled_frame = 1;
+    return 1.0;
+  }
+  if (triangle_count > ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
+                           anvil_wasm_ray_mesh_triangles_frame)
+    return 0.0;
+  if (!anvil_mesh_draw_textured(
+          textured_data, triangle_count, textures, texture_dimensions,
+          texture_count, cx, cy, cz, radius, x, y, z, scale, rx, ry, rz))
+    return 0.0;
+  anvil_wasm_ray_mesh_triangles_frame += triangle_count;
   return 1.0;
 }
 
@@ -2745,8 +2902,9 @@ double anvil_mesh_draw_skinned(
     const int *parents, const int *joint_nodes, int joint_count,
     const double *bind, const double *times, const double *values,
     const int *tracks, int track_count, double clip_length, double clip_time,
-    double x, double y, double z, double scale, double rx, double ry,
-    double rz) {
+    const double *textured_data, const uint32_t *const *textures,
+    const int *texture_dimensions, int texture_count, double x, double y,
+    double z, double scale, double rx, double ry, double rz) {
   if (!anvil_scene_is_3d || !data || !nodes || !parents || !joint_nodes ||
       !bind || triangle_count <= 0 ||
       triangle_count > ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
@@ -2758,7 +2916,11 @@ double anvil_mesh_draw_skinned(
       !anvil_wasm_finite(z) || !anvil_wasm_finite(scale) || scale == 0.0 ||
       !anvil_wasm_finite(rx) || !anvil_wasm_finite(ry) ||
       !anvil_wasm_finite(rz) ||
-      (track_count > 0 && (!times || !values || !tracks)))
+      (track_count > 0 && (!times || !values || !tracks)) ||
+      (textured_data && (!textures || !texture_dimensions || texture_count <= 0)) ||
+      (textured_data && triangle_count >
+          ANVIL_WASM_TEXTURED_MODEL_TRIANGLE_BUDGET -
+              anvil_wasm_textured_model_triangles_frame))
     return 0.0;
   for (int node = 0; node < node_count; ++node) {
     if (parents[node] < -1 || parents[node] >= node_count)
@@ -2826,6 +2988,21 @@ double anvil_mesh_draw_skinned(
         py = vertex[1];
         pz = vertex[2];
       }
+      if (textured_data) {
+        const double *texture = textured_data + (size_t)triangle * 20;
+        double *posed = anvil_wasm_animated_textured_data +
+                        (size_t)triangle * 20;
+        posed[corner * 5] = px;
+        posed[corner * 5 + 1] = py;
+        posed[corner * 5 + 2] = pz;
+        posed[corner * 5 + 3] = texture[corner * 5 + 3];
+        posed[corner * 5 + 4] = texture[corner * 5 + 4];
+        if (corner == 2) {
+          posed[15] = texture[15]; posed[16] = texture[16];
+          posed[17] = texture[17]; posed[18] = texture[18];
+          posed[19] = texture[19];
+        }
+      }
       AnvilWasmVec3 local = {px * scale, py * scale, pz * scale};
       local = anvil_wasm_rotate(local, rx, ry, rz);
       points[corner] =
@@ -2834,10 +3011,18 @@ double anvil_mesh_draw_skinned(
     AnvilWasmVec3 normal = anvil_wasm_normalize(
         anvil_wasm_cross(anvil_wasm_sub(points[1], points[0]),
                          anvil_wasm_sub(points[2], points[0])));
+    if (textured_data)
+      continue;
     anvil_wasm_triangle(points[0], points[1], points[2], normal,
                         (int)source[3], (int)source[4], (int)source[5], 255, 1,
                         0.0, 0);
   }
+  if (textured_data &&
+      !anvil_mesh_draw_textured(
+          anvil_wasm_animated_textured_data, triangle_count, textures,
+          texture_dimensions, texture_count, 0.0, 0.0, 0.0, 1.0e100,
+          x, y, z, scale, rx, ry, rz))
+    return 0.0;
   anvil_mesh_drawn_frame = triangle_count;
   anvil_wasm_ray_mesh_triangles_frame += triangle_count;
   return 1.0;
@@ -2849,13 +3034,16 @@ static double anvil_wasm_submit_animated_groups(
     const double *values, const int *tracks, int track_count, double clip_length,
     double clip_time, const double *morph_deltas,
     const double *group_defaults, const double *morph_weights, int model_id,
-    int morph_count, double x, double y, double z, double scale, double rx,
+    int morph_count, const double *textured_data,
+    const uint32_t *const *textures, const int *texture_dimensions,
+    int texture_count, double x, double y, double z, double scale, double rx,
     double ry, double rz) {
   if (!anvil_scene_is_3d || !data || !groups || triangle_count <= 0 ||
       group_count <= 0 || morph_count < 0 ||
       morph_count > ANVIL_WASM_MORPH_TARGETS ||
       (morph_count > 0 &&
        (!morph_deltas || !group_defaults || !morph_weights)) ||
+      (textured_data && (!textures || !texture_dimensions || texture_count <= 0)) ||
       !anvil_wasm_finite(x) || !anvil_wasm_finite(y) ||
       !anvil_wasm_finite(z) || !anvil_wasm_finite(scale) || scale == 0.0 ||
       !anvil_wasm_finite(rx) || !anvil_wasm_finite(ry) ||
@@ -2883,6 +3071,12 @@ static double anvil_wasm_submit_animated_groups(
       active_triangles >
           (size_t)(ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
                    anvil_wasm_ray_mesh_triangles_frame))
+    return 0.0;
+  if (textured_data && active_triangles != (size_t)triangle_count)
+    return 0.0;
+  if (textured_data &&
+      triangle_count > ANVIL_WASM_TEXTURED_MODEL_TRIANGLE_BUDGET -
+                           anvil_wasm_textured_model_triangles_frame)
     return 0.0;
   if (!anvil_wasm_model_pose(nodes, node_count, parents, times, values, tracks,
                              track_count, clip_length, clip_time))
@@ -2927,12 +3121,29 @@ static double anvil_wasm_submit_animated_groups(
           }
         }
         anvil_wasm_mat_point(matrix, px, py, pz, position);
+        if (textured_data) {
+          const double *texture = textured_data + (size_t)triangle * 20;
+          double *posed = anvil_wasm_animated_textured_data +
+                          (size_t)triangle * 20;
+          posed[vertex * 5] = position[0];
+          posed[vertex * 5 + 1] = position[1];
+          posed[vertex * 5 + 2] = position[2];
+          posed[vertex * 5 + 3] = texture[vertex * 5 + 3];
+          posed[vertex * 5 + 4] = texture[vertex * 5 + 4];
+          if (vertex == 2) {
+            posed[15] = texture[15]; posed[16] = texture[16];
+            posed[17] = texture[17]; posed[18] = texture[18];
+            posed[19] = texture[19];
+          }
+        }
         AnvilWasmVec3 local = {position[0] * scale, position[1] * scale,
                                position[2] * scale};
         local = anvil_wasm_rotate(local, rx, ry, rz);
         points[vertex] =
             (AnvilWasmVec3){x + local.x, y + local.y, z + local.z};
       }
+      if (textured_data)
+        continue;
       int red = (int)source[9], green = (int)source[10], blue = (int)source[11];
       AnvilWasmVec3 normal = anvil_wasm_normalize(
           anvil_wasm_cross(anvil_wasm_sub(points[1], points[0]),
@@ -2943,6 +3154,14 @@ static double anvil_wasm_submit_animated_groups(
       anvil_mesh_drawn_frame += 1;
     }
   }
+  if (textured_data &&
+      !anvil_mesh_draw_textured(
+          anvil_wasm_animated_textured_data, triangle_count, textures,
+          texture_dimensions, texture_count, 0.0, 0.0, 0.0, 1.0e100,
+          x, y, z, scale, rx, ry, rz))
+    return 0.0;
+  if (textured_data)
+    anvil_mesh_drawn_frame = (int)active_triangles;
   anvil_wasm_ray_mesh_triangles_frame += (int)active_triangles;
   return 1.0;
 }
@@ -2953,13 +3172,15 @@ double anvil_mesh_draw_animated(
     const double *values, const int *tracks, int track_count, double clip_length,
     double clip_time, const double *morph_deltas,
     const double *group_defaults, const double *morph_weights, int model_id,
-    int morph_count, double x, double y, double z, double scale, double rx,
+    int morph_count, const double *textured_data,
+    const uint32_t *const *textures, const int *texture_dimensions,
+    int texture_count, double x, double y, double z, double scale, double rx,
     double ry, double rz) {
   return anvil_wasm_submit_animated_groups(
       data, triangle_count, nodes, node_count, parents, groups, group_count,
       times, values, tracks, track_count, clip_length, clip_time, morph_deltas,
-      group_defaults, morph_weights, model_id, morph_count, x, y, z, scale, rx,
-      ry, rz);
+      group_defaults, morph_weights, model_id, morph_count, textured_data,
+      textures, texture_dimensions, texture_count, x, y, z, scale, rx, ry, rz);
 }
 
 double anvil_trace_mesh_animated(
@@ -2968,13 +3189,15 @@ double anvil_trace_mesh_animated(
     const double *values, const int *tracks, int track_count, double clip_length,
     double clip_time, const double *morph_deltas,
     const double *group_defaults, const double *morph_weights, int model_id,
-    int morph_count, double x, double y, double z, double scale, double rx,
+    int morph_count, const double *textured_data,
+    const uint32_t *const *textures, const int *texture_dimensions,
+    int texture_count, double x, double y, double z, double scale, double rx,
     double ry, double rz) {
   return anvil_wasm_submit_animated_groups(
       data, triangle_count, nodes, node_count, parents, groups, group_count,
       times, values, tracks, track_count, clip_length, clip_time, morph_deltas,
-      group_defaults, morph_weights, model_id, morph_count, x, y, z, scale, rx,
-      ry, rz);
+      group_defaults, morph_weights, model_id, morph_count, textured_data,
+      textures, texture_dimensions, texture_count, x, y, z, scale, rx, ry, rz);
 }
 
 /* ---- Images, baked at compile time --------------------------------------

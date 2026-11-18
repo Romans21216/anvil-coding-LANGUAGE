@@ -935,7 +935,17 @@ class ExpressionParser:
                      f"{model.get('morph_count', 0)})"
             )
             if value == "ray_mesh":
-                if model.get("skinned"):
+                if model.get("textured") and not model.get("animated") and not model.get("skinned"):
+                    call = (
+                        f"anvil_trace_mesh_textured((const double *){symbol}, "
+                        f"(const double *){symbol}_textured, "
+                        f"(const uint32_t *const *){symbol}_textures, "
+                        f"(const int *){symbol}_texture_dimensions, "
+                        f"{len(model['textures'])}, {count}, "
+                        + ", ".join(f"{item:.6g}" for item in bounds)
+                        + f", {placement})"
+                    )
+                elif model.get("skinned"):
                     call = (
                         f"anvil_mesh_draw_skinned((const double *){symbol}, {count}, "
                         f"(const double *){symbol}_nodes, {len(model['nodes']) // 10}, "
@@ -944,6 +954,7 @@ class ExpressionParser:
                         f"(const double *){symbol}_times, (const double *){symbol}_values, "
                         f"(const int *){symbol}_tracks, {len(model['tracks']) // 6}, "
                         f"{model['length']:.6g}, anvil_model_clock({model['id']}), "
+                        "NULL, NULL, NULL, 0, "
                         f"{placement})"
                     )
                 elif model.get("animated"):
@@ -967,6 +978,14 @@ class ExpressionParser:
                             f"{model['morph_count']}, "
                             if model.get("morph_count")
                             else "NULL, NULL, NULL, -1, 0, "
+                        )
+                        + (
+                            f"(const double *){symbol}_textured, "
+                            f"(const uint32_t *const *){symbol}_textures, "
+                            f"(const int *){symbol}_texture_dimensions, "
+                            f"{len(model['textures'])}, "
+                            if model.get("textured")
+                            else "NULL, NULL, NULL, 0, "
                         )
                         + f"{placement})"
                     )
@@ -998,7 +1017,15 @@ class ExpressionParser:
                     f"(const double *){symbol}_times, (const double *){symbol}_values, "
                     f"(const int *){symbol}_tracks, {len(model['tracks']) // 6}, "
                     f"{model['length']:.6g}, anvil_model_clock({model['id']}), "
-                    f"{placement})"
+                    + (
+                        f"(const double *){symbol}_textured, "
+                        f"(const uint32_t *const *){symbol}_textures, "
+                        f"(const int *){symbol}_texture_dimensions, "
+                        f"{len(model['textures'])}, "
+                        if model.get("textured") and value != "ray_mesh"
+                        else "NULL, NULL, NULL, 0, "
+                    )
+                    + f"{placement})"
                 )
             elif model.get("morph_count") and not model.get("animated"):
                 call = (
@@ -1030,6 +1057,14 @@ class ExpressionParser:
                         f"{model['morph_count']}, "
                         if model.get("morph_count")
                         else "NULL, NULL, NULL, -1, 0, "
+                    )
+                    + (
+                        f"(const double *){symbol}_textured, "
+                        f"(const uint32_t *const *){symbol}_textures, "
+                        f"(const int *){symbol}_texture_dimensions, "
+                        f"{len(model['textures'])}, "
+                        if model.get("textured")
+                        else "NULL, NULL, NULL, 0, "
                     )
                     + f"{placement})"
                 )

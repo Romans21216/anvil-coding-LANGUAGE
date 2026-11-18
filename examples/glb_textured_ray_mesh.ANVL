@@ -1,0 +1,7 @@
+scene 3d
+camera perspective 0 0 7
+camera fov(60)
+
+fn(draw)
+  set var(ok) = ray_mesh("glb_textured_quad.glb", 0, 0, 0, 1, 0, 0, 0)
+end

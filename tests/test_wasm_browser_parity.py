@@ -75,7 +75,9 @@ def _png_chunk(kind: bytes, payload: bytes) -> bytes:
     return struct.pack(">I", len(payload)) + content + struct.pack(">I", zlib.crc32(content) & 0xFFFFFFFF)
 
 
-def _write_textured_near_plane_glb(path: pathlib.Path) -> None:
+def _write_textured_near_plane_glb(
+    path: pathlib.Path, alpha_values: tuple[int, int] = (255, 255)
+) -> None:
     """Make four UV-gradient cases plus a farther overlapping depth control."""
     centers = (-0.4, -0.13, 0.13, 0.4)
     depths = ((0.8, 0.8, 0.8), (0.8, 0.8, 0.02), (0.8, 0.02, 0.02), (0.02, 0.02, 0.02))
@@ -97,7 +99,7 @@ def _write_textured_near_plane_glb(path: pathlib.Path) -> None:
     uv_bytes = b"".join(struct.pack("<2f", *uv) for uv in texcoords)
     index_bytes = struct.pack("<15H", *range(15))
     rows = (
-        b"\x00" + bytes((245, 30, 20, 255, 20, 235, 40, 255))
+        b"\x00" + bytes((245, 30, 20, alpha_values[0], 20, 235, 40, alpha_values[1]))
         + b"\x00" + bytes((25, 70, 245, 255, 250, 225, 20, 255))
     )
     png = (
@@ -566,6 +568,135 @@ class WasmBrowserParityTests(unittest.TestCase):
         metrics = self._color_metrics(c_rgba, wasm_rgba)
         self.assertLess(metrics["mae_visible_pixels"], 10.0, metrics)
         self.assertGreater(metrics["within_16_visible"], 0.90, metrics)
+
+    def test_bundled_textured_glb_example_matches_c_in_chromium(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            c_dir, wasm_dir = root / "c", root / "wasm"
+            c_dir.mkdir()
+            wasm_dir.mkdir()
+            template = (ROOT / "examples" / "glb_textured_model.ANVL").read_text(encoding="utf-8")
+            template = template.replace(
+                '  set var(model_visible) = model_draw("glb_textured_quad.glb", 0, 0, 0, 1, 0, 20, 0)',
+                '  set var(left_visible) = model_draw("glb_textured_quad.glb", -1.5, 0, 0, 0.55, 0, 20, 0)\n'
+                '  set var(middle_visible) = model_draw("middle.glb", 0, 0, 0, 0.55, 0, 20, 0)\n'
+                '  set var(right_visible) = model_draw("glb_textured_quad.glb", 1.5, 0, 0, 0.55, 0, 20, 0)',
+            )
+            asset = ROOT / "examples" / "glb_textured_quad.glb"
+            for directory in (c_dir, wasm_dir):
+                shutil.copy2(asset, directory / asset.name)
+                shutil.copy2(asset, directory / "middle.glb")
+            for yaw, pitch in ((0, 0), (20, -12), (-28, 14)):
+                with self.subTest(camera_angle=(yaw, pitch)):
+                    program = template.replace(
+                        "camera_angle(20, -12)", f"camera_angle({yaw}, {pitch})"
+                    )
+                    for directory in (c_dir, wasm_dir):
+                        (directory / "program.ANVL").write_text(program, encoding="utf-8")
+
+                    c_output = c_dir / "program.exe"
+                    wasm_output = wasm_dir / "program.wasm"
+                    _compile(c_dir / "program.ANVL", c_output)
+                    _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+                    browser = subprocess.run(
+                        ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                        capture_output=True,
+                        text=True,
+                        timeout=90,
+                        env={**os.environ, "CHROME_PATH": str(CHROME)},
+                    )
+                    self.assertEqual(browser.returncode, 0, browser.stderr)
+                    page = json.loads(browser.stdout.strip().splitlines()[-1])
+                    wasm_rgba = base64.b64decode(page["rgba"], validate=True)
+                    c_rgba = _native_rgba(c_output)
+                    self.assertEqual(len(c_rgba), len(wasm_rgba))
+                    self.assertGreater(self._silhouette_iou(c_rgba, wasm_rgba), 0.92)
+                    metrics = self._color_metrics(c_rgba, wasm_rgba)
+                    self.assertLess(metrics["mae_visible_pixels"], 10.0, metrics)
+                    self.assertGreater(metrics["within_16_visible"], 0.90, metrics)
+
+    def test_textured_glb_batches_render_in_painter_and_no_webgl_fallbacks(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            asset = ROOT / "examples" / "glb_textured_quad.glb"
+            shutil.copy2(asset, root / asset.name)
+            source = root / "program.ANVL"
+            source.write_text("\n".join((
+                "scene 3d",
+                "camera perspective 0 0 6",
+                "camera fov(60)",
+                "clear rgba(11, 16, 27, 255)",
+                "fn(draw)",
+                '  set var(left) = model_draw("glb_textured_quad.glb", -1.25, 0, 0, 0.7, 0, 20, 0)',
+                '  set var(right) = model_draw("glb_textured_quad.glb", 1.25, 0, 0, 0.7, 0, 20, 0)',
+                "end",
+                "",
+            )), encoding="utf-8")
+            output = root / "program.wasm"
+            _compile(source, output, "wasm")
+            for fallback in ("ANVIL_WASM_PAINTER", "ANVIL_WASM_NO_WEBGL"):
+                with self.subTest(fallback=fallback):
+                    browser = subprocess.run(
+                        ["node", str(CAPTURE), str(root), "program.html"],
+                        capture_output=True,
+                        text=True,
+                        timeout=90,
+                        env={**os.environ, "CHROME_PATH": str(CHROME), fallback: "1"},
+                    )
+                    self.assertEqual(browser.returncode, 0, browser.stderr)
+                    page = json.loads(browser.stdout.strip().splitlines()[-1])
+                    rgba = base64.b64decode(page["rgba"], validate=True)
+                    colored = [0, 0]
+                    colors = set()
+                    for y in range(600):
+                        for x in range(960):
+                            at = (y * 960 + x) * 4
+                            pixel = tuple(rgba[at:at + 3])
+                            if max(abs(pixel[channel] - (11, 16, 27)[channel]) for channel in range(3)) > 12:
+                                colored[x // 480] += 1
+                                colors.add(pixel)
+                    self.assertGreater(colored[0], 100, (fallback, colored))
+                    self.assertGreater(colored[1], 100, (fallback, colored))
+                    self.assertGreater(len(colors), 3, (fallback, len(colors)))
+
+    def test_textured_glb_cutout_and_partial_alpha_match_c_and_chromium(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            c_dir, wasm_dir = root / "c", root / "wasm"
+            c_dir.mkdir()
+            wasm_dir.mkdir()
+            program = "\n".join((
+                "scene 3d",
+                "camera perspective 0 0 5",
+                "camera fov(60)",
+                "clear rgba(40, 80, 120, 255)",
+                "fn(draw)",
+                '  set var(ok) = model_draw("alpha.glb", 0, 0, 0, 1, 0, 0, 0)',
+                "end",
+                "",
+            ))
+            for directory in (c_dir, wasm_dir):
+                _write_textured_near_plane_glb(directory / "alpha.glb", (0, 128))
+                (directory / "program.ANVL").write_text(program, encoding="utf-8")
+            c_output = c_dir / "program.exe"
+            wasm_output = wasm_dir / "program.wasm"
+            _compile(c_dir / "program.ANVL", c_output)
+            _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+            browser = subprocess.run(
+                ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={**os.environ, "CHROME_PATH": str(CHROME)},
+            )
+            self.assertEqual(browser.returncode, 0, browser.stderr)
+            page = json.loads(browser.stdout.strip().splitlines()[-1])
+            c_rgba = _native_rgba(c_output)
+            wasm_rgba = base64.b64decode(page["rgba"], validate=True)
+        self.assertGreater(self._silhouette_iou(c_rgba, wasm_rgba), 0.90)
+        metrics = self._color_metrics(c_rgba, wasm_rgba)
+        self.assertLess(metrics["mae_visible_pixels"], 12.0, metrics)
+        self.assertGreater(metrics["within_32_visible"], 0.88, metrics)
 
     def test_embedded_glb_texture_clips_at_near_plane_with_uv_and_depth_parity(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:

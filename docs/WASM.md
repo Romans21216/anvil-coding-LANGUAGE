@@ -179,8 +179,11 @@ animation clip or use the bind pose when no clip exists. Static and animated
 unskinned models also support morph targets. Skinned draws skip bounds culling
 and overhead shadows. In WebAssembly, `ray_mesh` is triangle
 submission, not the C runtime's software ray-tracing/BVH implementation. All
-wasm model submissions, including skinned `model_draw` and `ray_mesh`, share a
-16,384-triangle frame budget. Each call is checked as a whole and returns 0
+untextured wasm model submissions, static and animated textured `ray_mesh`, and animated or
+skinned textured `model_draw` share a 16,384-triangle frame budget. Textured
+static `model_draw` has a separate 200,000 source-triangle and 256-material-run
+per-frame budget, plus a 48 MiB renderer-owned vertex staging pool. Each call
+is checked as a whole and returns 0
 without submitting geometry when the call
 would exceed the remaining budget. `mesh_drawn()` counts triangles from the most
 recent model submission; `mesh_culled()` reports whole-model frustum culling,
@@ -199,9 +202,26 @@ sort, which is how the depth test is demonstrated — an unsorted painter shows
 the farther cube, WebGL shows the nearer one. 3D is still painted after any 2D
 drawing in the frame, and 2D primitives in a 3D scene are covered by the blit.
 Skinned `ray_mesh` uses the same WebGL raster submission as `model_draw`;
-Textured `model_draw` calls sample embedded PNG base-color textures; static
-unskinned C model draws use the same PNG support. `ray_mesh` and textured
-animated, skinned or morphed models use `baseColorFactor` fallback. `model_draw` and
+Textured `model_draw` calls for static, animated, animated+morphed and skinned
+models sample embedded PNG base-color
+textures in the browser. Their camera-space triangles clip against the same
+0.08 near-depth plane as C, with UV interpolation and fan triangulation for
+near-plane crossings. A C/Chrome parity regression covers one/two vertices
+behind the plane, fully visible/behind triangles, UV gradients, and overlapping
+depth. Textured submissions append compatible chunks into one pooled typed
+array per contiguous material run, keeping repeated instances distinct and
+preserving run order. WebGL discards zero-alpha
+fragments and source-over blends visible texels while writing depth; overlapping
+partial-alpha surfaces therefore follow submission order. Painter and no-WebGL
+fallbacks sample the same batches with texture tint and alpha. The textured path accepts up to 200,000 source
+triangles per frame; other model APIs retain the shared 16,384-triangle frame
+budget. Textured animated and skinned models use that shared 16,384-triangle
+budget and the common 200,000 textured source-triangle cap. Static textured
+`ray_mesh` is subject to both limits.
+Static and animated unskinned textured `ray_mesh` samples base-color PNGs
+through the raster path; skinned textured `ray_mesh` uses `baseColorFactor`
+fallback.
+`model_draw` and
 `ray_mesh` sample skinning and the first glTF clip with translation,
 rotation and scale tracks using LINEAR or STEP interpolation. `model_animate`
 sets a per-model clock; `model_animation_length` is baked as a compile-time
@@ -263,9 +283,11 @@ separate morph states, use `model_instance(path)`,
 `model_instance_destroy(path,handle)`. The 64 generation-checked handles are
 available in both C and wasm; each must match the asset path used to create it.
 All model draw calls use the same WebGL depth-tested triangle path, which resolves
-overlapping mesh depth per pixel in the browser. `model_draw` and `ray_mesh`
-share a 16,384-triangle frame budget across
-static and animated submissions; each call is accepted whole or rejected before
+overlapping mesh depth per pixel in the browser. Untextured submissions, static
+textured `ray_mesh`, and animated/skinned textured draws share a 16,384-triangle
+frame budget. Static textured `model_draw` has a separate 200,000-triangle cap;
+textured `ray_mesh` also shares that source-triangle cap.
+Each call is accepted whole or rejected before
 triangle submission. The Node and `?painter=1` fallbacks sort
 triangles and can show intersections. The browser path has no mesh BVH or
 ray-traced shadows; skinned `ray_mesh` uses the same animated skin transform
@@ -394,6 +416,9 @@ decoded or embedded in the WASM module. Serve the HTML, module, and asset folder
 from the same origin so the browser can fetch the sidecar. Supported tracks are
 PCM WAV mono/stereo, 8/16-bit, 8,000-192,000 Hz. The path must be a literal
 `music_load("...")`; a missing or unsupported file is a located build error.
+PCM `WAVE_FORMAT_EXTENSIBLE` is accepted only with the PCM subformat GUID and
+valid bits matching the container depth. Byte rate, block alignment and complete
+sample-frame length are validated before the browser output is written.
 `music_length()` uses the WAV metadata, `music_position()` reads the media
 element's playback clock, and `music_stop` stops and resets it. Browser autoplay
 rules still apply, so start music from a user gesture when the page blocks
@@ -468,7 +493,8 @@ identical.
   `ray_sphere` impostor path has C/Chrome camera, depth-order, lighting and
   shadow parity fixtures, plus measured hardware CPU/heap/GPU budgets and
   variable SwiftShader runs. The checked-in screenshot remains a tessellation
-  fallback capture. Both model APIs share the 16,384-triangle frame budget.
+  fallback capture. Untextured model APIs share the 16,384-triangle frame budget;
+  textured static model draws have a separate 200,000-triangle frame budget.
   Static morph groups use
   conservative per-group bounds spanning default weights and all 0–1 target
   overrides, and skip fully offscreen groups when mesh culling is enabled.
@@ -478,3 +504,28 @@ identical.
   same as the C runtime; `char` returns empty text for out-of-range indexes.
 - `anvil_frame(delta_ms)` advances `time()` and `delta()`; model clips
   are sampled when `model_draw` or `ray_mesh` is submitted.
+
+#### Textured WebAssembly submission benchmark
+
+Run `node tools/bench_wasm_textured_submission.mjs` from the repository root.
+It builds textured static GLB-derived assets at 1k, 10k, 100k and 200k triangles
+measures 30 warmup plus 120 Chrome/SwiftShader frames by default. The report
+includes frame p50/p95/max, observed JS heap peak, WASM initial/peak/end linear
+memory pages, and per-frame maximum batches, vertex-buffer allocations, draw
+calls, and upload bytes. It enforces 20 ms p95, 25 ms max-frame, 50 MiB process
+heap and 320 WASM linear-memory page budgets through 100k triangles. The 200k
+maximum-size fixture uses separate 40 ms p95, 50 ms max-frame, 100 MiB process
+heap and 600-page limits. Set
+`ANVIL_BENCH_WARMUP`, `ANVIL_BENCH_SAMPLES`, and `ANVIL_BENCH_OUTPUT` to adjust
+or save a run. A single contiguous material run appends chunks into one pooled
+typed array and reuses its persistent vertex buffer. Separate material runs
+retain order and produce separate draws; up to 256 runs are allowed per frame.
+The renderer-owned vertex pool is capped at 48 MiB. Textured static `model_draw`
+has a bounded 200,000 source-triangle frame budget. On the recorded Chrome 157 /
+SwiftShader host, the 1k/10k/100k fixtures used 47/69/288 WASM pages at start,
+peak and end (no frame-time growth); process JS heap peaks were 1.5/4.5/42.5
+MiB. Their p95 was 4.7/5.4/15.4 ms and maximum frame was 6.5/5.7/16.3 ms.
+The 200k maximum-size fixture used 533 pages (no memory growth), with 26.8 ms
+p95, 28.1 ms max, and 84.6 MiB process JS heap. A/B/A material runs used 44
+pages and measured 4.5 ms p95 and 5.1 ms max, with three draws and two
+persistent buffers. Larger models may exceed these budgets.

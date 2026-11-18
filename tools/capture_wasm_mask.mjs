@@ -8,9 +8,13 @@ import { setTimeout as delay } from "node:timers/promises";
 const root = path.resolve(process.argv[2] || ".");
 const page = process.argv[3] || "program.html";
 const captureFrames = Number.parseInt(process.env.ANVIL_WASM_CAPTURE_FRAMES || "1", 10);
+const benchmarkFrames = Number.parseInt(process.env.ANVIL_WASM_BENCH_FRAMES || "0", 10);
+const warmupFrames = Number.parseInt(process.env.ANVIL_WASM_BENCH_WARMUP || "0", 10);
 const requireSphereImpostor = process.env.ANVIL_REQUIRE_SPHERE_IMPOSTOR === "1";
-if (!Number.isInteger(captureFrames) || captureFrames < 1 || captureFrames > 60)
+  if (!Number.isInteger(captureFrames) || captureFrames < 1 || captureFrames > 60)
   throw new Error("ANVIL_WASM_CAPTURE_FRAMES must be between 1 and 60");
+if (!Number.isInteger(benchmarkFrames) || benchmarkFrames < 0 || benchmarkFrames > 10000 || !Number.isInteger(warmupFrames) || warmupFrames < 0 || warmupFrames > 10000)
+  throw new Error("benchmark frame counts must be between 0 and 10000");
 const chromePath = process.env.CHROME_PATH || "C:/Program Files/Google/Chrome/Application/chrome.exe";
 if (!fs.existsSync(path.join(root, page))) throw new Error(`page not found: ${page}`);
 
@@ -99,7 +103,13 @@ try {
   }
   if (!devtoolsPort) throw new Error("Chrome did not create a readable DevTools port file");
   await pollJson(`http://127.0.0.1:${devtoolsPort}/json/version`);
-  const url = `http://127.0.0.1:${server.address().port}/${encodeURIComponent(page)}${requireSphereImpostor ? "?anvil_debug=1" : ""}`;
+  const debug = requireSphereImpostor || benchmarkFrames > 0;
+  const params = new URLSearchParams();
+  if (debug) params.set("anvil_debug", "1");
+  if (process.env.ANVIL_WASM_PAINTER === "1") params.set("painter", "1");
+  if (process.env.ANVIL_WASM_NO_WEBGL === "1") params.set("no_webgl", "1");
+  const query = params.toString();
+  const url = `http://127.0.0.1:${server.address().port}/${encodeURIComponent(page)}${query ? `?${query}` : ""}`;
   const response = await fetch(`http://127.0.0.1:${devtoolsPort}/json/new?${url}`, { method: "PUT" });
   if (!response.ok) throw new Error(`Chrome page creation failed: ${response.status}`);
   const cdp = await connect(await response.json());
@@ -120,6 +130,25 @@ try {
       const context = canvas.getContext('2d');
       const gl = document.createElement('canvas').getContext('webgl');
       if (!gl) throw new Error('WebGL unavailable');
+      const timings = [];
+      const frameStats = [];
+      let heapPeak = 0;
+      const wasmMemory = window.anvil.exports.memory;
+      const wasmMemoryStartBytes = wasmMemory ? wasmMemory.buffer.byteLength : 0;
+      let wasmMemoryPeakBytes = wasmMemoryStartBytes;
+      for (let frame = 0; frame < ${warmupFrames}; frame++) {
+        window.anvil.exports.anvil_frame(16.6667);
+        if (wasmMemory) wasmMemoryPeakBytes=Math.max(wasmMemoryPeakBytes,wasmMemory.buffer.byteLength);
+      }
+      for (let frame = 0; frame < ${benchmarkFrames}; frame++) {
+        const before = {...(window.__anvilTexturedRendererStats||{})};
+        const start = performance.now(); window.anvil.exports.anvil_frame(16.6667); timings.push(performance.now() - start);
+        const after = window.__anvilTexturedRendererStats||{};
+        frameStats.push({triangles:(after.triangles||0)-(before.triangles||0),batches:(after.batches||0)-(before.batches||0),buffer_allocations:(after.buffer_allocations||0)-(before.buffer_allocations||0),draw_calls:(after.draw_calls||0)-(before.draw_calls||0),uploaded_bytes:(after.uploaded_bytes||0)-(before.uploaded_bytes||0)});
+        if (performance.memory) heapPeak=Math.max(heapPeak,performance.memory.usedJSHeapSize);
+        if (wasmMemory) wasmMemoryPeakBytes=Math.max(wasmMemoryPeakBytes,wasmMemory.buffer.byteLength);
+      }
+      timings.sort((a,b)=>a-b);
       const frames = [];
       for (let frame = 0; frame < ${captureFrames}; frame++) {
         window.anvil.exports.anvil_frame(16.6667);
@@ -139,7 +168,9 @@ try {
       let binary = '';
       for (let start = 0; start < packed.length; start += 8192)
         binary += String.fromCharCode(...packed.subarray(start, start + 8192));
-      return { width: 960, height: 600, mask: btoa(binary), rgba: frames[frames.length - 1], frames, sphere_impostor_available: !!window.__anvilSphereImpostorAvailable, sphere_impostor_calls: window.__anvilSphereImpostorCalls ?? 0 };
+      const memory = performance.memory;
+      const counters = frameStats.length ? Object.fromEntries(Object.keys(frameStats[0]).map((key)=>[key,Math.max(...frameStats.map((row)=>row[key]))])) : null;
+      return { width: 960, height: 600, mask: btoa(binary), rgba: frames[frames.length - 1], frames, sphere_impostor_available: !!window.__anvilSphereImpostorAvailable, sphere_impostor_calls: window.__anvilSphereImpostorCalls ?? 0, benchmark: ${benchmarkFrames > 0 ? "{warmup_frames:" + warmupFrames + ",sample_frames:" + benchmarkFrames + ",p50_ms:timings[Math.floor(timings.length*.5)],p95_ms:timings[Math.ceil(timings.length*.95)-1],max_ms:timings[timings.length-1],heap_peak_mb:heapPeak/1048576,wasm_memory_start_bytes:wasmMemoryStartBytes,wasm_memory_peak_bytes:wasmMemoryPeakBytes,wasm_memory_end_bytes:wasmMemory?wasmMemory.buffer.byteLength:0,wasm_memory_start_pages:wasmMemoryStartBytes/65536,wasm_memory_peak_pages:wasmMemoryPeakBytes/65536,renderer_per_frame_max:counters,renderer_total:window.__anvilTexturedRendererStats||null}" : "null"} };
     })()` ,
     returnByValue: true,
   });

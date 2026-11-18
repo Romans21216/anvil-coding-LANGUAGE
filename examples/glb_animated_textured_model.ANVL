@@ -1,0 +1,8 @@
+scene 3d
+camera perspective 0 0 7
+camera fov(60)
+set var(t) = model_animate("glb_animated_textured.glb", 0.5)
+
+fn(draw)
+  set var(ok) = model_draw("glb_animated_textured.glb", 0, 0, 0, 1, 0, 0, 0)
+end

@@ -15,9 +15,10 @@ LINEAR and STEP keys). Animated models bake node-local triangles and hierarchy
 data for runtime posing; static models use a cheaper world-space bake. One skin
 can bake mesh-space vertices with four joint indices and weights per vertex,
 plus inverse bind matrices. Morph targets are supported for unskinned static
-and animated models. Static unskinned C-backend draws also support base-color
-PNG textures with `TEXCOORD_0`; WebAssembly currently falls back to
-`baseColorFactor`. Sparse accessors are not supported yet.
+and animated models. Base-color PNG textures with `TEXCOORD_0` are supported
+for static, animated and skinned `model_draw` calls in both backends. Sparse
+accessors are not
+supported yet.
 """
 
 from __future__ import annotations
@@ -1400,6 +1401,10 @@ def load_skinned(path: pathlib.Path) -> dict:
     if not skin_nodes:
         raise ModelError("no node uses the skin")
     vertices: list[float] = []
+    textured_vertices: list[float] = []
+    texture_slots, textures = _collect_base_color_textures(
+        document, path.parent, binary
+    )
     for node_index in skin_nodes:
         node = nodes_doc[node_index]
         if "mesh" not in node:
@@ -1417,6 +1422,16 @@ def load_skinned(path: pathlib.Path) -> dict:
                 raise ModelError(
                     f"generated model geometry exceeds the {MAX_GEOMETRY_BYTES} byte import limit"
                 )
+            if textures:
+                first_textured = len(textured_vertices) // 20
+                _primitive(
+                    document, primitive, _identity(), path.parent, binary,
+                    texture_out=textured_vertices, texture_slots=texture_slots,
+                    max_triangles=MAX_TRIANGLES - len(textured_vertices) // 20,
+                )
+                expected = _triangle_count(primitive.get("mode", 4), item_count)
+                if len(textured_vertices) // 20 - first_textured != expected:
+                    raise ModelError("textured and skinned triangle data became misaligned")
             vertices.extend(_skinned_primitive(
                 document, primitive, path.parent, binary,
                 MAX_TRIANGLES - len(vertices) // 42,
@@ -1425,7 +1440,7 @@ def load_skinned(path: pathlib.Path) -> dict:
         raise ModelError("the skinned model has no triangle geometry")
 
     tracks, times, values, length = _clip(document, nodes_doc, path.parent, binary)
-    return {
+    entry = {
         "vertices": vertices,
         "nodes": nodes,
         "parents": parents,
@@ -1436,6 +1451,10 @@ def load_skinned(path: pathlib.Path) -> dict:
         "values": values,
         "length": length,
     }
+    if textures:
+        entry.update({"textured_data": textured_vertices, "textures": textures,
+                      "textured": True})
+    return entry
 
 
 def _skinned_primitive(
@@ -1545,6 +1564,10 @@ def load_animated(path: pathlib.Path) -> dict:
         roots = list(range(len(nodes_doc)))
 
     vertices: list[float] = []
+    textured_vertices: list[float] = []
+    texture_slots, textures = _collect_base_color_textures(
+        document, base_dir, binary
+    )
     groups: list[int] = []
     morph: list[float] = []
     morph_counts: list[int] = []
@@ -1558,6 +1581,7 @@ def load_animated(path: pathlib.Path) -> dict:
         node = nodes_doc[index]
         if "mesh" in node:
             first = len(vertices) // 12
+            textured_first = len(textured_vertices) // 20
             mesh = _mesh_for_node(document, node)
             primitives = mesh.get("primitives", [])
             node_target_count = max(
@@ -1574,10 +1598,14 @@ def load_animated(path: pathlib.Path) -> dict:
                     _primitive(
                         document, primitive, _identity(), base_dir, binary,
                         morph if primitive.get("targets") else None,
+                        texture_out=textured_vertices if textures else None,
+                        texture_slots=texture_slots if textures else None,
                     )
                 )
                 morph_counts.append(len(primitive.get("targets", [])))
             count = len(vertices) // 12 - first
+            if textures and len(textured_vertices) // 20 - textured_first != count:
+                raise ModelError("textured and animated triangle data became misaligned")
             if count:
                 groups.extend((index, first, count))
                 if node_defaults is not None:
@@ -1603,6 +1631,9 @@ def load_animated(path: pathlib.Path) -> dict:
         "values": values,
         "length": length,
     }
+    if textures:
+        entry.update({"textured_data": textured_vertices, "textures": textures,
+                      "textured": True})
     if morph_counts and max(morph_counts) > 0:
         target_count = morph_counts[0]
         if target_count > MAX_MORPH_TARGETS:
@@ -1783,13 +1814,7 @@ def _ensure_model(
         raise ModelError("only .gltf and .glb models are supported")
     entry: dict = {"id": len(_registry), "symbol": f"anvil_model_{len(_registry)}"}
     kind = _kind(path, include_textures=include_textures)
-    if kind.startswith("textured_"):
-        feature = kind.removeprefix("textured_")
-        raise ModelError(
-            f"base-color textures on {feature} models are not supported yet; "
-            "texture rendering currently requires a static unskinned model"
-        )
-    if kind == "skinned":
+    if kind in ("skinned", "textured_skinned"):
         clip = load_skinned(path)
         entry.update(clip)
         entry["skinned"] = True
@@ -1804,7 +1829,7 @@ def _ensure_model(
         entry["count"] = len(morph["vertices"]) // 12
         entry["data"] = morph["vertices"]
         entry["bounds"] = bounds_of(morph["vertices"])
-    elif kind == "animated":
+    elif kind in ("animated", "textured_animated"):
         clip = load_animated(path)
         entry.update(clip)
         entry["animated"] = True
@@ -1899,6 +1924,18 @@ def definitions(*, include_textures: bool = True) -> list[str]:
             _double_array(lines, symbol + "_times", entry["times"], 8)
             _double_array(lines, symbol + "_values", entry["values"], 8)
             _int_array(lines, symbol + "_tracks", entry["tracks"], 6)
+            if entry.get("textured") and include_textures:
+                _double_array(lines, symbol + "_textured", entry["textured_data"], 20)
+                for index, (width, height, pixels) in enumerate(entry["textures"]):
+                    _uint_array(lines, f"{symbol}_texture_{index}", pixels, 8)
+                pointers = ", ".join(
+                    f"{symbol}_texture_{index}" for index in range(len(entry["textures"]))
+                )
+                dimensions = ", ".join(
+                    f"{width}, {height}" for width, height, _ in entry["textures"]
+                )
+                lines.append(f"static const uint32_t *const {symbol}_textures[] = {{{pointers}}};")
+                lines.append(f"static const int {symbol}_texture_dimensions[] = {{{dimensions}}};")
         elif entry.get("animated"):
             lines.append(
                 f"/* model: {pathlib.Path(key).name}, {count} animated triangles, "
@@ -1914,6 +1951,18 @@ def definitions(*, include_textures: bool = True) -> list[str]:
             if entry.get("morph_count"):
                 _double_array(lines, symbol + "_morph", entry["morph"], 12)
                 _double_array(lines, symbol + "_morph_default", entry["morph_defaults"], 8)
+            if entry.get("textured") and include_textures:
+                _double_array(lines, symbol + "_textured", entry["textured_data"], 20)
+                for index, (width, height, pixels) in enumerate(entry["textures"]):
+                    _uint_array(lines, f"{symbol}_texture_{index}", pixels, 8)
+                pointers = ", ".join(
+                    f"{symbol}_texture_{index}" for index in range(len(entry["textures"]))
+                )
+                dimensions = ", ".join(
+                    f"{width}, {height}" for width, height, _ in entry["textures"]
+                )
+                lines.append(f"static const uint32_t *const {symbol}_textures[] = {{{pointers}}};")
+                lines.append(f"static const int {symbol}_texture_dimensions[] = {{{dimensions}}};")
         elif entry.get("morph_count"):
             lines.append(
                 f"/* model: {pathlib.Path(key).name}, {count} morphing triangles, "

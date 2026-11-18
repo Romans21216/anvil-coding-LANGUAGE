@@ -99,6 +99,11 @@ typedef struct {
 typedef struct {
   const AnvilMeshBvh *bvh;
   AnvilMeshBvh animated_bvh;
+  double *animated_textured_data;
+  const double *textured_data;
+  const uint32_t *const *textures;
+  const int *texture_dimensions;
+  int texture_count;
   double cx, cy, cz, radius;
   double x, y, z, scale, rx, ry, rz;
   const double *morph_weights;
@@ -301,6 +306,7 @@ static void anvil_trace_mesh_clear(void) {
     free(mesh->animated_bvh.nodes);
     free(mesh->animated_bvh.indices);
     free(mesh->animated_bvh.posed_data);
+    free(mesh->animated_textured_data);
     if (mesh->transient_bytes <= anvil_trace_mesh_transient_bytes)
       anvil_trace_mesh_transient_bytes -= mesh->transient_bytes;
     else
@@ -1297,7 +1303,9 @@ double anvil_mesh_draw_animated(
     const double *values, const int *tracks, int track_count, double clip_length,
     double clip_time, const double *morph_deltas,
     const double *group_defaults, const double *morph_weights, int model_id,
-    int morph_count, double x, double y, double z, double scale, double rx,
+    int morph_count, const double *textured_data,
+    const uint32_t *const *textures, const int *texture_dimensions,
+    int texture_count, double x, double y, double z, double scale, double rx,
     double ry, double rz) {
   if (!data || !groups || triangle_count <= 0 || group_count <= 0 ||
       morph_count < 0 || morph_count > ANVIL_MORPH_TARGETS ||
@@ -1306,10 +1314,13 @@ double anvil_mesh_draw_animated(
       !isfinite(x) || !isfinite(y) || !isfinite(z) || !isfinite(scale) ||
       !isfinite(rx) || !isfinite(ry) || !isfinite(rz) || scale == 0.0)
     return 0.0;
+  if (textured_data && (!textures || !texture_dimensions || texture_count <= 0))
+    return 0.0;
   if (!anvil_model_pose(nodes, node_count, parents, times, values, tracks,
                         track_count, clip_length, clip_time))
     return 0.0;
-  anvil_mesh_drawn_frame++;
+  if (!textured_data)
+    anvil_mesh_drawn_frame++;
   double group_weights[ANVIL_MORPH_TARGETS];
   for (int group = 0; group < group_count; ++group) {
     const int *entry = groups + group * 3;
@@ -1349,7 +1360,27 @@ double anvil_mesh_draw_animated(
           anvil_cross(anvil_sub(v[1], v[0]), anvil_sub(v[2], v[0])));
       double brightness = anvil_light_level(n, 1);
       uint32_t base = anvil_color((int)p[9], (int)p[10], (int)p[11]);
-      anvil_world_triangle(v, base, brightness, 255);
+      const double *texture_source = textured_data
+          ? textured_data + (size_t)triangle * 20 : NULL;
+      if (texture_source && texture_source[19] >= 0.0) {
+        const double *source = texture_source;
+        double posed[20];
+        for (int corner = 0; corner < 3; ++corner) {
+          posed[corner * 5] = v[corner].x;
+          posed[corner * 5 + 1] = v[corner].y;
+          posed[corner * 5 + 2] = v[corner].z;
+          posed[corner * 5 + 3] = source[corner * 5 + 3];
+          posed[corner * 5 + 4] = source[corner * 5 + 4];
+        }
+        posed[15] = source[15]; posed[16] = source[16];
+        posed[17] = source[17]; posed[18] = source[18];
+        posed[19] = source[19];
+        anvil_mesh_draw_textured(posed, 1, textures, texture_dimensions,
+                                 texture_count, 0.0, 0.0, 0.0, 1.0e100,
+                                 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0);
+      } else {
+        anvil_world_triangle(v, base, brightness, 255);
+      }
     }
   }
   return 1.0;
@@ -1362,12 +1393,15 @@ double anvil_mesh_draw_skinned(
     const int *parents, const int *joint_nodes, int joint_count,
     const double *bind, const double *times, const double *values,
     const int *tracks, int track_count, double clip_length, double clip_time,
-    double x, double y, double z, double scale, double rx, double ry,
-    double rz) {
+    const double *textured_data, const uint32_t *const *textures,
+    const int *texture_dimensions, int texture_count, double x, double y,
+    double z, double scale, double rx, double ry, double rz) {
   if (!data || !joint_nodes || !bind || triangle_count <= 0 ||
       joint_count <= 0 || joint_count > 64 || !isfinite(x) || !isfinite(y) ||
       !isfinite(z) || !isfinite(scale) || !isfinite(rx) || !isfinite(ry) ||
       !isfinite(rz) || scale == 0.0)
+    return 0.0;
+  if (textured_data && (!textures || !texture_dimensions || texture_count <= 0))
     return 0.0;
   if (!anvil_model_pose(nodes, node_count, parents, times, values, tracks,
                         track_count, clip_length, clip_time))
@@ -1417,7 +1451,26 @@ double anvil_mesh_draw_skinned(
     AnvilVec3 n = anvil_normalize(
         anvil_cross(anvil_sub(v[1], v[0]), anvil_sub(v[2], v[0])));
     double brightness = anvil_light_level(n, 1);
-    anvil_world_triangle(v, base, brightness, 255);
+    const double *texture = textured_data
+        ? textured_data + (size_t)triangle * 20 : NULL;
+    if (texture && texture[19] >= 0.0) {
+      double posed[20];
+      for (int corner = 0; corner < 3; ++corner) {
+        posed[corner * 5] = v[corner].x;
+        posed[corner * 5 + 1] = v[corner].y;
+        posed[corner * 5 + 2] = v[corner].z;
+        posed[corner * 5 + 3] = texture[corner * 5 + 3];
+        posed[corner * 5 + 4] = texture[corner * 5 + 4];
+      }
+      posed[15] = texture[15]; posed[16] = texture[16];
+      posed[17] = texture[17]; posed[18] = texture[18];
+      posed[19] = texture[19];
+      anvil_mesh_draw_textured(posed, 1, textures, texture_dimensions,
+                               texture_count, 0.0, 0.0, 0.0, 1.0e100,
+                               0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0);
+    } else {
+      anvil_world_triangle(v, base, brightness, 255);
+    }
   }
   return 1.0;
 }
@@ -3887,6 +3940,26 @@ double anvil_trace_mesh(const double *data, int triangle_count, double cx,
                                    rz);
 }
 
+double anvil_trace_mesh_textured(
+    const double *data, const double *textured_data,
+    const uint32_t *const *textures, const int *texture_dimensions,
+    int texture_count, int triangle_count, double cx, double cy, double cz,
+    double radius, double x, double y, double z, double scale, double rx,
+    double ry, double rz) {
+  if (!textured_data || !textures || !texture_dimensions || texture_count <= 0)
+    return 0.0;
+  double result = anvil_trace_mesh(data, triangle_count, cx, cy, cz, radius,
+                                   x, y, z, scale, rx, ry, rz);
+  if (result != 0.0) {
+    AnvilTraceMesh *mesh = &anvil_trace_meshes[anvil_trace_mesh_count - 1];
+    mesh->textured_data = textured_data;
+    mesh->textures = textures;
+    mesh->texture_dimensions = texture_dimensions;
+    mesh->texture_count = texture_count;
+  }
+  return result;
+}
+
 double anvil_trace_mesh_morphed(
     const double *data, int triangle_count, const double *morph_deltas,
     const double *morph_defaults, const double *morph_weights,
@@ -4359,13 +4432,16 @@ double anvil_trace_mesh_animated(
     const double *values, const int *tracks, int track_count, double clip_length,
     double clip_time, const double *morph_deltas,
     const double *group_defaults, const double *morph_weights, int model_id,
-    int morph_count, double x, double y, double z, double scale, double rx,
+    int morph_count, const double *textured_data,
+    const uint32_t *const *textures, const int *texture_dimensions,
+    int texture_count, double x, double y, double z, double scale, double rx,
     double ry, double rz) {
   if (!data || !groups || triangle_count <= 0 ||
       triangle_count > ANVIL_MESH_MAX_TRIANGLES || group_count <= 0 ||
       morph_count < 0 || morph_count > ANVIL_MORPH_TARGETS ||
       (morph_count > 0 &&
        (!morph_deltas || !group_defaults || !morph_weights)) ||
+      (textured_data && (!textures || !texture_dimensions || texture_count <= 0)) ||
       anvil_trace_mesh_count >= ANVIL_TRACE_MESHES || !isfinite(x) ||
       !isfinite(y) || !isfinite(z) || !isfinite(scale) || scale == 0.0 ||
       !isfinite(rx) || !isfinite(ry) || !isfinite(rz) ||
@@ -4386,7 +4462,10 @@ double anvil_trace_mesh_animated(
   size_t node_bytes = (size_t)triangle_count * 2 * sizeof(AnvilBvhNode);
   size_t index_bytes = (size_t)triangle_count * sizeof(int);
   size_t pose_bytes = (size_t)triangle_count * 12 * sizeof(double);
-  size_t transient_bytes = node_bytes + index_bytes + pose_bytes;
+  size_t textured_pose_bytes = textured_data
+      ? (size_t)triangle_count * 20 * sizeof(double) : 0;
+  size_t transient_bytes = node_bytes + index_bytes + pose_bytes +
+                           textured_pose_bytes;
   if (anvil_mesh_bvh_memory_bytes > ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES ||
       anvil_trace_mesh_transient_bytes >
           ANVIL_MESH_BVH_MEMORY_LIMIT_BYTES - anvil_mesh_bvh_memory_bytes ||
@@ -4403,11 +4482,15 @@ double anvil_trace_mesh_animated(
       index_bytes);
   mesh->animated_bvh.posed_data = (double *)malloc(
       pose_bytes);
+  if (textured_data)
+    mesh->animated_textured_data = (double *)malloc(textured_pose_bytes);
   if (!mesh->animated_bvh.nodes || !mesh->animated_bvh.indices ||
-      !mesh->animated_bvh.posed_data) {
+      !mesh->animated_bvh.posed_data ||
+      (textured_data && !mesh->animated_textured_data)) {
     free(mesh->animated_bvh.nodes);
     free(mesh->animated_bvh.indices);
     free(mesh->animated_bvh.posed_data);
+    free(mesh->animated_textured_data);
     memset(mesh, 0, sizeof(*mesh));
     --anvil_trace_mesh_count;
     return 0.0;
@@ -4450,6 +4533,20 @@ double anvil_trace_mesh_animated(
           }
         }
         anvil_mat_point(matrix, px, py, pz, posed + vertex * 3);
+        if (textured_data) {
+          const double *texture = textured_data + (size_t)triangle * 20;
+          double *posed_texture = mesh->animated_textured_data +
+                                  (size_t)triangle * 20;
+          posed_texture[vertex * 5] = posed[vertex * 3];
+          posed_texture[vertex * 5 + 1] = posed[vertex * 3 + 1];
+          posed_texture[vertex * 5 + 2] = posed[vertex * 3 + 2];
+          posed_texture[vertex * 5 + 3] = texture[vertex * 5 + 3];
+          posed_texture[vertex * 5 + 4] = texture[vertex * 5 + 4];
+          if (vertex == 2) {
+            for (int field = 15; field < 20; ++field)
+              posed_texture[field] = texture[field];
+          }
+        }
       }
       posed[9] = source[9];
       posed[10] = source[10];
@@ -4464,6 +4561,10 @@ double anvil_trace_mesh_animated(
       (bvh->nodes[0].minimum.z + bvh->nodes[0].maximum.z) * 0.5};
   AnvilVec3 extent = anvil_sub(bvh->nodes[0].maximum, center);
   mesh->bvh = bvh;
+  mesh->textured_data = textured_data ? mesh->animated_textured_data : NULL;
+  mesh->textures = textured_data ? textures : NULL;
+  mesh->texture_dimensions = textured_data ? texture_dimensions : NULL;
+  mesh->texture_count = textured_data ? texture_count : 0;
   mesh->cx = center.x;
   mesh->cy = center.y;
   mesh->cz = center.z;
@@ -4646,6 +4747,57 @@ static void anvil_mesh_ray_local(const AnvilTraceMesh *mesh,
   *local_direction = (AnvilVec3){local_direction->x / mesh->scale,
                                  local_direction->y / mesh->scale,
                                  local_direction->z / mesh->scale};
+}
+
+/* Return -1 for an untextured primitive, 0 for a transparent/invalid sample,
+   and 1 for a sampled base-color texel. The hit and UVs are in model space. */
+static int anvil_trace_mesh_texture_sample(
+    const AnvilTraceMesh *mesh, int triangle_index, AnvilVec3 hit,
+    int *red, int *green, int *blue, int *alpha) {
+  if (!mesh->textured_data)
+    return -1;
+  const double *triangle = mesh->textured_data + (size_t)triangle_index * 20;
+  int texture_index = (int)triangle[19];
+  if (texture_index < 0)
+    return -1;
+  if (texture_index >= mesh->texture_count || !mesh->textures[texture_index])
+    return 0;
+  AnvilVec3 a = {triangle[0], triangle[1], triangle[2]};
+  AnvilVec3 b = {triangle[5], triangle[6], triangle[7]};
+  AnvilVec3 c = {triangle[10], triangle[11], triangle[12]};
+  AnvilVec3 e0 = anvil_sub(b, a), e1 = anvil_sub(c, a), d = anvil_sub(hit, a);
+  double d00 = anvil_dot(e0, e0), d01 = anvil_dot(e0, e1);
+  double d11 = anvil_dot(e1, e1), d20 = anvil_dot(d, e0), d21 = anvil_dot(d, e1);
+  double denominator = d00 * d11 - d01 * d01;
+  if (!isfinite(denominator) || fabs(denominator) < 1.0e-20)
+    return 0;
+  double w1 = (d11 * d20 - d01 * d21) / denominator;
+  double w2 = (d00 * d21 - d01 * d20) / denominator;
+  double w0 = 1.0 - w1 - w2;
+  double u = w0 * triangle[3] + w1 * triangle[8] + w2 * triangle[13];
+  double v = w0 * triangle[4] + w1 * triangle[9] + w2 * triangle[14];
+  u -= floor(u);
+  v = 1.0 - v;
+  v -= floor(v);
+  int width = mesh->texture_dimensions[texture_index * 2];
+  int height = mesh->texture_dimensions[texture_index * 2 + 1];
+  if (width <= 0 || height <= 0 || !isfinite(u) || !isfinite(v))
+    return 0;
+  int tx = (int)(u * width), ty = (int)(v * height);
+  if (tx >= width) tx = width - 1;
+  if (ty >= height) ty = height - 1;
+  uint32_t texel = mesh->textures[texture_index][(size_t)ty * width + tx];
+  unsigned int texel_alpha = (texel >> 24) & 255u;
+  double material_alpha = triangle[18];
+  if (material_alpha < 0.0) material_alpha = 0.0;
+  if (material_alpha > 255.0) material_alpha = 255.0;
+  *alpha = (int)(texel_alpha * material_alpha / 255.0);
+  if (*alpha <= 0)
+    return 0;
+  *red = (int)(((texel >> 16) & 255u) * triangle[15] / 255.0);
+  *green = (int)(((texel >> 8) & 255u) * triangle[16] / 255.0);
+  *blue = (int)((texel & 255u) * triangle[17] / 255.0);
+  return 1;
 }
 
 static int anvil_trace_meshes_shadow(AnvilVec3 origin,
@@ -4978,10 +5130,27 @@ void anvil_trace_finish(void) {
           AnvilVec3 view = {-direction.x, -direction.y, -direction.z};
           AnvilVec3 halfway = anvil_normalize(anvil_add(light, view));
           double specular = pow(fmax(0.0, anvil_dot(normal, halfway)), 28.0) * 0.22;
-          red_sum += triangle[9] * brightness + 255.0 * specular;
-          green_sum += triangle[10] * brightness + 255.0 * specular;
-          blue_sum += triangle[11] * brightness + 255.0 * specular;
-          alpha_sum += 255.0;
+          AnvilVec3 local_hit = anvil_add(
+              local_origin, (AnvilVec3){local_direction.x * closest,
+                                       local_direction.y * closest,
+                                       local_direction.z * closest});
+          int texture_r = 0, texture_g = 0, texture_b = 0, texture_a = 0;
+          int texture_result = anvil_trace_mesh_texture_sample(
+              mesh, triangle_index, local_hit, &texture_r, &texture_g,
+              &texture_b, &texture_a);
+          if (texture_result == 0)
+            continue;
+          if (texture_result > 0) {
+            red_sum += texture_r * brightness + 255.0 * specular;
+            green_sum += texture_g * brightness + 255.0 * specular;
+            blue_sum += texture_b * brightness + 255.0 * specular;
+            alpha_sum += texture_a;
+          } else {
+            red_sum += triangle[9] * brightness + 255.0 * specular;
+            green_sum += triangle[10] * brightness + 255.0 * specular;
+            blue_sum += triangle[11] * brightness + 255.0 * specular;
+            alpha_sum += 255.0;
+          }
           double depth = anvil_dot(anvil_sub(point, origin), forward);
           if (depth < nearest_depth) nearest_depth = depth;
           ++hits;

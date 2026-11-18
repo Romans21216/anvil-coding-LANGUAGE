@@ -1904,3 +1904,175 @@ scenes passed. Full suite: `python -m pytest -q` — 1,049 passed, 1 skipped,
 rechecked: the budget-schema mismatch was fixed, both visual checks now pass,
 and the transient WASM browser initialization failure passed on rerun. No
 commit or push was made.
+
+## Batch 141 — textured WebAssembly GLB rendering, batching, and example
+
+Completed the textured static GLB path in the browser with camera-space
+near-plane clipping, UV interpolation, contiguous texture-run submission, and
+a separate 200,000-source-triangle frame budget. WebGL host submission now uses
+one typed upload and one draw per contiguous texture run, preserving run order.
+The host reuses its typed vertex array and persistent WebGL buffer for each run.
+Added `examples/glb_textured_quad.glb` and
+`examples/glb_textured_model.ANVL`, plus a C/Chrome framebuffer regression that
+compiles and renders the bundled asset from an oblique camera. The example passed WASM `--check`, a
+WASM build, and headless Chrome capture; the browser capture contained all four
+embedded texture colors. The parity regression passed. The 1k/10k/100k textured
+submission benchmark measured one persistent buffer allocation per texture run and one draw per frame for
+a single texture run. Reusing the host typed array bounds measured JS heap use. On the recorded Chrome/SwiftShader run, 100k triangles
+measured 13.1 ms p50, 15.1 ms p95, 16.3 ms max and 12.3 MiB heap peak,
+inside the benchmark’s 20 ms p95, 25 ms max-frame and 25 MiB heap budgets.
+See `tools/bench_wasm_textured_submission.mjs` and
+`docs/PART8_EVIDENCE_LEDGER.md` for the full measurements and remaining
+limitations. Validation: focused GLB browser parity and texture tests passed;
+Node script syntax checks and `git diff --check` passed. No commit or push.
+
+## Batch 142 — unify streamed WAV metadata validation
+
+Added `_wav_pcm_info()` as the shared validator used by the baked PCM reader and
+streaming-music metadata reader. Both paths now check the complete PCM
+WAVE_FORMAT_EXTENSIBLE subtype GUID, valid bits, supported channels/rate/depth,
+byte rate, block alignment, data alignment to complete sample frames, and
+non-empty payload. Browser compilation rejects a non-PCM extensible subformat
+at the `music_load` source line before emitting the WASM output.
+
+Validation: `python -m unittest tests.test_wav_stream_metadata -v` — 3 passed;
+`python -m unittest tests.test_wasm.WasmMusicTests.test_non_pcm_extensible_music_is_a_located_build_error tests.test_wasm.WasmMusicTests.test_a_streamed_track_reports_its_length_and_uses_sidecar_url -v` — 2 passed. `git diff --check` passed.
+
+### Textured GLB camera parity matrix
+
+Expanded `test_bundled_textured_glb_example_matches_c_in_chromium` to compile
+and compare the bundled embedded-PNG GLB under three camera angles: `(0, 0)`,
+`(20, -12)`, and `(-28, 14)`. Each case checks C/Chrome silhouette IoU, visible
+color error, and channel tolerance against the same compiled example source.
+Validation: the three-angle browser parity test passed (17.70 s).
+
+## Batch 143 — animated textured GLB model_draw support
+
+Extended animated GLB import to preserve per-triangle UVs, base-color tint,
+alpha, texture slots, and decoded PNG images beside node-local geometry. The C
+and WebAssembly animated model_draw runtimes now apply the evaluated node pose
+and active POSITION morph weights to texture coordinates' positions before using
+the existing textured projection, near-plane clipping, lighting and sampling
+paths. Textured animated draws retain the shared 16,384-triangle WASM model
+budget; static textured draws retain the separate 200,000-triangle budget.
+Added `examples/glb_animated_textured.glb` and
+`examples/glb_animated_textured_model.ANVL`.
+
+Validation: temporary animated embedded-PNG GLB passed compiler `--check`,
+compiled for C and WebAssembly, and rendered in headless Chrome with 95,172
+visible pixels and all four expected texture colors. The checked-in example
+passes `--check` and a WASM build. `git diff --check` passes. No test suite was
+run. Skinned texture support and texture sampling through `ray_mesh` remain
+unsupported.
+
+## Batch 144 — textured skinned GLB model_draw support
+
+Extended skinned GLB import with parallel UV/material/alpha/texture-slot data.
+C and WebAssembly `model_draw` now blend each vertex through its joint matrices,
+then submit the posed triangle with its original UVs and texture material. The
+WASM path preflights both its shared 16,384-triangle model-frame budget and the
+200,000 textured-source-triangle budget before drawing. The skinned WebAssembly
+`ray_mesh` call keeps its existing flat-color behavior and passes no texture
+payload. Added `examples/glb_skinned_textured.glb` and
+`examples/glb_skinned_textured_model.ANVL`.
+
+Validation: the bundled example passed compiler `--check`, a fresh C build and
+a fresh WASM build. Headless Chromium rendered 7,021 visible pixels with three
+sampled texture colors. A textured skinned `ray_mesh` WASM build also succeeds
+and retains its prior non-textured call path. `git diff --check` passes. No
+formal test suite was run. Textured `ray_mesh` remains unsupported.
+
+## Batch 145 — textured GLB support in ray_mesh
+
+Static unskinned textured `ray_mesh` now retains the texture records through
+code generation. The C path samples nearest, REPEAT-wrapped base-color PNG
+texels at BVH ray hits using interpolated UVs and multiplies material/vertex
+tint and alpha while preserving ray-traced lighting and shadows. The WebAssembly
+path submits static textured `ray_mesh` through its textured raster renderer,
+with the same near-plane clipping and the shared 16,384 model-triangle budget.
+Mixed textured and untextured primitives retain both material paths. Added
+`examples/glb_textured_ray_mesh.ANVL` using the bundled embedded-texture GLB.
+
+Validation: the example passed `--check`, fresh C and WASM builds, and
+headless Chromium capture with 94,864 visible pixels and all four texture
+colors. Fresh C/WASM builds of the animated and skinned textured examples also
+passed after updating the shared mixed-material path. `git diff --check`
+passes. No test suite was run. Animated and skinned textured `ray_mesh` still
+uses flat material color; C skinned `ray_mesh` remains unsupported.
+
+
+## Batch 146 — animated textured GLB ray_mesh support
+
+Animated unskinned textured `ray_mesh` now carries the baked UV/material data
+into the animated pose. C snapshots transformed vertex positions beside the
+per-frame BVH and samples texture colors at ray hits; WebAssembly reuses the
+animated textured depth-tested triangle renderer. Existing per-frame limits
+remain in force. Added `examples/glb_animated_textured_ray_mesh.ANVL` from the
+bundled embedded-PNG GLB. Skinned textured `ray_mesh` retains its flat material
+fallback in WebAssembly; C skinned `ray_mesh` remains unsupported.
+
+Validation: the example passed compiler `--check`, fresh C and WASM builds, and
+headless Chromium capture at 960x600 with 3,080 visible model pixels and two
+texture colors. `git diff --check` passed. No formal test suite was run.
+
+
+## Batch 147 — preserve textured WASM batches and fallbacks
+
+Fixed repeated textured model submissions by assigning each queued browser batch
+a distinct pooled typed array and merging `.vertices` records correctly before
+WebGL upload. The Node host now matches the six-argument textured batch ABI and
+records canonical bounds/count/dimensions/layer/color summaries. The painter and
+no-WebGL fallback draw all queued triangles with repeat-wrapped texture, tint and
+alpha. Textured fragments use source-over blending and discard fully transparent
+texels before depth writes. Reduced the fixed C staging array from 400,000 to
+16,384 triangles and flushes full chunks in order. Updated README and renderer
+documentation.
+
+Validation: Node repeated-instance regression and three Chromium regressions
+passed (C/Chrome parity for repeated instances across three camera angles,
+painter/no-WebGL texture rendering, and RGBA cutout/partial-alpha parity).
+Focused result: 4 passed in 17.31 s. `py_compile`, Node syntax checks and
+`git diff --check` passed. No full suite was run. The WASM initial/peak memory
+page measurement from finding 8.246 remains open.
+
+### Batch 147 follow-up — pooled run memory and benchmark
+
+Changed the browser textured path to append each C flush chunk directly into a
+growable pooled array for its contiguous material run, then issue one WebGL
+upload/draw for that run. Renderer-owned vertex staging has a 48 MiB cap and
+textured static `model_draw` has a 256-run frame limit. Added atomic Node
+coverage for exhausting that run budget. Re-ran five focused Node/Chromium
+regressions: 5 passed in 16.55 s. The 30-warmup/120-frame Chrome 157 SwiftShader
+benchmark measured 1k/10k/100k p95 at 4.4/5.2/15.3 ms, max at
+4.9/5.8/15.8 ms, and process JS heap peak at 1.5/4.5/42.2 MiB. A/B/A material
+submission measured 4.4 ms p95, 4.7 ms max, three ordered draws and two
+persistent buffers. The 100k fixture's process heap includes compiled WASM
+module memory; it stays under the benchmark's 50 MiB process budget, while
+renderer-owned vertex staging is capped separately at 48 MiB. This is a
+headless software-renderer measurement, not a GPU hardware result.
+
+### Batch 147 follow-up — linear memory accounting
+
+Extended the repeatable browser benchmark to sample the exported WebAssembly
+memory buffer at module start, after warmup, through every measured frame, and
+at the end. Added a fail-closed 320-page measured-fixture budget. On Chrome 157
+/ SwiftShader, the 1k/10k/100k fixtures began, peaked and ended at 47/69/288
+pages respectively; no memory growth occurred during warmup or 120 measured
+frames. The final budget-enforced run measured p95 4.5/5.5/15.6 ms, maximum
+frames 5.1/5.7/16.4 ms, and process JS heap peaks 1.5/4.5/42.5 MiB. The 100k
+result includes compiled module data and remains below its 50 MiB process
+budget. A/B/A used 44
+pages. This closes the missing initial/peak page measurement for the checked-in
+workloads; larger source modules still need to remain within their own
+configured budgets.
+
+### Batch 147 follow-up — maximum textured GLB scene
+
+Extended the benchmark through the supported 200,000 source-triangle static
+textured model limit. The added full 30-warmup/120-frame Chrome 157 / SwiftShader
+run measured 533 WASM pages at start, peak and end, 84.6 MiB process JS heap,
+26.8 ms p95 and 28.1 ms max frame; memory did not grow during rendering. Added
+separate enforced large-scene limits of 600 pages, 100 MiB process heap, 40 ms
+p95 and 50 ms max frame. The benchmark passed those gates. This closes the
+previous memory-budget gap for the maximum source-triangle fixture; near-plane
+worst-case clipping and non-software GPU timings remain unmeasured.
