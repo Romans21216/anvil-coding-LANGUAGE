@@ -463,3 +463,18 @@ model. Chrome 157 / SwiftShader measured 533 WASM pages at start/peak/end,
 84.6 MiB process JS heap, 26.8 ms p95 and 28.1 ms maximum frame. It stayed
 within the dedicated 600-page, 100 MiB, 40 ms p95 and 50 ms max-frame gates.
 Near-plane worst-case clipping and hardware GPU timing are not included.
+
+Added the worst-case clipping shape (two vertices visible, one behind) at
+200,000 source triangles. It expands to 400,000 submitted triangles and
+measured 43.2 MB upload, 533 WASM pages, 97.1 MiB heap, 69.4 ms p95 and 72.0
+ms max on Chrome 157 / SwiftShader, within the dedicated pool and benchmark
+limits. Rotation and camera basis trigonometry is now precomputed once per
+textured model call. Six focused GLB regressions, including near-plane
+UV/depth parity, passed. Hardware GPU timing remains unmeasured.
+
+Fallback mixed-geometry ordering now shares one painter command stream for
+flat and textured triangles. Painter/no-WebGL sort by layer and average camera
+depth, while `?nosort=1` follows submission order. WebGL interleaves flat and
+textured material runs in draw order. A C/Chrome overlap regression checks
+partial alpha, zero alpha, both submission orders and painter/no-WebGL parity;
+the related browser regression set passed (3 tests).

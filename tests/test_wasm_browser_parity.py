@@ -143,6 +143,52 @@ def _write_textured_near_plane_glb(
     )
 
 
+def _write_solid_alpha_triangle_glb(
+    path: pathlib.Path, colour: tuple[int, int, int], alpha: int
+) -> None:
+    positions = b"".join(
+        struct.pack("<3f", *point)
+        for point in ((-0.8, -0.8, 0.0), (0.8, -0.8, 0.0), (0.0, 0.8, 0.0))
+    )
+    texcoords = b"".join(
+        struct.pack("<2f", *uv) for uv in ((0.0, 0.0), (1.0, 0.0), (0.5, 1.0))
+    )
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
+        + _png_chunk(b"IDAT", zlib.compress(b"\x00" + bytes((*colour, alpha))))
+        + _png_chunk(b"IEND", b"")
+    )
+    image_offset = len(positions) + len(texcoords)
+    binary = positions + texcoords + png
+    binary += bytes((-len(binary)) % 4)
+    document = {
+        "asset": {"version": "2.0"}, "scene": 0,
+        "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0}],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "material": 0}]}],
+        "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}],
+        "textures": [{"source": 0}], "images": [{"bufferView": 2, "mimeType": "image/png"}],
+        "buffers": [{"byteLength": len(binary)}],
+        "bufferViews": [
+            {"buffer": 0, "byteOffset": 0, "byteLength": len(positions)},
+            {"buffer": 0, "byteOffset": len(positions), "byteLength": len(texcoords)},
+            {"buffer": 0, "byteOffset": image_offset, "byteLength": len(png)},
+        ],
+        "accessors": [
+            {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"},
+            {"bufferView": 1, "componentType": 5126, "count": 3, "type": "VEC2"},
+        ],
+    }
+    json_bytes = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    json_bytes += b" " * ((-len(json_bytes)) % 4)
+    total = 12 + 8 + len(json_bytes) + 8 + len(binary)
+    path.write_bytes(
+        b"glTF" + struct.pack("<II", 2, total)
+        + struct.pack("<II", len(json_bytes), 0x4E4F534A) + json_bytes
+        + struct.pack("<II", len(binary), 0x004E4942) + binary
+    )
+
+
 def _compile(source: pathlib.Path, output: pathlib.Path, backend: str | None = None) -> None:
     command = [sys.executable, str(COMPILER), str(source), "-o", str(output)]
     if backend:
@@ -739,6 +785,7 @@ class WasmBrowserParityTests(unittest.TestCase):
         metrics = self._color_metrics(c_rgba, wasm_rgba)
         self.assertLess(metrics["mae_visible_pixels"], 12.0, metrics)
         self.assertGreater(metrics["within_16_visible"], 0.85, metrics)
+
         for left, right in ((90, 210), (310, 430), (525, 650)):
             visible = sum(
                 c_rgba[(y * 960 + x) * 4] > 2
@@ -756,6 +803,82 @@ class WasmBrowserParityTests(unittest.TestCase):
             for x in range(740, 840)
         )
         self.assertEqual(behind_visible, 0)
+
+    def test_partial_alpha_textured_draws_preserve_mixed_geometry_order(self) -> None:
+        pixels_by_case: dict[str, tuple[tuple[int, int, int], ...]] = {}
+        cases = (
+            ("opaque_first", 128, True),
+            ("transparent_first", 128, False),
+            ("zero_alpha_first", 0, False),
+        )
+        for name, alpha, opaque_first in cases:
+            with self.subTest(order=name), tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+                root = pathlib.Path(temp)
+                c_dir, wasm_dir = root / "c", root / "wasm"
+                c_dir.mkdir()
+                wasm_dir.mkdir()
+                for directory in (c_dir, wasm_dir):
+                    write_quad(directory, "background.gltf", (1.0, 0.0, 0.0), (0, 0, -1))
+                    _write_solid_alpha_triangle_glb(directory / "foreground.glb", (0, 0, 255), alpha)
+                calls = (
+                    ("  call fn(background_draw)", "  call fn(foreground_draw)")
+                    if opaque_first else
+                    ("  call fn(foreground_draw)", "  call fn(background_draw)")
+                )
+                program = "\n".join((
+                    "scene 3d", "camera perspective 0 0 5", "camera fov(60)",
+                    "set var(light_ok) = light(0, 0, 1)",
+                    "set var(ambient) = light_ambient(1)",
+                    "clear rgba(0, 0, 0, 255)",
+                    "fn(background_draw)", '  set var(ok) = model_draw("background.gltf", 0, 0, 0, 3, 0, 0, 0)', "end",
+                    "fn(foreground_draw)", '  set var(ok) = model_draw("foreground.glb", 0, 0, 0, 1, 0, 0, 0)', "end",
+                    "fn(draw)", *calls, "end", "",
+                ))
+                c_output, wasm_output = c_dir / "program.exe", wasm_dir / "program.wasm"
+                (c_dir / "program.ANVL").write_text(program, encoding="utf-8")
+                (wasm_dir / "program.ANVL").write_text(program, encoding="utf-8")
+                _compile(c_dir / "program.ANVL", c_output)
+                _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+                c_rgba = _native_rgba(c_output)
+                at = (324 * 960 + 480) * 4
+                c_pixel = tuple(c_rgba[at:at + 3])
+                wasm_pixels = []
+                for fallback in (None, "ANVIL_WASM_PAINTER", "ANVIL_WASM_NO_WEBGL"):
+                    environment = {**os.environ, "CHROME_PATH": str(CHROME)}
+                    if fallback:
+                        environment[fallback] = "1"
+                    browser = subprocess.run(
+                        ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                        capture_output=True, text=True, timeout=90, env=environment,
+                    )
+                    self.assertEqual(browser.returncode, 0, browser.stderr)
+                    page = json.loads(browser.stdout.strip().splitlines()[-1])
+                    wasm_rgba = base64.b64decode(page["rgba"], validate=True)
+                    wasm_pixels.append(tuple(wasm_rgba[at:at + 3]))
+                pixels_by_case[name] = (c_pixel, *wasm_pixels)
+
+        for backend_index, backend in enumerate(("C", "WebGL", "painter", "no-WebGL")):
+            opaque_first = pixels_by_case["opaque_first"][backend_index]
+            transparent_first = pixels_by_case["transparent_first"][backend_index]
+            zero_alpha_first = pixels_by_case["zero_alpha_first"][backend_index]
+            self.assertGreater(opaque_first[0], 50, (backend, opaque_first))
+            self.assertGreater(opaque_first[2], 50, (backend, opaque_first))
+            self.assertGreater(zero_alpha_first[0], 150, (backend, zero_alpha_first))
+            self.assertLess(zero_alpha_first[2], 30, (backend, zero_alpha_first))
+            if backend_index < 2:
+                self.assertLess(transparent_first[0], 20, (backend, transparent_first))
+                self.assertGreater(transparent_first[2], 30, (backend, transparent_first))
+                self.assertGreater(sum(abs(a - b) for a, b in zip(opaque_first, transparent_first)), 60, backend)
+            else:
+                self.assertGreater(transparent_first[0], 50, (backend, transparent_first))
+                self.assertGreater(transparent_first[2], 30, (backend, transparent_first))
+                self.assertLess(sum(abs(a - b) for a, b in zip(opaque_first, transparent_first)), 4, backend)
+        for case in pixels_by_case:
+            self.assertLess(
+                sum(abs(a - b) for a, b in zip(pixels_by_case[case][2], pixels_by_case[case][3])),
+                4,
+                (case, "painter/no-WebGL parity"),
+            )
 
     def test_custom_model_lighting_matches_c_color_and_rejects_zero_direction(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:

@@ -435,7 +435,7 @@ async function start() {
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
         gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         glRenderer = {
           canvas,
           gl,
@@ -448,9 +448,9 @@ async function start() {
           texturedImage: gl.getUniformLocation(texturedProgram, "image"),
           textureCache: new Map(),
           texturedBuffers: new Map(),
-      texturedVertexPool: new Float32Array(0),
-      texturedVertexPoolIndex: 0,
-      texturedCurrentRun: null,
+          texturedVertexPool: new Float32Array(0),
+          texturedVertexPoolIndex: 0,
+          texturedCurrentRun: null,
           pos: gl.getAttribLocation(program, "pos"),
           depth: gl.getAttribLocation(program, "depth"),
           colour: gl.getAttribLocation(program, "colour"),
@@ -513,12 +513,11 @@ async function start() {
         gl.drawArrays(gl.TRIANGLES, 0, entries.length * 3);
         gl.deleteBuffer(buffer);
       };
-      upload(list.filter((entry) => entry[13] !== 1), true);
       const texturedBatches = [];
       let texturedBatch = null;
       for (const entry of texturedList) {
         if (entry.batch && entry.run) {
-          texturedBatches.push({ key: entry.run.key, entries: [entry], run: entry.run });
+          texturedBatches.push({ key: entry.run.key, entries: [entry], run: entry.run, order: entry.order });
           continue;
         }
         const layer = entry.batch ? entry.layer : entry[19];
@@ -527,12 +526,25 @@ async function start() {
         const height = entry.batch ? entry.height : entry[22];
         const cacheKey = pointer + ":" + width + ":" + height + ":" + layer;
         if (!texturedBatch || texturedBatch.key !== cacheKey) {
-          texturedBatch = { key: cacheKey, entries: [] };
+          texturedBatch = { key: cacheKey, entries: [], order: entry.order };
           texturedBatches.push(texturedBatch);
         }
         texturedBatch.entries.push(entry);
       }
-      for (const batch of texturedBatches) {
+      const commands = list.filter((entry) => entry[13] !== 1).map((entry) => ({ kind: "flat", order: entry.order, entry }))
+        .concat(texturedBatches.map((batch) => ({ kind: "textured", order: batch.order, batch })))
+        .sort((first, second) => first.order - second.order);
+      for (let commandIndex = 0; commandIndex < commands.length;) {
+        const command = commands[commandIndex];
+        if (command.kind === "flat") {
+          const entries = [];
+          while (commandIndex < commands.length && commands[commandIndex].kind === "flat")
+            entries.push(commands[commandIndex++].entry);
+          upload(entries, true);
+          continue;
+        }
+        const batch = command.batch;
+        commandIndex += 1;
         const entries = batch.entries;
         const first = entries[0];
         const pointer = first.batch ? first.pointer : first[20];
@@ -693,6 +705,7 @@ async function start() {
     const triangles = [];
     const texturedTriangles = [];
     const sphereImpostors = [];
+    let drawOrder = 0;
     let rendererDiagnostics = new URLSearchParams(location.search).get("anvil_debug") === "1";
     if (gpuTimerRequested) {
       window.__anvilGpuTimer = {
@@ -1171,7 +1184,9 @@ async function start() {
       },
       triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
         if (glRenderer && glRenderer !== false) glRenderer.texturedCurrentRun = null;
-        triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
+        const entry = [x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer];
+        entry.order = drawOrder++;
+        triangles.push(entry);
       },
       textured_triangle(pointer, count, pixels, width, height, layer) {
         const source = new Float64Array(memory.buffer, pointer, count * 19);
@@ -1181,7 +1196,7 @@ async function start() {
           const current = renderer.texturedCurrentRun;
           const key = pixels + ":" + width + ":" + height + ":" + layer;
           if (!current || current.key !== key) {
-            renderer.texturedCurrentRun = { key, start: renderer.texturedVertexPoolIndex, count: 0 };
+            renderer.texturedCurrentRun = { key, start: renderer.texturedVertexPoolIndex, count: 0, order: drawOrder++ };
           }
           const run = renderer.texturedCurrentRun;
           const needed = (renderer.texturedVertexPoolIndex + count) * 27;
@@ -1210,8 +1225,8 @@ async function start() {
           run.count += count;
           renderer.texturedVertexPoolIndex += count;
           if (texturedTriangles.length && texturedTriangles[texturedTriangles.length - 1].run === run) {
-            texturedTriangles[texturedTriangles.length - 1] = { batch: true, count: run.count, pointer: pixels, width, height, layer, run };
-          } else texturedTriangles.push({ batch: true, count: run.count, pointer: pixels, width, height, layer, run });
+            texturedTriangles[texturedTriangles.length - 1] = { batch: true, count: run.count, pointer: pixels, width, height, layer, run, order: run.order };
+          } else texturedTriangles.push({ batch: true, count: run.count, pointer: pixels, width, height, layer, run, order: run.order });
           return;
         }
         if (!vertices || vertices.length !== count * 27) {
@@ -1228,7 +1243,7 @@ async function start() {
             vertices[at++] = source[base + 18] / 255;
           }
         }
-        texturedTriangles.push({ batch: true, vertices, count, pointer: pixels, width, height, layer });
+        texturedTriangles.push({ batch: true, vertices, count, pointer: pixels, width, height, layer, order: drawOrder++ });
       },
       sphere_impostor_available() {
         if (forcePainter || !scene3dState.active) return 0;
@@ -1256,66 +1271,86 @@ async function start() {
             texturedTriangles.length = 0;
             sphereImpostors.length = 0;
           } else {
-            if (!skipSort) triangles.sort(
-              (first, second) =>
-                first[13] - second[13] ||
-                second[2] + second[5] + second[8] - (first[2] + first[5] + first[8])
-            );
-            for (const t of triangles) {
-              context.fillStyle = "rgba(" + t[9] + "," + t[10] + "," + t[11] + "," + (t[12] / 255) + ")";
-              context.beginPath();
-              context.moveTo(t[0], t[1]);
-              context.lineTo(t[3], t[4]);
-              context.lineTo(t[6], t[7]);
-              context.closePath();
-              context.fill();
+            const painterCommands = triangles.map((entry) => ({
+              kind: "flat", entry, layer: entry[13],
+              depth: entry[2] + entry[5] + entry[8], order: entry.order,
+            }));
+            for (const entry of texturedTriangles) {
+              if (!entry.batch) {
+                painterCommands.push({
+                  kind: "textured", entry, triangle: 0, layer: entry[19],
+                  depth: entry[2] + entry[7] + entry[12], order: entry.order,
+                });
+                continue;
+              }
+              for (let triangle = 0; triangle < entry.count; triangle++) {
+                const base = triangle * 27;
+                painterCommands.push({
+                  kind: "textured", entry, triangle, layer: entry.layer,
+                  depth: entry.vertices[base + 2] + entry.vertices[base + 11] + entry.vertices[base + 20],
+                  order: entry.order + triangle / Math.max(1, entry.count),
+                });
+              }
             }
-            triangles.length = 0;
-            for (const t of texturedTriangles) {
-              if (t.batch) {
-                for (let triangle = 0; triangle < t.count; triangle++) {
-                  const base = triangle * 27;
-                  const vertex = (corner) => base + corner * 9;
-                  const i0 = vertex(0), i1 = vertex(1), i2 = vertex(2);
-                  const points = [[t.vertices[i0], t.vertices[i0 + 1]],
-                    [t.vertices[i1], t.vertices[i1 + 1]],
-                    [t.vertices[i2], t.vertices[i2 + 1]]];
-                  const source = [[t.vertices[i0 + 3] * t.width, (1 - t.vertices[i0 + 4]) * t.height],
-                    [t.vertices[i1 + 3] * t.width, (1 - t.vertices[i1 + 4]) * t.height],
-                    [t.vertices[i2 + 3] * t.width, (1 - t.vertices[i2 + 4]) * t.height]];
-                  const [s0, s1, s2] = source;
-                  const det = s0[0] * (s1[1] - s2[1]) + s1[0] * (s2[1] - s0[1]) + s2[0] * (s0[1] - s1[1]);
-                  if (!Number.isFinite(det) || Math.abs(det) < 1e-8) continue;
-                  const affine = (axis) => {
-                    const [p0, p1, p2] = points.map((point) => point[axis]);
-                    const a = (p0 * (s1[1] - s2[1]) + p1 * (s2[1] - s0[1]) + p2 * (s0[1] - s1[1])) / det;
-                    const c = (p0 * (s2[0] - s1[0]) + p1 * (s0[0] - s2[0]) + p2 * (s1[0] - s0[0])) / det;
-                    const e = (p0 * (s1[0] * s2[1] - s2[0] * s1[1]) + p1 * (s2[0] * s0[1] - s0[0] * s2[1]) + p2 * (s0[0] * s1[1] - s1[0] * s0[1])) / det;
-                    return [a, c, e];
-                  };
-                  const [a, c, e] = affine(0), [b, d, f] = affine(1);
-                  const image = tintedSurface(t.pointer, t.width, t.height,
-                    Math.round(t.vertices[i0 + 5] * 255),
-                    Math.round(t.vertices[i0 + 6] * 255),
-                    Math.round(t.vertices[i0 + 7] * 255));
-                  const pattern = context.createPattern(image, "repeat");
-                  pattern.setTransform(new DOMMatrix([a, b, c, d, e, f]));
-                  context.save();
-                  context.beginPath(); context.moveTo(...points[0]);
-                  context.lineTo(...points[1]); context.lineTo(...points[2]);
-                  context.closePath();
-                  context.globalAlpha = Math.max(0, Math.min(1, t.vertices[i0 + 8]));
-                  context.fillStyle = pattern;
-                  context.fill();
-                  context.restore();
-                }
-              } else {
+            painterCommands.sort(skipSort
+              ? (first, second) => first.order - second.order
+              : (first, second) => first.layer - second.layer || second.depth - first.depth || first.order - second.order
+            );
+            for (const command of painterCommands) {
+              const t = command.entry;
+              if (command.kind === "flat") {
+                context.fillStyle = "rgba(" + t[9] + "," + t[10] + "," + t[11] + "," + (t[12] / 255) + ")";
+                context.beginPath();
+                context.moveTo(t[0], t[1]);
+                context.lineTo(t[3], t[4]);
+                context.lineTo(t[6], t[7]);
+                context.closePath();
+                context.fill();
+                continue;
+              }
+              if (!t.batch) {
                 context.fillStyle = "rgba(" + t[15] + "," + t[16] + "," + t[17] + "," + (t[18] / 255) + ")";
                 context.beginPath(); context.moveTo(t[0], t[1]);
                 context.lineTo(t[5], t[6]); context.lineTo(t[10], t[11]);
                 context.closePath(); context.fill();
+                continue;
               }
+              const base = command.triangle * 27;
+              const vertex = (corner) => base + corner * 9;
+              const i0 = vertex(0), i1 = vertex(1), i2 = vertex(2);
+              const points = [[t.vertices[i0], t.vertices[i0 + 1]],
+                [t.vertices[i1], t.vertices[i1 + 1]],
+                [t.vertices[i2], t.vertices[i2 + 1]]];
+              const source = [[t.vertices[i0 + 3] * t.width, (1 - t.vertices[i0 + 4]) * t.height],
+                [t.vertices[i1 + 3] * t.width, (1 - t.vertices[i1 + 4]) * t.height],
+                [t.vertices[i2 + 3] * t.width, (1 - t.vertices[i2 + 4]) * t.height]];
+              const [s0, s1, s2] = source;
+              const det = s0[0] * (s1[1] - s2[1]) + s1[0] * (s2[1] - s0[1]) + s2[0] * (s0[1] - s1[1]);
+              if (!Number.isFinite(det) || Math.abs(det) < 1e-8) continue;
+              const affine = (axis) => {
+                const [p0, p1, p2] = points.map((point) => point[axis]);
+                const a = (p0 * (s1[1] - s2[1]) + p1 * (s2[1] - s0[1]) + p2 * (s0[1] - s1[1])) / det;
+                const c = (p0 * (s2[0] - s1[0]) + p1 * (s0[0] - s2[0]) + p2 * (s1[0] - s0[0])) / det;
+                const e = (p0 * (s1[0] * s2[1] - s2[0] * s1[1]) + p1 * (s2[0] * s0[1] - s0[0] * s2[1]) + p2 * (s0[0] * s1[1] - s1[0] * s0[1])) / det;
+                return [a, c, e];
+              };
+              const [a, c, e] = affine(0), [b, d, f] = affine(1);
+              const image = tintedSurface(t.pointer, t.width, t.height,
+                Math.round(t.vertices[i0 + 5] * 255),
+                Math.round(t.vertices[i0 + 6] * 255),
+                Math.round(t.vertices[i0 + 7] * 255));
+              const pattern = context.createPattern(image, "repeat");
+              pattern.setTransform(new DOMMatrix([a, b, c, d, e, f]));
+              context.save();
+              context.beginPath(); context.moveTo(...points[0]);
+              context.lineTo(...points[1]); context.lineTo(...points[2]);
+              context.closePath();
+              context.globalAlpha = Math.max(0, Math.min(1, t.vertices[i0 + 8]));
+              context.fillStyle = pattern;
+              context.fill();
+              context.restore();
             }
+            triangles.length = 0;
             texturedTriangles.length = 0;
             for (const sphere of sphereImpostors) {
               const depth = Math.max(0.05, sphere[2]);

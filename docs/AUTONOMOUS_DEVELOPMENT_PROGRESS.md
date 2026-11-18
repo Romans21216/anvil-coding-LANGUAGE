@@ -2076,3 +2076,30 @@ separate enforced large-scene limits of 600 pages, 100 MiB process heap, 40 ms
 p95 and 50 ms max frame. The benchmark passed those gates. This closes the
 previous memory-budget gap for the maximum source-triangle fixture; near-plane
 worst-case clipping and non-software GPU timings remain unmeasured.
+
+### Batch 147 follow-up — worst-case near-plane fan and transform cost
+
+Added a 200k-triangle fixture with two vertices in front of the near plane and
+one behind. Clipping expands it to 400k submitted triangles. The full
+30-warmup/120-frame capture measured 533 WASM pages, 97.1 MiB process heap,
+69.4 ms p95 and 72.0 ms maximum frame; the single upload contains 43.2 MB of
+vertex bytes (41.2 MiB) and fits within the 48 MiB staging pool. To reduce CPU
+cost, the textured model draw now computes rotation and camera basis
+trigonometry once per call rather than once per vertex. The ordinary 200k
+fixture improved from 26.8 ms p95 / 28.1 ms max to 20.6 ms / 21.4 ms in the
+latest measured run; the clipping-heavy case measured 69.4 ms p95 / 72.0 ms.
+Six focused Node/Chromium regressions, including near-plane UV/depth parity,
+pass after this change. Hardware GPU timing and other clipping patterns remain
+open.
+
+### Batch 147 follow-up — mixed textured painter ordering
+
+Unified fallback rendering into one command stream for flat and textured
+triangles. Painter and no-WebGL modes now depth-sort both kinds together by
+layer and average camera depth; `?nosort=1` uses their shared submission order.
+WebGL continues to preserve interleaved draw order and uses separate RGB/alpha
+blend factors so the canvas receives source-over alpha correctly. Added a
+C/Chrome regression that checks overlapping partial-alpha and zero-alpha GLB
+triangles in WebGL, forced-painter and no-WebGL modes, and verifies the two
+fallback modes agree. Validation: three focused browser regressions passed;
+Python syntax and `git diff --check` pass. No full suite was run.

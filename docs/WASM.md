@@ -213,7 +213,10 @@ array per contiguous material run, keeping repeated instances distinct and
 preserving run order. WebGL discards zero-alpha
 fragments and source-over blends visible texels while writing depth; overlapping
 partial-alpha surfaces therefore follow submission order. Painter and no-WebGL
-fallbacks sample the same batches with texture tint and alpha. The textured path accepts up to 200,000 source
+fallbacks interleave textured and flat triangles in one painter command stream.
+They sort by layer and average camera depth, and `?nosort=1` preserves submission
+order. Both fallbacks sample the same batches with texture tint and alpha. The
+textured path accepts up to 200,000 source
 triangles per frame; other model APIs retain the shared 16,384-triangle frame
 budget. Textured animated and skinned models use that shared 16,384-triangle
 budget and the common 200,000 textured source-triangle cap. Static textured
@@ -509,13 +512,15 @@ identical.
 
 Run `node tools/bench_wasm_textured_submission.mjs` from the repository root.
 It builds textured static GLB-derived assets at 1k, 10k, 100k and 200k triangles
-measures 30 warmup plus 120 Chrome/SwiftShader frames by default. The report
+plus a 200k near-plane-crossing case that expands to 400k submitted triangles,
+and measures 30 warmup plus 120 Chrome/SwiftShader frames by default. The report
 includes frame p50/p95/max, observed JS heap peak, WASM initial/peak/end linear
 memory pages, and per-frame maximum batches, vertex-buffer allocations, draw
 calls, and upload bytes. It enforces 20 ms p95, 25 ms max-frame, 50 MiB process
 heap and 320 WASM linear-memory page budgets through 100k triangles. The 200k
 maximum-size fixture uses separate 40 ms p95, 50 ms max-frame, 100 MiB process
-heap and 600-page limits. Set
+heap and 600-page limits. The near-plane case uses 80 ms p95, 100 ms max-frame,
+160 MiB process heap and 600-page limits. Set
 `ANVIL_BENCH_WARMUP`, `ANVIL_BENCH_SAMPLES`, and `ANVIL_BENCH_OUTPUT` to adjust
 or save a run. A single contiguous material run appends chunks into one pooled
 typed array and reuses its persistent vertex buffer. Separate material runs
@@ -523,9 +528,13 @@ retain order and produce separate draws; up to 256 runs are allowed per frame.
 The renderer-owned vertex pool is capped at 48 MiB. Textured static `model_draw`
 has a bounded 200,000 source-triangle frame budget. On the recorded Chrome 157 /
 SwiftShader host, the 1k/10k/100k fixtures used 47/69/288 WASM pages at start,
-peak and end (no frame-time growth); process JS heap peaks were 1.5/4.5/42.5
-MiB. Their p95 was 4.7/5.4/15.4 ms and maximum frame was 6.5/5.7/16.3 ms.
-The 200k maximum-size fixture used 533 pages (no memory growth), with 26.8 ms
-p95, 28.1 ms max, and 84.6 MiB process JS heap. A/B/A material runs used 44
-pages and measured 4.5 ms p95 and 5.1 ms max, with three draws and two
-persistent buffers. Larger models may exceed these budgets.
+peak and end (no frame-time growth); process JS heap peaks were 1.7/4.7/42.5
+MiB. Their p95 was 4.1/4.9/12.2 ms and maximum frame was 4.6/5.5/12.6 ms.
+The ordinary 200k maximum-size fixture used 533 pages (no memory growth), with
+20.6 ms p95, 21.4 ms max, and 84.7 MiB process JS heap. The worst-case
+near-plane fixture submitted 400k fan triangles with one draw and 41.2 MiB
+uploaded vertex data; it used 533 pages and 97.1 MiB heap, with 69.4 ms p95
+and 72.0 ms max. Rotation and camera basis trigonometry is computed once per
+model call instead of once per vertex. A/B/A material runs used 44 pages and
+measured 4.1 ms p95 and 4.6 ms max, with three draws and two persistent
+buffers. Larger models may exceed these budgets.
