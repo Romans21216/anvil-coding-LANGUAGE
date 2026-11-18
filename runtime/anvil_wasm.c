@@ -4,7 +4,6 @@
    the host through the imported `env.write` function. No OS, no libc: strings,
    memory and number formatting are implemented here. */
 #include "anvil_wasm.h"
-#include "anvil_projection.h"
 
 __attribute__((import_module("env"), import_name("write")))
 extern void anvil_host_write(int fd, const void *bytes, int length);
@@ -924,13 +923,34 @@ static int anvil_wasm_project(AnvilWasmVec3 p, double *sx, double *sy,
 
 static int anvil_wasm_project_model_camera(AnvilWasmVec3 camera, double *sx,
                                            double *sy, double *depth) {
-  if (!isfinite(camera.x) || !isfinite(camera.y) ||
-      !isfinite(camera.z) || camera.z < ANVIL_WASM_MODEL_NEAR_DEPTH)
+  if (!anvil_wasm_finite(camera.x) || !anvil_wasm_finite(camera.y) ||
+      !anvil_wasm_finite(camera.z) ||
+      camera.z < ANVIL_WASM_MODEL_NEAR_DEPTH)
     return 0;
   *sx = 480.0 + camera.x * anvil_camera_focal / camera.z;
   *sy = 324.0 - camera.y * anvil_camera_focal / camera.z;
   *depth = camera.z;
-  return isfinite(*sx) && isfinite(*sy);
+  return anvil_wasm_finite(*sx) && anvil_wasm_finite(*sy);
+}
+
+static int anvil_wasm_interpolation_parameter(double a, double b,
+                                              double target, double *t) {
+  double aa = __builtin_fabs(a), ab = __builtin_fabs(b);
+  double at = __builtin_fabs(target);
+  double scale = aa > ab ? aa : ab;
+  if (at > scale) scale = at;
+  if (!t || !anvil_wasm_finite(scale) || scale == 0.0)
+    return 0;
+  double scaled_a = a / scale;
+  double denominator = b / scale - scaled_a;
+  if (denominator == 0.0 || !anvil_wasm_finite(denominator))
+    return 0;
+  *t = (target / scale - scaled_a) / denominator;
+  return anvil_wasm_finite(*t) && *t >= 0.0 && *t <= 1.0;
+}
+
+static double anvil_wasm_lerp_stable(double a, double b, double t) {
+  return a * (1.0 - t) + b * t;
 }
 
 typedef struct {
@@ -944,30 +964,33 @@ static int anvil_wasm_clip_textured_triangle(
     AnvilWasmTexturedVertex output[4]) {
   int count = 0;
   AnvilWasmTexturedVertex previous = input[2];
-  if (!isfinite(previous.camera.x) || !isfinite(previous.camera.y) ||
-      !isfinite(previous.camera.z) || !isfinite(previous.u) ||
-      !isfinite(previous.v))
+  if (!anvil_wasm_finite(previous.camera.x) ||
+      !anvil_wasm_finite(previous.camera.y) ||
+      !anvil_wasm_finite(previous.camera.z) ||
+      !anvil_wasm_finite(previous.u) || !anvil_wasm_finite(previous.v))
     return 0;
   int previous_inside = previous.camera.z >= ANVIL_WASM_MODEL_NEAR_DEPTH;
   for (int i = 0; i < 3; ++i) {
     AnvilWasmTexturedVertex current = input[i];
-    if (!isfinite(current.camera.x) || !isfinite(current.camera.y) ||
-        !isfinite(current.camera.z) || !isfinite(current.u) ||
-        !isfinite(current.v))
+    if (!anvil_wasm_finite(current.camera.x) ||
+        !anvil_wasm_finite(current.camera.y) ||
+        !anvil_wasm_finite(current.camera.z) ||
+        !anvil_wasm_finite(current.u) || !anvil_wasm_finite(current.v))
       return 0;
     int current_inside = current.camera.z >= ANVIL_WASM_MODEL_NEAR_DEPTH;
     if (current_inside != previous_inside) {
       double t;
-      if (!anvil_interpolation_parameter(previous.camera.z, current.camera.z,
-                                         ANVIL_WASM_MODEL_NEAR_DEPTH, &t) ||
+      if (!anvil_wasm_interpolation_parameter(
+              previous.camera.z, current.camera.z,
+              ANVIL_WASM_MODEL_NEAR_DEPTH, &t) ||
           count >= 4)
         return 0;
       output[count++] = (AnvilWasmTexturedVertex){
-          {anvil_lerp_stable(previous.camera.x, current.camera.x, t),
-           anvil_lerp_stable(previous.camera.y, current.camera.y, t),
+          {anvil_wasm_lerp_stable(previous.camera.x, current.camera.x, t),
+           anvil_wasm_lerp_stable(previous.camera.y, current.camera.y, t),
            ANVIL_WASM_MODEL_NEAR_DEPTH},
-          anvil_lerp_stable(previous.u, current.u, t),
-          anvil_lerp_stable(previous.v, current.v, t)};
+          anvil_wasm_lerp_stable(previous.u, current.u, t),
+          anvil_wasm_lerp_stable(previous.v, current.v, t)};
     }
     if (current_inside) {
       if (count >= 4)

@@ -7,11 +7,13 @@ import json
 import os
 import pathlib
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+import zlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPILER = ROOT / "compiler" / "anvil.py"
@@ -65,6 +67,77 @@ def _animated_program() -> str:
             "end",
             "",
         )
+    )
+
+
+def _png_chunk(kind: bytes, payload: bytes) -> bytes:
+    content = kind + payload
+    return struct.pack(">I", len(payload)) + content + struct.pack(">I", zlib.crc32(content) & 0xFFFFFFFF)
+
+
+def _write_textured_near_plane_glb(path: pathlib.Path) -> None:
+    """Make four UV-gradient cases plus a farther overlapping depth control."""
+    centers = (-0.4, -0.13, 0.13, 0.4)
+    depths = ((0.8, 0.8, 0.8), (0.8, 0.8, 0.02), (0.8, 0.02, 0.02), (0.02, 0.02, 0.02))
+    offsets = ((-0.07, -0.06), (0.07, -0.06), (0.0, 0.08))
+    uv_triangle = ((0.0, 0.0), (1.0, 0.0), (0.5, 1.0))
+    positions = []
+    texcoords = []
+    for center, triangle_depths in zip(centers, depths):
+        for (dx, dy), depth, uv in zip(offsets, triangle_depths, uv_triangle):
+            positions.append(((center + dx) * depth, dy * depth, 5.0 - depth))
+            texcoords.append(uv)
+    # This later submitted triangle occupies the same projected footprint as
+    # the front case but is farther away and samples a different texel.
+    for (dx, dy), uv in zip(offsets, ((0.75, 0.25),) * 3):
+        depth = 1.2
+        positions.append(((centers[0] + dx) * depth, dy * depth, 5.0 - depth))
+        texcoords.append(uv)
+    position_bytes = b"".join(struct.pack("<3f", *point) for point in positions)
+    uv_bytes = b"".join(struct.pack("<2f", *uv) for uv in texcoords)
+    index_bytes = struct.pack("<15H", *range(15))
+    rows = (
+        b"\x00" + bytes((245, 30, 20, 255, 20, 235, 40, 255))
+        + b"\x00" + bytes((25, 70, 245, 255, 250, 225, 20, 255))
+    )
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 2, 8, 6, 0, 0, 0))
+        + _png_chunk(b"IDAT", zlib.compress(rows))
+        + _png_chunk(b"IEND", b"")
+    )
+    image_offset = len(position_bytes) + len(uv_bytes) + len(index_bytes)
+    binary = position_bytes + uv_bytes + index_bytes + png
+    binary += bytes((-len(binary)) % 4)
+    document = {
+        "asset": {"version": "2.0"},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0}],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0}]}],
+        "materials": [{"pbrMetallicRoughness": {"baseColorFactor": [1, 1, 1, 1], "baseColorTexture": {"index": 0}}}],
+        "textures": [{"source": 0}],
+        "images": [{"bufferView": 3, "mimeType": "image/png"}],
+        "buffers": [{"byteLength": len(binary)}],
+        "bufferViews": [
+            {"buffer": 0, "byteOffset": 0, "byteLength": len(position_bytes)},
+            {"buffer": 0, "byteOffset": len(position_bytes), "byteLength": len(uv_bytes)},
+            {"buffer": 0, "byteOffset": len(position_bytes) + len(uv_bytes), "byteLength": len(index_bytes)},
+            {"buffer": 0, "byteOffset": image_offset, "byteLength": len(png)},
+        ],
+        "accessors": [
+            {"bufferView": 0, "componentType": 5126, "count": 15, "type": "VEC3"},
+            {"bufferView": 1, "componentType": 5126, "count": 15, "type": "VEC2"},
+            {"bufferView": 2, "componentType": 5123, "count": 15, "type": "SCALAR"},
+        ],
+    }
+    json_bytes = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    json_bytes += b" " * ((-len(json_bytes)) % 4)
+    total = 12 + 8 + len(json_bytes) + 8 + len(binary)
+    path.write_bytes(
+        b"glTF" + struct.pack("<II", 2, total)
+        + struct.pack("<II", len(json_bytes), 0x4E4F534A) + json_bytes
+        + struct.pack("<II", len(binary), 0x004E4942) + binary
     )
 
 
@@ -493,6 +566,65 @@ class WasmBrowserParityTests(unittest.TestCase):
         metrics = self._color_metrics(c_rgba, wasm_rgba)
         self.assertLess(metrics["mae_visible_pixels"], 10.0, metrics)
         self.assertGreater(metrics["within_16_visible"], 0.90, metrics)
+
+    def test_embedded_glb_texture_clips_at_near_plane_with_uv_and_depth_parity(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            root = pathlib.Path(temp)
+            c_dir, wasm_dir = root / "c", root / "wasm"
+            c_dir.mkdir()
+            wasm_dir.mkdir()
+            program = "\n".join((
+                "scene 3d",
+                "camera perspective 0 0 5",
+                "camera fov(60)",
+                "clear rgba(0, 0, 0, 255)",
+                "fn(draw)",
+                '  set var(ok) = model_draw("near.glb", 0, 0, 0, 1, 0, 0, 0)',
+                "end",
+                "",
+            ))
+            for directory in (c_dir, wasm_dir):
+                _write_textured_near_plane_glb(directory / "near.glb")
+                (directory / "program.ANVL").write_text(program, encoding="utf-8")
+
+            c_output = c_dir / "program.exe"
+            wasm_output = wasm_dir / "program.wasm"
+            _compile(c_dir / "program.ANVL", c_output)
+            _compile(wasm_dir / "program.ANVL", wasm_output, "wasm")
+            browser = subprocess.run(
+                ["node", str(CAPTURE), str(wasm_dir), "program.html"],
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={**os.environ, "CHROME_PATH": str(CHROME)},
+            )
+            self.assertEqual(browser.returncode, 0, browser.stderr)
+            page = json.loads(browser.stdout.strip().splitlines()[-1])
+            c_rgba = _native_rgba(c_output)
+            wasm_rgba = base64.b64decode(page["rgba"], validate=True)
+            self.assertEqual((page["width"], page["height"]), (960, 600))
+
+        self.assertGreater(self._silhouette_iou(c_rgba, wasm_rgba), 0.90)
+        metrics = self._color_metrics(c_rgba, wasm_rgba)
+        self.assertLess(metrics["mae_visible_pixels"], 12.0, metrics)
+        self.assertGreater(metrics["within_16_visible"], 0.85, metrics)
+        for left, right in ((90, 210), (310, 430), (525, 650)):
+            visible = sum(
+                c_rgba[(y * 960 + x) * 4] > 2
+                or c_rgba[(y * 960 + x) * 4 + 1] > 2
+                or c_rgba[(y * 960 + x) * 4 + 2] > 2
+                for y in range(260, 390)
+                for x in range(left, right)
+            )
+            self.assertGreater(visible, 20, (left, right, visible))
+        behind_visible = sum(
+            c_rgba[(y * 960 + x) * 4] > 2
+            or c_rgba[(y * 960 + x) * 4 + 1] > 2
+            or c_rgba[(y * 960 + x) * 4 + 2] > 2
+            for y in range(260, 390)
+            for x in range(740, 840)
+        )
+        self.assertEqual(behind_visible, 0)
 
     def test_custom_model_lighting_matches_c_color_and_rejects_zero_direction(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
