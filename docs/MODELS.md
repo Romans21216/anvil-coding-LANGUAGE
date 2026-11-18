@@ -21,8 +21,11 @@ container, 256 MiB per buffer, 64 MiB for decoded accessor data, 200,000
 triangles and 512 MiB of estimated generated geometry.
 
 The GLB path imports geometry, node transforms and supported material/vertex
-colours. Embedded base-color textures are not decoded yet; textured materials
-currently use their base-color factor. `examples/glb_model.ANVL` shows the
+colours. Static unskinned `model_draw` calls on the C backend also render
+base-color PNG textures using `TEXCOORD_0`; images can be external, data-URI or
+embedded in a bufferView. Sampling uses nearest-neighbour filtering and REPEAT
+wrapping. WebAssembly `model_draw` and `ray_mesh`, plus C `ray_mesh`, still use
+`baseColorFactor` for textured models. `examples/glb_model.ANVL` shows the
 `model_draw` path with the bundled `examples/ray_mesh.glb` asset.
 
 ```anvil
@@ -51,15 +54,20 @@ around X, Y and Z. The order is scale, rotate, translate.
 | Positions | `POSITION` as VEC3 float |
 | Indices | ubyte/ushort/uint, or none (sequential) |
 | Colour | `COLOR_0` (averaged per triangle) or material `baseColorFactor` |
+| Base-color texture | Static unskinned `model_draw` on C and WebAssembly; PNG RGB/RGBA, `TEXCOORD_0`, REPEAT wrapping |
 | Animation | One clip; TRANSLATION/ROTATION/SCALE channels, `LINEAR` and `STEP` keys |
 | Skin | One skin, 1-64 joints, four influences per vertex, optional bind matrices |
 | Morph targets | Up to eight `POSITION` deltas, per-mesh default weights |
 | Budget | 200,000 triangles, checked at compile time |
 
-Embedded base-color textures are not decoded: a textured material is rendered
-with its `baseColorFactor` fallback. Sparse accessors, `CUBICSPLINE` keys,
+`ray_mesh` uses `baseColorFactor` for textured models. Textures on animated,
+skinned or morphed `model_draw` models are not supported yet.
+PNG textures must be non-interlaced 8-bit RGB/RGBA, use `TEXCOORD_0`, and use
+REPEAT wrapping; unsupported texture formats, UV sets, texture transforms or
+wrap modes produce a located compile error. `COLOR_0` multiplies texture RGB;
+`baseColorFactor` multiplies texture RGB and alpha. Sparse accessors, `CUBICSPLINE` keys,
 multiple skins or clips, morph targets combined with a skin, and primitive
-modes other than triangles/strips/fans are refused with a located compile
+modes other than triangles/strips/fans are also refused with a located compile
 error.
 
 ## Shading

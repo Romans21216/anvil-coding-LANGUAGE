@@ -890,7 +890,10 @@ class ExpressionParser:
                 ) from None
             from compiler import gltf
             try:
-                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+                model = gltf.ensure_model(
+                    asset, pathlib.Path(self.path),
+                    include_textures=True,
+                )
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             symbol, count, bounds = model["symbol"], model["count"], model["bounds"]
@@ -1030,6 +1033,17 @@ class ExpressionParser:
                     )
                     + f"{placement})"
                 )
+            elif model.get("textured"):
+                texture_count = len(model["textures"])
+                call = (
+                    f"anvil_mesh_draw_textured((const double *){symbol}_textured, "
+                    f"{count}, (const uint32_t *const *){symbol}_textures, "
+                    f"(const int *){symbol}_texture_dimensions, {texture_count}, "
+                    + ", ".join(f"{value:.6g}" for value in bounds)
+                    + ", "
+                    + placement
+                    + ")"
+                )
             else:
                 call = (
                     f"anvil_mesh_draw((const double *){symbol}, {count}, "
@@ -1057,7 +1071,10 @@ class ExpressionParser:
                 ) from None
             from compiler import gltf
             try:
-                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+                model = gltf.ensure_model(
+                    asset, pathlib.Path(self.path),
+                    include_textures=True,
+                )
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             if not model.get("morph_count"):
@@ -1103,7 +1120,10 @@ class ExpressionParser:
                 ) from None
             from compiler import gltf
             try:
-                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+                model = gltf.ensure_model(
+                    asset, pathlib.Path(self.path),
+                    include_textures=True,
+                )
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             if not model.get("tracks"):
@@ -1130,7 +1150,10 @@ class ExpressionParser:
                 ) from None
             from compiler import gltf
             try:
-                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+                model = gltf.ensure_model(
+                    asset, pathlib.Path(self.path),
+                    include_textures=True,
+                )
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             if not model.get("tracks"):
@@ -1152,7 +1175,10 @@ class ExpressionParser:
                 ) from None
             from compiler import gltf
             try:
-                model = gltf.ensure_model(asset, pathlib.Path(self.path))
+                model = gltf.ensure_model(
+                    asset, pathlib.Path(self.path),
+                    include_textures=True,
+                )
             except gltf.ModelError as error:
                 raise CompileError(f"{self.path}:{self.line}: {error}") from None
             if not model.get("morph_count"):

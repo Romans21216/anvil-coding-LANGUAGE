@@ -333,6 +333,23 @@ async function start() {
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
           throw new Error(gl.getProgramInfoLog(program));
         }
+        const texturedProgram = gl.createProgram();
+        gl.attachShader(texturedProgram, compile(gl.VERTEX_SHADER,
+          "attribute vec2 pos; attribute float depth; attribute vec2 uv; attribute vec4 tint;" +
+          "varying vec2 v_uv_depth; varying float v_inv_depth; varying vec4 v_tint;" +
+          "void main(){ float z=clamp(depth/500.0,0.0,1.0)*2.0-1.0;" +
+          "gl_Position=vec4(pos.x/480.0-1.0,1.0-pos.y/300.0,z,1.0);" +
+          "float safeDepth=max(depth,0.0001); v_uv_depth=uv/safeDepth;" +
+          "v_inv_depth=1.0/safeDepth; v_tint=tint; }"));
+        gl.attachShader(texturedProgram, compile(gl.FRAGMENT_SHADER,
+          "precision highp float; varying vec2 v_uv_depth; varying float v_inv_depth;" +
+          "varying vec4 v_tint; uniform sampler2D image;" +
+          "void main(){ vec2 uv=v_uv_depth/max(v_inv_depth,0.000001);" +
+          "vec4 texel=texture2D(image,vec2(uv.x,1.0-uv.y)); gl_FragColor=texel*v_tint; }"));
+        gl.linkProgram(texturedProgram);
+        if (!gl.getProgramParameter(texturedProgram, gl.LINK_STATUS)) {
+          throw new Error(gl.getProgramInfoLog(texturedProgram));
+        }
         let sphereProgram = null;
         if (fragmentDepth) {
           try {
@@ -420,6 +437,8 @@ async function start() {
           canvas,
           gl,
           program,
+          texturedProgram,
+          textureCache: new Map(),
           pos: gl.getAttribLocation(program, "pos"),
           depth: gl.getAttribLocation(program, "depth"),
           colour: gl.getAttribLocation(program, "colour"),
@@ -439,7 +458,7 @@ async function start() {
       }
       return glRenderer;
     };
-    const drawGl = (list, spheres) => {
+    const drawGl = (list, texturedList, spheres) => {
       const renderer = createGlRenderer();
       if (!renderer) return false;
       const { canvas, gl } = renderer;
@@ -478,6 +497,48 @@ async function start() {
         gl.deleteBuffer(buffer);
       };
       upload(list.filter((entry) => entry[13] !== 1), true);
+      for (const entry of texturedList) {
+        const [x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,pointer,width,height] = entry;
+        const cacheKey = pointer + ":" + width + ":" + height;
+        let texture = renderer.textureCache.get(cacheKey);
+        if (!texture) {
+          if (!memory || width <= 0 || height <= 0) continue;
+          const source = new Uint32Array(memory.buffer, pointer, width * height);
+          const rgba = new Uint8Array(width * height * 4);
+          for (let pixel = 0; pixel < source.length; pixel++) {
+            const packed = source[pixel], at = pixel * 4;
+            rgba[at] = packed >>> 16; rgba[at + 1] = packed >>> 8;
+            rgba[at + 2] = packed; rgba[at + 3] = packed >>> 24;
+          }
+          texture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+          renderer.textureCache.set(cacheKey, texture);
+        } else gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.useProgram(renderer.texturedProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(gl.getUniformLocation(renderer.texturedProgram, "image"), 0);
+        const vertices = new Float32Array([
+          x1,y1,z1,u1,v1,r/255,g/255,b/255,a/255,
+          x2,y2,z2,u2,v2,r/255,g/255,b/255,a/255,
+          x3,y3,z3,u3,v3,r/255,g/255,b/255,a/255,
+        ]);
+        const buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+        const stride = 9 * 4;
+        for (const [name, size, offset] of [["pos",2,0],["depth",1,2*4],["uv",2,3*4],["tint",4,5*4]]) {
+          const location = gl.getAttribLocation(renderer.texturedProgram, name);
+          gl.enableVertexAttribArray(location);
+          gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset);
+        }
+        gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+        gl.drawArrays(gl.TRIANGLES, 0, 3); gl.deleteBuffer(buffer);
+      }
       if (spheres.length && renderer.sphere) {
         const shader = renderer.sphere;
         const shadowData = new Float32Array(32 * 4);
@@ -575,6 +636,7 @@ async function start() {
       return utf8.decode(bytes.subarray(pointer, end));
     };
     const triangles = [];
+    const texturedTriangles = [];
     const sphereImpostors = [];
     let rendererDiagnostics = new URLSearchParams(location.search).get("anvil_debug") === "1";
     if (gpuTimerRequested) {
@@ -1055,6 +1117,9 @@ async function start() {
       triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
         triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
       },
+      textured_triangle(x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,pointer,width,height) {
+        texturedTriangles.push([x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,pointer,width,height]);
+      },
       sphere_impostor_available() {
         if (forcePainter || !scene3dState.active) return 0;
         const renderer = createGlRenderer();
@@ -1075,9 +1140,10 @@ async function start() {
             (window.__anvilSphereImpostorCalls || 0) + sphereImpostors.length;
           rendererDiagnostics = false;
         }
-        if (triangles.length || sphereImpostors.length) {
-          if (!forcePainter && scene3dState.active && drawGl(triangles, sphereImpostors)) {
+        if (triangles.length || texturedTriangles.length || sphereImpostors.length) {
+          if (!forcePainter && scene3dState.active && drawGl(triangles, texturedTriangles, sphereImpostors)) {
             triangles.length = 0;
+            texturedTriangles.length = 0;
             sphereImpostors.length = 0;
           } else {
             if (!skipSort) triangles.sort(
@@ -1095,6 +1161,13 @@ async function start() {
               context.fill();
             }
             triangles.length = 0;
+            for (const t of texturedTriangles) {
+              context.fillStyle = "rgba(" + t[15] + "," + t[16] + "," + t[17] + "," + (t[18] / 255) + ")";
+              context.beginPath(); context.moveTo(t[0], t[1]);
+              context.lineTo(t[5], t[6]); context.lineTo(t[10], t[11]);
+              context.closePath(); context.fill();
+            }
+            texturedTriangles.length = 0;
             for (const sphere of sphereImpostors) {
               const depth = Math.max(0.05, sphere[2]);
               const radius = sphere[3] * sphere[11] / depth;
@@ -1290,7 +1363,9 @@ def validate(
         from compiler import gltf
 
         try:
-            model = gltf.ensure_model(asset, pathlib.Path(source_path))
+            model = gltf.ensure_model(
+                asset, pathlib.Path(source_path), include_textures=True
+            )
         except gltf.ModelError:
             continue  # the C generator reports the real problem with the file
         # Static morph targets are supported by both model_draw and ray_mesh;

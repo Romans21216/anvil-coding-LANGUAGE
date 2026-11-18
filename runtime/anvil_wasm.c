@@ -43,6 +43,13 @@ extern void anvil_host_triangle(double x1, double y1, double z1, double x2,
                                 double y2, double z2, double x3, double y3,
                                 double z3, int r, int g, int b, int a,
                                 int layer);
+__attribute__((import_module("env"), import_name("textured_triangle")))
+extern void anvil_host_textured_triangle(
+    double x1, double y1, double z1, double u1, double v1,
+    double x2, double y2, double z2, double u2, double v2,
+    double x3, double y3, double z3, double u3, double v3,
+    int red, int green, int blue, int alpha, int layer,
+    const uint32_t *pixels, int width, int height);
 __attribute__((import_module("env"), import_name("sphere_impostor_available")))
 extern int anvil_host_sphere_impostor_available(void);
 __attribute__((import_module("env"), import_name("sphere_impostor")))
@@ -1899,6 +1906,77 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
     anvil_wasm_triangle(points[0], points[1], points[2], normal, r, g, b, 255,
                         1, 0.0, 0);
     anvil_wasm_shadow_triangle(points[0], points[1], points[2]);
+    anvil_mesh_drawn_frame += 1;
+  }
+  anvil_wasm_ray_mesh_triangles_frame += triangle_count;
+  return 1.0;
+}
+
+/* Textured baked models use 20 doubles per triangle: three position/UV pairs,
+   RGB tint, alpha, and a texture table index. Pixel arrays are embedded in the
+   module and consumed by the browser host during frame presentation. */
+double anvil_mesh_draw_textured(
+    const double *data, int triangle_count, const uint32_t *const *textures,
+    const int *texture_dimensions, int texture_count, double cx, double cy,
+    double cz, double radius, double x, double y, double z, double scale,
+    double rx, double ry, double rz) {
+  if (!data || !textures || !texture_dimensions || triangle_count <= 0 ||
+      texture_count <= 0 || triangle_count > ANVIL_WASM_MODEL_TRIANGLE_BUDGET -
+          anvil_wasm_ray_mesh_triangles_frame ||
+      !anvil_wasm_finite(cx) || !anvil_wasm_finite(cy) ||
+      !anvil_wasm_finite(cz) || !anvil_wasm_finite(radius) || radius < 0.0 ||
+      !anvil_wasm_finite(scale) || scale == 0.0 || !anvil_wasm_finite(x) ||
+      !anvil_wasm_finite(y) || !anvil_wasm_finite(z) ||
+      !anvil_wasm_finite(rx) || !anvil_wasm_finite(ry) ||
+      !anvil_wasm_finite(rz)) return 0.0;
+  if (!anvil_wasm_sphere_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry,
+                                 rz)) {
+    anvil_mesh_culled_frame = 1;
+    return 0.0;
+  }
+  anvil_mesh_culled_frame = 0;
+  anvil_mesh_drawn_frame = 0;
+  for (int triangle = 0; triangle < triangle_count; ++triangle) {
+    const double *p = data + (size_t)triangle * 20;
+    double projected[3][3];
+    AnvilWasmVec3 world[3];
+    int visible = 1;
+    for (int vertex = 0; vertex < 3; ++vertex) {
+      AnvilWasmVec3 local = {p[vertex * 5] * scale,
+                             p[vertex * 5 + 1] * scale,
+                             p[vertex * 5 + 2] * scale};
+      local = anvil_wasm_rotate(local, rx, ry, rz);
+      world[vertex] = (AnvilWasmVec3){local.x + x, local.y + y, local.z + z};
+      if (!anvil_wasm_project(world[vertex], &projected[vertex][0],
+                              &projected[vertex][1], &projected[vertex][2])) {
+        visible = 0;
+        break;
+      }
+    }
+    if (!visible) continue;
+    AnvilWasmVec3 normal = anvil_wasm_normalize(
+        anvil_wasm_cross(anvil_wasm_sub(world[1], world[0]),
+                         anvil_wasm_sub(world[2], world[0])));
+    double facing = anvil_wasm_dot(
+        normal, anvil_wasm_normalize(anvil_wasm_light_direction));
+    if (facing < 0.0) facing = -facing;
+    double shade = anvil_wasm_light_ambient_value +
+        (1.0 - anvil_wasm_light_ambient_value) *
+        anvil_wasm_light_intensity_value * facing;
+    if (shade < 0.0) shade = 0.0;
+    if (shade > 1.0) shade = 1.0;
+    int texture = (int)p[19];
+    if (texture < 0 || texture >= texture_count || !textures[texture]) continue;
+    double alpha = p[18];
+    if (alpha < 0.0) alpha = 0.0;
+    if (alpha > 255.0) alpha = 255.0;
+    anvil_host_textured_triangle(
+        projected[0][0], projected[0][1], projected[0][2], p[3], p[4],
+        projected[1][0], projected[1][1], projected[1][2], p[8], p[9],
+        projected[2][0], projected[2][1], projected[2][2], p[13], p[14],
+        (int)(p[15] * shade), (int)(p[16] * shade),
+        (int)(p[17] * shade), (int)alpha, 1, textures[texture],
+        texture_dimensions[texture * 2], texture_dimensions[texture * 2 + 1]);
     anvil_mesh_drawn_frame += 1;
   }
   anvil_wasm_ray_mesh_triangles_frame += triangle_count;

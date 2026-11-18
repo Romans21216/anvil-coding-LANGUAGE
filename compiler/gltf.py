@@ -15,13 +15,15 @@ LINEAR and STEP keys). Animated models bake node-local triangles and hierarchy
 data for runtime posing; static models use a cheaper world-space bake. One skin
 can bake mesh-space vertices with four joint indices and weights per vertex,
 plus inverse bind matrices. Morph targets are supported for unskinned static
-and animated models. Base-color texture images and sparse accessors are not
-supported yet.
+and animated models. Static unskinned C-backend draws also support base-color
+PNG textures with `TEXCOORD_0`; WebAssembly currently falls back to
+`baseColorFactor`. Sparse accessors are not supported yet.
 """
 
 from __future__ import annotations
 
 import base64
+import array
 import functools
 import json
 import math
@@ -29,12 +31,15 @@ import pathlib
 import struct
 import time
 from urllib.parse import unquote
+import zlib
 
 MAX_TRIANGLES = 200_000
 MAX_CONTAINER_BYTES = 64 * 1024 * 1024
 MAX_BUFFER_BYTES = 256 * 1024 * 1024
 MAX_ACCESSOR_DECODED_BYTES = 64 * 1024 * 1024
 MAX_GEOMETRY_BYTES = 512 * 1024 * 1024
+MAX_TEXTURE_BYTES = 64 * 1024 * 1024
+MAX_TEXTURE_PIXELS = 16 * 1024 * 1024
 # The C runtime keeps one clip clock per model in ANVIL_MODEL_STATES slots; a
 # posed model (animated or skinned) past this index would silently read 0 and
 # never move, so the importer refuses it at the model_draw line instead.
@@ -134,6 +139,187 @@ def _buffer_bytes(
         return data
     except OSError as error:
         raise ModelError(f"cannot read buffer {uri!r}: {error}") from error
+
+
+def _decode_png_rgba(raw: bytes) -> tuple[int, int, array.array]:
+    """Decode a bounded, non-interlaced 8-bit RGB/RGBA PNG to 0xAARRGGBB."""
+    if len(raw) > MAX_TEXTURE_BYTES:
+        raise ModelError(f"a texture exceeds the {MAX_TEXTURE_BYTES} byte import limit")
+    if not raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ModelError("only PNG base-color textures are supported")
+    offset = 8
+    width = height = bit_depth = color_type = None
+    compressed = bytearray()
+    saw_header = saw_end = False
+    while offset + 12 <= len(raw):
+        chunk_length = struct.unpack_from(">I", raw, offset)[0]
+        chunk_type = raw[offset + 4 : offset + 8]
+        end = offset + 12 + chunk_length
+        if end > len(raw):
+            raise ModelError("a PNG texture chunk is truncated")
+        payload = raw[offset + 8 : offset + 8 + chunk_length]
+        expected_crc = struct.unpack_from(">I", raw, offset + 8 + chunk_length)[0]
+        if zlib.crc32(chunk_type + payload) & 0xFFFFFFFF != expected_crc:
+            raise ModelError("a PNG texture chunk has an invalid checksum")
+        if chunk_type == b"IHDR":
+            if saw_header or chunk_length != 13:
+                raise ModelError("a PNG texture has an invalid header")
+            width, height, bit_depth, color_type, compression, filtering, interlace = struct.unpack(
+                ">IIBBBBB", payload
+            )
+            if compression != 0 or filtering != 0 or interlace != 0:
+                raise ModelError("interlaced or non-standard PNG textures are not supported")
+            if bit_depth != 8 or color_type not in (2, 6):
+                raise ModelError("PNG textures must use 8-bit RGB or RGBA pixels")
+            if width == 0 or height == 0 or width * height > MAX_TEXTURE_PIXELS:
+                raise ModelError(f"a texture exceeds the {MAX_TEXTURE_PIXELS} pixel import limit")
+            saw_header = True
+        elif chunk_type == b"IDAT":
+            if not saw_header or saw_end:
+                raise ModelError("a PNG texture has misplaced image data")
+            if len(compressed) + chunk_length > MAX_TEXTURE_BYTES:
+                raise ModelError(f"a texture exceeds the {MAX_TEXTURE_BYTES} byte import limit")
+            compressed.extend(payload)
+        elif chunk_type == b"IEND":
+            if chunk_length != 0:
+                raise ModelError("a PNG texture has an invalid end chunk")
+            saw_end = True
+            offset = end
+            break
+        elif chunk_type[0] & 0x20 == 0 and chunk_type not in (b"IHDR", b"PLTE"):
+            raise ModelError("a PNG texture uses an unsupported critical chunk")
+        offset = end
+    if not saw_header or not saw_end or offset != len(raw) or not compressed:
+        raise ModelError("a PNG texture is incomplete")
+    channels = 3 if color_type == 2 else 4
+    stride = width * channels
+    expected_size = height * (stride + 1)
+    try:
+        inflater = zlib.decompressobj()
+        decoded = inflater.decompress(bytes(compressed), expected_size + 1)
+    except zlib.error as error:
+        raise ModelError(f"a PNG texture has invalid compressed data: {error}") from None
+    if (
+        len(decoded) != expected_size
+        or not inflater.eof
+        or inflater.unused_data
+        or inflater.unconsumed_tail
+    ):
+        raise ModelError("a PNG texture has an invalid decompressed size")
+    pixels = bytearray(height * stride)
+    source_offset = 0
+    for y in range(height):
+        filter_type = decoded[source_offset]
+        source_offset += 1
+        row = decoded[source_offset : source_offset + stride]
+        source_offset += stride
+        destination = y * stride
+        previous = pixels[destination - stride : destination] if y else None
+        for x in range(stride):
+            left = pixels[destination + x - channels] if x >= channels else 0
+            above = previous[x] if previous is not None else 0
+            upper_left = previous[x - channels] if previous is not None and x >= channels else 0
+            if filter_type == 1:
+                predictor = left
+            elif filter_type == 2:
+                predictor = above
+            elif filter_type == 3:
+                predictor = (left + above) // 2
+            elif filter_type == 4:
+                p = left + above - upper_left
+                pa, pb, pc = abs(p - left), abs(p - above), abs(p - upper_left)
+                predictor = left if pa <= pb and pa <= pc else above if pb <= pc else upper_left
+            elif filter_type == 0:
+                predictor = 0
+            else:
+                raise ModelError("a PNG texture uses an unsupported row filter")
+            pixels[destination + x] = (row[x] + predictor) & 0xFF
+    packed = array.array("I")
+    for index in range(0, len(pixels), channels):
+        red, green, blue = pixels[index : index + 3]
+        alpha = pixels[index + 3] if channels == 4 else 255
+        packed.append((alpha << 24) | (red << 16) | (green << 8) | blue)
+    return width, height, packed
+
+
+def _image_bytes(
+    document: dict, image: dict, base_dir: pathlib.Path, binary: bytes | None
+) -> bytes:
+    """Read a glTF image from a project-contained URI or a bufferView."""
+    uri = image.get("uri")
+    if uri is not None:
+        if not isinstance(uri, str):
+            raise ModelError("an image uri must be a string")
+        if uri[:5].lower() == "data:":
+            header, separator, payload = uri.partition(",")
+            if not separator or ";base64" not in header.lower():
+                raise ModelError("only base64 data URIs are supported for images")
+            if len(payload) > ((MAX_TEXTURE_BYTES + 2) // 3) * 4 + 8:
+                raise ModelError(f"a texture exceeds the {MAX_TEXTURE_BYTES} byte import limit")
+            try:
+                raw = base64.b64decode(payload, validate=True)
+            except ValueError as error:
+                raise ModelError(f"an image has invalid base64 data: {error}") from None
+            if len(raw) > MAX_TEXTURE_BYTES:
+                raise ModelError(f"a texture exceeds the {MAX_TEXTURE_BYTES} byte import limit")
+            return raw
+        root = _asset_root or _safe_resolve(base_dir, "project folder")
+        path = pathlib.Path(unquote(uri))
+        if not path.is_absolute():
+            path = base_dir / path
+        path = _safe_resolve(path, f"image uri {uri!r}")
+        try:
+            path.relative_to(_safe_resolve(root, "project folder"))
+        except ValueError:
+            raise ModelError("an image uri must resolve inside the project folder") from None
+        try:
+            if path.stat().st_size > MAX_TEXTURE_BYTES:
+                raise ModelError(f"a texture exceeds the {MAX_TEXTURE_BYTES} byte import limit")
+            return path.read_bytes()
+        except OSError as error:
+            raise ModelError(f"cannot read image {uri!r}: {error}") from None
+
+    view_index = image.get("bufferView")
+    views = document.get("bufferViews")
+    if (
+        not isinstance(view_index, int)
+        or isinstance(view_index, bool)
+        or not isinstance(views, list)
+        or not 0 <= view_index < len(views)
+        or not isinstance(views[view_index], dict)
+    ):
+        raise ModelError("an image needs a valid uri or bufferView")
+    view = views[view_index]
+    buffer_index = view.get("buffer")
+    buffers = document.get("buffers")
+    if (
+        not isinstance(buffer_index, int)
+        or isinstance(buffer_index, bool)
+        or not isinstance(buffers, list)
+        or not 0 <= buffer_index < len(buffers)
+        or not isinstance(buffers[buffer_index], dict)
+    ):
+        raise ModelError("an image bufferView refers to an invalid buffer")
+    offset = view.get("byteOffset", 0)
+    length = view.get("byteLength")
+    declared = buffers[buffer_index].get("byteLength")
+    if (
+        not isinstance(offset, int)
+        or isinstance(offset, bool)
+        or not isinstance(length, int)
+        or isinstance(length, bool)
+        or not isinstance(declared, int)
+        or isinstance(declared, bool)
+        or offset < 0
+        or length <= 0
+        or length > MAX_TEXTURE_BYTES
+        or offset + length > declared
+    ):
+        raise ModelError("an image bufferView has an invalid byte range")
+    data = _buffer_bytes(document, buffer_index, base_dir, binary)
+    if len(data) < declared or offset + length > len(data):
+        raise ModelError("an image bufferView reads past its buffer")
+    return data[offset : offset + length]
 
 
 def _accessor(
@@ -357,6 +543,110 @@ def _material_colour(document: dict, primitive: dict) -> tuple[int, int, int]:
     return tuple(max(0, min(255, int(round(float(channel) * 255.0)))) for channel in factor[:3])
 
 
+def _material_alpha(document: dict, primitive: dict) -> int:
+    index = primitive.get("material")
+    if index is None:
+        return 255
+    try:
+        factor = document["materials"][index]["pbrMetallicRoughness"]["baseColorFactor"]
+        alpha = float(factor[3])
+    except (KeyError, IndexError, TypeError, ValueError, OverflowError):
+        return 255
+    if not math.isfinite(alpha):
+        raise ModelError("baseColorFactor alpha must be finite")
+    return max(0, min(255, int(round(alpha * 255.0))))
+
+
+def _has_base_color_texture(document: dict) -> bool:
+    materials = document.get("materials", [])
+    for mesh in document.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            material_index = primitive.get("material")
+            if (
+                isinstance(material_index, int)
+                and not isinstance(material_index, bool)
+                and 0 <= material_index < len(materials)
+                and isinstance(materials[material_index], dict)
+            ):
+                pbr = materials[material_index].get("pbrMetallicRoughness", {})
+                if isinstance(pbr, dict) and pbr.get("baseColorTexture") is not None:
+                    return True
+    return False
+
+
+def _collect_base_color_textures(
+    document: dict, base_dir: pathlib.Path, binary: bytes | None
+) -> tuple[dict[int, int], list[tuple[int, int, array.array]]]:
+    """Load the PNGs referenced by baseColorTexture, in compact table order."""
+    textures = document.get("textures", [])
+    images = document.get("images", [])
+    materials = document.get("materials", [])
+    if not isinstance(textures, list) or not isinstance(images, list) or not isinstance(materials, list):
+        raise ModelError("glTF texture, image and material tables must be arrays")
+    texture_to_image: dict[int, int] = {}
+    for mesh in document.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            material_index = primitive.get("material")
+            if material_index is None:
+                continue
+            if not isinstance(material_index, int) or isinstance(material_index, bool) or not 0 <= material_index < len(materials):
+                raise ModelError("a primitive material index is out of range")
+            material = materials[material_index]
+            pbr = material.get("pbrMetallicRoughness", {})
+            info = pbr.get("baseColorTexture")
+            if info is None:
+                continue
+            if not isinstance(info, dict):
+                raise ModelError("a baseColorTexture entry must be an object")
+            tex_coord = info.get("texCoord", 0)
+            if not isinstance(tex_coord, int) or isinstance(tex_coord, bool) or tex_coord != 0:
+                raise ModelError("base-color textures currently require TEXCOORD_0")
+            extensions = info.get("extensions", {})
+            if not isinstance(extensions, dict):
+                raise ModelError("baseColorTexture extensions must be an object")
+            if "KHR_texture_transform" in extensions:
+                raise ModelError("KHR_texture_transform is not supported for base-color textures")
+            texture_index = info.get("index")
+            if not isinstance(texture_index, int) or isinstance(texture_index, bool) or not 0 <= texture_index < len(textures):
+                raise ModelError("a baseColorTexture index is out of range")
+            texture = textures[texture_index]
+            if not isinstance(texture, dict):
+                raise ModelError("a glTF texture entry must be an object")
+            sampler_index = texture.get("sampler")
+            if sampler_index is not None:
+                samplers = document.get("samplers", [])
+                if not isinstance(sampler_index, int) or isinstance(sampler_index, bool) or not isinstance(samplers, list) or not 0 <= sampler_index < len(samplers):
+                    raise ModelError("a glTF texture sampler index is out of range")
+                sampler = samplers[sampler_index]
+                if sampler.get("wrapS", 10497) != 10497 or sampler.get("wrapT", 10497) != 10497:
+                    raise ModelError("base-color texture samplers must use REPEAT wrapping")
+            image_index = texture.get("source")
+            if not isinstance(image_index, int) or isinstance(image_index, bool) or not 0 <= image_index < len(images):
+                raise ModelError("a glTF texture source image index is out of range")
+            texture_to_image[texture_index] = image_index
+    image_slots: dict[int, int] = {}
+    decoded: list[tuple[int, int, array.array]] = []
+    texture_slots: dict[int, int] = {}
+    total_bytes = 0
+    for texture_index, image_index in texture_to_image.items():
+        slot = image_slots.get(image_index)
+        if slot is None:
+            image = images[image_index]
+            if not isinstance(image, dict):
+                raise ModelError("a glTF image entry must be an object")
+            width, height, pixels = _decode_png_rgba(
+                _image_bytes(document, image, base_dir, binary)
+            )
+            total_bytes += len(pixels) * 4
+            if total_bytes > MAX_TEXTURE_BYTES:
+                raise ModelError(f"model textures exceed the {MAX_TEXTURE_BYTES} byte import limit")
+            slot = len(decoded)
+            image_slots[image_index] = slot
+            decoded.append((width, height, pixels))
+        texture_slots[texture_index] = slot
+    return texture_slots, decoded
+
+
 def _primitive(
     document: dict,
     primitive: dict,
@@ -365,6 +655,8 @@ def _primitive(
     binary: bytes | None = None,
     morph_out: list[float] | None = None,
     max_triangles: int = MAX_TRIANGLES,
+    texture_out: list[float] | None = None,
+    texture_slots: dict[int, int] | None = None,
 ) -> list[float]:
     attributes = primitive.get("attributes", {})
     if "POSITION" not in attributes:
@@ -394,6 +686,25 @@ def _primitive(
         raw = _accessor(document, attributes["COLOR_0"], base_dir, binary, vertex_attribute=True, semantic="COLOR_0")
         colours = [tuple(max(0, min(255, int(round(v * 255.0)))) for v in row[:3]) for row in raw]
     fallback = _material_colour(document, primitive)
+    texture_index = -1
+    if texture_slots is not None:
+        material_index = primitive.get("material")
+        if material_index is not None:
+            info = document["materials"][material_index].get("pbrMetallicRoughness", {}).get("baseColorTexture")
+            if info is not None:
+                texture_index = texture_slots[info["index"]]
+    texcoords = None
+    if texture_index >= 0:
+        if "TEXCOORD_0" not in attributes:
+            raise ModelError("a textured primitive has no TEXCOORD_0 attribute")
+        texcoords = _accessor(
+            document, attributes["TEXCOORD_0"], base_dir, binary,
+            vertex_attribute=True, semantic="TEXCOORD_0",
+        )
+        if len(texcoords) != len(positions) or any(len(row) != 2 for row in texcoords):
+            raise ModelError("TEXCOORD_0 must be a VEC2 accessor matching POSITION")
+        if any(not math.isfinite(float(value)) for row in texcoords for value in row):
+            raise ModelError("TEXCOORD_0 contains a non-finite value")
 
     targets = primitive.get("targets", [])
     deltas: list[list[tuple[float, float, float]]] = []
@@ -440,6 +751,27 @@ def _primitive(
         for point in points:
             out.extend(point)
         out.extend((float(colour[0]), float(colour[1]), float(colour[2])))
+        if texture_out is not None:
+            for corner, point in zip(corners, points):
+                texture_out.extend(point)
+                texture_out.extend(texcoords[corner] if texcoords is not None else (0.0, 0.0))
+            texture_colour = colour
+            if texture_index >= 0:
+                vertex_colour = (
+                    tuple(
+                        sum(colours[i][channel] for i in corners) / 3.0
+                        for channel in range(3)
+                    )
+                    if colours is not None
+                    else (255.0, 255.0, 255.0)
+                )
+                texture_colour = tuple(
+                    int(round(fallback[channel] * vertex_colour[channel] / 255.0))
+                    for channel in range(3)
+                )
+            texture_out.extend(float(channel) for channel in texture_colour)
+            texture_out.append(float(_material_alpha(document, primitive)))
+            texture_out.append(float(texture_index))
         if morph_out is not None:
             for corner in corners:
                 for target in deltas:
@@ -660,6 +992,8 @@ def _static_walk(
     morph_out: list[float] | None = None,
     morph_defaults_out: list[list[float]] | None = None,
     morph_groups_out: list[int] | None = None,
+    texture_out: list[float] | None = None,
+    texture_slots: dict[int, int] | None = None,
 ) -> tuple[list[float], list[int]]:
     """Bake every mesh in world space; optionally collect morph deltas."""
     nodes = document.get("nodes", [])
@@ -702,6 +1036,7 @@ def _static_walk(
                     raise ModelError(f"a model may use at most {MAX_MORPH_TARGETS} morph targets")
                 generated_components = (
                     len(triangles) + primitive_triangles * 12
+                    + (primitive_triangles * 20 if texture_out is not None else 0)
                     + (len(morph_out) if morph_out is not None else 0)
                     + primitive_triangles * 9 * morph_targets
                 )
@@ -714,6 +1049,7 @@ def _static_walk(
                     _primitive(
                         document, primitive, world, base_dir, binary, morph_out,
                         MAX_TRIANGLES - len(triangles) // 12,
+                        texture_out, texture_slots,
                     )
                 )
                 target_counts.append(len(primitive.get("targets", [])))
@@ -779,6 +1115,25 @@ def load_triangles(path: pathlib.Path) -> list[float]:
     if not triangles:
         raise ModelError("the model has no triangle geometry")
     return triangles
+
+
+@_translate_malformed_structure
+def load_textured(path: pathlib.Path) -> dict:
+    """Bake static geometry plus UVs and decoded base-color PNG images."""
+    document, binary = _static_document(path)
+    texture_slots, textures = _collect_base_color_textures(
+        document, path.parent, binary
+    )
+    if not textures:
+        raise ModelError("the model has no base-color textures")
+    textured: list[float] = []
+    triangles, _ = _static_walk(
+        document, binary, path.parent, texture_out=textured,
+        texture_slots=texture_slots,
+    )
+    if not triangles:
+        raise ModelError("the model has no triangle geometry")
+    return {"vertices": triangles, "textured": textured, "textures": textures}
 
 
 @_translate_malformed_structure
@@ -1354,20 +1709,23 @@ def bounds_of(data: list[float]) -> tuple[float, float, float, float]:
     return (cx, cy, cz, radius)
 
 
-def _kind(path: pathlib.Path) -> str:
+def _kind(path: pathlib.Path, *, include_textures: bool = True) -> str:
     """Classify the model from one read: skinned, animated or static."""
     document, _ = _container(path)
     if not isinstance(document, dict):
         return "static"
     nodes = document.get("nodes", [])
+    has_texture = include_textures and _has_base_color_texture(document)
     if document.get("skins") and any("skin" in node for node in nodes):
-        return "skinned"
+        return "textured_skinned" if has_texture else "skinned"
     if document.get("animations"):
-        return "animated"
+        return "textured_animated" if has_texture else "animated"
     for mesh in document.get("meshes", []):
         for primitive in mesh.get("primitives", []):
             if primitive.get("targets"):
-                return "morphed"
+                return "textured_morphed" if has_texture else "morphed"
+    if has_texture:
+        return "textured"
     return "static"
 
 
@@ -1390,14 +1748,16 @@ def _skinned_bounds(vertices: list[float]) -> tuple[float, float, float, float]:
     return (cx, cy, cz, radius)
 
 
-def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
+def ensure_model(
+    asset: str, source_path: pathlib.Path, *, include_textures: bool = True
+) -> dict:
     global _import_seconds
     owns_cache_scope = not _cache_import_reads
     if owns_cache_scope:
         _begin_import_cache()
     started = time.perf_counter() if _measure_import_time else None
     try:
-        return _ensure_model(asset, source_path)
+        return _ensure_model(asset, source_path, include_textures=include_textures)
     finally:
         if started is not None:
             _import_seconds += time.perf_counter() - started
@@ -1405,7 +1765,9 @@ def ensure_model(asset: str, source_path: pathlib.Path) -> dict:
             _end_import_cache()
 
 
-def _ensure_model(asset: str, source_path: pathlib.Path) -> dict:
+def _ensure_model(
+    asset: str, source_path: pathlib.Path, *, include_textures: bool = True
+) -> dict:
     """Register a model and return everything code generation needs.
 
     The returned dict always has symbol/count/bounds/id; an animated model also
@@ -1420,7 +1782,13 @@ def _ensure_model(asset: str, source_path: pathlib.Path) -> dict:
     if not key.endswith((".gltf", ".glb")):
         raise ModelError("only .gltf and .glb models are supported")
     entry: dict = {"id": len(_registry), "symbol": f"anvil_model_{len(_registry)}"}
-    kind = _kind(path)
+    kind = _kind(path, include_textures=include_textures)
+    if kind.startswith("textured_"):
+        feature = kind.removeprefix("textured_")
+        raise ModelError(
+            f"base-color textures on {feature} models are not supported yet; "
+            "texture rendering currently requires a static unskinned model"
+        )
     if kind == "skinned":
         clip = load_skinned(path)
         entry.update(clip)
@@ -1443,6 +1811,15 @@ def _ensure_model(asset: str, source_path: pathlib.Path) -> dict:
         entry["count"] = len(clip["vertices"]) // 12
         entry["data"] = clip["vertices"]
         entry["bounds"] = bounds_of(clip["vertices"])
+    elif kind == "textured":
+        model = load_textured(path)
+        entry["animated"] = False
+        entry["count"] = len(model["vertices"]) // 12
+        entry["data"] = model["vertices"]
+        entry["textured_data"] = model["textured"]
+        entry["textures"] = model["textures"]
+        entry["textured"] = True
+        entry["bounds"] = bounds_of(model["vertices"])
     else:
         data = load_triangles(path)
         entry.update({"animated": False, "count": len(data) // 12, "data": data})
@@ -1494,7 +1871,17 @@ def _int_array(lines: list[str], symbol: str, values: list[int], per_line: int) 
     lines.append("};")
 
 
-def definitions() -> list[str]:
+def _uint_array(lines: list[str], symbol: str, values: list[int], per_line: int) -> None:
+    if not values:
+        values = [0]
+    lines.append(f"static const uint32_t {symbol}[{len(values)}] = {{")
+    for start in range(0, len(values), per_line):
+        chunk = values[start : start + per_line]
+        lines.append("    " + ", ".join(f"0x{value:08x}u" for value in chunk) + ",")
+    lines.append("};")
+
+
+def definitions(*, include_textures: bool = True) -> list[str]:
     lines: list[str] = []
     for key, entry in _registry.items():
         symbol = entry["symbol"]
@@ -1537,6 +1924,29 @@ def definitions() -> list[str]:
             _int_array(lines, symbol + "_morph_groups", entry["morph_groups"], 12)
             _double_array(lines, symbol + "_morph_bounds", entry["morph_group_bounds"], 4)
             _double_array(lines, symbol + "_morph_default", entry["morph_defaults"], 8)
+        elif entry.get("textured"):
+            lines.append(
+                f"/* model: {pathlib.Path(key).name}, {count} textured triangles */"
+            )
+            _double_array(lines, symbol, entry["data"], 12)
+            if include_textures:
+                _double_array(lines, symbol + "_textured", entry["textured_data"], 20)
+                for index, (width, height, pixels) in enumerate(entry["textures"]):
+                    _uint_array(lines, f"{symbol}_texture_{index}", pixels, 8)
+                pointers = ", ".join(
+                    f"{symbol}_texture_{index}"
+                    for index in range(len(entry["textures"]))
+                )
+                dimensions = ", ".join(
+                    f"{width}, {height}"
+                    for width, height, _ in entry["textures"]
+                )
+                lines.append(
+                    f"static const uint32_t *const {symbol}_textures[] = {{{pointers}}};"
+                )
+                lines.append(
+                    f"static const int {symbol}_texture_dimensions[] = {{{dimensions}}};"
+                )
         else:
             lines.append(f"/* model: {pathlib.Path(key).name}, {count} triangles */")
             _double_array(lines, symbol, entry["data"], 12)

@@ -1113,7 +1113,7 @@ def _emit_c(
     # Model imports are discovered while lowering reachable expressions.
     # Insert their definitions before function declarations after all emitted
     # bodies and setup expressions have registered their referenced assets.
-    model_lines = _gltf.definitions()
+    model_lines = _gltf.definitions(include_textures=True)
     if model_lines:
         lines[model_declaration_index:model_declaration_index] = model_lines
     return "\n".join(lines)

@@ -1,6 +1,8 @@
 #ifndef ANVIL_RUNTIME_H
 #define ANVIL_RUNTIME_H
 
+#include <stdint.h>
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -225,6 +227,11 @@ void anvil_cube(double x, double y, double z, double size, double rx, double ry,
 double anvil_mesh_draw(const double *data, int triangle_count, double cx,
                        double cy, double cz, double radius, double x, double y,
                        double z, double scale, double rx, double ry, double rz);
+double anvil_mesh_draw_textured(
+    const double *data, int triangle_count, const uint32_t *const *textures,
+    const int *texture_dimensions, int texture_count, double cx, double cy,
+    double cz, double radius, double x, double y, double z, double scale,
+    double rx, double ry, double rz);
 double anvil_mesh_culled(void);
 double anvil_model_animate(int id, double seconds);
 double anvil_model_clock(int id);

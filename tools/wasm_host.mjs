@@ -54,6 +54,7 @@ let memory = null;
 const ops = [];
 const voices = new Map();
 const triangles = [];
+const texturedTriangles = [];
 let nextVoice = 0;
 let musicPlaying = false;
 const readCString = (pointer) => {
@@ -187,6 +188,9 @@ const imports = {
     triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer) {
       triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3, r, g, b, a, layer]);
     },
+    textured_triangle(x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,pointer,width,height) {
+      texturedTriangles.push([x1,y1,z1,u1,v1,x2,y2,z2,u2,v2,x3,y3,z3,u3,v3,r,g,b,a,layer,width,height]);
+    },
     sphere_impostor_available() {
       return 0;
     },
@@ -204,7 +208,7 @@ const imports = {
       ops.push(["announce", utf8.decode(view)]);
     },
     present() {
-      if (triangles.length) {
+      if (triangles.length || texturedTriangles.length) {
         if (process.env.ANVIL_WASM_DUMP_TRIANGLES) {
           fs.writeFileSync(
             process.env.ANVIL_WASM_DUMP_TRIANGLES,
@@ -214,6 +218,14 @@ const imports = {
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         for (const t of triangles) {
           for (const [x, y] of [[t[0], t[1]], [t[3], t[4]], [t[6], t[7]]]) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+        for (const t of texturedTriangles) {
+          for (const [x, y] of [[t[0], t[1]], [t[5], t[6]], [t[10], t[11]]]) {
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
@@ -232,9 +244,15 @@ const imports = {
           if (luminance < darkest) darkest = luminance;
           if (luminance > brightest) brightest = luminance;
         }
+        for (const t of texturedTriangles) {
+          const luminance = t[15] + t[16] + t[17];
+          tones.add(t[15] + "," + t[16] + "," + t[17]);
+          if (luminance < darkest) darkest = luminance;
+          if (luminance > brightest) brightest = luminance;
+        }
         ops.push([
           "triangles",
-          triangles.length,
+          triangles.length + texturedTriangles.length,
           Math.round(minX),
           Math.round(maxX),
           Math.round(minY),
@@ -244,6 +262,7 @@ const imports = {
           Math.round(brightest),
         ]);
         triangles.length = 0;
+        texturedTriangles.length = 0;
       }
       ops.push(["present"]);
     },

@@ -199,9 +199,10 @@ sort, which is how the depth test is demonstrated — an unsorted painter shows
 the farther cube, WebGL shows the nearer one. 3D is still painted after any 2D
 drawing in the frame, and 2D primitives in a 3D scene are covered by the blit.
 Skinned `ray_mesh` uses the same WebGL raster submission as `model_draw`;
-glTF base-color textures are not decoded by either backend, so textured models
-use their material `baseColorFactor` fallback. `model_draw` and `ray_mesh`
-sample skinning and the first glTF clip with translation,
+Textured `model_draw` calls sample embedded PNG base-color textures; static
+unskinned C model draws use the same PNG support. `ray_mesh` and textured
+animated, skinned or morphed models use `baseColorFactor` fallback. `model_draw` and
+`ray_mesh` sample skinning and the first glTF clip with translation,
 rotation and scale tracks using LINEAR or STEP interpolation. `model_animate`
 sets a per-model clock; `model_animation_length` is baked as a compile-time
 constant. Morph targets are supported on static and animated unskinned models,

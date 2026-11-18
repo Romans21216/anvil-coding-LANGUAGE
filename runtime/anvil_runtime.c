@@ -501,10 +501,10 @@ double anvil_texture(double handle) {
   return anvil_texture_image ? 1.0 : 0.0;
 }
 
-static void anvil_triangle_textured(AnvilProjected p[3], double uv[3][2],
-                                    double brightness, int alpha) {
-  AnvilImage *texture = anvil_texture_image;
-  if (!texture || !texture->pixels) {
+static void anvil_triangle_textured_pixels(
+    AnvilProjected p[3], double uv[3][2], double brightness, int alpha,
+    const uint32_t *pixels, int width, int height, const double tint[3]) {
+  if (!pixels || width <= 0 || height <= 0 || !tint || alpha <= 0) {
     return;
   }
   double area =
@@ -548,22 +548,32 @@ static void anvil_triangle_textured(AnvilProjected p[3], double uv[3][2],
       u -= floor(u);
       v = 1.0 - v;
       v -= floor(v);
-      int tx = (int)(u * texture->width);
-      int ty = (int)(v * texture->height);
+      int tx = (int)(u * width);
+      int ty = (int)(v * height);
       if (tx < 0) tx = 0;
       if (ty < 0) ty = 0;
-      if (tx >= texture->width) tx = texture->width - 1;
-      if (ty >= texture->height) ty = texture->height - 1;
-      uint32_t texel = texture->pixels[(size_t)ty * (size_t)texture->width + (size_t)tx];
+      if (tx >= width) tx = width - 1;
+      if (ty >= height) ty = height - 1;
+      uint32_t texel = pixels[(size_t)ty * (size_t)width + (size_t)tx];
       unsigned int ta = (texel >> 24) & 255u;
       if (ta == 0)
         continue;
-      int r = (int)(((texel >> 16) & 255u) * brightness);
-      int g = (int)(((texel >> 8) & 255u) * brightness);
-      int b = (int)((texel & 255u) * brightness);
+      int r = (int)(((texel >> 16) & 255u) * brightness * tint[0] / 255.0);
+      int g = (int)(((texel >> 8) & 255u) * brightness * tint[1] / 255.0);
+      int b = (int)((texel & 255u) * brightness * tint[2] / 255.0);
       anvil_depth_buffer[index] = z;
       anvil_pixel(x, y, anvil_color(r, g, b), (int)(ta * alpha / 255));
     }
+}
+
+static void anvil_triangle_textured(AnvilProjected p[3], double uv[3][2],
+                                    double brightness, int alpha) {
+  AnvilImage *texture = anvil_texture_image;
+  if (!texture || !texture->pixels)
+    return;
+  const double tint[3] = {255.0, 255.0, 255.0};
+  anvil_triangle_textured_pixels(p, uv, brightness, alpha, texture->pixels,
+                                 texture->width, texture->height, tint);
 }
 
 void anvil_set_scene3d(int enabled) { anvil_scene_is_3d = enabled != 0; }
@@ -937,6 +947,140 @@ double anvil_mesh_draw(const double *data, int triangle_count, double cx,
     uint32_t base =
         anvil_color((int)p[9], (int)p[10], (int)p[11]);
     anvil_world_triangle(v, base, brightness, 255);
+  }
+  return 1.0;
+}
+
+typedef struct {
+  AnvilCameraVertex camera;
+  double u, v;
+} AnvilTexturedVertex;
+
+static int anvil_clip_textured_triangle(const AnvilTexturedVertex input[3],
+                                       AnvilTexturedVertex output[4]) {
+  int count = 0;
+  AnvilTexturedVertex previous = input[2];
+  int previous_inside = previous.camera.depth >= ANVIL_NEAR_DEPTH;
+  for (int i = 0; i < 3; ++i) {
+    AnvilTexturedVertex current = input[i];
+    int current_inside = current.camera.depth >= ANVIL_NEAR_DEPTH;
+    if (current_inside != previous_inside) {
+      double t;
+      if (!anvil_interpolation_parameter(previous.camera.depth,
+                                         current.camera.depth,
+                                         ANVIL_NEAR_DEPTH, &t))
+        return 0;
+      output[count++] = (AnvilTexturedVertex){
+          {anvil_lerp_stable(previous.camera.x, current.camera.x, t),
+           anvil_lerp_stable(previous.camera.y, current.camera.y, t),
+           ANVIL_NEAR_DEPTH},
+          anvil_lerp_stable(previous.u, current.u, t),
+          anvil_lerp_stable(previous.v, current.v, t)};
+    }
+    if (current_inside)
+      output[count++] = current;
+    previous = current;
+    previous_inside = current_inside;
+  }
+  return count;
+}
+
+double anvil_mesh_draw_textured(
+    const double *data, int triangle_count, const uint32_t *const *textures,
+    const int *texture_dimensions, int texture_count, double cx, double cy,
+    double cz, double radius, double x, double y, double z, double scale,
+    double rx, double ry, double rz) {
+  if (!data || triangle_count <= 0 || !textures || !texture_dimensions ||
+      texture_count <= 0 || !isfinite(x) || !isfinite(y) || !isfinite(z) ||
+      !isfinite(scale) || !isfinite(rx) || !isfinite(ry) || !isfinite(rz) ||
+      scale == 0.0)
+    return 0.0;
+  if (anvil_mesh_culling_enabled &&
+      !anvil_mesh_visible(cx, cy, cz, radius, x, y, z, scale, rx, ry, rz)) {
+    anvil_mesh_culled_frame++;
+    return 0.0;
+  }
+  anvil_mesh_drawn_frame++;
+  for (int triangle = 0; triangle < triangle_count; ++triangle) {
+    const double *p = data + (size_t)triangle * 20;
+    AnvilVec3 world[3];
+    double uv[3][2];
+    for (int vertex = 0; vertex < 3; ++vertex) {
+      AnvilVec3 local = {p[vertex * 5] * scale, p[vertex * 5 + 1] * scale,
+                         p[vertex * 5 + 2] * scale};
+      local = anvil_rotate(local, rx, ry, rz);
+      world[vertex] = (AnvilVec3){x + local.x, y + local.y, z + local.z};
+      uv[vertex][0] = p[vertex * 5 + 3];
+      uv[vertex][1] = p[vertex * 5 + 4];
+    }
+    if (anvil_shadows_enabled) {
+      AnvilVec3 shadow[3];
+      for (int vertex = 0; vertex < 3; ++vertex)
+        shadow[vertex] = (AnvilVec3){world[vertex].x,
+                                     anvil_shadow_ground_y + 0.002,
+                                     world[vertex].z};
+      anvil_world_triangle(shadow, 0, 1.0, anvil_shadow_alpha_value);
+    }
+  int texture_index = (int)p[19];
+    if (texture_index < 0 || texture_index >= texture_count ||
+        !textures[texture_index]) {
+      uint32_t colour = anvil_color((int)p[15], (int)p[16], (int)p[17]);
+      AnvilVec3 normal = anvil_normalize(
+          anvil_cross(anvil_sub(world[1], world[0]),
+                      anvil_sub(world[2], world[0])));
+      anvil_world_triangle(world, colour,
+                           anvil_light_level(normal, 1), 255);
+      continue;
+    }
+    int width = texture_dimensions[texture_index * 2];
+    int height = texture_dimensions[texture_index * 2 + 1];
+    if (width <= 0 || height <= 0)
+      continue;
+    double tint[3] = {p[15], p[16], p[17]};
+    int alpha = (int)p[18];
+    AnvilVec3 normal = anvil_normalize(
+        anvil_cross(anvil_sub(world[1], world[0]),
+                    anvil_sub(world[2], world[0])));
+    double brightness = anvil_light_level(normal, 1);
+    if (!anvil_scene_is_3d) {
+      AnvilProjected projected[3];
+      int valid = 1;
+      for (int vertex = 0; vertex < 3; ++vertex)
+        valid &= anvil_project(world[vertex], &projected[vertex]);
+      if (valid)
+        anvil_triangle_textured_pixels(projected, uv, brightness, alpha,
+                                       textures[texture_index], width, height,
+                                       tint);
+      continue;
+    }
+    AnvilTexturedVertex camera[3];
+    for (int vertex = 0; vertex < 3; ++vertex) {
+      camera[vertex].camera = anvil_to_camera(world[vertex]);
+      camera[vertex].u = uv[vertex][0];
+      camera[vertex].v = uv[vertex][1];
+    }
+    AnvilTexturedVertex clipped[4];
+    int clipped_count = anvil_clip_textured_triangle(camera, clipped);
+    AnvilProjected projected[4];
+    double clipped_uv[4][2];
+    int valid = clipped_count >= 3;
+    for (int vertex = 0; vertex < clipped_count && valid; ++vertex) {
+      valid = anvil_project_camera(clipped[vertex].camera,
+                                   &projected[vertex]);
+      clipped_uv[vertex][0] = clipped[vertex].u;
+      clipped_uv[vertex][1] = clipped[vertex].v;
+    }
+    for (int vertex = 1; vertex + 1 < clipped_count && valid; ++vertex) {
+      AnvilProjected fan[3] = {projected[0], projected[vertex],
+                               projected[vertex + 1]};
+      double fan_uv[3][2] = {{clipped_uv[0][0], clipped_uv[0][1]},
+                             {clipped_uv[vertex][0], clipped_uv[vertex][1]},
+                             {clipped_uv[vertex + 1][0],
+                              clipped_uv[vertex + 1][1]}};
+      anvil_triangle_textured_pixels(fan, fan_uv, brightness, alpha,
+                                     textures[texture_index], width, height,
+                                     tint);
+    }
   }
   return 1.0;
 }
