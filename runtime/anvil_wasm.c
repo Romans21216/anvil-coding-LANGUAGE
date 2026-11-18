@@ -4,6 +4,7 @@
    the host through the imported `env.write` function. No OS, no libc: strings,
    memory and number formatting are implemented here. */
 #include "anvil_wasm.h"
+#include "anvil_projection.h"
 
 __attribute__((import_module("env"), import_name("write")))
 extern void anvil_host_write(int fd, const void *bytes, int length);
@@ -917,6 +918,66 @@ static int anvil_wasm_project(AnvilWasmVec3 p, double *sx, double *sy,
   *sy = 324.0 - camera.y * anvil_camera_focal / camera.z;
   *depth = camera.z;
   return 1;
+}
+
+#define ANVIL_WASM_MODEL_NEAR_DEPTH 0.08
+
+static int anvil_wasm_project_model_camera(AnvilWasmVec3 camera, double *sx,
+                                           double *sy, double *depth) {
+  if (!isfinite(camera.x) || !isfinite(camera.y) ||
+      !isfinite(camera.z) || camera.z < ANVIL_WASM_MODEL_NEAR_DEPTH)
+    return 0;
+  *sx = 480.0 + camera.x * anvil_camera_focal / camera.z;
+  *sy = 324.0 - camera.y * anvil_camera_focal / camera.z;
+  *depth = camera.z;
+  return isfinite(*sx) && isfinite(*sy);
+}
+
+typedef struct {
+  AnvilWasmVec3 camera;
+  double u;
+  double v;
+} AnvilWasmTexturedVertex;
+
+static int anvil_wasm_clip_textured_triangle(
+    const AnvilWasmTexturedVertex input[3],
+    AnvilWasmTexturedVertex output[4]) {
+  int count = 0;
+  AnvilWasmTexturedVertex previous = input[2];
+  if (!isfinite(previous.camera.x) || !isfinite(previous.camera.y) ||
+      !isfinite(previous.camera.z) || !isfinite(previous.u) ||
+      !isfinite(previous.v))
+    return 0;
+  int previous_inside = previous.camera.z >= ANVIL_WASM_MODEL_NEAR_DEPTH;
+  for (int i = 0; i < 3; ++i) {
+    AnvilWasmTexturedVertex current = input[i];
+    if (!isfinite(current.camera.x) || !isfinite(current.camera.y) ||
+        !isfinite(current.camera.z) || !isfinite(current.u) ||
+        !isfinite(current.v))
+      return 0;
+    int current_inside = current.camera.z >= ANVIL_WASM_MODEL_NEAR_DEPTH;
+    if (current_inside != previous_inside) {
+      double t;
+      if (!anvil_interpolation_parameter(previous.camera.z, current.camera.z,
+                                         ANVIL_WASM_MODEL_NEAR_DEPTH, &t) ||
+          count >= 4)
+        return 0;
+      output[count++] = (AnvilWasmTexturedVertex){
+          {anvil_lerp_stable(previous.camera.x, current.camera.x, t),
+           anvil_lerp_stable(previous.camera.y, current.camera.y, t),
+           ANVIL_WASM_MODEL_NEAR_DEPTH},
+          anvil_lerp_stable(previous.u, current.u, t),
+          anvil_lerp_stable(previous.v, current.v, t)};
+    }
+    if (current_inside) {
+      if (count >= 4)
+        return 0;
+      output[count++] = current;
+    }
+    previous = current;
+    previous_inside = current_inside;
+  }
+  return count;
 }
 
 static void anvil_wasm_triangle(AnvilWasmVec3 a, AnvilWasmVec3 b,
@@ -1938,22 +1999,35 @@ double anvil_mesh_draw_textured(
   anvil_mesh_drawn_frame = 0;
   for (int triangle = 0; triangle < triangle_count; ++triangle) {
     const double *p = data + (size_t)triangle * 20;
-    double projected[3][3];
     AnvilWasmVec3 world[3];
-    int visible = 1;
+    AnvilWasmTexturedVertex camera[3];
     for (int vertex = 0; vertex < 3; ++vertex) {
       AnvilWasmVec3 local = {p[vertex * 5] * scale,
                              p[vertex * 5 + 1] * scale,
                              p[vertex * 5 + 2] * scale};
       local = anvil_wasm_rotate(local, rx, ry, rz);
       world[vertex] = (AnvilWasmVec3){local.x + x, local.y + y, local.z + z};
-      if (!anvil_wasm_project(world[vertex], &projected[vertex][0],
-                              &projected[vertex][1], &projected[vertex][2])) {
-        visible = 0;
+      camera[vertex] = (AnvilWasmTexturedVertex){
+          anvil_wasm_to_camera(world[vertex]), p[vertex * 5 + 3],
+          p[vertex * 5 + 4]};
+    }
+    AnvilWasmTexturedVertex clipped[4];
+    int clipped_count =
+        anvil_wasm_clip_textured_triangle(camera, clipped);
+    if (clipped_count < 3)
+      continue;
+    double projected[4][3];
+    int projectable = 1;
+    for (int vertex = 0; vertex < clipped_count; ++vertex) {
+      if (!anvil_wasm_project_model_camera(
+              clipped[vertex].camera, &projected[vertex][0],
+              &projected[vertex][1], &projected[vertex][2])) {
+        projectable = 0;
         break;
       }
     }
-    if (!visible) continue;
+    if (!projectable)
+      continue;
     AnvilWasmVec3 normal = anvil_wasm_normalize(
         anvil_wasm_cross(anvil_wasm_sub(world[1], world[0]),
                          anvil_wasm_sub(world[2], world[0])));
@@ -1970,14 +2044,21 @@ double anvil_mesh_draw_textured(
     double alpha = p[18];
     if (alpha < 0.0) alpha = 0.0;
     if (alpha > 255.0) alpha = 255.0;
-    anvil_host_textured_triangle(
-        projected[0][0], projected[0][1], projected[0][2], p[3], p[4],
-        projected[1][0], projected[1][1], projected[1][2], p[8], p[9],
-        projected[2][0], projected[2][1], projected[2][2], p[13], p[14],
-        (int)(p[15] * shade), (int)(p[16] * shade),
-        (int)(p[17] * shade), (int)alpha, 1, textures[texture],
-        texture_dimensions[texture * 2], texture_dimensions[texture * 2 + 1]);
-    anvil_mesh_drawn_frame += 1;
+    for (int vertex = 1; vertex + 1 < clipped_count; ++vertex) {
+      const int fan[3] = {0, vertex, vertex + 1};
+      anvil_host_textured_triangle(
+          projected[fan[0]][0], projected[fan[0]][1],
+          projected[fan[0]][2], clipped[fan[0]].u, clipped[fan[0]].v,
+          projected[fan[1]][0], projected[fan[1]][1],
+          projected[fan[1]][2], clipped[fan[1]].u, clipped[fan[1]].v,
+          projected[fan[2]][0], projected[fan[2]][1],
+          projected[fan[2]][2], clipped[fan[2]].u, clipped[fan[2]].v,
+          (int)(p[15] * shade), (int)(p[16] * shade),
+          (int)(p[17] * shade), (int)alpha, 1, textures[texture],
+          texture_dimensions[texture * 2],
+          texture_dimensions[texture * 2 + 1]);
+      anvil_mesh_drawn_frame += 1;
+    }
   }
   anvil_wasm_ray_mesh_triangles_frame += triangle_count;
   return 1.0;
